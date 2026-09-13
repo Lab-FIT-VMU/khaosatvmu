@@ -336,6 +336,62 @@ export interface SemesterSurveyDashboard {
   responseRate: number;
 }
 
+/** Một cột điểm của trang Thống kê theo mục. */
+export interface QuestionSectionColumn {
+  /** Khoá trong `surveySectionCatalog`, hoặc 'OTHER' cho mục ngoài danh mục. */
+  sectionKey: string;
+  sectionName: string;
+  /** Số câu được chấm điểm của mục, không tính câu bẫy và câu tự nhập. */
+  questionCount: number;
+}
+
+export interface QuestionSectionScore {
+  sectionKey: string;
+  /** Null khi nhóm lớp chưa có lượt trả lời nào cho mục này. */
+  averageScore: number | null;
+  answerCount: number;
+}
+
+/**
+ * Một dòng ở một cấp: toàn trường, khoa/viện, bộ môn, học phần hoặc lớp học phần.
+ * Các trường của cấp dưới để trống, nên con của một dòng lọc ra bằng cách so các
+ * trường của cấp trên.
+ */
+export interface QuestionSectionScoreRow {
+  facultyId: number | null;
+  facultyName: string;
+  departmentId: number | null;
+  departmentName: string;
+  courseId: number | null;
+  courseCode: string;
+  courseName: string;
+  /** Chỉ có ở dòng lớp học phần. */
+  courseSectionSurveyId: number | null;
+  sectionName: string;
+  lecturerName: string;
+  /** Số lớp đã chốt điểm của nhóm; chỉ những lớp này góp vào các con số của dòng. */
+  sectionCount: number;
+  validResponseCount: number;
+  /** Điểm tổng hợp cả bộ câu hỏi. KHÔNG bằng trung bình cộng các mục. */
+  overallAverageScore: number | null;
+  scores: QuestionSectionScore[];
+}
+
+export interface SemesterSurveyQuestionSectionScores {
+  semesterSurveyId: number;
+  templateName: string;
+  semesterName: string;
+  academicYearName: string;
+  columns: QuestionSectionColumn[];
+  school: QuestionSectionScoreRow;
+  faculties: QuestionSectionScoreRow[];
+  departments: QuestionSectionScoreRow[];
+  /** Học phần gom trong từng bộ môn: học phần có lớp ở hai bộ môn thì thành hai dòng. */
+  courses: QuestionSectionScoreRow[];
+  /** Từng lớp học phần đã chốt điểm. */
+  courseSections: QuestionSectionScoreRow[];
+}
+
 export interface RecalculateScoresResult {
   semesterSurveyId: number;
   updatedSectionCount: number;
@@ -480,6 +536,11 @@ export const surveyApi = {
   semesterSurveyDashboard: (semesterSurveyId: number) =>
     apiRequest<SemesterSurveyDashboard>(
       `/api/surveys/semester-surveys/${semesterSurveyId}/dashboard`,
+    ),
+  /** Điểm tách theo mục câu hỏi ở cấp toàn trường, khoa và bộ môn. Chỉ quản trị. */
+  semesterSurveyQuestionSectionScores: (semesterSurveyId: number) =>
+    apiRequest<SemesterSurveyQuestionSectionScores>(
+      `/api/surveys/semester-surveys/${semesterSurveyId}/question-section-scores`,
     ),
   /** So các lớp trong cùng một học phần để tách lỗi học phần khỏi lỗi giảng viên. */
   semesterSurveyCourseDiagnosis: (semesterSurveyId: number) =>
@@ -770,6 +831,8 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_TEMPLATE_TOO_MANY_SECTIONS: `Mỗi bộ câu hỏi chỉ được tối đa ${maximumSectionsPerTemplate} mục.`,
   SURVEY_SECTION_NAME_REQUIRED: 'Thiếu tên mục.',
   SURVEY_SECTION_NAME_EXISTS: 'Hai mục trong cùng một bộ không được trùng tên.',
+  SURVEY_SECTION_NAME_NOT_ALLOWED:
+    'Mục chỉ được chọn trong danh mục cố định: đánh giá học phần, đánh giá giảng viên, đánh giá cơ sở vật chất.',
   SURVEY_SECTION_NOT_FOUND: 'Một mục gửi lên không thuộc bộ câu hỏi này.',
   SURVEY_SECTION_EMPTY: 'Mỗi mục phải có ít nhất một câu hỏi.',
   SURVEY_QUESTION_SECTION_INVALID: 'Một câu hỏi đang trỏ tới mục không tồn tại.',

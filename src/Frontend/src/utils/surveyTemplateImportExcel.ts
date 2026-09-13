@@ -2,6 +2,7 @@ import type { CellValue } from 'read-excel-file/browser';
 import type { SheetData } from 'write-excel-file/browser';
 import { maximumSectionsPerTemplate } from '../types';
 import type { AnswerScale } from '../types';
+import { resolveSurveySectionKey, surveySectionName } from './surveySectionCatalog';
 import {
   buildLookupSheet,
   downloadFailedRows,
@@ -58,7 +59,7 @@ const attentionCheckHeaders = new Set([
 
 export interface ImportSurveyQuestionRow {
   rowNumber: number;
-  /** Tên mục như người dùng gõ, giữ nguyên chữ hoa chữ thường của lần đầu xuất hiện. */
+  /** Tên chuẩn của mục trong danh mục mục cố định, không phải chữ người dùng gõ. */
   sectionName: string;
   /** Vị trí mục trong danh sách mục đọc được, dùng làm `sectionIndex` khi lưu. */
   sectionIndex: number;
@@ -111,12 +112,13 @@ export interface InvalidAttentionCheckRow {
  *   viện đọc chỉ trả giá trị cho ô trên cùng, các dòng sau ra rỗng.
  * - `NOT_CONTIGUOUS`: mục quay lại sau khi đã sang mục khác, tức bị cắt làm hai
  *   khúc. Tiêu đề mục hiện trước câu đầu tiên của mục nên không đặt vào đâu được.
+ * - `NOT_IN_CATALOG`: tên mục không thuộc danh mục mục cố định.
  */
 export interface InvalidSectionRow {
   rowNumber: number;
   questionText: string;
   sectionName: string;
-  reason: 'MISSING' | 'NOT_CONTIGUOUS';
+  reason: 'MISSING' | 'NOT_CONTIGUOUS' | 'NOT_IN_CATALOG';
 }
 
 export interface SurveyTemplateImportResult {
@@ -147,17 +149,6 @@ function normalizeHeader(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
-/** Khoá so tên mục: bỏ dấu, gộp khoảng trắng, không phân biệt hoa thường. */
-function sectionKey(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(combiningMarks, '')
-    .replace(/đ/gi, 'd')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, ' ');
-}
-
 function cellText(value: CellValue | null | undefined): string {
   if (value === null || value === undefined) return '';
   if (value instanceof Date) return value.toISOString();
@@ -181,9 +172,9 @@ const surveyTemplateColumnWidths = [32, 70, 18, 30];
  * không kẹp bên phải sheet 1 nữa: để chung một sheet thì người soạn hay chèn hay
  * xoá dòng ở phần câu hỏi và làm xô lệch luôn bảng tra bên cạnh.
  *
- * Câu mẫu cố ý trải trên hai mục và có một câu bẫy nằm giữa mục, để người soạn
- * thấy ngay ba điều: tên mục phải LẶP LẠI ở mọi dòng (không gộp ô), câu bẫy cũng
- * phải có mục, và các câu cùng mục phải nằm liền nhau.
+ * Câu mẫu cố ý trải trên cả ba mục cố định và có một câu bẫy nằm giữa mục, để người
+ * soạn thấy ngay ba điều: tên mục phải LẶP LẠI ở mọi dòng (không gộp ô), câu bẫy
+ * cũng phải có mục, và các câu cùng mục phải nằm liền nhau.
  */
 export async function downloadSurveyTemplateImportTemplate(
   answerScales: AnswerScale[]
@@ -194,8 +185,10 @@ export async function downloadSurveyTemplateImportTemplate(
   // Mức mẫu cho câu bẫy phải là một mức có thật của chính thang đó.
   const trapValue = defaultScale?.options?.[Math.floor((defaultScale.options.length - 1) / 2)]?.value;
 
-  const courseSection = 'Nội dung đánh giá học phần';
-  const lecturerSection = 'Nội dung đánh giá về giảng viên';
+  // Tên mục lấy thẳng từ danh mục cố định để tệp mẫu luôn qua được luật khi nhập lại.
+  const courseSection = surveySectionName('COURSE_CONTENT');
+  const lecturerSection = surveySectionName('LECTURER');
+  const facilitiesSection = surveySectionName('FACILITIES');
 
   const sampleRows: {
     sectionName: string;
@@ -232,6 +225,12 @@ export async function downloadSurveyTemplateImportTemplate(
     {
       sectionName: lecturerSection,
       questionText: 'Giảng viên thực hiện nghiêm túc giờ giảng, sử dụng hiệu quả thời gian lên lớp.',
+      answerScaleId: defaultScaleId,
+      trap: null,
+    },
+    {
+      sectionName: facilitiesSection,
+      questionText: 'Phòng học, trang thiết bị đáp ứng yêu cầu học tập của học phần.',
       answerScaleId: defaultScaleId,
       trap: null,
     },
@@ -382,10 +381,10 @@ export async function parseSurveyTemplateImportFile(
     throw new SurveyTemplateImportFileError('NO_DATA_ROWS');
   }
 
-  // Đọc tuần tự từ trên xuống: gặp tên mục mới thì mở mục mới, tên đã gặp thì
-  // dùng lại đúng mục đó. Mục quay lại sau khi đã sang mục khác là bị cắt khúc,
-  // ghi vào danh sách lỗi chứ không tự gộp — tự gộp thì thứ tự câu khi lưu khác
-  // thứ tự trong tệp, người dùng không hiểu vì sao.
+  // Đọc tuần tự từ trên xuống: gặp mục mới thì mở mục mới, mục đã gặp thì dùng lại
+  // đúng mục đó. Mục quay lại sau khi đã sang mục khác là bị cắt khúc, ghi vào danh
+  // sách lỗi chứ không tự gộp — tự gộp thì thứ tự câu khi lưu khác thứ tự trong
+  // tệp, người dùng không hiểu vì sao.
   const invalidSectionRows: InvalidSectionRow[] = [];
   const sections: string[] = [];
   const sectionIndexByKey = new Map<string, number>();
@@ -403,12 +402,24 @@ export async function parseSurveyTemplateImportFile(
       continue;
     }
 
-    const key = sectionKey(row.sectionName);
+    // Mục phải thuộc danh mục cố định, và nhận theo KHOÁ danh mục chứ không theo
+    // chữ gõ: "cơ sơ vật chất" với "cơ sở vật chất" là cùng một mục.
+    const key = resolveSurveySectionKey(row.sectionName);
+    if (key === null) {
+      invalidSectionRows.push({
+        rowNumber: row.rowNumber,
+        questionText: row.questionText,
+        sectionName: row.sectionName,
+        reason: 'NOT_IN_CATALOG',
+      });
+      continue;
+    }
+
     const known = sectionIndexByKey.get(key);
 
     if (known === undefined) {
       sectionIndexByKey.set(key, sections.length);
-      sections.push(row.sectionName);
+      sections.push(surveySectionName(key));
       previousSectionIndex = sections.length - 1;
       sectionOfRow.set(row.rowNumber, previousSectionIndex);
       continue;

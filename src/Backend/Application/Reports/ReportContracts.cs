@@ -1,3 +1,5 @@
+using Application.Surveys;
+
 namespace Application.Reports;
 
 /// <summary>Chi tiết tiến độ thu phiếu của một lớp học phần.</summary>
@@ -55,7 +57,12 @@ public sealed record QuestionRatingDto(
     IReadOnlyList<OptionCountDto> OptionDistribution,
     string ScaleKind = "Options",
     string AnswerScaleName = "",
-    IReadOnlyList<string>? TextAnswers = null);
+    IReadOnlyList<string>? TextAnswers = null,
+    /// <summary>
+    /// Khoá mục của câu trong <see cref="SurveySectionCatalog"/>, để giao diện tách phần
+    /// phân tích theo mục. Chỉ gắn ở trang giảng viên và trang kết quả một lớp.
+    /// </summary>
+    string? SectionKey = null);
 
 /// <summary>Tóm tắt kết quả của một lớp học phần mà giảng viên đảm nhận.</summary>
 public sealed record LecturerSectionSummaryDto(
@@ -91,7 +98,12 @@ public sealed record LecturerPerformanceReportDto(
     /// những lớp đã chốt điểm. <paramref name="TotalResponses"/> đếm cả lớp chưa đủ
     /// điều kiện vì đó là tiến độ, không phải mẫu số của điểm.
     /// </summary>
-    int ScoredValidResponseCount = 0);
+    int ScoredValidResponseCount = 0,
+    /// <summary>
+    /// Điểm từng mục câu hỏi của các lớp đã chốt điểm, cùng công thức với trang Thống kê
+    /// theo mục — cho tab Học phần / Giảng viên của phần phân tích theo câu hỏi.
+    /// </summary>
+    IReadOnlyList<QuestionSectionScoreDto>? SectionScores = null);
 
 /// <summary>Báo cáo thống kê cấp Bộ môn.</summary>
 public sealed record DepartmentSummaryDto(
@@ -139,7 +151,12 @@ public sealed record SectionSurveyAnalysisDto(
     /// mọi con số phân tích đều rỗng — giống hệt ô điểm bỏ trống ở trang Bảng dữ
     /// liệu khảo sát, chứ không tự tính lấy một con số riêng.
     /// </summary>
-    bool IsScored = true);
+    bool IsScored = true,
+    /// <summary>
+    /// Điểm từng mục câu hỏi của lớp, cùng công thức với trang Thống kê theo mục — cho tab
+    /// Học phần / Giảng viên của phần phân tích theo câu hỏi. Null khi lớp chưa chốt điểm.
+    /// </summary>
+    IReadOnlyList<QuestionSectionScoreDto>? SectionScores = null);
 
 /// <summary>Một dòng kết quả chi tiết của một bài khảo sát lớp học phần.</summary>
 public sealed record SurveyResultDetailDto(
@@ -163,7 +180,13 @@ public sealed record SurveyResultDetailDto(
     int InvalidResponseCount,
     /// <summary>Tính trên phiếu hợp lệ so với sĩ số.</summary>
     decimal CompletionRate,
-    decimal AverageScore);
+    decimal AverageScore,
+    /// <summary>
+    /// Tên đọc từ tệp import khi lớp chưa gắn được mã giảng viên (<paramref name="LecturerId"/>
+    /// bằng 0). Có tên thì giao diện mở được trang giảng viên theo tên; null là lớp chưa
+    /// có người dạy hoặc đã gắn mã.
+    /// </summary>
+    string? UnidentifiedLecturerName = null);
 
 /// <summary>Một nhóm điểm trong phân bố điểm toàn trường (theo điểm TB từng phiếu).</summary>
 public sealed record ScoreBandDto(
@@ -285,6 +308,17 @@ public interface IReportService
     /// <summary>Lấy báo cáo đánh giá chi tiết cho 1 giảng viên.</summary>
     Task<LecturerPerformanceReportDto?> GetLecturerPerformanceReportAsync(
         int lecturerId,
+        int? semesterId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Trang giảng viên của người chưa gắn được mã: tra theo tên đọc từ tệp import, chỉ
+    /// lấy lớp thuộc khoa/viện <paramref name="facultyId"/> (null hoặc 0 là lớp chưa thuộc
+    /// khoa nào). Null khi không có lớp nào khớp.
+    /// </summary>
+    Task<LecturerPerformanceReportDto?> GetUnidentifiedLecturerReportAsync(
+        string lecturerName,
+        int? facultyId,
         int? semesterId,
         CancellationToken cancellationToken = default);
 

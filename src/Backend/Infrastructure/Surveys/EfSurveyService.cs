@@ -2977,6 +2977,236 @@ public sealed class EfSurveyService(
                 : Math.Round((decimal)totalResponseCount / totalClassSize * 100, 1)));
     }
 
+    public async Task<SurveyOperationResult<SemesterSurveyQuestionSectionScoresDto>> GetSemesterSurveyQuestionSectionScoresAsync(
+        int semesterSurveyId,
+        CancellationToken cancellationToken = default)
+    {
+        // Trang Thống kê theo mục tạm thời chỉ mở cho quản trị. Chặn ở đây, ẩn menu
+        // không phải là khoá.
+        var scope = await userScope.ResolveAsync(cancellationToken);
+        if (!scope.SeesEverything)
+        {
+            return Failed<SemesterSurveyQuestionSectionScoresDto>(SurveyErrorCodes.OutOfScope);
+        }
+
+        var header = await LoadSurveyHeaderAsync(semesterSurveyId, cancellationToken);
+        if (header is null)
+        {
+            return Failed<SemesterSurveyQuestionSectionScoresDto>(SurveyErrorCodes.SemesterSurveyNotFound);
+        }
+
+        // Cùng tập lớp và cùng cách quy lớp về khoa/bộ môn với mọi sheet phân tích: chỉ
+        // lớp đã chốt điểm, đơn vị theo học phần trước rồi mới tới giảng viên. Nhờ vậy
+        // số lớp và điểm tổng của từng dòng khớp đúng bảng Tổng hợp theo bộ môn.
+        var sections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
+
+        // Điểm từng câu của từng lớp ĐÃ CHỐT ở lần bấm "Tính lại điểm" gần nhất — cùng
+        // ảnh chụp với điểm tổng nên hai con số không lệch nhau về thời điểm. Bảng này
+        // đã loại sẵn phiếu không hợp lệ, câu bẫy và câu tự nhập chữ.
+        //
+        // Bỏ bộ lọc xoá mềm của câu: ảnh chụp ghi câu nào thì tính câu đó, một thao tác
+        // xoá về sau không được làm điểm mục lệch khỏi điểm tổng đã chốt.
+        var scoreRows = await (
+            from score in db.CourseSectionSurveyQuestionScores.AsNoTracking()
+            join sectionSurvey in db.CourseSectionSurveys.AsNoTracking()
+                on score.CourseSectionSurveyId equals sectionSurvey.CourseSectionSurveyId
+            join question in db.SurveyQuestions.IgnoreQueryFilters().AsNoTracking()
+                on score.QuestionId equals question.QuestionId
+            where sectionSurvey.SemesterSurveyId == semesterSurveyId
+            group score by new { score.CourseSectionSurveyId, question.SectionId } into g
+            select new
+            {
+                g.Key.CourseSectionSurveyId,
+                g.Key.SectionId,
+                WeightedScore = g.Sum(x => x.AverageScore * x.AnswerCount),
+                AnswerCount = g.Sum(x => x.AnswerCount),
+            })
+            .ToListAsync(cancellationToken);
+
+        var scoredSectionIds = scoreRows.Select(x => x.SectionId).Distinct().ToList();
+        var catalogKeyOfSection = (await db.SurveyQuestionSections.IgnoreQueryFilters().AsNoTracking()
+                .Where(x => scoredSectionIds.Contains(x.SectionId))
+                .Select(x => new { x.SectionId, x.SectionName })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(
+                x => x.SectionId,
+                x => SurveySectionCatalog.Resolve(x.SectionName) ?? SurveySectionCatalog.Other);
+
+        // Tử số và mẫu số theo (lớp, mục). Cộng dồn qua mọi lớp của một nhóm rồi mới
+        // chia ở bước cuối — lớp 50 lượt trả lời phải nặng hơn lớp 5 lượt.
+        var totalsBySectionSurvey = scoreRows
+            .GroupBy(x => x.CourseSectionSurveyId)
+            .ToDictionary(
+                g => g.Key,
+                g => g
+                    .GroupBy(x => catalogKeyOfSection.GetValueOrDefault(x.SectionId, SurveySectionCatalog.Other))
+                    .ToDictionary(
+                        k => k.Key,
+                        k => (WeightedScore: k.Sum(x => x.WeightedScore), AnswerCount: k.Sum(x => x.AnswerCount))));
+
+        // Số câu được chấm điểm của từng mục trong bộ đề, để người xem biết mỗi cột gộp
+        // bao nhiêu câu. Không đếm câu bẫy và câu tự nhập, đúng như phần điểm.
+        var scoredQuestionSectionNames = await (
+            from question in db.SurveyQuestions.AsNoTracking()
+            join questionSection in db.SurveyQuestionSections.AsNoTracking()
+                on question.SectionId equals questionSection.SectionId
+            join scale in db.AnswerScales.IgnoreQueryFilters().AsNoTracking()
+                on question.AnswerScaleId equals scale.AnswerScaleId
+            where questionSection.SurveyTemplateId == header.SurveyTemplateId
+                && question.AttentionCheckValue == null
+                && scale.ScaleKind == AnswerScaleKinds.Options
+            select questionSection.SectionName)
+            .ToListAsync(cancellationToken);
+        var questionCountByKey = scoredQuestionSectionNames
+            .GroupBy(x => SurveySectionCatalog.Resolve(x) ?? SurveySectionCatalog.Other)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        var columns = SurveySectionCatalog.Entries
+            .Select(entry => new QuestionSectionColumnDto(
+                entry.Key,
+                entry.Name,
+                questionCountByKey.GetValueOrDefault(entry.Key)))
+            .ToList();
+        // Mục ngoài danh mục chỉ có ở bộ đề soạn trước khi khoá danh mục. Có thật mới
+        // thêm cột, để đợt bình thường không mọc ra một cột trống.
+        if (questionCountByKey.ContainsKey(SurveySectionCatalog.Other)
+            || totalsBySectionSurvey.Values.Any(x => x.ContainsKey(SurveySectionCatalog.Other)))
+        {
+            columns.Add(new QuestionSectionColumnDto(
+                SurveySectionCatalog.Other,
+                SurveySectionCatalog.OtherName,
+                questionCountByKey.GetValueOrDefault(SurveySectionCatalog.Other)));
+        }
+
+        // Số liệu của một nhóm lớp. Các trường định danh để trống, bên gọi điền theo
+        // đúng cấp của dòng bằng `with`.
+        QuestionSectionScoreRowDto RowOf(IReadOnlyCollection<AnalysedSection> group)
+        {
+            var scores = columns
+                .Select(column =>
+                {
+                    decimal weightedScore = 0;
+                    var answerCount = 0;
+                    foreach (var section in group)
+                    {
+                        if (totalsBySectionSurvey.TryGetValue(section.CourseSectionSurveyId, out var byKey)
+                            && byKey.TryGetValue(column.SectionKey, out var total))
+                        {
+                            weightedScore += total.WeightedScore;
+                            answerCount += total.AnswerCount;
+                        }
+                    }
+
+                    return new QuestionSectionScoreDto(
+                        column.SectionKey,
+                        answerCount > 0 ? (decimal?)Math.Round(weightedScore / answerCount, 2) : null,
+                        answerCount);
+                })
+                .ToList();
+
+            return new QuestionSectionScoreRowDto(
+                FacultyId: null,
+                FacultyName: string.Empty,
+                DepartmentId: null,
+                DepartmentName: string.Empty,
+                CourseId: null,
+                CourseCode: string.Empty,
+                CourseName: string.Empty,
+                CourseSectionSurveyId: null,
+                SectionName: string.Empty,
+                LecturerName: string.Empty,
+                SectionCount: group.Count,
+                ValidResponseCount: group.Sum(x => x.ValidResponseCount),
+                // Đúng công thức điểm tổng hợp của trang Tổng quan và bảng bộ môn.
+                OverallAverageScore: WeightedAverageScore(group),
+                Scores: scores);
+        }
+
+        var faculties = sections
+            .GroupBy(x => new { x.FacultyId, x.FacultyName })
+            .Select(g => RowOf(g.ToList()) with
+            {
+                FacultyId = g.Key.FacultyId,
+                FacultyName = g.Key.FacultyName,
+            })
+            .OrderBy(x => x.FacultyName)
+            .ToList();
+
+        var departments = sections
+            .GroupBy(x => new { x.FacultyId, x.FacultyName, x.DepartmentId, x.DepartmentName })
+            .Select(g => RowOf(g.ToList()) with
+            {
+                FacultyId = g.Key.FacultyId,
+                FacultyName = g.Key.FacultyName,
+                DepartmentId = g.Key.DepartmentId,
+                DepartmentName = g.Key.DepartmentName,
+            })
+            .OrderBy(x => x.FacultyName)
+            .ThenBy(x => x.DepartmentName)
+            .ToList();
+
+        // Học phần gom TRONG từng bộ môn. Học phần không ghi bộ môn thì lớp đi theo bộ
+        // môn của giảng viên, nên cùng một học phần có thể rơi vào hai bộ môn — gom theo
+        // cả các cấp trên để mỗi dòng luôn có đúng một dòng cha.
+        var courses = sections
+            .GroupBy(x => new
+            {
+                x.FacultyId,
+                x.FacultyName,
+                x.DepartmentId,
+                x.DepartmentName,
+                x.CourseId,
+                x.CourseCode,
+                x.CourseName,
+            })
+            .Select(g => RowOf(g.ToList()) with
+            {
+                FacultyId = g.Key.FacultyId,
+                FacultyName = g.Key.FacultyName,
+                DepartmentId = g.Key.DepartmentId,
+                DepartmentName = g.Key.DepartmentName,
+                CourseId = g.Key.CourseId,
+                CourseCode = g.Key.CourseCode,
+                CourseName = g.Key.CourseName,
+            })
+            .OrderBy(x => x.FacultyName)
+            .ThenBy(x => x.DepartmentName)
+            .ThenBy(x => x.CourseCode)
+            .ToList();
+
+        var courseSections = sections
+            .Select(section => RowOf([section]) with
+            {
+                FacultyId = section.FacultyId,
+                FacultyName = section.FacultyName,
+                DepartmentId = section.DepartmentId,
+                DepartmentName = section.DepartmentName,
+                CourseId = section.CourseId,
+                CourseCode = section.CourseCode,
+                CourseName = section.CourseName,
+                CourseSectionSurveyId = section.CourseSectionSurveyId,
+                SectionName = section.SectionName,
+                LecturerName = section.LecturerName,
+            })
+            .OrderBy(x => x.FacultyName)
+            .ThenBy(x => x.DepartmentName)
+            .ThenBy(x => x.CourseCode)
+            .ThenBy(x => x.SectionName)
+            .ToList();
+
+        return Succeeded(new SemesterSurveyQuestionSectionScoresDto(
+            semesterSurveyId,
+            header.TemplateName,
+            header.SemesterName,
+            header.AcademicYearName,
+            columns,
+            RowOf(sections) with { FacultyName = "Toàn trường" },
+            faculties,
+            departments,
+            courses,
+            courseSections));
+    }
+
     public async Task<SurveyOperationResult<SurveyScopeAnalysisDto>> GetSurveyScopeAnalysisAsync(
         int semesterSurveyId,
         string scopeType,
@@ -3611,13 +3841,12 @@ public sealed class EfSurveyService(
         {
             return Invalid(SurveyErrorCodes.SectionNameRequired, name);
         }
-        // Chuẩn hoá rồi mới so: "Đánh giá học phần" và "Đánh giá  học phần" chỉ
-        // khác nhau một dấu cách, để lọt thành hai mục thì người dùng không hiểu
-        // vì sao mục bị tách đôi.
-        var sectionKeys = sections.Select(x => NormalizeKey(x.SectionName)).ToList();
-        if (sectionKeys.Distinct().Count() != sectionKeys.Count)
+        // Tên mục chỉ được chọn trong danh mục cố định, và hai mục không được quy về
+        // cùng một khoá — xem SurveySectionCatalog. So theo khoá đã chuẩn hoá nên hai
+        // tên chỉ lệch nhau dấu cách hay kiểu đặt dấu cũng bị bắt là trùng.
+        if (SurveySectionCatalog.Validate(sections.Select(x => x.SectionName).ToList()) is { } sectionError)
         {
-            return Invalid(SurveyErrorCodes.SectionNameExists, name);
+            return Invalid(sectionError, name);
         }
 
         // Mục gửi lên kèm Id phải là mục có thật của CHÍNH bộ này. Bộ tạo mới thì
@@ -3626,6 +3855,7 @@ public sealed class EfSurveyService(
             .Where(x => x.SectionId is not null)
             .Select(x => x.SectionId!.Value)
             .ToList();
+        Dictionary<int, string> ownSectionNames = [];
         if (sentSectionIds.Count > 0)
         {
             if (exceptTemplateId is not { } templateId)
@@ -3633,16 +3863,31 @@ public sealed class EfSurveyService(
                 return Invalid(SurveyErrorCodes.SectionNotFound, name);
             }
 
-            var ownSectionIds = await db.SurveyQuestionSections
+            ownSectionNames = await db.SurveyQuestionSections
                 .Where(x => x.SurveyTemplateId == templateId)
-                .Select(x => x.SectionId)
-                .ToListAsync(cancellationToken);
+                .Select(x => new { x.SectionId, x.SectionName })
+                .ToDictionaryAsync(x => x.SectionId, x => x.SectionName, cancellationToken);
             if (sentSectionIds.Distinct().Count() != sentSectionIds.Count
-                || sentSectionIds.Any(id => !ownSectionIds.Contains(id)))
+                || sentSectionIds.Any(id => !ownSectionNames.ContainsKey(id)))
             {
                 return Invalid(SurveyErrorCodes.SectionNotFound, name);
             }
         }
+
+        // Ghi xuống tên chuẩn của danh mục. Riêng mục đã có mà tên đang lưu vẫn quy về
+        // đúng khoá được chọn thì giữ nguyên tên cũ: lưu lại bộ đề không được lặng lẽ
+        // đổi chữ của mục mà các đợt đã chạy đang đọc ra, kể cả khi tên cũ gõ lệch dấu.
+        sections = sections
+            .Select(section =>
+            {
+                var key = SurveySectionCatalog.Resolve(section.SectionName)!;
+                return section.SectionId is { } sectionId
+                    && ownSectionNames.TryGetValue(sectionId, out var storedName)
+                    && SurveySectionCatalog.Resolve(storedName) == key
+                        ? section with { SectionName = storedName }
+                        : section with { SectionName = SurveySectionCatalog.NameOf(key) };
+            })
+            .ToList();
 
         var questions = (command.Questions ?? [])
             .Select(question => new SaveSurveyQuestionCommand(

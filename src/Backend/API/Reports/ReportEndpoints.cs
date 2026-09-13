@@ -30,6 +30,19 @@ public static class ReportEndpoints
             return Results.Ok(reports);
         });
 
+        // Giảng viên chưa gắn mã: tra theo tên đọc từ tệp import, khoanh trong một
+        // khoa/viện. Ràng buộc :int của route bên dưới không bắt nhầm chữ "unidentified".
+        group.MapGet("/lecturers/unidentified", async (
+            string name,
+            int? facultyId,
+            int? semesterId,
+            IReportService reportService,
+            CancellationToken cancellationToken) =>
+        {
+            var report = await reportService.GetUnidentifiedLecturerReportAsync(name, facultyId, semesterId, cancellationToken);
+            return report is null ? Results.NotFound() : Results.Ok(report);
+        });
+
         group.MapGet("/lecturers/{lecturerId:int}", async (
             int lecturerId,
             int? semesterId,

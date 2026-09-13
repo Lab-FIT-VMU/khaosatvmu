@@ -21,6 +21,8 @@ import '../styles/catalogs.css';
 export interface QuestionAnalysisChartProps {
   questions: QuestionRating[];
   overallAverageScore?: number;
+  /** Nhãn của điểm trung bình trên hàng tiêu đề; tab theo mục đổi thành điểm của mục. */
+  averageLabel?: string;
   responseCount?: number;
   title?: string;
   showDistributionTable?: boolean;
@@ -130,6 +132,7 @@ const CustomQuestionTooltip: React.FC<CustomTooltipProps> = ({ active, payload }
 export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
   questions,
   overallAverageScore,
+  averageLabel = 'ĐTB toàn bài',
   responseCount,
   title = 'Phân tích kết quả theo câu hỏi',
   showDistributionTable = true,
@@ -210,7 +213,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
           )}
           <span className="analysis-meta-avg">
             <span className="analysis-meta-dash" aria-hidden="true" />
-            ĐTB toàn bài:{' '}
+            {averageLabel}:{' '}
             <strong style={{ color: getScoreColor(computedAverage) }}>
               {computedAverage > 0 ? computedAverage.toFixed(2) : '—'} / 5.0
             </strong>

@@ -283,6 +283,14 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSemesterSurveyDashboardAsync(semesterSurveyId, cancellationToken)));
 
+        // Điểm tách theo mục câu hỏi. Tạm thời chỉ quản trị xem được: service tự chặn
+        // theo vai trò, nhóm quyền ở đây chỉ là lớp gác bên ngoài.
+        reportingReadGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/question-section-scores", async (
+            int semesterSurveyId,
+            ISurveyService service,
+            CancellationToken cancellationToken) =>
+            ToResult(await service.GetSemesterSurveyQuestionSectionScoresAsync(semesterSurveyId, cancellationToken)));
+
         surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/course-diagnosis", async (
             int semesterSurveyId,
             ISurveyService service,

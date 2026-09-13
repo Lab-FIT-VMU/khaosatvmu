@@ -12,11 +12,16 @@ import {
   type SurveyTemplateImportFileErrorCode,
 } from '../utils/surveyTemplateImportExcel';
 import type { SaveSurveyTemplatePayload } from '../services/surveyApi';
-import { maximumSectionsPerTemplate } from '../types';
+import { maximumSectionsPerTemplate, surveySectionCatalog } from '../types';
 import type { AnswerScale } from '../types';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
 import { Modal } from './Modal';
 import '../styles/auth-admin.css';
+
+/** Lý do cho dòng ghi tên mục ngoài danh mục mục cố định. */
+const notInCatalogReason = `Tên mục phải là một trong ba mục cố định: ${surveySectionCatalog
+  .map((entry) => `"${entry.name}"`)
+  .join(', ')}.`;
 
 interface SurveyTemplateImportDialogProps {
   isOpen: boolean;
@@ -115,7 +120,9 @@ export function SurveyTemplateImportDialog({
         reason:
           row.reason === 'MISSING'
             ? 'Chưa điền tên mục (nếu đang gộp ô cột Mục thì bỏ gộp và lặp lại tên mục ở từng dòng)'
-            : 'Mục này đã kết thúc ở phía trên; gom các câu cùng mục lại liền nhau',
+            : row.reason === 'NOT_IN_CATALOG'
+              ? notInCatalogReason
+              : 'Mục này đã kết thúc ở phía trên; gom các câu cùng mục lại liền nhau',
       })),
       ...invalidScaleRows.map((row) => ({
         rowNumber: row.rowNumber,
@@ -327,7 +334,9 @@ export function SurveyTemplateImportDialog({
                       <td>
                         {row.reason === 'MISSING'
                           ? 'Chưa điền tên mục. Nếu đang gộp ô ở cột Mục thì bỏ gộp và lặp lại tên mục ở từng dòng.'
-                          : 'Mục này đã kết thúc ở phía trên rồi. Gom các câu cùng mục lại liền nhau.'}
+                          : row.reason === 'NOT_IN_CATALOG'
+                            ? notInCatalogReason
+                            : 'Mục này đã kết thúc ở phía trên rồi. Gom các câu cùng mục lại liền nhau.'}
                       </td>
                     </tr>
                   ))}

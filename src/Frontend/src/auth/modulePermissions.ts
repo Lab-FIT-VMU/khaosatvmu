@@ -4,6 +4,9 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   reports: 'REPORTS_ACCESS',
   'survey-statistics': 'SURVEY_STATISTICS_ACCESS',
   'survey-analysis': 'SURVEY_ANALYSIS_ACCESS',
+  // Chỉ quản trị: vai trò lọc thêm ở Sidebar và App, backend chặn thật. Lấy quyền
+  // mà cả ADMIN lẫn SURVEY_ADMIN đang có sẵn để khỏi phải cấp thêm quyền mới.
+  'survey-section-scores': 'SURVEY_STATISTICS_ACCESS',
   'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
   'survey-dashboard': 'SURVEY_DASHBOARD_ACCESS',
   faculties: 'FACULTIES_ACCESS',

@@ -18,7 +18,7 @@ import {
 import { useAuth } from '../auth/authContext';
 import { useSemester } from '../context/semesterContext';
 import { DataTable, type Column, type DataTableSortDirection } from '../components/DataTable';
-import { QuestionAnalysisChart } from '../components/QuestionAnalysisChart';
+import { QuestionAnalysisTabs } from '../components/QuestionAnalysisTabs';
 import { SchoolSurveyOverview } from '../components/reports/SchoolSurveyOverview';
 import { SectionSurveyResponsesPage } from './SectionSurveyResponsesPage';
 import { catalogApi } from '../services/catalogApi';
@@ -31,6 +31,7 @@ import {
   type ReportRouteState,
   type ReportResultSortKey,
   type ReportWorkspace,
+  type UnidentifiedLecturerRef,
 } from './reportRoute';
 import type {
   Department,
@@ -500,10 +501,18 @@ export const ReportsOverviewPage: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Drill-down: giảng viên → bài khảo sát.
+  // Giảng viên chưa gắn mã (lecturerId 0) không có mã để tra, nên nhận diện bằng tên
+  // đọc từ tệp import kèm khoa/viện của lớp đã bấm.
+  const [unidentifiedLecturer, setUnidentifiedLecturer] = useState<UnidentifiedLecturerRef | null>(
+    initialRoute.unidentifiedLecturer ?? null,
+  );
   const [lecturer, setLecturer] = useState<LecturerPerformanceReport | null>(() => {
     const routeLecturerId = initialRoute.lecturerId ?? initialRoute.parentLecturerId;
-    return routeLecturerId
-      ? ({ lecturerId: routeLecturerId, fullName: 'Chi tiết giảng viên' } as LecturerPerformanceReport)
+    if (routeLecturerId) {
+      return { lecturerId: routeLecturerId, fullName: 'Chi tiết giảng viên' } as LecturerPerformanceReport;
+    }
+    return initialRoute.unidentifiedLecturer
+      ? ({ lecturerId: 0, fullName: initialRoute.unidentifiedLecturer.name } as LecturerPerformanceReport)
       : null;
   });
   const [lecturerDetail, setLecturerDetail] = useState<LecturerPerformanceReport | null>(null);
@@ -526,6 +535,8 @@ export const ReportsOverviewPage: React.FC = () => {
       comparisonSemesterId,
       resultSortKey,
       resultSortDirection,
+      // Chỉ được ghi lên đường dẫn ở trang giảng viên và bài khảo sát, xem buildReportHash.
+      unidentifiedLecturer: unidentifiedLecturer ?? undefined,
       ...overrides,
     }),
     [
@@ -539,6 +550,7 @@ export const ReportsOverviewPage: React.FC = () => {
       resultSortKey,
       selectedSemesterId,
       semesterSurveyId,
+      unidentifiedLecturer,
     ],
   );
 
@@ -573,11 +585,16 @@ export const ReportsOverviewPage: React.FC = () => {
 
   const backToLecturer = useCallback(() => {
     if (lecturer?.lecturerId) {
-      navigateToRoute(routeFromState('lecturer', { lecturerId: lecturer.lecturerId }));
+      navigateToRoute(routeFromState('lecturer', {
+        lecturerId: lecturer.lecturerId,
+        unidentifiedLecturer: undefined,
+      }));
+    } else if (unidentifiedLecturer) {
+      navigateToRoute(routeFromState('lecturer', { lecturerId: undefined }));
     } else {
       navigateToWorkspace('details');
     }
-  }, [lecturer?.lecturerId, navigateToRoute, navigateToWorkspace, routeFromState]);
+  }, [lecturer?.lecturerId, navigateToRoute, navigateToWorkspace, routeFromState, unidentifiedLecturer]);
 
   const changeSemester = useCallback(
     (nextSemesterId: number) => {
@@ -586,7 +603,8 @@ export const ReportsOverviewPage: React.FC = () => {
           screen: 'survey',
           semesterId: nextSemesterId,
           surveyId,
-          parentLecturerId: lecturer?.lecturerId,
+          parentLecturerId: lecturer?.lecturerId || undefined,
+          unidentifiedLecturer: unidentifiedLecturer ?? undefined,
         });
         return;
       }
@@ -598,13 +616,21 @@ export const ReportsOverviewPage: React.FC = () => {
         });
         return;
       }
+      if (unidentifiedLecturer) {
+        navigateToRoute({
+          screen: 'lecturer',
+          semesterId: nextSemesterId,
+          unidentifiedLecturer,
+        });
+        return;
+      }
       navigateToRoute({
         screen: workspace,
         semesterId: nextSemesterId,
         analysisView: workspace === 'overview' ? analysisView : undefined,
       });
     },
-    [analysisView, lecturer?.lecturerId, navigateToRoute, surveyId, workspace],
+    [analysisView, lecturer?.lecturerId, navigateToRoute, surveyId, unidentifiedLecturer, workspace],
   );
 
   const changeAnalysisView = useCallback(
@@ -652,21 +678,38 @@ export const ReportsOverviewPage: React.FC = () => {
         setSurveyId(route.surveyId);
         setSurveyTitle('Chi tiết bài khảo sát');
         const parentId = route.parentLecturerId;
+        const parentUnidentified = parentId ? null : route.unidentifiedLecturer ?? null;
+        setUnidentifiedLecturer(parentUnidentified);
         setLecturer(parentId
           ? ({ lecturerId: parentId, fullName: 'Chi tiết giảng viên' } as LecturerPerformanceReport)
-          : null);
+          : parentUnidentified
+            ? ({ lecturerId: 0, fullName: parentUnidentified.name } as LecturerPerformanceReport)
+            : null);
       } else if (route.screen === 'lecturer' && route.lecturerId) {
         setWorkspace('details');
         setSurveyId(null);
         setSurveyTitle(null);
+        setUnidentifiedLecturer(null);
         setLecturer({
           lecturerId: route.lecturerId,
           fullName: 'Chi tiết giảng viên',
         } as LecturerPerformanceReport);
+      } else if (route.screen === 'lecturer' && route.unidentifiedLecturer) {
+        const named = route.unidentifiedLecturer;
+        setWorkspace('details');
+        setSurveyId(null);
+        setSurveyTitle(null);
+        // Giữ nguyên object cũ nếu vẫn là người đó, để không nạp lại trang vô ích.
+        setUnidentifiedLecturer((current) =>
+          current && current.name === named.name && current.facultyId === named.facultyId
+            ? current
+            : named);
+        setLecturer({ lecturerId: 0, fullName: named.name } as LecturerPerformanceReport);
       } else if (route.screen === 'overview' || route.screen === 'details') {
         setWorkspace(route.screen);
         setSurveyId(null);
         setSurveyTitle(null);
+        setUnidentifiedLecturer(null);
         setLecturer(null);
         setLecturerDetail(null);
       } else {
@@ -815,10 +858,51 @@ export const ReportsOverviewPage: React.FC = () => {
     };
   }, [lecturer?.lecturerId, selectedSemesterId]);
 
+  // Giảng viên chưa gắn mã: tra theo tên, khoanh trong khoa/viện của lớp đã bấm.
+  const unidentifiedName = unidentifiedLecturer?.name;
+  const unidentifiedFacultyId = unidentifiedLecturer?.facultyId;
+  useEffect(() => {
+    if (unidentifiedName === undefined || unidentifiedFacultyId === undefined || !selectedSemesterId) return;
+    let cancelled = false;
+    setLecturerDetail(null);
+    setLecDetailLoading(true);
+    reportApi
+      .unidentifiedLecturerDetail(unidentifiedName, unidentifiedFacultyId, selectedSemesterId)
+      .then((detail) => {
+        if (cancelled) return;
+        setLecturerDetail(detail);
+        setLecturer(detail);
+        setLoadError(null);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError('Không thể tải chi tiết đánh giá giảng viên.');
+      })
+      .finally(() => {
+        if (!cancelled) setLecDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [unidentifiedName, unidentifiedFacultyId, selectedSemesterId]);
+
   const openLecturer = useCallback(
     (nextLecturerId: number, lecturerName: string) => {
+      setUnidentifiedLecturer(null);
       setLecturer({ lecturerId: nextLecturerId, fullName: lecturerName } as LecturerPerformanceReport);
-      navigateToRoute(routeFromState('lecturer', { lecturerId: nextLecturerId }));
+      navigateToRoute(routeFromState('lecturer', {
+        lecturerId: nextLecturerId,
+        unidentifiedLecturer: undefined,
+      }));
+    },
+    [navigateToRoute, routeFromState],
+  );
+
+  const openUnidentifiedLecturer = useCallback(
+    (lecturerName: string, lecturerFacultyId: number) => {
+      const next: UnidentifiedLecturerRef = { name: lecturerName, facultyId: lecturerFacultyId };
+      setUnidentifiedLecturer(next);
+      setLecturer({ lecturerId: 0, fullName: lecturerName } as LecturerPerformanceReport);
+      navigateToRoute(routeFromState('lecturer', { lecturerId: undefined, unidentifiedLecturer: next }));
     },
     [navigateToRoute, routeFromState],
   );
@@ -1068,8 +1152,9 @@ export const ReportsOverviewPage: React.FC = () => {
 
   const renderQuestionAnalysis = (questions: LecturerPerformanceReport['questionRatings']) => {
     return (
-      <QuestionAnalysisChart
+      <QuestionAnalysisTabs
         questions={questions}
+        sectionScores={lecturerDetail?.sectionScores}
         overallAverageScore={lecturerDetail?.averageScore}
         // Mẫu số phải là phiếu của lớp đã chốt điểm, đúng bằng tập lớp dựng nên
         // averageScore ngay bên trên — chứ không phải mọi phiếu hợp lệ của giảng viên.
@@ -1130,16 +1215,31 @@ export const ReportsOverviewPage: React.FC = () => {
       width: '14%',
       sortValue: (item) => item.lecturerName,
       filterValue: (item) => item.lecturerName,
-      render: (item) => (
-        <button
-          type="button"
-          className="report-lecturer-link"
-          onClick={() => void openLecturer(item.lecturerId, item.lecturerName)}
-          title={`Xem chi tiết ${item.lecturerName}`}
-        >
-          {item.lecturerName}
-        </button>
-      ),
+      // Lớp chưa gắn được mã giảng viên (mã 0) mở trang giảng viên theo tên đọc từ tệp
+      // import, khoanh trong khoa/viện của chính lớp này. Lớp chưa có người dạy thì
+      // không có gì để mở nên hiện chữ thường.
+      render: (item) => {
+        const unidentifiedName = item.lecturerId > 0 ? null : item.unidentifiedLecturerName;
+        if (item.lecturerId <= 0 && !unidentifiedName) {
+          return <span className="catalog-cell-primary">{item.lecturerName}</span>;
+        }
+        return (
+          <button
+            type="button"
+            className="report-lecturer-link"
+            onClick={() => {
+              if (unidentifiedName) {
+                openUnidentifiedLecturer(unidentifiedName, item.facultyId);
+              } else {
+                void openLecturer(item.lecturerId, item.lecturerName);
+              }
+            }}
+            title={`Xem chi tiết ${item.lecturerName}`}
+          >
+            {item.lecturerName}
+          </button>
+        );
+      },
     },
     {
       key: 'classSize',

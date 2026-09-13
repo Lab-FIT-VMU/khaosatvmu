@@ -162,6 +162,19 @@ public sealed class EfReportService(
             : rating with { AverageScore = 0, TotalAnswers = 0, OptionDistribution = [] };
     }
 
+    /// <summary>
+    /// Tên người dạy của một lớp. Lớp chưa gắn được mã giảng viên vẫn có tên đọc từ tệp
+    /// import ở "UnidentifiedLecturerName" — bỏ qua nó thì một lớp thật ra có người dạy
+    /// lại hiện "Chưa phân công". Cùng thứ tự với trang Thống kê chi tiết, để một lớp
+    /// không mang hai tên ở hai màn hình.
+    /// </summary>
+    private static string LecturerNameOf(Lecturer? lecturer, CourseSection? section)
+    {
+        if (lecturer is not null) return lecturer.FullName;
+        var unidentifiedName = section?.UnidentifiedLecturerName?.Trim();
+        return string.IsNullOrEmpty(unidentifiedName) ? "Chưa phân công" : unidentifiedName;
+    }
+
     public async Task<OperationalProgressReportDto?> GetOperationalProgressReportAsync(
         int semesterId,
         CancellationToken cancellationToken = default)
@@ -263,7 +276,7 @@ public sealed class EfReportService(
                 crs?.CourseCode ?? string.Empty,
                 crs?.CourseName ?? string.Empty,
                 sec?.SectionName ?? string.Empty,
-                lec?.FullName ?? "Chưa phân công",
+                LecturerNameOf(lec, sec),
                 classSize,
                 responseCount,
                 rate,
@@ -355,75 +368,196 @@ public sealed class EfReportService(
         foreach (var lec in lecturers)
         {
             var lecSections = sectionsByLecturerId[lec.LecturerId].ToList();
-            var lecCss = lecSections
-                .SelectMany(section => sectionSurveysBySectionId[section.CourseSectionId])
-                .ToList();
-            var lecSectionById = lecSections.ToDictionary(x => x.CourseSectionId);
-
-            // Mọi con số hiển thị đều tính trên phiếu hợp lệ; phiếu bị bộ lọc nhiễu
-            // loại không dùng được vào kết quả nào nên cũng không tính là đã thu.
-            int totalResponses = 0;
-            int validResponses = 0;
-
-            // Điểm trung bình gộp riêng, chỉ từ lớp đã thu đủ phiếu. Số ĐẾM phiếu ở
-            // trên vẫn cộng mọi lớp — đó là tiến độ, lớp thiếu phiếu cũng phải hiện
-            // ra thì giảng viên mới biết lớp nào cần nhắc sinh viên làm.
-            int scoredValidResponses = 0;
-            decimal scoredScoreSum = 0;
-
-            var sectionSummaries = new List<LecturerSectionSummaryDto>();
-            foreach (var css in lecCss)
-            {
-                var sec = lecSectionById.GetValueOrDefault(css.CourseSectionId);
-                var crs = sec != null && courses.TryGetValue(sec.CourseId, out var c) ? c : null;
-
-                var tally = responseStats.GetValueOrDefault(css.CourseSectionSurveyId, ResponseTally.Empty);
-
-                totalResponses += tally.TotalCount;
-                validResponses += tally.ValidCount;
-
-                int classSize = sec?.ClassSize ?? 0;
-                if (tally.IsScored)
-                {
-                    scoredValidResponses += tally.ValidCount;
-                    scoredScoreSum += tally.ValidTotalScore;
-                }
-
-                sectionSummaries.Add(new LecturerSectionSummaryDto(
-                    css.CourseSectionSurveyId,
-                    crs?.CourseCode ?? string.Empty,
-                    crs?.CourseName ?? string.Empty,
-                    sec?.SectionName ?? string.Empty,
-                    classSize,
-                    tally.TotalCount,
-                    tally.ValidCount,
-                    tally.TotalCount - tally.ValidCount,
-                    classSize > 0 ? Math.Round((decimal)tally.ValidCount / classSize * 100, 1) : 0,
-                    tally.AverageScore
-                ));
-            }
-
-            decimal avgScore = scoredValidResponses > 0
-                ? Math.Round(scoredScoreSum / scoredValidResponses, 2)
-                : 0;
+            var summary = SummariseLecturerSections(lecSections, sectionSurveysBySectionId, courses, responseStats);
 
             reports.Add(new LecturerPerformanceReportDto(
                 lec.LecturerId,
                 lec.FullName,
                 lec.DepartmentId.HasValue && departments.TryGetValue(lec.DepartmentId.Value, out var dName) ? dName : "Chưa thuộc bộ môn",
                 lec.FacultyId.HasValue && faculties.TryGetValue(lec.FacultyId.Value, out var fName) ? fName : "Chưa thuộc khoa",
-                avgScore,
-                validResponses,
+                summary.AverageScore,
+                summary.ValidResponses,
                 lecSections.Count,
-                avgScore,
-                avgScore,
-                sectionSummaries,
+                summary.AverageScore,
+                summary.AverageScore,
+                summary.Sections,
                 [],
-                scoredValidResponses
+                summary.ScoredValidResponses
             ));
         }
 
         return reports.OrderByDescending(x => x.AverageScore).ToList();
+    }
+
+    private sealed record LecturerSectionsSummary(
+        IReadOnlyList<LecturerSectionSummaryDto> Sections,
+        int ValidResponses,
+        int ScoredValidResponses,
+        decimal AverageScore);
+
+    /// <summary>
+    /// Gộp số liệu các lớp của một giảng viên cho trang giảng viên. Dùng chung cho
+    /// giảng viên đã gắn mã và giảng viên chưa gắn mã tra theo tên, để hai trang tính
+    /// đúng một cách.
+    /// </summary>
+    private static LecturerSectionsSummary SummariseLecturerSections(
+        IReadOnlyCollection<CourseSection> lecturerSections,
+        ILookup<int, CourseSectionSurvey> sectionSurveysBySectionId,
+        IReadOnlyDictionary<int, Course> courses,
+        IReadOnlyDictionary<int, ResponseTally> responseStats)
+    {
+        var sectionById = lecturerSections.ToDictionary(x => x.CourseSectionId);
+        var sectionSurveys = lecturerSections
+            .SelectMany(section => sectionSurveysBySectionId[section.CourseSectionId])
+            .ToList();
+
+        // Mọi con số hiển thị đều tính trên phiếu hợp lệ; phiếu bị bộ lọc nhiễu
+        // loại không dùng được vào kết quả nào nên cũng không tính là đã thu.
+        int validResponses = 0;
+
+        // Điểm trung bình gộp riêng, chỉ từ lớp đã thu đủ phiếu. Số ĐẾM phiếu ở
+        // trên vẫn cộng mọi lớp — đó là tiến độ, lớp thiếu phiếu cũng phải hiện
+        // ra thì giảng viên mới biết lớp nào cần nhắc sinh viên làm.
+        int scoredValidResponses = 0;
+        decimal scoredScoreSum = 0;
+
+        var sectionSummaries = new List<LecturerSectionSummaryDto>();
+        foreach (var css in sectionSurveys)
+        {
+            var sec = sectionById.GetValueOrDefault(css.CourseSectionId);
+            var crs = sec != null && courses.TryGetValue(sec.CourseId, out var c) ? c : null;
+
+            var tally = responseStats.GetValueOrDefault(css.CourseSectionSurveyId, ResponseTally.Empty);
+
+            validResponses += tally.ValidCount;
+
+            int classSize = sec?.ClassSize ?? 0;
+            if (tally.IsScored)
+            {
+                scoredValidResponses += tally.ValidCount;
+                scoredScoreSum += tally.ValidTotalScore;
+            }
+
+            sectionSummaries.Add(new LecturerSectionSummaryDto(
+                css.CourseSectionSurveyId,
+                crs?.CourseCode ?? string.Empty,
+                crs?.CourseName ?? string.Empty,
+                sec?.SectionName ?? string.Empty,
+                classSize,
+                tally.TotalCount,
+                tally.ValidCount,
+                tally.TotalCount - tally.ValidCount,
+                classSize > 0 ? Math.Round((decimal)tally.ValidCount / classSize * 100, 1) : 0,
+                tally.AverageScore
+            ));
+        }
+
+        decimal avgScore = scoredValidResponses > 0
+            ? Math.Round(scoredScoreSum / scoredValidResponses, 2)
+            : 0;
+
+        return new LecturerSectionsSummary(sectionSummaries, validResponses, scoredValidResponses, avgScore);
+    }
+
+    public async Task<LecturerPerformanceReportDto?> GetUnidentifiedLecturerReportAsync(
+        string lecturerName,
+        int? facultyId,
+        int? semesterId,
+        CancellationToken cancellationToken = default)
+    {
+        var name = lecturerName?.Trim() ?? string.Empty;
+        if (name.Length == 0) return null;
+
+        // 0 hay null đều là lớp chưa thuộc khoa/viện nào, khớp FacultyId = 0 của bảng
+        // Tra cứu chi tiết.
+        int? targetFacultyId = facultyId is > 0 ? facultyId : null;
+
+        // Chỉ lớp CHƯA gắn mã giảng viên. Tên đọc từ tệp import không phải khoá duy nhất
+        // — hai người trùng tên ở hai khoa là chuyện thường — nên khoanh thêm theo
+        // khoa/viện. Không khoanh theo bộ môn: một người vẫn dạy học phần của nhiều bộ
+        // môn trong cùng một khoa.
+        var candidateQuery = db.CourseSections.AsNoTracking()
+            .Where(x => x.LecturerId == null && x.UnidentifiedLecturerName != null);
+        if (semesterId is { } semId)
+        {
+            candidateQuery = candidateQuery.Where(x => x.SemesterId == semId);
+        }
+        var namedSections = (await candidateQuery.ToListAsync(cancellationToken))
+            .Where(x => string.Equals(x.UnidentifiedLecturerName!.Trim(), name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (namedSections.Count == 0) return null;
+
+        var courseIds = namedSections.Select(x => x.CourseId).Distinct().ToList();
+        var courses = await db.Courses.AsNoTracking()
+            .Where(x => courseIds.Contains(x.CourseId))
+            .ToDictionaryAsync(x => x.CourseId, x => x, cancellationToken);
+        var departments = await db.Departments.AsNoTracking()
+            .ToDictionaryAsync(x => x.DepartmentId, x => x, cancellationToken);
+
+        // Đơn vị của lớp theo đúng thứ tự của bảng Tra cứu chi tiết: đơn vị sở hữu học
+        // phần, khoa suy từ bộ môn nếu học phần không ghi khoa. Lớp chưa gắn mã nên không
+        // có nhánh giảng viên để lùi về.
+        int? DepartmentOf(CourseSection section) =>
+            courses.TryGetValue(section.CourseId, out var course) ? course.DepartmentId : null;
+
+        int? FacultyOf(CourseSection section)
+        {
+            if (!courses.TryGetValue(section.CourseId, out var course)) return null;
+            if (course.FacultyId is { } courseFacultyId) return courseFacultyId;
+            return course.DepartmentId is { } departmentId
+                && departments.TryGetValue(departmentId, out var department)
+                    ? department.FacultyId
+                    : null;
+        }
+
+        var sections = namedSections.Where(x => FacultyOf(x) == targetFacultyId).ToList();
+        if (sections.Count == 0) return null;
+
+        var sectionIds = sections.Select(x => x.CourseSectionId).ToList();
+        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+            .Where(x => sectionIds.Contains(x.CourseSectionId))
+            .ToListAsync(cancellationToken);
+        var responseStats = await ResponseTalliesAsync(
+            sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList(),
+            cancellationToken);
+        var summary = SummariseLecturerSections(
+            sections,
+            sectionSurveys.ToLookup(x => x.CourseSectionId),
+            courses,
+            responseStats);
+
+        // Một người có thể dạy học phần của nhiều bộ môn trong khoa: ghi đủ các bộ môn.
+        var departmentNames = sections
+            .Select(DepartmentOf)
+            .Distinct()
+            .Select(id => id is { } departmentId && departments.TryGetValue(departmentId, out var department)
+                ? department.DepartmentName
+                : "Chưa thuộc bộ môn")
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+        var facultyName = targetFacultyId is { } targetId
+            ? await db.Faculties.AsNoTracking()
+                .Where(x => x.FacultyId == targetId)
+                .Select(x => x.FacultyName)
+                .FirstOrDefaultAsync(cancellationToken) ?? "Chưa thuộc khoa"
+            : "Chưa thuộc khoa";
+
+        var report = new LecturerPerformanceReportDto(
+            0,
+            sections[0].UnidentifiedLecturerName!.Trim(),
+            string.Join(", ", departmentNames),
+            facultyName,
+            summary.AverageScore,
+            summary.ValidResponses,
+            sections.Count,
+            summary.AverageScore,
+            summary.AverageScore,
+            summary.Sections,
+            [],
+            summary.ScoredValidResponses);
+
+        return await WithQuestionRatingsAsync(report, sectionIds, cancellationToken);
     }
 
     public async Task<LecturerPerformanceReportDto?> GetLecturerPerformanceReportAsync(
@@ -441,9 +575,83 @@ public sealed class EfReportService(
         {
             sectionQuery = sectionQuery.Where(x => x.SemesterId == semId);
         }
-        var sections = await sectionQuery.ToListAsync(cancellationToken);
-        var sectionIds = sections.Select(x => x.CourseSectionId).ToList();
+        var sectionIds = await sectionQuery.Select(x => x.CourseSectionId).ToListAsync(cancellationToken);
 
+        return await WithQuestionRatingsAsync(report, sectionIds, cancellationToken);
+    }
+
+    /// <summary>
+    /// Khoá mục (<see cref="SurveySectionCatalog"/>) của từng câu, để giao diện tách phần
+    /// phân tích theo mục. Bỏ bộ lọc xoá mềm: câu đã nằm trong ảnh chụp điểm thì vẫn phải
+    /// biết nó thuộc mục nào.
+    /// </summary>
+    private async Task<Dictionary<int, string>> QuestionSectionKeysAsync(
+        IReadOnlyCollection<int> questionIds,
+        CancellationToken cancellationToken)
+    {
+        if (questionIds.Count == 0) return [];
+
+        var rows = await (
+            from question in db.SurveyQuestions.IgnoreQueryFilters().AsNoTracking()
+            join questionSection in db.SurveyQuestionSections.IgnoreQueryFilters().AsNoTracking()
+                on question.SectionId equals questionSection.SectionId
+            where questionIds.Contains(question.QuestionId)
+            select new { question.QuestionId, questionSection.SectionName })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(
+            x => x.QuestionId,
+            x => SurveySectionCatalog.Resolve(x.SectionName) ?? SurveySectionCatalog.Other);
+    }
+
+    /// <summary>
+    /// Điểm từng mục của một tập lớp ĐÃ CHỐT, gộp có trọng số từ ảnh chụp điểm từng câu —
+    /// đúng công thức của trang Thống kê theo mục, nên cùng một tập lớp ra cùng một con số.
+    /// </summary>
+    private async Task<IReadOnlyList<QuestionSectionScoreDto>> QuestionSectionScoresAsync(
+        IReadOnlyCollection<int> scoredSectionSurveyIds,
+        CancellationToken cancellationToken)
+    {
+        if (scoredSectionSurveyIds.Count == 0) return [];
+
+        var rows = await (
+            from score in db.CourseSectionSurveyQuestionScores.AsNoTracking()
+            join question in db.SurveyQuestions.IgnoreQueryFilters().AsNoTracking()
+                on score.QuestionId equals question.QuestionId
+            join questionSection in db.SurveyQuestionSections.IgnoreQueryFilters().AsNoTracking()
+                on question.SectionId equals questionSection.SectionId
+            where scoredSectionSurveyIds.Contains(score.CourseSectionSurveyId)
+            group score by questionSection.SectionName into g
+            select new
+            {
+                SectionName = g.Key,
+                WeightedScore = g.Sum(x => x.AverageScore * x.AnswerCount),
+                AnswerCount = g.Sum(x => x.AnswerCount),
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(x => SurveySectionCatalog.Resolve(x.SectionName) ?? SurveySectionCatalog.Other)
+            .Select(g =>
+            {
+                var answerCount = g.Sum(x => x.AnswerCount);
+                return new QuestionSectionScoreDto(
+                    g.Key,
+                    answerCount > 0 ? (decimal?)Math.Round(g.Sum(x => x.WeightedScore) / answerCount, 2) : null,
+                    answerCount);
+            })
+            .ToList();
+    }
+
+    /// <summary>
+    /// Bảng phân tích theo câu hỏi của trang giảng viên, dựng trên đúng tập lớp của trang.
+    /// Dùng chung cho giảng viên đã gắn mã và giảng viên chưa gắn mã tra theo tên.
+    /// </summary>
+    private async Task<LecturerPerformanceReportDto> WithQuestionRatingsAsync(
+        LecturerPerformanceReportDto report,
+        IReadOnlyCollection<int> sectionIds,
+        CancellationToken cancellationToken)
+    {
         var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
             .Where(x => sectionIds.Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
@@ -539,7 +747,20 @@ public sealed class EfReportService(
                 questionSnapshots))
             .ToList();
 
-        return report with { QuestionRatings = questionRatings.OrderBy(x => x.QuestionOrder).ToList() };
+        // Gắn mục cho từng câu và điểm từng mục, để giao diện tách tab Học phần / Giảng viên.
+        var sectionKeys = await QuestionSectionKeysAsync(
+            questionRatings.Select(x => x.QuestionId).ToList(),
+            cancellationToken);
+        var sectionScores = await QuestionSectionScoresAsync(scoredCssIds, cancellationToken);
+
+        return report with
+        {
+            QuestionRatings = questionRatings
+                .Select(x => x with { SectionKey = sectionKeys.GetValueOrDefault(x.QuestionId) })
+                .OrderBy(x => x.QuestionOrder)
+                .ToList(),
+            SectionScores = sectionScores,
+        };
     }
 
     public async Task<IReadOnlyList<FacultyDepartmentReportDto>> GetFacultyDepartmentReportsAsync(
@@ -875,7 +1096,7 @@ public sealed class EfReportService(
                 course?.CourseCode ?? string.Empty,
                 course?.CourseName ?? string.Empty,
                 section?.SectionName ?? string.Empty,
-                lecturer?.FullName ?? "Chưa phân công",
+                LecturerNameOf(lecturer, section),
                 section?.ClassSize ?? 0,
                 0,
                 0m,
@@ -888,22 +1109,31 @@ public sealed class EfReportService(
             [courseSectionSurveyId],
             cancellationToken);
 
+        // Gắn mục cho từng câu và điểm từng mục, để giao diện tách tab Học phần / Giảng viên.
+        var sectionKeys = await QuestionSectionKeysAsync(
+            questionRatings.Select(x => x.QuestionId).ToList(),
+            cancellationToken);
         questionRatings = questionRatings
-            .Select(rating => WithSnapshotScore(rating, questionSnapshots))
+            .Select(rating => WithSnapshotScore(rating, questionSnapshots) with
+            {
+                SectionKey = sectionKeys.GetValueOrDefault(rating.QuestionId),
+            })
             .ToList();
+        var sectionScores = await QuestionSectionScoresAsync([courseSectionSurveyId], cancellationToken);
 
         return new SectionSurveyAnalysisDto(
             courseSectionSurveyId,
             course?.CourseCode ?? string.Empty,
             course?.CourseName ?? string.Empty,
             section?.SectionName ?? string.Empty,
-            lecturer?.FullName ?? "Chưa phân công",
+            LecturerNameOf(lecturer, section),
             section?.ClassSize ?? 0,
             sectionSurvey.ValidResponseCount,
             sectionSurvey.AverageScore!.Value,
             template?.TemplateName ?? string.Empty,
             questionRatings,
-            true
+            true,
+            sectionScores
         );
     }
 
@@ -1014,7 +1244,7 @@ public sealed class EfReportService(
             var courseCode = crs?.CourseCode ?? string.Empty;
             var courseName = crs?.CourseName ?? string.Empty;
             var sectionName = sec?.SectionName ?? string.Empty;
-            var lecturerName = lec?.FullName ?? "Chưa phân công";
+            var lecturerName = LecturerNameOf(lec, sec);
 
             if (!string.IsNullOrEmpty(term)
                 && !courseCode.ToLowerInvariant().Contains(term)
@@ -1060,7 +1290,11 @@ public sealed class EfReportService(
                 tally.ValidCount,
                 cnt - tally.ValidCount,
                 completionRate,
-                averageScore));
+                averageScore,
+                UnidentifiedLecturerName: lec is null
+                    && sec?.UnidentifiedLecturerName?.Trim() is { Length: > 0 } unidentifiedName
+                        ? unidentifiedName
+                        : null));
         }
 
         return results

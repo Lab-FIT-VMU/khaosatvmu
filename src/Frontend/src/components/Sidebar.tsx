@@ -8,6 +8,7 @@ import {
   FileCheck2,
   Gauge,
   GraduationCap,
+  Layers,
   LayoutDashboard,
   ListChecks,
   Network,
@@ -24,7 +25,7 @@ import {
 } from 'lucide-react';
 import { canAccessModule } from '../auth/modulePermissions';
 import { useAuth } from '../auth/authContext';
-import { canAccessDashboard } from '../auth/roles';
+import { canAccessDashboard, isUnrestrictedRole } from '../auth/roles';
 import { HeaderSemesterPicker } from './HeaderSemesterPicker';
 
 interface SidebarProps {
@@ -92,6 +93,7 @@ export function Sidebar({
         { id: 'survey-statistics', label: 'Bảng dữ liệu khảo sát', icon: Table2 },
         { id: 'reports', label: 'Thống kê & Báo cáo', icon: BarChart3 },
         { id: 'survey-analysis', label: 'Thống kê chi tiết', icon: Sigma },
+        { id: 'survey-section-scores', label: 'Thống kê theo mục', icon: Layers },
         { id: 'graduation-analytics', label: 'Thống kê tốt nghiệp', icon: GraduationCap },
       ],
     },
@@ -140,6 +142,8 @@ export function Sidebar({
           canAccessModule(permissions, item.id)
           // Bảng điều khiển tạm đóng với giảng viên và trưởng bộ môn.
           && (item.id !== 'overview' || dashboardAllowed)
+          // Thống kê theo mục tạm thời chỉ dành cho quản trị.
+          && (item.id !== 'survey-section-scores' || isUnrestrictedRole(activeProfile?.roleCode))
       ),
     }))
     .filter((group) => group.items.length > 0);

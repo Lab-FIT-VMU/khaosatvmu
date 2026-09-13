@@ -73,6 +73,19 @@ export const reportApi = {
     );
   },
 
+  /**
+   * Trang giảng viên của người chưa gắn mã: tra theo tên đọc từ tệp import, khoanh
+   * trong một khoa/viện. `facultyId` bằng 0 là lớp chưa thuộc khoa nào.
+   */
+  unidentifiedLecturerDetail: (name: string, facultyId: number, semesterId?: number) => {
+    const query = new URLSearchParams({ name });
+    if (facultyId > 0) query.append('facultyId', String(facultyId));
+    if (semesterId) query.append('semesterId', String(semesterId));
+    return apiRequest<LecturerPerformanceReport>(
+      `/api/v1/reports/lecturers/unidentified?${query.toString()}`,
+    );
+  },
+
   faculties: (semesterId?: number) => {
     const query = semesterId ? `?semesterId=${semesterId}` : '';
     return apiRequest<FacultyDepartmentReport[]>(`/api/v1/reports/faculties${query}`);
