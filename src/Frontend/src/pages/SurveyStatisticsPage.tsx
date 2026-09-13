@@ -21,6 +21,7 @@ import type { SectionStatisticsRow, SemesterSurveyStatistics } from '../services
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
 import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole } from '../auth/roles';
+import { buildReportHash } from './reportRoute';
 import { Modal } from '../components/Modal';
 import {
   publishScoringThresholds,
@@ -961,7 +962,22 @@ export const SurveyStatisticsPage: React.FC = () => {
                     <td className="col-left col-left-1">
                       <span className="operations-code">{row.courseCode}</span>
                     </td>
-                    <td className="col-left col-left-2">{row.sectionName}</td>
+                    <td className="col-left col-left-2">
+                      {/* Mở trang kết quả của lớp ở Thống kê & Báo cáo, kèm học kỳ và đợt
+                          đang xem. Liên kết thật nên Back và Ctrl + bấm vẫn dùng được. */}
+                      <a
+                        className="statistics-section-link"
+                        href={buildReportHash({
+                          screen: 'survey',
+                          surveyId: row.courseSectionSurveyId,
+                          semesterId: Number(semesterId) || undefined,
+                          semesterSurveyId: Number(semesterSurveyId) || undefined,
+                        })}
+                        title={`Xem kết quả ${row.courseCode} - ${row.courseName} (${row.sectionName})`}
+                      >
+                        {row.sectionName}
+                      </a>
+                    </td>
                     <td className="col-left col-left-3" title={row.courseName}>
                       {row.courseName}
                     </td>

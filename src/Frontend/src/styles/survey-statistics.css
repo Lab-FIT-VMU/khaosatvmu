@@ -351,6 +351,17 @@
   max-width: var(--col-left-2);
 }
 
+/* Tên lớp mở trang kết quả của lớp ở Thống kê & Báo cáo. */
+.statistics-table .statistics-section-link {
+  color: #0788b8;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.statistics-table .statistics-section-link:hover {
+  text-decoration: underline;
+}
+
 .statistics-table .col-left-3 {
   left: calc(var(--col-left-1) + var(--col-left-2));
   width: var(--col-left-3);
