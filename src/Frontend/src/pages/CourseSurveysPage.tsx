@@ -156,6 +156,15 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   const [editSurveySchedule, setEditSurveySchedule] = useState<ScheduleForm>(defaultSchedule);
   const [editSurveyError, setEditSurveyError] = useState<string | null>(null);
   const [savingSurvey, setSavingSurvey] = useState(false);
+  /**
+   * Lịch mới kéo theo lịch các lớp: đếm sẵn để hỏi xác nhận ngay trong form trước khi
+   * lưu. Null là chưa cần hỏi.
+   */
+  const [scheduleConfirm, setScheduleConfirm] = useState<{
+    followingCount: number;
+    narrowedCustomCount: number;
+    closingEarlierCount: number;
+  } | null>(null);
 
   const [editingSection, setEditingSection] = useState<CourseSectionSurvey | null>(null);
   const [editSchedule, setEditSchedule] = useState<ScheduleForm>(defaultSchedule);
@@ -403,6 +412,33 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     setEditSurveyError(null);
   };
 
+  const submitSurveyUpdate = async () => {
+    if (!editingSurvey) return;
+    setSavingSurvey(true);
+    try {
+      const editedSurveyId = editingSurvey.semesterSurveyId;
+      const updated = await surveyApi.updateSemesterSurvey(editedSurveyId, {
+        surveyName: editSurveyName.trim(),
+        startTime: toIso(editSurveySchedule.startTime),
+        endTime: toIso(editSurveySchedule.endTime),
+      });
+      await loadSemesterSurveys(semesterId);
+      // Đổi lịch tổng kéo theo lịch các lớp, nên danh sách lớp đã tải của đợt này cũng
+      // phải nạp lại — không thì các dòng lớp vẫn hiện giờ cũ tới khi tải lại trang.
+      if (sectionSurveys[editedSurveyId]) {
+        await loadSections(editedSurveyId);
+      }
+      onSurveysChanged?.();
+      toast.success('Đã cập nhật đợt khảo sát', { description: updated.surveyName });
+      setEditingSurvey(null);
+      setEditSurveyError(null);
+    } catch (error) {
+      setEditSurveyError(messageFrom(error));
+    } finally {
+      setSavingSurvey(false);
+    }
+  };
+
   const handleSaveSurvey = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!editingSurvey) return;
@@ -420,37 +456,44 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
 
     setSavingSurvey(true);
     try {
-      // Kiểm tra trước để chỉ rõ lớp vi phạm; backend vẫn kiểm tra lại để không thể lách qua API.
+      // Đổi lịch toàn đợt kéo theo lịch các lớp, cùng luật với backend: lớp đang dùng
+      // lịch tổng nhận lịch mới, lớp có lịch riêng bị thu lại cho nằm trong lịch mới.
+      // Đếm trước để hỏi xác nhận: bao nhiêu lớp đổi lịch, bao nhiêu lớp đóng sớm hơn.
       const sections = await surveyApi.courseSectionSurveys(editingSurvey.semesterSurveyId);
-      const outside = sections.find(
-        (section) => new Date(section.startTime) < proposedStart
-          || new Date(section.endTime) > proposedEnd
-      );
-      if (outside) {
-        setEditSurveyError(
-          `Không thể lưu: lịch của lớp ${outside.sectionName} (${formatRange(
-            outside.startTime,
-            outside.endTime
-          )}) nằm ngoài lịch tổng mới.`
-        );
-        return;
+      const oldStart = new Date(editingSurvey.startTime).getTime();
+      const oldEnd = new Date(editingSurvey.endTime).getTime();
+      const newStart = proposedStart.getTime();
+      const newEnd = proposedEnd.getTime();
+
+      let followingCount = 0;
+      let narrowedCustomCount = 0;
+      let closingEarlierCount = 0;
+      for (const section of sections) {
+        const start = new Date(section.startTime).getTime();
+        const end = new Date(section.endTime).getTime();
+        const followsSurvey = start === oldStart && end === oldEnd;
+        const changes = followsSurvey
+          ? start !== newStart || end !== newEnd
+          : start < newStart || end > newEnd;
+        if (!changes) continue;
+
+        if (followsSurvey) followingCount += 1;
+        else narrowedCustomCount += 1;
+        if (newEnd < end) closingEarlierCount += 1;
       }
 
-      const updated = await surveyApi.updateSemesterSurvey(editingSurvey.semesterSurveyId, {
-        surveyName: editSurveyName.trim(),
-        startTime: toIso(editSurveySchedule.startTime),
-        endTime: toIso(editSurveySchedule.endTime),
-      });
-      await loadSemesterSurveys(semesterId);
-      onSurveysChanged?.();
-      toast.success('Đã cập nhật đợt khảo sát', { description: updated.surveyName });
-      setEditingSurvey(null);
-      setEditSurveyError(null);
+      if (followingCount + narrowedCustomCount > 0) {
+        setScheduleConfirm({ followingCount, narrowedCustomCount, closingEarlierCount });
+        return;
+      }
     } catch (error) {
       setEditSurveyError(messageFrom(error));
+      return;
     } finally {
       setSavingSurvey(false);
     }
+
+    await submitSurveyUpdate();
   };
 
   const handleDelete = async () => {
@@ -1026,6 +1069,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
           if (savingSurvey) return;
           setEditingSurvey(null);
           setEditSurveyError(null);
+          setScheduleConfirm(null);
         }}
         title="Chỉnh sửa đợt khảo sát"
       >
@@ -1046,8 +1090,8 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
           </div>
 
           <div className="catalog-context-band">
-            Lịch của mọi lớp học phần phải nằm trọn trong lịch tổng. Nếu lịch mới loại ra
-            bất kỳ lớp nào, hệ thống sẽ không lưu.
+            Đổi lịch tổng thì lịch các lớp đổi theo: lớp đang dùng lịch tổng nhận lịch mới, lớp
+            có lịch riêng bị thu lại cho nằm trong lịch mới. Phiếu đã thu không bị ảnh hưởng.
           </div>
 
           <div className="catalog-form-grid catalog-form-grid--2">
@@ -1057,10 +1101,13 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                 id="edit-semester-survey-start"
                 type="datetime-local"
                 value={editSurveySchedule.startTime}
-                onChange={(event) => setEditSurveySchedule((prev) => ({
-                  ...prev,
-                  startTime: event.target.value,
-                }))}
+                onChange={(event) => {
+                  setScheduleConfirm(null);
+                  setEditSurveySchedule((prev) => ({
+                    ...prev,
+                    startTime: event.target.value,
+                  }));
+                }}
                 required
               />
             </div>
@@ -1070,31 +1117,77 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                 id="edit-semester-survey-end"
                 type="datetime-local"
                 value={editSurveySchedule.endTime}
-                onChange={(event) => setEditSurveySchedule((prev) => ({
-                  ...prev,
-                  endTime: event.target.value,
-                }))}
+                onChange={(event) => {
+                  setScheduleConfirm(null);
+                  setEditSurveySchedule((prev) => ({
+                    ...prev,
+                    endTime: event.target.value,
+                  }));
+                }}
                 required
               />
             </div>
           </div>
 
+          {/* Xác nhận ngay trong form thay vì mở thêm hộp thoại chồng lên: hai hộp thoại
+              cùng bắt phím Esc/Tab ở cấp document sẽ đóng nhầm form bên dưới. */}
+          {scheduleConfirm && (
+            <div className="catalog-context-band" role="alert">
+              <strong>Xác nhận đổi lịch toàn đợt</strong> — lịch mới{' '}
+              {formatRange(toIso(editSurveySchedule.startTime), toIso(editSurveySchedule.endTime))}:
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                {scheduleConfirm.followingCount > 0 && (
+                  <li>{scheduleConfirm.followingCount} lớp đang dùng lịch tổng sẽ đổi sang lịch mới.</li>
+                )}
+                {scheduleConfirm.narrowedCustomCount > 0 && (
+                  <li>
+                    {scheduleConfirm.narrowedCustomCount} lớp có lịch riêng sẽ bị thu lại cho nằm
+                    trong lịch mới.
+                  </li>
+                )}
+                {scheduleConfirm.closingEarlierCount > 0 && (
+                  <li>
+                    <strong>{scheduleConfirm.closingEarlierCount} lớp sẽ đóng sớm hơn hiện tại</strong>:
+                    sau thời điểm đóng mới sinh viên không nộp phiếu được nữa.
+                  </li>
+                )}
+                <li>Phiếu đã thu giữ nguyên.</li>
+              </ul>
+            </div>
+          )}
+
           <div className="modal-footer catalog-form-actions">
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setEditingSurvey(null)}
+              onClick={() => {
+                if (scheduleConfirm) {
+                  setScheduleConfirm(null);
+                } else {
+                  setEditingSurvey(null);
+                }
+              }}
               disabled={savingSurvey}
             >
-              Hủy
+              {scheduleConfirm ? 'Quay lại sửa' : 'Hủy'}
             </button>
-            <button type="submit" className="btn btn-primary" disabled={savingSurvey}>
+            <button
+              type={scheduleConfirm ? 'button' : 'submit'}
+              className="btn btn-primary"
+              disabled={savingSurvey}
+              onClick={scheduleConfirm
+                ? () => {
+                  setScheduleConfirm(null);
+                  void submitSurveyUpdate();
+                }
+                : undefined}
+            >
               {savingSurvey ? (
                 <LoaderCircle className="auth-spin" aria-hidden="true" size={16} />
               ) : (
                 <Save aria-hidden="true" size={16} />
               )}
-              Lưu thay đổi
+              {scheduleConfirm ? 'Xác nhận lưu lịch mới' : 'Lưu thay đổi'}
             </button>
           </div>
         </form>

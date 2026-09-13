@@ -657,16 +657,34 @@ public sealed class EfSurveyService(
             return Failed<SemesterSurveyDto>(SurveyErrorCodes.SemesterSurveyNotFound);
         }
 
-        // Không tự ép lịch lớp theo lịch tổng mới: người quản trị phải nhìn thấy và sửa rõ từng
-        // lịch đang vượt biên, tránh vô tình đóng sớm hàng loạt lớp đã công bố thời gian.
-        var excludesExistingSection = await db.CourseSectionSurveys.AnyAsync(
-            x => x.SemesterSurveyId == semesterSurveyId
-                 && (x.StartTime < startTime || x.EndTime > endTime),
-            cancellationToken);
-        if (excludesExistingSection)
+        // Sửa lịch toàn đợt thì lịch lớp đi theo. Lớp đang dùng đúng lịch tổng cũ nhận lịch
+        // tổng mới; lớp có lịch riêng chỉ bị thu lại cho nằm trong lịch mới, phần còn nằm
+        // trong thì giữ; lịch riêng nằm hẳn ngoài lịch mới thì nhận trọn lịch mới. Trước đây
+        // chặn hẳn để khỏi vô tình đóng sớm hàng loạt lớp — nay giao diện hỏi xác nhận, kèm
+        // số lớp đổi lịch và số lớp đóng sớm hơn. Phiếu đã thu không bị động tới.
+        var oldStartTime = survey.StartTime;
+        var oldEndTime = survey.EndTime;
+        var sectionSurveys = await db.CourseSectionSurveys
+            .Where(x => x.SemesterSurveyId == semesterSurveyId)
+            .ToListAsync(cancellationToken);
+        foreach (var sectionSurvey in sectionSurveys)
         {
-            return Failed<SemesterSurveyDto>(
-                SurveyErrorCodes.SemesterSurveyScheduleExcludesSections);
+            if (sectionSurvey.StartTime == oldStartTime && sectionSurvey.EndTime == oldEndTime)
+            {
+                sectionSurvey.StartTime = startTime;
+                sectionSurvey.EndTime = endTime;
+                continue;
+            }
+
+            var clampedStart = sectionSurvey.StartTime < startTime ? startTime : sectionSurvey.StartTime;
+            var clampedEnd = sectionSurvey.EndTime > endTime ? endTime : sectionSurvey.EndTime;
+            if (clampedEnd <= clampedStart)
+            {
+                clampedStart = startTime;
+                clampedEnd = endTime;
+            }
+            sectionSurvey.StartTime = clampedStart;
+            sectionSurvey.EndTime = clampedEnd;
         }
 
         survey.SurveyName = surveyName;

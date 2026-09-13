@@ -422,7 +422,7 @@ public class SurveySectionScopeTests
     }
 
     [Fact]
-    public async Task UpdateSemesterSurvey_WhenNewRangeExcludesASection_ShouldBeRejected()
+    public async Task UpdateSemesterSurvey_WhenRangeNarrows_SectionsFollowingTheSurveyMoveWithIt()
     {
         await RunInRollbackAsync(async (db, serviceFor) =>
         {
@@ -431,17 +431,68 @@ public class SurveySectionScopeTests
 
             var survey = await db.SemesterSurveys.SingleAsync(
                 x => x.SemesterSurveyId == seeded.Value.SemesterSurveyId);
+            // Rút ngắn cả hai đầu: trước đây bị chặn vì mọi lớp đang dùng lịch tổng cũ.
+            var newStart = survey.StartTime.AddMinutes(1);
+            var newEnd = survey.EndTime.AddDays(-10);
             var result = await serviceFor(Admin).UpdateSemesterSurveyAsync(
                 survey.SemesterSurveyId,
-                new UpdateSemesterSurveyCommand(
-                    "Tên không được lưu",
-                    survey.StartTime.AddMinutes(1),
-                    survey.EndTime));
+                new UpdateSemesterSurveyCommand("Đợt rút ngắn", newStart, newEnd));
 
-            result.Succeeded.Should().BeFalse();
-            result.ErrorCode.Should().Be(
-                SurveyErrorCodes.SemesterSurveyScheduleExcludesSections);
-            survey.SurveyName.Should().Be(SeededSurveyName);
+            result.Succeeded.Should().BeTrue();
+            var sections = await db.CourseSectionSurveys
+                .Where(x => x.SemesterSurveyId == survey.SemesterSurveyId)
+                .ToListAsync();
+            sections.Should().NotBeEmpty();
+            sections.Should().OnlyContain(
+                x => x.StartTime == newStart && x.EndTime == newEnd,
+                "lớp đang dùng lịch tổng phải đổi theo lịch tổng mới");
+        });
+    }
+
+    [Fact]
+    public async Task UpdateSemesterSurvey_CustomSectionSchedules_AreClampedIntoTheNewRange()
+    {
+        await RunInRollbackAsync(async (db, serviceFor) =>
+        {
+            var seeded = await SeedDepartmentScopedSurveyAsync(db, 1);
+            if (seeded is null) return;
+
+            var survey = await db.SemesterSurveys.SingleAsync(
+                x => x.SemesterSurveyId == seeded.Value.SemesterSurveyId);
+            var sections = await db.CourseSectionSurveys
+                .Where(x => x.SemesterSurveyId == survey.SemesterSurveyId)
+                .OrderBy(x => x.CourseSectionSurveyId)
+                .ToListAsync();
+            if (sections.Count < 3) return;
+
+            var newStart = survey.StartTime.AddDays(2);
+            var newEnd = survey.EndTime.AddDays(-5);
+
+            // Lịch riêng thò qua đầu đóng mới: giữ đầu mở, chỉ thu đầu đóng lại.
+            var overlapping = sections[0];
+            overlapping.StartTime = survey.StartTime.AddDays(3);
+            overlapping.EndTime = survey.EndTime.AddDays(-1);
+            var keptStart = overlapping.StartTime;
+
+            // Lịch riêng nằm hẳn sau đầu đóng mới: thu lại thì rỗng nên nhận trọn lịch mới.
+            var outside = sections[1];
+            outside.StartTime = survey.EndTime.AddDays(-2);
+            outside.EndTime = survey.EndTime.AddDays(-1);
+            await db.SaveChangesAsync();
+
+            var result = await serviceFor(Admin).UpdateSemesterSurveyAsync(
+                survey.SemesterSurveyId,
+                new UpdateSemesterSurveyCommand(SeededSurveyName, newStart, newEnd));
+
+            result.Succeeded.Should().BeTrue();
+            overlapping.StartTime.Should().Be(keptStart);
+            overlapping.EndTime.Should().Be(newEnd);
+            outside.StartTime.Should().Be(newStart);
+            outside.EndTime.Should().Be(newEnd);
+            sections.Skip(2).Should().OnlyContain(x => x.StartTime == newStart && x.EndTime == newEnd);
+            sections.Should().OnlyContain(
+                x => x.StartTime >= newStart && x.EndTime <= newEnd,
+                "mọi lớp phải nằm trọn trong lịch tổng mới");
         });
     }
 
