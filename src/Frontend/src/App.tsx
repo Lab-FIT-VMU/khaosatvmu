@@ -104,7 +104,7 @@ function DashboardApp() {
     .some((moduleId) => canAccessModule(permissions, moduleId));
   const canLoadCourseSections = canAccessModule(permissions, 'classes');
   const canLoadSurveyOperations = [
-    'progress', 'reports', 'survey-dashboard', 'survey-statistics', 'survey-analysis',
+    'progress', 'reports', 'survey-dashboard', 'survey-comparison', 'survey-statistics', 'survey-analysis',
     'course-campaigns',
   ].some((moduleId) => canAccessModule(permissions, moduleId));
 
@@ -594,7 +594,7 @@ function DashboardApp() {
               )
             )}
 
-            {currentTab === 'survey-dashboard' && (
+            {(currentTab === 'survey-dashboard' || currentTab === 'survey-comparison') && (
               <SurveyDashboardPage />
             )}
 

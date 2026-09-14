@@ -235,6 +235,27 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSemesterSurveyDashboardAsync(semesterSurveyId, cancellationToken)));
 
+        surveyDashboardGroup.MapGet("/semester-surveys/comparison", async (
+            string? scope,
+            int? baselineId,
+            int? targetId,
+            string? surveyIds,
+            ISurveyService service,
+            CancellationToken cancellationToken) =>
+        {
+            if (!string.IsNullOrWhiteSpace(scope) && baselineId.HasValue && targetId.HasValue)
+            {
+                return ToResult(await service.CompareOverviewAsync(scope, baselineId.Value, targetId.Value, cancellationToken));
+            }
+
+            var parsedIds = (surveyIds ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => int.TryParse(s, out var id) ? id : 0)
+                .Where(id => id > 0)
+                .ToList();
+            return ToResult(await service.CompareSurveysAsync(parsedIds, cancellationToken));
+        });
+
         surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/course-diagnosis", async (
             int semesterSurveyId,
             ISurveyService service,

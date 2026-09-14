@@ -14,6 +14,7 @@ import {
 import { useSemester } from '../context/semesterContext';
 import { NoteModalButton } from '../components/NoteModalButton';
 import { ExportDropdown } from '../components/ExportDropdown';
+import { SurveyComparisonView } from '../components/SurveyComparisonView';
 import { ApiError } from '../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import type {
@@ -65,11 +66,78 @@ export const SurveyDashboardPage: React.FC = () => {
     if (activeSemesterId) setSemesterId(String(activeSemesterId));
   }, [activeSemesterId]);
 
+  const parseActiveTabFromHash = (): 'single' | 'comparison' => {
+    if (typeof window === 'undefined') return 'single';
+    const hash = window.location.hash.toLowerCase();
+    if (hash.includes('tab=comparison') || hash.includes('/comparison') || hash.startsWith('#survey-comparison')) {
+      return 'comparison';
+    }
+    return 'single';
+  };
+
   const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
   const [semesterSurveyId, setSemesterSurveyId] = useState<string>('');
+  const [allSurveys, setAllSurveys] = useState<SemesterSurvey[]>([]);
+  const [activeTab, setActiveTab] = useState<'single' | 'comparison'>(parseActiveTabFromHash);
   const [data, setData] = useState<SemesterSurveyDashboard | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setActiveTab(parseActiveTabFromHash());
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const handleSelectTab = (tab: 'single' | 'comparison') => {
+    setActiveTab(tab);
+    if (tab === 'comparison') {
+      window.location.hash = '#survey-dashboard?tab=comparison';
+    } else {
+      window.location.hash = '#survey-dashboard';
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAllSurveys = async () => {
+      const allSemesterEntries = academicYears.flatMap((y) =>
+        y.semesters.map((s) => ({
+          semesterId: s.semesterId,
+          semesterName: s.semesterName,
+          academicYearName: y.academicYearName,
+        }))
+      );
+      if (allSemesterEntries.length === 0) return;
+      try {
+        const results = await Promise.all(
+          allSemesterEntries.map(async (entry) => {
+            try {
+              const list = await surveyApi.semesterSurveys(entry.semesterId);
+              return list.map((s) => ({
+                ...s,
+                semesterName: s.semesterName || entry.semesterName,
+                academicYearName: s.academicYearName || entry.academicYearName,
+              }));
+            } catch {
+              return [];
+            }
+          })
+        );
+        if (!cancelled) {
+          setAllSurveys(results.flat());
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void fetchAllSurveys();
+    return () => {
+      cancelled = true;
+    };
+  }, [academicYears]);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,102 +197,132 @@ export const SurveyDashboardPage: React.FC = () => {
 
   return (
     <div className="survey-operations-page survey-statistics-page">
-      <section className="statistics-toolbar">
-        <label className="form-group">
-          <span>Học kỳ</span>
-          <select value={semesterId} onChange={(event) => setSemesterId(event.target.value)}>
-            <option value="">Chọn học kỳ</option>
-            {semesterOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="dashboard-tab-bar" role="tablist" aria-label="Chế độ xem bảng điều khiển">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'single'}
+          className={`dashboard-nav-tab ${activeTab === 'single' ? 'is-active' : ''}`}
+          onClick={() => handleSelectTab('single')}
+        >
+          Tổng quan một đợt
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'comparison'}
+          className={`dashboard-nav-tab ${activeTab === 'comparison' ? 'is-active' : ''}`}
+          onClick={() => handleSelectTab('comparison')}
+        >
+          So sánh & Xu hướng giữa các đợt
+        </button>
+      </div>
 
-        <label className="form-group">
-          <span>Đợt khảo sát</span>
-          <select
-            value={semesterSurveyId}
-            onChange={(event) => setSemesterSurveyId(event.target.value)}
-            disabled={semesterSurveys.length === 0}
-          >
-            {semesterSurveys.length === 0 && <option value="">Chưa có đợt nào</option>}
-            {semesterSurveys.map((survey) => (
-              <option key={survey.semesterSurveyId} value={String(survey.semesterSurveyId)}>
-                {survey.templateName} · {survey.sectionSurveyCount} lớp
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="statistics-toolbar-actions">
-          {data && (
-            <ExportDropdown
-              buttonLabel="Xuất báo cáo"
-              size="sm"
-              options={{
-                fileName: 'tong-quan-dot-khao-sat',
-                metadata: {
-                  title: 'BÁO CÁO TỔNG QUAN ĐỢT KHẢO SÁT HỌC PHẦN',
-                  subtitle: `${data.templateName} — ${data.semesterName} năm học ${data.academicYearName}`,
-                  subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
-                  info: {
-                    'Bộ câu hỏi': data.templateName,
-                    'Học kỳ': `${data.semesterName} · ${data.academicYearName}`,
-                    'Số lớp học phần': data.sectionCount,
-                    'Tổng số phiếu thu': data.totalResponseCount,
-                    'Số phiếu hợp lệ': data.validResponseCount,
-                    'Tỷ lệ hoàn thành': `${data.averageCompletionRate.toFixed(1)}%`,
-                    'Điểm trung bình toàn trường': data.overallScore !== null ? data.overallScore.toFixed(2) : '—',
-                  },
-                  summaryNotes: [
-                    'Số liệu tính toán từ kết quả các phiếu khảo sát hợp lệ qua bộ lọc.',
-                  ],
-                },
-                columns: [
-                  { key: 'facultyName', header: 'Khoa / Viện', width: 28 },
-                  { key: 'averageScore', header: 'Điểm TB', width: 14, type: 'number' as const, align: 'right' as const, format: (v: any) => Number(v).toFixed(2) },
-                  { key: 'sectionsBelowThreshold', header: 'Số lớp dưới ngưỡng', width: 18, type: 'number' as const, align: 'right' as const },
-                ],
-                data: data.faculties,
-              }}
-            />
-          )}
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => void loadData()}
-            disabled={!semesterSurveyId || loading}
-          >
-            <RefreshCw aria-hidden="true" size={16} />
-            Tải lại
-          </button>
-        </div>
-      </section>
-
-      {loadError && (
-        <div className="admin-alert" role="alert">
-          <CircleAlert aria-hidden="true" />
-          <span>{loadError}</span>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="operations-empty" role="status">
-          <LoaderCircle className="operation-icon auth-spin" aria-hidden="true" />
-          <strong>Đang tổng hợp số liệu...</strong>
-        </div>
-      ) : !semesterSurveyId ? (
-        <div className="operations-empty">
-          <strong>Chọn học kỳ và đợt khảo sát để xem tổng quan.</strong>
-        </div>
-      ) : data === null ? (
-        <div className="operations-empty">
-          <strong>Đợt này chưa có số liệu.</strong>
-        </div>
+      {activeTab === 'comparison' ? (
+        <SurveyComparisonView
+          academicYears={academicYears}
+          allSemesterSurveys={allSurveys.length > 0 ? allSurveys : semesterSurveys}
+        />
       ) : (
-        <DashboardReport data={data} />
+        <>
+          <section className="statistics-toolbar">
+            <label className="form-group">
+              <span>Học kỳ</span>
+              <select value={semesterId} onChange={(event) => setSemesterId(event.target.value)}>
+                <option value="">Chọn học kỳ</option>
+                {semesterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="form-group">
+              <span>Đợt khảo sát</span>
+              <select
+                value={semesterSurveyId}
+                onChange={(event) => setSemesterSurveyId(event.target.value)}
+                disabled={semesterSurveys.length === 0}
+              >
+                {semesterSurveys.length === 0 && <option value="">Chưa có đợt nào</option>}
+                {semesterSurveys.map((survey) => (
+                  <option key={survey.semesterSurveyId} value={String(survey.semesterSurveyId)}>
+                    {survey.templateName} · {survey.sectionSurveyCount} lớp
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="statistics-toolbar-actions">
+              {data && (
+                <ExportDropdown
+                  buttonLabel="Xuất báo cáo"
+                  size="sm"
+                  options={{
+                    fileName: 'tong-quan-dot-khao-sat',
+                    metadata: {
+                      title: 'BÁO CÁO TỔNG QUAN ĐỢT KHẢO SÁT HỌC PHẦN',
+                      subtitle: `${data.templateName} — ${data.semesterName} năm học ${data.academicYearName}`,
+                      subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+                      info: {
+                        'Bộ câu hỏi': data.templateName,
+                        'Học kỳ': `${data.semesterName} · ${data.academicYearName}`,
+                        'Số lớp học phần': data.sectionCount,
+                        'Tổng số phiếu thu': data.totalResponseCount,
+                        'Số phiếu hợp lệ': data.validResponseCount,
+                        'Tỷ lệ hoàn thành': `${data.averageCompletionRate.toFixed(1)}%`,
+                        'Điểm trung bình toàn trường': data.overallScore !== null ? data.overallScore.toFixed(2) : '—',
+                      },
+                      summaryNotes: [
+                        'Số liệu tính toán từ kết quả các phiếu khảo sát hợp lệ qua bộ lọc.',
+                      ],
+                    },
+                    columns: [
+                      { key: 'facultyName', header: 'Khoa / Viện', width: 28 },
+                      { key: 'averageScore', header: 'Điểm TB', width: 14, type: 'number' as const, align: 'right' as const, format: (v: any) => Number(v).toFixed(2) },
+                      { key: 'sectionsBelowThreshold', header: 'Số lớp dưới ngưỡng', width: 18, type: 'number' as const, align: 'right' as const },
+                    ],
+                    data: data.faculties,
+                  }}
+                />
+              )}
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => void loadData()}
+                disabled={!semesterSurveyId || loading}
+              >
+                <RefreshCw aria-hidden="true" size={16} />
+                Tải lại
+              </button>
+            </div>
+          </section>
+
+          {loadError && (
+            <div className="admin-alert" role="alert">
+              <CircleAlert aria-hidden="true" />
+              <span>{loadError}</span>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="operations-empty" role="status">
+              <LoaderCircle className="operation-icon auth-spin" aria-hidden="true" />
+              <strong>Đang tổng hợp số liệu...</strong>
+            </div>
+          ) : !semesterSurveyId ? (
+            <div className="operations-empty">
+              <strong>Chọn học kỳ và đợt khảo sát để xem tổng quan.</strong>
+            </div>
+          ) : data === null ? (
+            <div className="operations-empty">
+              <strong>Đợt này chưa có số liệu.</strong>
+            </div>
+          ) : (
+            <DashboardReport data={data} />
+          )}
+        </>
       )}
     </div>
   );

@@ -314,6 +314,60 @@ export interface SemesterSurveyDashboard {
   lecturerVarianceCount: number;
 }
 
+export interface SurveyComparisonPeriod {
+  semesterSurveyId: number;
+  surveyName: string;
+  templateName: string;
+  semesterName: string;
+  academicYearName: string;
+  sectionCount: number;
+  totalResponseCount: number;
+  validResponseCount: number;
+  completionRate: number;
+  overallScore: number | null;
+  belowAverageSectionCount: number;
+  invalidResponseCount: number;
+}
+
+export interface FacultyComparisonItem {
+  facultyId: number;
+  facultyName: string;
+  scoresBySurveyId: Record<number, number | null>;
+  baselineScore: number | null;
+  targetScore: number | null;
+  deltaScore: number | null;
+  trendStatus: 'Improved' | 'Declined' | 'Stable' | 'New' | 'NoData';
+  baselineBelowAverageSections: number;
+  targetBelowAverageSections: number;
+  deltaBelowAverageSections: number;
+}
+
+export interface QuestionComparisonItem {
+  questionOrder: number;
+  questionText: string;
+  scoresBySurveyId: Record<number, number | null>;
+  baselineScore: number | null;
+  targetScore: number | null;
+  deltaScore: number | null;
+}
+
+export interface SurveyComparisonResponse {
+  periods: SurveyComparisonPeriod[];
+  faculties: FacultyComparisonItem[];
+  questions: QuestionComparisonItem[];
+  overallBaselineScore: number | null;
+  overallTargetScore: number | null;
+  overallDeltaScore: number | null;
+  completionRateDelta: number | null;
+  improvedFacultyCount: number;
+  declinedFacultyCount: number;
+  baselineBelowAverageSectionCount: number;
+  targetBelowAverageSectionCount: number;
+  belowAverageSectionDelta: number;
+  baselineInvalidResponseCount: number;
+  targetInvalidResponseCount: number;
+}
+
 export interface RecalculateScoresResult {
   semesterSurveyId: number;
   updatedSectionCount: number;
@@ -456,6 +510,35 @@ export const surveyApi = {
     apiRequest<SemesterSurveyDashboard>(
       `/api/surveys/semester-surveys/${semesterSurveyId}/dashboard`,
     ),
+  /** So sánh kết quả khảo sát tổng quan theo Năm học, Học kỳ hoặc Đợt khảo sát. */
+  compareSurveys: (
+    params:
+      | number[]
+      | {
+          scope?: 'year' | 'semester' | 'survey';
+          baselineId?: number;
+          targetId?: number;
+          surveyIds?: number[];
+        },
+  ) => {
+    if (Array.isArray(params)) {
+      const ids = params.filter((id) => id > 0).join(',');
+      return apiRequest<SurveyComparisonResponse>(
+        `/api/surveys/semester-surveys/comparison?surveyIds=${ids}`,
+      );
+    }
+    const query = new URLSearchParams();
+    if (params.scope && params.baselineId && params.targetId) {
+      query.set('scope', params.scope);
+      query.set('baselineId', String(params.baselineId));
+      query.set('targetId', String(params.targetId));
+    } else if (params.surveyIds?.length) {
+      query.set('surveyIds', params.surveyIds.filter((id) => id > 0).join(','));
+    }
+    return apiRequest<SurveyComparisonResponse>(
+      `/api/surveys/semester-surveys/comparison?${query.toString()}`,
+    );
+  },
   /** So các lớp trong cùng một học phần để tách lỗi học phần khỏi lỗi giảng viên. */
   semesterSurveyCourseDiagnosis: (semesterSurveyId: number) =>
     apiRequest<SemesterSurveyCourseDiagnosis>(

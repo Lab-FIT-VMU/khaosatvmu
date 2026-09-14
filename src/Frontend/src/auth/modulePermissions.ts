@@ -6,6 +6,7 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   'survey-analysis': 'SURVEY_ANALYSIS_ACCESS',
   'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
   'survey-dashboard': 'SURVEY_DASHBOARD_ACCESS',
+  'survey-comparison': 'SURVEY_DASHBOARD_ACCESS',
   faculties: 'FACULTIES_ACCESS',
   departments: 'DEPARTMENTS_ACCESS',
   lecturers: 'LECTURERS_ACCESS',

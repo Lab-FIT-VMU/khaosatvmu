@@ -349,6 +349,60 @@ public sealed record SemesterSurveyDashboardDto(
     /// <summary>Số học phần có biên độ điểm giữa các lớp quá rộng.</summary>
     int LecturerVarianceCount);
 
+/// <summary>Thông tin tóm tắt của một đợt khảo sát trong bảng so sánh.</summary>
+public sealed record SurveyComparisonPeriodDto(
+    int SemesterSurveyId,
+    string SurveyName,
+    string TemplateName,
+    string SemesterName,
+    string AcademicYearName,
+    int SectionCount,
+    int TotalResponseCount,
+    int ValidResponseCount,
+    decimal CompletionRate,
+    decimal? OverallScore,
+    int BelowAverageSectionCount = 0,
+    int InvalidResponseCount = 0);
+
+/// <summary>Số liệu so sánh của một Khoa/Viện giữa các đợt khảo sát.</summary>
+public sealed record SurveyFacultyComparisonDto(
+    int FacultyId,
+    string FacultyName,
+    IReadOnlyDictionary<int, decimal?> ScoresBySurveyId,
+    decimal? BaselineScore,
+    decimal? TargetScore,
+    decimal? DeltaScore,
+    string TrendStatus,
+    int BaselineBelowAverageSections = 0,
+    int TargetBelowAverageSections = 0,
+    int DeltaBelowAverageSections = 0);
+
+/// <summary>Số liệu so sánh từng tiêu chí/câu hỏi giữa các đợt khảo sát.</summary>
+public sealed record SurveyQuestionComparisonDto(
+    int QuestionOrder,
+    string QuestionText,
+    IReadOnlyDictionary<int, decimal?> ScoresBySurveyId,
+    decimal? BaselineScore,
+    decimal? TargetScore,
+    decimal? DeltaScore);
+
+/// <summary>Tổng hợp so sánh giữa các đợt khảo sát toàn trường.</summary>
+public sealed record SurveyComparisonResponseDto(
+    IReadOnlyList<SurveyComparisonPeriodDto> Periods,
+    IReadOnlyList<SurveyFacultyComparisonDto> Faculties,
+    IReadOnlyList<SurveyQuestionComparisonDto> Questions,
+    decimal? OverallBaselineScore,
+    decimal? OverallTargetScore,
+    decimal? OverallDeltaScore,
+    decimal? CompletionRateDelta,
+    int ImprovedFacultyCount,
+    int DeclinedFacultyCount,
+    int BaselineBelowAverageSectionCount = 0,
+    int TargetBelowAverageSectionCount = 0,
+    int BelowAverageSectionDelta = 0,
+    int BaselineInvalidResponseCount = 0,
+    int TargetInvalidResponseCount = 0);
+
 /// <summary>
 /// Dải chỉ số gọn cho bảng điều khiển riêng của trưởng bộ môn. Mỗi con số của bộ môn
 /// đi kèm một con số toàn trường để so — mặt bằng LUÔN tính trên toàn bộ dữ liệu chứ
@@ -826,6 +880,18 @@ public interface ISurveyService
     /// <summary>Tổng quan một đợt khảo sát ở phạm vi toàn trường.</summary>
     Task<SurveyOperationResult<SemesterSurveyDashboardDto>> GetSemesterSurveyDashboardAsync(
         int semesterSurveyId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>So sánh chỉ số tổng hợp giữa nhiều đợt khảo sát (theo đợt, học kỳ hoặc năm học).</summary>
+    Task<SurveyOperationResult<SurveyComparisonResponseDto>> CompareSurveysAsync(
+        IReadOnlyList<int> surveyIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>So sánh tổng quan cấp Trường & Khoa/Viện theo Năm học, Học kỳ hoặc Đợt khảo sát.</summary>
+    Task<SurveyOperationResult<SurveyComparisonResponseDto>> CompareOverviewAsync(
+        string scope,
+        int baselineId,
+        int targetId,
         CancellationToken cancellationToken = default);
 
     /// <summary>

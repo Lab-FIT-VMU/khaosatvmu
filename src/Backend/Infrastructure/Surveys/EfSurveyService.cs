@@ -2655,6 +2655,379 @@ public sealed class EfSurveyService(
             courseRows.Count(x => x.Verdict == CourseDiagnosisVerdicts.LecturerVariance)));
     }
 
+    public async Task<SurveyOperationResult<SurveyComparisonResponseDto>> CompareSurveysAsync(
+        IReadOnlyList<int> surveyIds,
+        CancellationToken cancellationToken = default)
+    {
+        var targetIds = surveyIds?
+            .Where(x => x > 0)
+            .Distinct()
+            .Take(12)
+            .ToList() ?? [];
+
+        if (targetIds.Count == 0)
+        {
+            return Succeeded(new SurveyComparisonResponseDto(
+                [], [], [], null, null, null, null, 0, 0));
+        }
+
+        var surveys = await db.SemesterSurveys.AsNoTracking()
+            .Where(x => targetIds.Contains(x.SemesterSurveyId) && !x.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        if (surveys.Count == 0)
+        {
+            return Succeeded(new SurveyComparisonResponseDto(
+                [], [], [], null, null, null, null, 0, 0));
+        }
+
+        var headers = new Dictionary<int, SurveyHeader>();
+        foreach (var s in surveys)
+        {
+            var h = await LoadSurveyHeaderAsync(s.SemesterSurveyId, cancellationToken);
+            if (h != null) headers[s.SemesterSurveyId] = h;
+        }
+
+        // Sắp xếp theo trình tự thời gian học kỳ: năm học -> thứ tự kỳ -> đợt khảo sát
+        surveys = surveys
+            .OrderBy(x => headers.TryGetValue(x.SemesterSurveyId, out var h) ? h.AcademicYearName : string.Empty)
+            .ThenBy(x => headers.TryGetValue(x.SemesterSurveyId, out var h) ? h.SemesterName : string.Empty)
+            .ThenBy(x => x.SemesterSurveyId)
+            .ToList();
+
+        var periodDtos = new List<SurveyComparisonPeriodDto>();
+        var facultyScoresBySurvey = new Dictionary<int, Dictionary<int, (string Name, decimal Score)>>();
+        var questionScoresBySurvey = new Dictionary<int, Dictionary<int, (string Text, decimal Score)>>();
+
+        foreach (var survey in surveys)
+        {
+            var sid = survey.SemesterSurveyId;
+            var header = headers.TryGetValue(sid, out var h)
+                ? h
+                : new SurveyHeader(survey.SurveyTemplateId, "Khảo sát", "Học kỳ", "Năm học");
+
+            var allSectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+                .Where(x => x.SemesterSurveyId == sid && !x.IsDeleted)
+                .Select(x => new { x.CourseSectionSurveyId, x.CourseSectionId })
+                .ToListAsync(cancellationToken);
+
+            var sectionIds = allSectionSurveys.Select(x => x.CourseSectionId).ToList();
+            var totalClassSize = await db.CourseSections.AsNoTracking()
+                .Where(x => sectionIds.Contains(x.CourseSectionId))
+                .SumAsync(x => (int?)x.ClassSize, cancellationToken) ?? 0;
+
+            var cssIds = allSectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
+            var totalResponseCount = await db.SurveyResponses.AsNoTracking()
+                .CountAsync(x => cssIds.Contains(x.CourseSectionSurveyId), cancellationToken);
+            var validResponseCount = await db.SurveyResponses.AsNoTracking()
+                .CountAsync(x => cssIds.Contains(x.CourseSectionSurveyId) && x.IsValid, cancellationToken);
+
+            var sections = await LoadAnalysedSectionsAsync(sid, cancellationToken);
+            var overallScore = sections.Count == 0
+                ? (decimal?)null
+                : Math.Round(sections.Average(x => x.AverageScore), 2);
+            var completionRate = totalClassSize == 0
+                ? 0m
+                : Math.Round((decimal)validResponseCount / totalClassSize * 100, 1);
+
+            periodDtos.Add(new SurveyComparisonPeriodDto(
+                sid,
+                string.IsNullOrWhiteSpace(survey.SurveyName) ? header.TemplateName : survey.SurveyName,
+                header.TemplateName,
+                header.SemesterName,
+                header.AcademicYearName,
+                allSectionSurveys.Count,
+                totalResponseCount,
+                validResponseCount,
+                completionRate,
+                overallScore));
+
+            // Gom điểm theo Khoa
+            var facultyScores = sections
+                .Where(x => x.FacultyId.HasValue)
+                .GroupBy(x => new { FacultyId = x.FacultyId!.Value, FacultyName = x.FacultyName ?? "Khoa" })
+                .ToDictionary(
+                    g => g.Key.FacultyId,
+                    g => (Name: g.Key.FacultyName, Score: Math.Round(g.Average(x => x.AverageScore), 2)));
+            facultyScoresBySurvey[sid] = facultyScores;
+        }
+
+        var firstPeriodId = periodDtos[0].SemesterSurveyId;
+        var lastPeriodId = periodDtos[^1].SemesterSurveyId;
+
+        // Xây dựng ma trận Khoa/Viện
+        var allFacultyIds = facultyScoresBySurvey.Values
+            .SelectMany(d => d.Keys)
+            .Distinct()
+            .ToList();
+
+        var facultyComparisons = new List<SurveyFacultyComparisonDto>();
+        foreach (var facId in allFacultyIds)
+        {
+            var facName = facultyScoresBySurvey.Values
+                .Where(d => d.ContainsKey(facId))
+                .Select(d => d[facId].Name)
+                .FirstOrDefault() ?? "Khoa";
+
+            var scoresMap = new Dictionary<int, decimal?>();
+            foreach (var period in periodDtos)
+            {
+                if (facultyScoresBySurvey.TryGetValue(period.SemesterSurveyId, out var dict) && dict.TryGetValue(facId, out var pair))
+                {
+                    scoresMap[period.SemesterSurveyId] = pair.Score;
+                }
+                else
+                {
+                    scoresMap[period.SemesterSurveyId] = null;
+                }
+            }
+
+            var baseline = scoresMap[firstPeriodId];
+            var target = scoresMap[lastPeriodId];
+            decimal? delta = null;
+            var trend = "NoData";
+
+            if (baseline.HasValue && target.HasValue)
+            {
+                delta = Math.Round(target.Value - baseline.Value, 2);
+                trend = delta >= 0.1m ? "Improved" : (delta <= -0.1m ? "Declined" : "Stable");
+            }
+            else if (target.HasValue)
+            {
+                trend = "New";
+            }
+
+            facultyComparisons.Add(new SurveyFacultyComparisonDto(
+                facId,
+                facName,
+                scoresMap,
+                baseline,
+                target,
+                delta,
+                trend));
+        }
+
+        facultyComparisons = facultyComparisons
+            .OrderByDescending(x => x.DeltaScore ?? -999)
+            .ThenByDescending(x => x.TargetScore ?? 0)
+            .ToList();
+
+        var overallBaseline = periodDtos[0].OverallScore;
+        var overallTarget = periodDtos[^1].OverallScore;
+        decimal? overallDelta = overallBaseline.HasValue && overallTarget.HasValue
+            ? Math.Round(overallTarget.Value - overallBaseline.Value, 2)
+            : null;
+
+        var completionRateDelta = Math.Round(periodDtos[^1].CompletionRate - periodDtos[0].CompletionRate, 1);
+        var improvedFaculties = facultyComparisons.Count(x => x.TrendStatus == "Improved");
+        var declinedFaculties = facultyComparisons.Count(x => x.TrendStatus == "Declined");
+
+        return Succeeded(new SurveyComparisonResponseDto(
+            periodDtos,
+            facultyComparisons,
+            [],
+            overallBaseline,
+            overallTarget,
+            overallDelta,
+            completionRateDelta,
+            improvedFaculties,
+            declinedFaculties));
+    }
+
+    public async Task<SurveyOperationResult<SurveyComparisonResponseDto>> CompareOverviewAsync(
+        string scope,
+        int baselineId,
+        int targetId,
+        CancellationToken cancellationToken = default)
+    {
+        string nameA = "Mốc A", nameB = "Mốc B";
+        string subA = string.Empty, subB = string.Empty;
+        List<int> surveyIdsA = [];
+        List<int> surveyIdsB = [];
+
+        var normalizedScope = (scope ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalizedScope is "year" or "academic_year")
+        {
+            var yearA = await db.AcademicYears.AsNoTracking().FirstOrDefaultAsync(y => y.AcademicYearId == baselineId, cancellationToken);
+            var yearB = await db.AcademicYears.AsNoTracking().FirstOrDefaultAsync(y => y.AcademicYearId == targetId, cancellationToken);
+            nameA = yearA != null ? yearA.AcademicYearName : $"Năm học {baselineId}";
+            nameB = yearB != null ? yearB.AcademicYearName : $"Năm học {targetId}";
+            subA = "Toàn bộ năm học";
+            subB = "Toàn bộ năm học";
+
+            var semIdsA = await db.Semesters.AsNoTracking().Where(s => s.AcademicYearId == baselineId).Select(s => s.SemesterId).ToListAsync(cancellationToken);
+            var semIdsB = await db.Semesters.AsNoTracking().Where(s => s.AcademicYearId == targetId).Select(s => s.SemesterId).ToListAsync(cancellationToken);
+
+            surveyIdsA = await db.SemesterSurveys.AsNoTracking().Where(s => semIdsA.Contains(s.SemesterId) && !s.IsDeleted).Select(s => s.SemesterSurveyId).ToListAsync(cancellationToken);
+            surveyIdsB = await db.SemesterSurveys.AsNoTracking().Where(s => semIdsB.Contains(s.SemesterId) && !s.IsDeleted).Select(s => s.SemesterSurveyId).ToListAsync(cancellationToken);
+        }
+        else if (normalizedScope is "semester")
+        {
+            var semA = await db.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.SemesterId == baselineId, cancellationToken);
+            var semB = await db.Semesters.AsNoTracking().FirstOrDefaultAsync(s => s.SemesterId == targetId, cancellationToken);
+            var yearA = semA != null ? await db.AcademicYears.AsNoTracking().FirstOrDefaultAsync(y => y.AcademicYearId == semA.AcademicYearId, cancellationToken) : null;
+            var yearB = semB != null ? await db.AcademicYears.AsNoTracking().FirstOrDefaultAsync(y => y.AcademicYearId == semB.AcademicYearId, cancellationToken) : null;
+
+            nameA = semA != null ? semA.SemesterName : $"Học kỳ {baselineId}";
+            nameB = semB != null ? semB.SemesterName : $"Học kỳ {targetId}";
+            subA = yearA?.AcademicYearName ?? string.Empty;
+            subB = yearB?.AcademicYearName ?? string.Empty;
+
+            surveyIdsA = await db.SemesterSurveys.AsNoTracking().Where(s => s.SemesterId == baselineId && !s.IsDeleted).Select(s => s.SemesterSurveyId).ToListAsync(cancellationToken);
+            surveyIdsB = await db.SemesterSurveys.AsNoTracking().Where(s => s.SemesterId == targetId && !s.IsDeleted).Select(s => s.SemesterSurveyId).ToListAsync(cancellationToken);
+        }
+        else // survey
+        {
+            var sA = await db.SemesterSurveys.AsNoTracking().FirstOrDefaultAsync(s => s.SemesterSurveyId == baselineId && !s.IsDeleted, cancellationToken);
+            var sB = await db.SemesterSurveys.AsNoTracking().FirstOrDefaultAsync(s => s.SemesterSurveyId == targetId && !s.IsDeleted, cancellationToken);
+            var hA = sA != null ? await LoadSurveyHeaderAsync(sA.SemesterSurveyId, cancellationToken) : null;
+            var hB = sB != null ? await LoadSurveyHeaderAsync(sB.SemesterSurveyId, cancellationToken) : null;
+
+            nameA = sA?.SurveyName ?? hA?.TemplateName ?? $"Đợt {baselineId}";
+            nameB = sB?.SurveyName ?? hB?.TemplateName ?? $"Đợt {targetId}";
+            subA = hA != null ? $"{hA.SemesterName} · {hA.AcademicYearName}" : string.Empty;
+            subB = hB != null ? $"{hB.SemesterName} · {hB.AcademicYearName}" : string.Empty;
+
+            surveyIdsA = [baselineId];
+            surveyIdsB = [targetId];
+        }
+
+        var (periodA, facultyScoresA) = await AggregatePeriodStatsAsync(baselineId, nameA, subA, surveyIdsA, cancellationToken);
+        var (periodB, facultyScoresB) = await AggregatePeriodStatsAsync(targetId, nameB, subB, surveyIdsB, cancellationToken);
+
+        var allFacultyIds = facultyScoresA.Keys.Union(facultyScoresB.Keys).Distinct().ToList();
+        var facultyComparisons = new List<SurveyFacultyComparisonDto>();
+
+        foreach (var fid in allFacultyIds)
+        {
+            var facName = facultyScoresA.TryGetValue(fid, out var aPair) ? aPair.Name : (facultyScoresB.TryGetValue(fid, out var bPair) ? bPair.Name : "Khoa");
+            decimal? scoreA = facultyScoresA.TryGetValue(fid, out var pA) ? pA.Score : null;
+            decimal? scoreB = facultyScoresB.TryGetValue(fid, out var pB) ? pB.Score : null;
+            int belowA = facultyScoresA.TryGetValue(fid, out var bA) ? bA.BelowAverageCount : 0;
+            int belowB = facultyScoresB.TryGetValue(fid, out var bB) ? bB.BelowAverageCount : 0;
+            int deltaBelow = belowB - belowA;
+            decimal? delta = null;
+            var trend = "NoData";
+
+            if (scoreA.HasValue && scoreB.HasValue)
+            {
+                delta = Math.Round(scoreB.Value - scoreA.Value, 2);
+                trend = delta >= 0.1m ? "Improved" : (delta <= -0.1m ? "Declined" : "Stable");
+            }
+            else if (scoreB.HasValue)
+            {
+                trend = "New";
+            }
+
+            var scoresMap = new Dictionary<int, decimal?>
+            {
+                [baselineId] = scoreA,
+                [targetId] = scoreB
+            };
+
+            facultyComparisons.Add(new SurveyFacultyComparisonDto(
+                fid,
+                facName,
+                scoresMap,
+                scoreA,
+                scoreB,
+                delta,
+                trend,
+                belowA,
+                belowB,
+                deltaBelow));
+        }
+
+        facultyComparisons = facultyComparisons
+            .OrderByDescending(x => x.DeltaScore ?? -999)
+            .ThenByDescending(x => x.TargetScore ?? 0)
+            .ToList();
+
+        decimal? overallDelta = (periodA.OverallScore.HasValue && periodB.OverallScore.HasValue)
+            ? Math.Round(periodB.OverallScore.Value - periodA.OverallScore.Value, 2)
+            : null;
+
+        var completionRateDelta = Math.Round(periodB.CompletionRate - periodA.CompletionRate, 1);
+        var improvedCount = facultyComparisons.Count(x => x.TrendStatus == "Improved");
+        var declinedCount = facultyComparisons.Count(x => x.TrendStatus == "Declined");
+        var belowAvgDelta = periodB.BelowAverageSectionCount - periodA.BelowAverageSectionCount;
+
+        return Succeeded(new SurveyComparisonResponseDto(
+            [periodA, periodB],
+            facultyComparisons,
+            [],
+            periodA.OverallScore,
+            periodB.OverallScore,
+            overallDelta,
+            completionRateDelta,
+            improvedCount,
+            declinedCount,
+            periodA.BelowAverageSectionCount,
+            periodB.BelowAverageSectionCount,
+            belowAvgDelta,
+            periodA.InvalidResponseCount,
+            periodB.InvalidResponseCount));
+    }
+
+    private async Task<(SurveyComparisonPeriodDto Period, Dictionary<int, (string Name, decimal Score, int BelowAverageCount)> Faculties)>
+        AggregatePeriodStatsAsync(
+            int periodId,
+            string periodName,
+            string subTitle,
+            IReadOnlyList<int> surveyIds,
+            CancellationToken ct)
+    {
+        if (surveyIds.Count == 0)
+        {
+            return (new SurveyComparisonPeriodDto(
+                periodId, periodName, subTitle, string.Empty, string.Empty, 0, 0, 0, 0m, null, 0, 0), []);
+        }
+
+        List<AnalysedSection> sections = [];
+        foreach (var sid in surveyIds)
+        {
+            var list = await LoadAnalysedSectionsAsync(sid, ct);
+            sections.AddRange(list);
+        }
+
+        var totalClassSize = sections.Sum(x => x.ClassSize);
+        var totalResponses = sections.Sum(x => x.ResponseCount);
+        var validResponses = sections.Sum(x => x.ValidResponseCount);
+        var invalidResponses = Math.Max(0, totalResponses - validResponses);
+        var scoredList = sections.Where(x => x.AverageScore > 0).Select(x => x.AverageScore).ToList();
+        decimal? overallScore = scoredList.Count > 0 ? Math.Round(scoredList.Average(), 2) : null;
+        var completionRate = totalClassSize > 0 ? Math.Round((decimal)validResponses / totalClassSize * 100, 1) : 0m;
+        var belowAverageSectionCount = scoredList.Count(score => overallScore.HasValue && score < overallScore.Value);
+
+        var periodDto = new SurveyComparisonPeriodDto(
+            periodId,
+            periodName,
+            subTitle,
+            subTitle,
+            string.Empty,
+            sections.Count,
+            totalResponses,
+            validResponses,
+            completionRate,
+            overallScore,
+            belowAverageSectionCount,
+            invalidResponses);
+
+        var faculties = sections
+            .Where(x => x.FacultyId.HasValue && x.AverageScore > 0)
+            .GroupBy(x => new { Id = x.FacultyId!.Value, Name = x.FacultyName ?? "Khoa khác" })
+            .ToDictionary(
+                g => g.Key.Id,
+                g => (
+                    Name: g.Key.Name,
+                    Score: Math.Round(g.Average(x => x.AverageScore), 2),
+                    BelowAverageCount: overallScore.HasValue ? g.Count(x => x.AverageScore < overallScore.Value) : 0
+                )
+            );
+
+        return (periodDto, faculties);
+    }
+
     public async Task<SurveyOperationResult<SurveyScopeAnalysisDto>> GetSurveyScopeAnalysisAsync(
         int semesterSurveyId,
         string scopeType,

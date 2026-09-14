@@ -157,3 +157,358 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Tab Navigation & Comparison Styles
+   --------------------------------------------------------------------------- */
+
+.dashboard-tab-bar {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 14px;
+  background: transparent;
+}
+
+.dashboard-nav-tab {
+  padding: 8px 16px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: -2px;
+}
+
+.dashboard-nav-tab:hover {
+  color: #0788b8;
+}
+
+.dashboard-nav-tab.is-active {
+  color: #0788b8;
+  border-bottom-color: #0788b8;
+  background: rgba(7, 136, 184, 0.05);
+  border-radius: 4px 4px 0 0;
+}
+
+/* Comparison Toolbar */
+.survey-comparison-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.comparison-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  color: #94a3b8;
+  padding: 0 4px;
+}
+
+/* Comparison KPI Row */
+.comparison-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.comparison-kpi-card {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid #dfe4e8;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.comparison-kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+
+.comparison-kpi-values {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.comparison-kpi-values .kpi-val.is-target {
+  color: #0f172a;
+}
+
+.comparison-kpi-values .kpi-separator {
+  color: #94a3b8;
+  font-weight: 400;
+  font-size: 16px;
+}
+
+.comparison-kpi-badge {
+  margin-top: 6px;
+}
+
+.comparison-kpi-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.comparison-kpi-count strong {
+  font-size: 22px;
+}
+
+.comparison-kpi-count.is-positive {
+  color: #16a34a;
+}
+
+.comparison-kpi-count.is-negative {
+  color: #dc2626;
+}
+
+/* Delta Badges */
+.delta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.delta-badge.is-positive {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.delta-badge.is-negative {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.delta-badge.is-neutral {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* Status Pills */
+.status-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-pill.is-improved {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-pill.is-declined {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-pill.is-stable {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.status-pill.is-new {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.status-pill.is-nodata {
+  color: #94a3b8;
+}
+
+.block-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.comparison-search {
+  max-width: 180px;
+}
+
+.comparison-grid {
+  grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr);
+}
+
+@media (max-width: 900px) {
+  .comparison-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Vùng cuộn của tab So sánh */
+.survey-comparison-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+}
+
+.comparison-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 40px;
+}
+
+.comparison-guidance-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  color: #166534;
+  font-size: 12px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.comparison-guidance-banner .guidance-icon {
+  flex-shrink: 0;
+  color: #15803d;
+  margin-top: 1px;
+}
+
+.comparison-warning-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-left: 4px solid #f59e0b;
+  color: #92400e;
+  font-size: 12px;
+  margin-bottom: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.comparison-swap-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .comparison-swap-btn .swap-text {
+    display: none;
+  }
+}
+
+/* Scope Selector (Năm học / Học kỳ / Đợt) */
+.comparison-scope-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #dfe4e8;
+  border-radius: 4px;
+  flex-wrap: wrap;
+}
+
+.scope-label {
+  font-size: 12px;
+  font-weight: 650;
+  color: #334155;
+}
+
+.scope-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.scope-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scope-tab-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.scope-tab-btn.is-active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(2, 132, 199, 0.2);
+}
+
+.comparison-full-block {
+  width: 100%;
+}
+
+.comparison-faculty-split {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.split-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.split-item.is-positive {
+  color: #16a34a;
+}
+
+.split-item.is-negative {
+  color: #dc2626;
+}
+
+.split-divider {
+  color: #cbd5e1;
+}
