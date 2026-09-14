@@ -1,7 +1,15 @@
-export type ReportWorkspace = 'overview' | 'details';
-/** Tab con của Tổng quan. 'units' là bảng Tổng hợp đơn vị, trước đây là tab lớn. */
-export type ReportAnalysisView = 'faculties' | 'units' | 'quality';
-export type ReportScreen = ReportWorkspace | 'lecturer' | 'survey';
+export type ReportWorkspace = 'overview' | 'details' | 'faculties' | 'departments' | 'courses';
+export type ReportAnalysisView = 'faculties' | 'quality';
+/**
+ * Ba cấp của trang chi tiết mở từ nút "Xem KQ" trên các bảng xếp hạng. Cấp trên
+ * là phạm vi đang xem, cấp dưới là danh sách nằm trong phạm vi đó:
+ * khoa/viện → bộ môn → học phần → lớp học phần.
+ */
+export type ReportScopeType = 'faculty' | 'department' | 'course';
+export type ReportScreen = ReportWorkspace | 'lecturer' | 'survey' | 'scope';
+
+/** Đường dẫn của trang chi tiết. Tách ra để chỗ đọc và chỗ ghi không lệch nhau. */
+export const scopeRouteSegment = 'scope';
 /** Khóa sắp xếp của bảng tra cứu chi tiết — đúng bằng key các cột sắp xếp được. */
 export const reportResultSortKeys = [
   'courseCode',
@@ -44,6 +52,9 @@ export interface ReportRouteState {
   unidentifiedLecturer?: UnidentifiedLecturerRef;
   surveyId?: number;
   parentLecturerId?: number;
+  /** Chỉ có nghĩa khi `screen` là `scope`. */
+  scopeType?: ReportScopeType;
+  scopeId?: number;
   analysisView?: ReportAnalysisView;
   comparisonSemesterId?: number;
   resultSortKey?: ReportResultSortKey;
@@ -81,12 +92,26 @@ export const parseReportRoute = (hash = window.location.hash): ReportRouteState 
   let lecturerId: number | undefined;
   let surveyId: number | undefined;
   let unidentifiedLecturer: UnidentifiedLecturerRef | undefined;
+  let scopeType: ReportScopeType | undefined;
+  let scopeId: number | undefined;
 
-  if (routeSegment === 'details' || routeSegment === 'overview') {
+  if (routeSegment === 'details' || routeSegment === 'overview'
+    || routeSegment === 'faculties' || routeSegment === 'departments' || routeSegment === 'courses') {
     screen = routeSegment;
+  } else if (routeSegment === scopeRouteSegment) {
+    // `/reports/scope/khoa-vien/15` — cấp và mã đơn vị phải cùng có, thiếu một
+    // trong hai thì rơi về trang tổng quan chứ không mở trang chi tiết rỗng.
+    const routeScopeType = segments[2];
+    const routeScopeId = positiveInt(segments[3]);
+    if ((routeScopeType === 'faculty' || routeScopeType === 'department'
+      || routeScopeType === 'course') && routeScopeId) {
+      scopeType = routeScopeType;
+      scopeId = routeScopeId;
+      screen = 'scope';
+    }
   } else if (routeSegment === 'rankings') {
-    // Link cũ: 'rankings' từng là tab lớn, nay là tab con 'units' của Tổng quan.
-    screen = 'overview';
+    // Link cũ của bảng tổng hợp đơn vị chuyển về tab Khoa / Viện mới.
+    screen = 'faculties';
   } else if (routeSegment === 'lecturers') {
     lecturerId = positiveInt(segments[2]);
     if (!lecturerId && segments[2] === 'unidentified') unidentifiedLecturer = namedLecturer;
@@ -101,9 +126,7 @@ export const parseReportRoute = (hash = window.location.hash): ReportRouteState 
 
   const analysis = query.get('analysis');
   const analysisView: ReportAnalysisView | undefined =
-    analysis === 'quality' || analysis === 'units' || analysis === 'faculties'
-      ? analysis
-      : undefined;
+    analysis === 'quality' || analysis === 'faculties' ? analysis : undefined;
   const sort = query.get('sort');
   const resultSortKey = reportResultSortKeys.find((key) => key === sort);
 
@@ -119,6 +142,8 @@ export const parseReportRoute = (hash = window.location.hash): ReportRouteState 
     unidentifiedLecturer,
     surveyId,
     parentLecturerId,
+    scopeType,
+    scopeId,
     analysisView,
     comparisonSemesterId: positiveInt(query.get('compare')),
     resultSortKey,
@@ -128,7 +153,13 @@ export const parseReportRoute = (hash = window.location.hash): ReportRouteState 
 
 export const buildReportHash = (route: ReportRouteState): string => {
   let path = `/reports/${route.screen}`;
-  if (route.screen === 'lecturer' && route.lecturerId) {
+  if (route.screen === 'scope') {
+    // Trang chi tiết cần đủ cấp lẫn mã đơn vị mới dựng lại được. Thiếu thì rơi về
+    // bảng tra cứu chi tiết thay vì ghi ra một đường dẫn không đọc ngược được.
+    path = route.scopeType && route.scopeId
+      ? `/reports/${scopeRouteSegment}/${route.scopeType}/${route.scopeId}`
+      : '/reports/details';
+  } else if (route.screen === 'lecturer' && route.lecturerId) {
     path = `/reports/lecturers/${route.lecturerId}`;
   } else if (route.screen === 'lecturer' && route.unidentifiedLecturer) {
     path = '/reports/lecturers/unidentified';

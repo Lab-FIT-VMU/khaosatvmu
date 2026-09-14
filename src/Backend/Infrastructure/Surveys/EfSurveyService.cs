@@ -1852,7 +1852,7 @@ public sealed class EfSurveyService(
         }
 
         var counts = await db.SurveyResponses
-            .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId))
+            .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId) && !x.IsDeleted)
             .GroupBy(x => x.CourseSectionSurveyId)
             .Select(group => new
             {
@@ -1875,7 +1875,7 @@ public sealed class EfSurveyService(
         }
 
         var counts = await db.SurveyResponses
-            .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId))
+            .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId) && !x.IsDeleted)
             .GroupBy(x => x.CourseSectionSurveyId)
             .Select(group => new { CourseSectionSurveyId = group.Key, Count = group.Count() })
             .ToListAsync(cancellationToken);
@@ -2114,14 +2114,16 @@ public sealed class EfSurveyService(
             .GroupBy(x => x.CourseSectionSurveyId)
             .ToDictionary(g => g.Key, g => g.ToDictionary(x => x.QuestionId, x => x));
 
-        // Số phiếu đọc từ ẢNH CHỤP đã ghi trên "CourseSectionSurveys", không đếm
-        // sống từ "SurveyResponses". Cả trang này lẫn mọi trang báo cáo phải cùng
-        // nói về một lần bấm "Tính lại điểm"; đếm sống thì cột số phiếu nhảy theo
-        // phiếu mới về trong khi cột điểm vẫn là số cũ, hai nửa của cùng một dòng
-        // thuộc hai thời điểm khác nhau.
+        // Số phiếu đếm TRỰC TIẾP từ "SurveyResponses" để phản ánh số phiếu thực tế
+        // sinh viên đã nộp tại thời điểm xem.
+        // Riêng điểm trung bình và điểm từng câu vẫn đọc từ ảnh chụp đã chốt
+        // để đảm bảo không bị nhảy múa khi chưa bấm nút "Tính lại điểm".
+        var liveValidityCounts = await ResponseValidityCountsAsync(cssIds, cancellationToken);
         var responseTallies = sectionSurveys.ToDictionary(
             x => x.CourseSectionSurveyId,
-            x => new { Total = x.TotalResponseCount, Valid = x.ValidResponseCount });
+            x => liveValidityCounts.TryGetValue(x.CourseSectionSurveyId, out var counts)
+                ? new { Total = counts.Total, Valid = counts.Valid }
+                : new { Total = 0, Valid = 0 });
 
         // Số phiếu có điền ô "Ý kiến khác" — chỉ đếm ô cuối bài, không đếm câu
         // thuộc thang tự nhập chữ.
@@ -3298,6 +3300,13 @@ public sealed class EfSurveyService(
             })
             .ToListAsync(cancellationToken);
 
+        // Khoá mục của từng câu, để giao diện tách phần phân tích theo mục đúng như
+        // trang bài khảo sát của một lớp.
+        var sectionKeys = await QuestionSectionScores.KeysAsync(
+            db,
+            questions.Select(x => x.QuestionId).ToList(),
+            cancellationToken);
+
         var scoredQuestionIds = questions
             .Where(x => x.AttentionCheckValue == null && x.ScaleKind == AnswerScaleKinds.Options)
             .Select(x => x.QuestionId)
@@ -3393,9 +3402,13 @@ public sealed class EfSurveyService(
                     distribution,
                     q.ScaleKind,
                     q.AnswerScaleName,
-                    null);
+                    null,
+                    sectionKeys.GetValueOrDefault(q.QuestionId) ?? SurveySectionCatalog.Other);
             })
             .ToList();
+
+        // Điểm từng mục, cùng công thức với trang bài khảo sát của một lớp.
+        var sectionScores = await QuestionSectionScores.ScoresAsync(db, cssIds, cancellationToken);
 
         List<DepartmentSummaryRowDto>? scopeDepartments = null;
         List<CourseDiagnosisRowDto>? scopeCourses = null;
@@ -3512,6 +3525,7 @@ public sealed class EfSurveyService(
             sections.Sum(x => x.ValidResponseCount),
             Math.Round(sections.Average(x => x.AverageScore), 2),
             questionRows,
+            sectionScores,
             Departments: scopeDepartments,
             Courses: scopeCourses,
             Sections: scopeSections));

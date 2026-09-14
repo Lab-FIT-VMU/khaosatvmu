@@ -45,6 +45,22 @@ export const QuestionAnalysisTabs: React.FC<QuestionAnalysisTabsProps> = ({
       ? overallAverageScore
       : sectionScores?.find((item) => item.sectionKey === activeTab)?.averageScore ?? undefined;
 
+  const tabExportMetadata = React.useMemo(() => {
+    if (!chartProps.exportMetadata) return undefined;
+    const tabSuffix = activeTab !== 'all' ? ` (${active.label})` : '';
+    return {
+      ...chartProps.exportMetadata,
+      title: chartProps.exportMetadata.title
+        ? `${chartProps.exportMetadata.title}${tabSuffix}`
+        : undefined,
+      tabName: active.label,
+      info: {
+        ...chartProps.exportMetadata.info,
+        'Nhóm câu hỏi': active.label,
+      },
+    };
+  }, [chartProps.exportMetadata, activeTab, active.label]);
+
   return (
     <div className="question-analysis-tabs">
       <div
@@ -73,6 +89,7 @@ export const QuestionAnalysisTabs: React.FC<QuestionAnalysisTabsProps> = ({
           // Dựng lại biểu đồ khi đổi tab để không giữ cột đang rê chuột của tab trước.
           key={activeTab}
           {...chartProps}
+          exportMetadata={tabExportMetadata}
           questions={questionsOf(activeTab)}
           overallAverageScore={averageScore}
           averageLabel={active.averageLabel}

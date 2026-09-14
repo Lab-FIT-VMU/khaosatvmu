@@ -68,8 +68,32 @@ import type {
   SystemStats,
 } from './types';
 
+/** Link cũ mở thẳng trang chi tiết của module Thống kê chi tiết. */
+const legacyScopeHashPattern = /^#\/?survey-analysis\/(faculty|department|course)\/(\d+)/;
+
+/**
+ * Trang chi tiết theo phạm vi đã chuyển sang module Thống kê & Báo cáo. Link cũ
+ * được đổi trước khi chọn tab, không thì thanh điều hướng tô sáng mục Thống kê
+ * chi tiết rồi mới nhảy sang mục đúng.
+ */
+function redirectLegacyScopeHash() {
+  const match = legacyScopeHashPattern.exec(window.location.hash);
+  if (!match) return;
+  const [, scopeType, scopeId] = match;
+  // Bỏ `tab` của trang cũ: cấp chi tiết suy ra từ chính đường dẫn, không từ tab.
+  const query = new URLSearchParams(window.location.hash.slice(match[0].length).replace(/^\?/, ''));
+  query.delete('tab');
+  const queryString = query.toString();
+  window.history.replaceState(
+    null,
+    '',
+    `#/reports/scope/${scopeType}/${scopeId}${queryString ? `?${queryString}` : ''}`,
+  );
+}
+
 function getInitialTab(): string {
   if (typeof window === 'undefined') return 'overview';
+  redirectLegacyScopeHash();
   return getHashRoot();
 }
 
@@ -124,6 +148,7 @@ function DashboardApp() {
 
   useEffect(() => {
     const handleHashChange = () => {
+      redirectLegacyScopeHash();
       const tab = getHashRoot();
       if (tab !== currentTab) {
         setCurrentTabState(tab);

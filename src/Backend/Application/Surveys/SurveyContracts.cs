@@ -254,6 +254,7 @@ public sealed record ScopeAnalysisOptionDto(
     int Count,
     decimal Percentage);
 
+/// <summary>Một câu hỏi trong bảng phân tích của một phạm vi.</summary>
 public sealed record ScopeAnalysisQuestionDto(
     int QuestionId,
     int QuestionOrder,
@@ -263,7 +264,9 @@ public sealed record ScopeAnalysisQuestionDto(
     IReadOnlyList<ScopeAnalysisOptionDto> OptionDistribution,
     string ScaleKind,
     string AnswerScaleName,
-    IReadOnlyList<string>? TextAnswers);
+    IReadOnlyList<string>? TextAnswers,
+    /// <summary>Khoá mục của câu trong <see cref="SurveySectionCatalog"/>, để giao diện tách theo mục.</summary>
+    string SectionKey);
 
 /// <summary>
 /// Kết quả chi tiết theo từng câu hỏi cho một khoa/viện, bộ môn hoặc học phần
@@ -282,6 +285,8 @@ public sealed record SurveyScopeAnalysisDto(
     int ResponseCount,
     decimal AverageScore,
     IReadOnlyList<ScopeAnalysisQuestionDto> Questions,
+    /// <summary>Điểm từng mục câu hỏi, cùng công thức với trang bài khảo sát của một lớp.</summary>
+    IReadOnlyList<QuestionSectionScoreDto> SectionScores,
     IReadOnlyList<DepartmentSummaryRowDto>? Departments = null,
     IReadOnlyList<CourseDiagnosisRowDto>? Courses = null,
     IReadOnlyList<NormalizedSectionDto>? Sections = null);

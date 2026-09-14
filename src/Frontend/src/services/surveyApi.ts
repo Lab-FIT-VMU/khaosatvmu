@@ -3,6 +3,7 @@ import type {
   AnswerScaleKind,
   CourseSectionSurvey,
   PublicSurvey,
+  QuestionAnalysisSectionScore,
   QuestionRating,
   SemesterSurvey,
   SurveyResponseDetail,
@@ -192,6 +193,8 @@ export interface SurveyScopeAnalysis {
   responseCount: number;
   averageScore: number;
   questions: QuestionRating[];
+  /** Điểm từng mục câu hỏi, để tách phần phân tích theo mục như trang bài khảo sát một lớp. */
+  sectionScores?: QuestionAnalysisSectionScore[] | null;
   departments?: DepartmentSummaryRow[] | null;
   courses?: CourseDiagnosisRow[] | null;
   sections?: NormalizedSection[] | null;

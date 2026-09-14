@@ -11,7 +11,6 @@ import {
 import { useAuth } from '../auth/authContext';
 import { isReadOnlyRole, isUnrestrictedRole } from '../auth/roles';
 import { useSemester } from '../context/semesterContext';
-import { QuestionAnalysisChart } from '../components/QuestionAnalysisChart';
 import { TablePagination } from '../components/TablePagination';
 import { usePaginatedItems } from '../hooks/usePaginatedItems';
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
@@ -26,16 +25,12 @@ import {
   surveyErrorMessage,
 } from '../services/surveyApi';
 import type {
-  CourseDiagnosisRow,
-  DepartmentSummaryRow,
   LecturerOption,
   LecturerReport,
-  NormalizedSection,
   SemesterSurveyCourseDiagnosis,
   SemesterSurveyDepartmentSummary,
   SemesterSurveyNormalization,
   SurveyAnalysisScopeType,
-  SurveyScopeAnalysis,
 } from '../services/surveyApi';
 import type { SemesterSurvey } from '../types';
 import '../styles/survey-operations.css';
@@ -248,7 +243,8 @@ type TabId =
   | 'courses'
   | 'lecturer';
 
-interface ScopeSelection {
+/** Cấp bị bấm vào để mở trang chi tiết: một khoa/viện, một bộ môn hay một học phần. */
+interface AnalysisScopeTarget {
   type: SurveyAnalysisScopeType;
   id: number;
 }
@@ -257,7 +253,6 @@ interface AnalysisRouteState {
   tab: TabId;
   semesterId?: number;
   semesterSurveyId?: number;
-  selection: ScopeSelection | null;
   lecturerId?: number;
 }
 
@@ -270,49 +265,36 @@ const tabIds: readonly TabId[] = [
 ];
 
 function parseAnalysisRoute(hash = window.location.hash): AnalysisRouteState {
-  const [pathPart, queryPart = ''] = hash.replace(/^#\/?/, '').split('?');
-  const segments = pathPart.split('/').filter(Boolean);
+  const [, queryPart = ''] = hash.replace(/^#\/?/, '').split('?');
   const query = new URLSearchParams(queryPart);
   const routeTab = query.get('tab');
-  const scopeType = segments[1];
-  const scopeId = Number(segments[2]);
-  const selection: ScopeSelection | null =
-    (scopeType === 'faculty' || scopeType === 'department' || scopeType === 'course')
-      && Number.isInteger(scopeId)
-      && scopeId > 0
-      ? { type: scopeType, id: scopeId }
-      : null;
-  const inferredTab: TabId = selection?.type === 'department'
-    ? 'departments'
-    : selection?.type === 'course'
-      ? 'courses'
-      : 'normalization';
   const semesterId = Number(query.get('semester'));
   const semesterSurveyId = Number(query.get('campaign'));
   const lecturerId = Number(query.get('lecturer'));
 
   return {
-    tab: tabIds.includes(routeTab as TabId) ? routeTab as TabId : inferredTab,
+    tab: tabIds.includes(routeTab as TabId) ? routeTab as TabId : 'normalization',
     semesterId: Number.isInteger(semesterId) && semesterId > 0 ? semesterId : undefined,
     semesterSurveyId: Number.isInteger(semesterSurveyId) && semesterSurveyId > 0
       ? semesterSurveyId
       : undefined,
-    selection,
     lecturerId: Number.isInteger(lecturerId) && lecturerId > 0 ? lecturerId : undefined,
   };
 }
 
+/**
+ * Trang này chỉ còn các tab tổng hợp; trang chi tiết theo phạm vi đã chuyển sang
+ * module Thống kê & Báo cáo. Link cũ dạng `/survey-analysis/{cấp}/{id}` được
+ * `App` đổi hướng trước khi chọn tab, nên ở đây không cần dựng lại đường dẫn đó.
+ */
 function buildAnalysisHash(route: AnalysisRouteState): string {
-  const path = route.selection
-    ? `/survey-analysis/${route.selection.type}/${route.selection.id}`
-    : '/survey-analysis';
   const query = new URLSearchParams();
   if (route.semesterId) query.set('semester', String(route.semesterId));
   if (route.semesterSurveyId) query.set('campaign', String(route.semesterSurveyId));
   if (route.tab !== 'normalization') query.set('tab', route.tab);
   if (route.tab === 'lecturer' && route.lecturerId) query.set('lecturer', String(route.lecturerId));
   const queryString = query.toString();
-  return `#${path}${queryString ? `?${queryString}` : ''}`;
+  return `#/survey-analysis${queryString ? `?${queryString}` : ''}`;
 }
 
 /**
@@ -334,13 +316,13 @@ const tabs: { id: TabId; label: string; hint: string; minimumRole: 'unrestricted
   },
   {
     id: 'departments',
-    label: 'Tổng hợp theo khoa/viện',
+    label: 'Phân tích theo bộ môn',
     hint: 'Phục vụ trưởng khoa: mỗi dòng là một bộ môn trong đợt khảo sát.',
     minimumRole: 'manager',
   },
   {
     id: 'courses',
-    label: 'Tổng hợp theo bộ môn',
+    label: 'Phân tích theo học phần',
     hint: 'So các lớp trong cùng một học phần để biết vấn đề nằm ở học phần hay ở giảng viên.',
     minimumRole: 'manager',
   },
@@ -504,12 +486,10 @@ export const SurveyAnalysisPage: React.FC = () => {
   const [lecturers, setLecturers] = useState<LecturerOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [scopeSelection, setScopeSelection] = useState<ScopeSelection | null>(initialRoute.selection);
   const [selectedLecturerId, setSelectedLecturerId] = useState<number | null>(initialRoute.lecturerId ?? null);
 
   const applyRoute = useCallback((route: AnalysisRouteState) => {
     setTab(route.tab);
-    setScopeSelection(route.selection);
     setSelectedLecturerId(route.lecturerId ?? null);
     if (route.semesterId) setSemesterId(String(route.semesterId));
     if (route.semesterId) {
@@ -519,13 +499,21 @@ export const SurveyAnalysisPage: React.FC = () => {
 
   const navigateAnalysis = useCallback((route: AnalysisRouteState, replace = false) => {
     const method = replace ? 'replaceState' : 'pushState';
-    window.history[method](
-      route.selection ? { surveyAnalysisDrilldown: true } : null,
-      '',
-      buildAnalysisHash(route),
-    );
+    window.history[method](null, '', buildAnalysisHash(route));
     applyRoute(route);
   }, [applyRoute]);
+
+  /**
+   * Ba tab tổng hợp mở ra trang chi tiết của một khoa/viện, bộ môn hay học phần.
+   * Trang đó giờ chỉ có MỘT bản, nằm trong module Thống kê & Báo cáo — trước đây
+   * mỗi module dựng một bản riêng nên bộ cột lệch nhau. Đi từ đây sang đó là đổi
+   * module thật, nên phải đặt hash của module đích chứ không điều hướng nội bộ.
+   */
+  const openScopeDetail = useCallback((target: AnalysisScopeTarget) => {
+    if (!semesterSurveyId) return;
+    window.location.hash = `/reports/scope/${target.type}/${target.id}`
+      + `?semester=${semesterId}&campaign=${semesterSurveyId}`;
+  }, [semesterId, semesterSurveyId]);
 
   useEffect(() => {
     const handleRouteChange = () => applyRoute(parseAnalysisRoute());
@@ -700,7 +688,6 @@ export const SurveyAnalysisPage: React.FC = () => {
       tab: fallback.id,
       semesterId: Number(semesterId) || undefined,
       semesterSurveyId: Number(semesterSurveyId) || undefined,
-      selection: null,
     }, true);
   }, [navigateAnalysis, semesterId, semesterSurveyId, tab, visibleTabs]);
   const thresholds = useScoringThresholds();
@@ -1085,41 +1072,6 @@ export const SurveyAnalysisPage: React.FC = () => {
     return null;
   }, [tab, normalization, departments, courses, lecturers, semesterSurveys, semesterSurveyId, flipCount]);
 
-  if (scopeSelection && semesterSurveyId) {
-    return (
-      <div className="survey-operations-page survey-statistics-page survey-analysis-page">
-        <ScopeAnalysisDetail
-          semesterSurveyId={Number(semesterSurveyId)}
-          selection={scopeSelection}
-          onBack={() => {
-            if (window.history.state?.surveyAnalysisDrilldown) {
-              window.history.back();
-              return;
-            }
-            navigateAnalysis({
-              tab,
-              semesterId: Number(semesterId) || undefined,
-              semesterSurveyId: Number(semesterSurveyId) || undefined,
-              selection: null,
-            }, true);
-          }}
-          onDrillDown={(nextSelection) => {
-            navigateAnalysis({
-              tab,
-              semesterId: Number(semesterId) || undefined,
-              semesterSurveyId: Number(semesterSurveyId) || undefined,
-              selection: nextSelection,
-            });
-          }}
-          onOpenSurvey={(courseSectionSurveyId) => {
-            window.location.hash = `/reports/surveys/${courseSectionSurveyId}`
-              + `?semester=${semesterId}&campaign=${semesterSurveyId}`;
-          }}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="survey-operations-page survey-statistics-page survey-analysis-page">
       {/* Dùng đúng khối tiêu đề của các trang danh mục. Lớp .operations-header
@@ -1141,7 +1093,6 @@ export const SurveyAnalysisPage: React.FC = () => {
                 tab,
                 semesterId: Number(nextSemesterId) || undefined,
                 semesterSurveyId: undefined,
-                selection: null,
               });
             }}
           >
@@ -1166,7 +1117,6 @@ export const SurveyAnalysisPage: React.FC = () => {
                 tab,
                 semesterId: Number(semesterId) || undefined,
                 semesterSurveyId: Number(nextCampaignId) || undefined,
-                selection: null,
               });
             }}
             options={semesterSurveys.map((survey) => ({
@@ -1204,7 +1154,6 @@ export const SurveyAnalysisPage: React.FC = () => {
                 tab: item.id,
                 semesterId: Number(semesterId) || undefined,
                 semesterSurveyId: Number(semesterSurveyId) || undefined,
-                selection: null,
               });
             }}
           >
@@ -1229,12 +1178,7 @@ export const SurveyAnalysisPage: React.FC = () => {
         <NormalizationGroupTab
           data={normalization}
           note={tabNote}
-          onOpenDetail={(selection) => navigateAnalysis({
-            tab,
-            semesterId: Number(semesterId) || undefined,
-            semesterSurveyId: Number(semesterSurveyId) || undefined,
-            selection,
-          })}
+          onOpenDetail={openScopeDetail}
         />
       ) : tab === 'normalizationSections' ? (
         <NormalizationSectionTab
@@ -1249,23 +1193,13 @@ export const SurveyAnalysisPage: React.FC = () => {
         <DepartmentTab
           data={departments}
           note={tabNote}
-          onOpenDetail={(selection) => navigateAnalysis({
-            tab,
-            semesterId: Number(semesterId) || undefined,
-            semesterSurveyId: Number(semesterSurveyId) || undefined,
-            selection,
-          })}
+          onOpenDetail={openScopeDetail}
         />
       ) : tab === 'courses' ? (
         <CourseDiagnosisTab
           data={courses}
           note={tabNote}
-          onOpenDetail={(selection) => navigateAnalysis({
-            tab,
-            semesterId: Number(semesterId) || undefined,
-            semesterSurveyId: Number(semesterSurveyId) || undefined,
-            selection,
-          })}
+          onOpenDetail={openScopeDetail}
         />
       ) : (
         <LecturerTab
@@ -1279,7 +1213,6 @@ export const SurveyAnalysisPage: React.FC = () => {
               tab: 'lecturer',
               semesterId: Number(semesterId) || undefined,
               semesterSurveyId: Number(semesterSurveyId) || undefined,
-              selection: null,
               lecturerId: id ?? undefined,
             });
           }}
@@ -1296,506 +1229,6 @@ export const SurveyAnalysisPage: React.FC = () => {
 // ------------------------------------------------ Chuẩn hoá điểm
 // Hai bảng tách làm hai tab: xếp chồng trong một tab thì bảng dưới bị đẩy khỏi
 // tầm nhìn, phải cuộn qua hết bảng khoa mới thấy.
-
-const scopeLabels: Record<SurveyAnalysisScopeType, string> = {
-  faculty: 'Khoa / Viện',
-  department: 'Bộ môn',
-  course: 'Học phần',
-};
-
-const ScopeDepartmentsTable: React.FC<{
-  departments: DepartmentSummaryRow[];
-  onOpenDetail: (selection: ScopeSelection) => void;
-}> = ({ departments, onOpenDetail }) => {
-  const columns = useMemo<FilterableColumn<DepartmentSummaryRow>[]>(() => [
-    { key: 'departmentName', value: (row) => row.departmentName },
-    { key: 'sectionCount', value: (row) => String(row.sectionCount), numeric: true },
-    { key: 'lecturerCount', value: (row) => String(row.lecturerCount), numeric: true },
-    { key: 'totalClassSize', value: (row) => String(row.totalClassSize ?? 0), numeric: true },
-    { key: 'responseCount', value: (row) => String(row.responseCount ?? 0), numeric: true },
-    { key: 'validResponseCount', value: (row) => String(row.validResponseCount ?? 0), numeric: true },
-    {
-      key: 'validResponseRate',
-      value: (row) => `${(row.validResponseRate ?? 0).toFixed(1)}%`,
-      sortValue: (row) => row.validResponseRate ?? 0,
-    },
-    {
-      key: 'averageScore',
-      value: (row) => (typeof row.averageScore === 'number' ? row.averageScore.toFixed(2) : '—'),
-      sortValue: (row) => row.averageScore,
-    },
-    { key: 'warningSectionCount', value: (row) => String(row.warningSectionCount ?? 0), numeric: true },
-  ], []);
-  const filters = useColumnFilters(departments, columns);
-  const pagination = usePaginatedItems(filters.visibleRows, analysisPageSize);
-
-  return (
-    <div className="analysis-scope-subtable">
-      <div className="analysis-subtable-heading">
-        <h3>Danh sách các bộ môn ({departments.length})</h3>
-        <p className="analysis-subtable-hint">Bấm vào tên bộ môn để xem chi tiết thống kê và các học phần của bộ môn đó.</p>
-      </div>
-      <div className="statistics-table-scroll" tabIndex={0} aria-label="Danh sách bộ môn">
-        {/* Không dùng `--fill`: nó kéo bảng cao bằng khung cuộn để dòng tổng kết nằm
-            sát đáy, mà bảng này không có dòng tổng kết lẫn ô đệm — nên chỗ thừa bị
-            chia đều cho các dòng và mỗi dòng phình to gấp đôi chuẩn. */}
-        <table className="statistics-table">
-          <thead>
-            <tr>
-              <th scope="col" style={{ textAlign: 'left', minWidth: 200 }}>
-                {filters.filterHeader('departmentName', 'Bộ môn')}
-              </th>
-              <th scope="col">{filters.filterHeader('sectionCount', 'Số lớp')}</th>
-              <th scope="col">{filters.filterHeader('lecturerCount', 'Số GV')}</th>
-              <th scope="col">{filters.filterHeader('totalClassSize', 'Tổng sĩ số')}</th>
-              <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu thu về')}</th>
-              <th scope="col">{filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}</th>
-              <th scope="col" title="Số phiếu hợp lệ chia tổng sĩ số">
-                {filters.filterHeader('validResponseRate', 'Tỷ lệ hợp lệ')}
-              </th>
-              <th scope="col">{filters.filterHeader('averageScore', 'Điểm trung bình')}</th>
-              <th scope="col" title="Lớp có điểm thấp hơn trung bình toàn trường từ 1 độ lệch chuẩn trở lên">
-                {filters.filterHeader('warningSectionCount', 'Lớp cảnh báo')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagination.visibleItems.map((row) => (
-              <tr
-                key={row.departmentId ?? row.departmentName}
-                className={row.departmentId === null ? undefined : 'analysis-drill-row'}
-                onClick={row.departmentId === null ? undefined : () => onOpenDetail({
-                  type: 'department',
-                  id: row.departmentId!,
-                })}
-              >
-                <td style={{ textAlign: 'left' }} title={row.departmentName}>
-                  {row.departmentId === null ? row.departmentName : (
-                    <button
-                      type="button"
-                      className="analysis-drill-link"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onOpenDetail({
-                          type: 'department',
-                          id: row.departmentId!,
-                        });
-                      }}
-                    >
-                      {row.departmentName}
-                    </button>
-                  )}
-                </td>
-                <td className="num">{row.sectionCount}</td>
-                <td className="num">{row.lecturerCount}</td>
-                <td className="num">{row.totalClassSize}</td>
-                <td className="num">{row.responseCount}</td>
-                <td className="num">{row.validResponseCount}</td>
-                <td className="num">{row.validResponseRate.toFixed(1)}%</td>
-                <td className={scoreClass(row.averageScore)}>
-                  {row.averageScore === null ? '—' : row.averageScore.toFixed(2)}
-                </td>
-                <td className={row.warningSectionCount > 0 ? 'num is-flagged' : 'num'}>
-                  {row.warningSectionCount}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <TablePagination
-          page={pagination.page}
-          pageSize={analysisPageSize}
-          totalItems={filters.visibleRows.length}
-          itemLabel="bộ môn"
-          onPageChange={pagination.setPage}
-        />
-      </div>
-    </div>
-  );
-};
-
-const ScopeCoursesTable: React.FC<{
-  courses: CourseDiagnosisRow[];
-  onOpenDetail: (selection: ScopeSelection) => void;
-}> = ({ courses, onOpenDetail }) => {
-  const columns = useMemo<FilterableColumn<CourseDiagnosisRow>[]>(() => [
-    { key: 'courseCode', value: (row) => row.courseCode },
-    { key: 'courseName', value: (row) => row.courseName },
-    { key: 'sectionCount', value: (row) => String(row.sectionCount), numeric: true },
-    { key: 'lecturerCount', value: (row) => String(row.lecturerCount), numeric: true },
-    { key: 'averageScore', value: (row) => row.averageScore.toFixed(2), numeric: true },
-    { key: 'minScore', value: (row) => row.minScore.toFixed(2), numeric: true },
-    { key: 'maxScore', value: (row) => row.maxScore.toFixed(2), numeric: true },
-    { key: 'spread', value: (row) => row.spread.toFixed(2), numeric: true },
-    {
-      key: 'weakestQuestionOrder',
-      value: (row) => (row.weakestQuestionOrder === null ? '—' : `C${row.weakestQuestionOrder}`),
-      sortValue: (row) => row.weakestQuestionOrder,
-    },
-    {
-      key: 'weakestQuestionScore',
-      value: (row) => (row.weakestQuestionScore === null ? '—' : row.weakestQuestionScore.toFixed(2)),
-      sortValue: (row) => row.weakestQuestionScore,
-    },
-  ], []);
-  const filters = useColumnFilters(courses, columns);
-  const pagination = usePaginatedItems(filters.visibleRows, analysisPageSize);
-
-  return (
-    <div className="analysis-scope-subtable">
-      <div className="analysis-subtable-heading">
-        <h3>Danh sách các học phần ({courses.length})</h3>
-        <p className="analysis-subtable-hint">Bấm vào tên học phần để xem chi tiết thống kê và các lớp học phần của học phần đó.</p>
-      </div>
-      <div className="statistics-table-scroll" tabIndex={0} aria-label="Danh sách học phần">
-        <table className="statistics-table">
-          <thead>
-            <tr>
-              <th className="col-left col-course-1" scope="col">
-                {filters.filterHeader('courseCode', 'Mã HP')}
-              </th>
-              <th className="col-left col-course-2" scope="col">
-                {filters.filterHeader('courseName', 'Học phần')}
-              </th>
-              <th scope="col" style={{ width: '8%' }}>
-                {filters.filterHeader('sectionCount', 'Số lớp')}
-              </th>
-              <th scope="col" style={{ width: '8%' }}>
-                {filters.filterHeader('lecturerCount', 'Số GV')}
-              </th>
-              <th scope="col" style={{ width: '10%' }}>
-                {filters.filterHeader('averageScore', 'Điểm TB')}
-              </th>
-              <th scope="col" style={{ width: '11%' }}>
-                {filters.filterHeader('minScore', 'Lớp thấp nhất')}
-              </th>
-              <th scope="col" style={{ width: '11%' }}>
-                {filters.filterHeader('maxScore', 'Lớp cao nhất')}
-              </th>
-              <th scope="col" style={{ width: '11%' }} title="Điểm lớp cao nhất trừ điểm lớp thấp nhất">
-                {filters.filterHeader('spread', 'Chênh lệch')}
-              </th>
-              <th scope="col" style={{ width: '9%' }}>
-                {filters.filterHeader('weakestQuestionOrder', 'Câu yếu nhất')}
-              </th>
-              <th scope="col" style={{ width: '10%' }}>
-                {filters.filterHeader('weakestQuestionScore', 'Điểm câu yếu')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagination.visibleItems.map((row) => (
-              <tr
-                key={row.courseId}
-                className="analysis-drill-row"
-                onClick={() => onOpenDetail({
-                  type: 'course',
-                  id: row.courseId,
-                })}
-              >
-                <td className="col-left col-course-1">
-                  <span className="operations-code">{row.courseCode}</span>
-                </td>
-                <td className="col-left col-course-2" title={row.courseName}>
-                  <button
-                    type="button"
-                    className="analysis-drill-link"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onOpenDetail({
-                        type: 'course',
-                        id: row.courseId,
-                      });
-                    }}
-                  >
-                    {row.courseName}
-                  </button>
-                </td>
-                <td className="num">{row.sectionCount}</td>
-                <td className="num">{row.lecturerCount}</td>
-                <td className={scoreClass(row.averageScore)}>{row.averageScore.toFixed(2)}</td>
-                <td className={scoreClass(row.minScore)}>{row.minScore.toFixed(2)}</td>
-                <td className={scoreClass(row.maxScore)}>{row.maxScore.toFixed(2)}</td>
-                <td className={spreadClass(row.spread)}>{row.spread.toFixed(2)}</td>
-                <td title={row.weakestQuestionText ?? undefined}>
-                  {row.weakestQuestionOrder === null ? '—' : `C${row.weakestQuestionOrder}`}
-                </td>
-                <td className="num">
-                  {row.weakestQuestionScore === null ? '—' : row.weakestQuestionScore.toFixed(2)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <TablePagination
-          page={pagination.page}
-          pageSize={analysisPageSize}
-          totalItems={filters.visibleRows.length}
-          itemLabel="học phần"
-          onPageChange={pagination.setPage}
-        />
-      </div>
-    </div>
-  );
-};
-
-const ScopeSectionsTable: React.FC<{
-  sections: NormalizedSection[];
-  onOpenSurvey: (courseSectionSurveyId: number) => void;
-}> = ({ sections, onOpenSurvey }) => {
-  const columns = useMemo<FilterableColumn<NormalizedSection>[]>(() => [
-    { key: 'courseCode', value: (row) => row.courseCode },
-    { key: 'sectionName', value: (row) => row.sectionName },
-    { key: 'courseName', value: (row) => row.courseName },
-    { key: 'lecturerName', value: (row) => row.lecturerName },
-    { key: 'departmentName', value: (row) => row.departmentName },
-    { key: 'facultyName', value: (row) => row.facultyName },
-    { key: 'classSize', value: (row) => String(row.classSize), numeric: true },
-    { key: 'averageScore', value: (row) => row.averageScore.toFixed(2), numeric: true },
-    {
-      key: 'zSchool',
-      value: (row) => (row.zSchool === null ? '—' : row.zSchool.toFixed(2)),
-      sortValue: (row) => row.zSchool,
-    },
-    {
-      key: 'zFaculty',
-      value: (row) => (row.zFaculty === null ? '—' : row.zFaculty.toFixed(2)),
-      sortValue: (row) => row.zFaculty,
-    },
-    {
-      key: 'zDifference',
-      value: (row) => (row.zDifference === null ? '—' : row.zDifference.toFixed(2)),
-      sortValue: (row) => row.zDifference,
-    },
-  ], []);
-  const filters = useColumnFilters(sections, columns);
-  const pagination = usePaginatedItems(filters.visibleRows, analysisPageSize);
-
-  return (
-    <div className="analysis-scope-subtable">
-      <div className="analysis-subtable-heading">
-        <h3>Danh sách các lớp học phần ({sections.length})</h3>
-        <p className="analysis-subtable-hint">Bấm vào mã hoặc lớp để xem toàn bộ kết quả và phiếu khảo sát của lớp.</p>
-      </div>
-      <div className="statistics-table-scroll" tabIndex={0} aria-label="Danh sách lớp học phần">
-        <table className="statistics-table">
-          <thead>
-            <tr>
-              <th className="col-left col-left-1" scope="col">
-                {filters.filterHeader('courseCode', 'Mã HP')}
-              </th>
-              <th className="col-left col-left-2" scope="col">
-                {filters.filterHeader('sectionName', 'Lớp')}
-              </th>
-              <th className="col-left col-left-3" scope="col">
-                {filters.filterHeader('courseName', 'Học phần')}
-              </th>
-              <th scope="col" style={{ width: '13%' }}>
-                {filters.filterHeader('lecturerName', 'Giảng viên')}
-              </th>
-              <th scope="col" style={{ width: '11%' }}>
-                {filters.filterHeader('departmentName', 'Bộ môn')}
-              </th>
-              <th scope="col" style={{ width: '11%' }}>
-                {filters.filterHeader('facultyName', 'Khoa / Viện')}
-              </th>
-              <th scope="col" style={{ width: '5%' }}>
-                {filters.filterHeader('classSize', 'Sĩ số')}
-              </th>
-              <th scope="col" style={{ width: '7%' }}>
-                {filters.filterHeader('averageScore', 'Điểm')}
-              </th>
-              <th scope="col" style={{ width: '10%' }}>
-                {filters.filterHeader('zSchool', 'Z-Score toàn trường')}
-              </th>
-              <th scope="col" style={{ width: '10%' }}>
-                {filters.filterHeader('zFaculty', 'Z-Score trong khoa')}
-              </th>
-              <th scope="col" style={{ width: '9%' }}>
-                {filters.filterHeader('zDifference', 'Chênh lệch Z-Score')}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {pagination.visibleItems.map((section) => (
-              <tr
-                key={section.courseSectionSurveyId}
-                className="analysis-drill-row"
-                onClick={() => onOpenSurvey(section.courseSectionSurveyId)}
-              >
-                <td className="col-left col-left-1">
-                  <button
-                    type="button"
-                    className="analysis-drill-link operations-code"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onOpenSurvey(section.courseSectionSurveyId);
-                    }}
-                    title={`Xem kết quả lớp ${section.courseCode} - ${section.sectionName}`}
-                  >
-                    {section.courseCode}
-                  </button>
-                </td>
-                <td className="col-left col-left-2">{section.sectionName}</td>
-                <td className="col-left col-left-3" title={section.courseName}>
-                  {section.courseName}
-                </td>
-                <td>{section.lecturerName}</td>
-                <td>{section.departmentName}</td>
-                <td>{section.facultyName}</td>
-                <td className="num">{section.classSize}</td>
-                <td className={zTierClass(section.zFaculty)}>
-                  {section.averageScore.toFixed(2)}
-                </td>
-                <td className={zTierClass(section.zSchool)}>
-                  {section.zSchool === null
-                    ? '—'
-                    : `${section.zSchool > 0 ? '+' : ''}${section.zSchool.toFixed(2)}`}
-                </td>
-                <td className={zTierClass(section.zFaculty)}>
-                  {section.zFaculty === null
-                    ? '—'
-                    : `${section.zFaculty > 0 ? '+' : ''}${section.zFaculty.toFixed(2)}`}
-                </td>
-                <td className="num">
-                  {section.zDifference === null
-                    ? '—'
-                    : `${section.zDifference > 0 ? '+' : ''}${section.zDifference.toFixed(2)}`}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <TablePagination
-          page={pagination.page}
-          pageSize={analysisPageSize}
-          totalItems={filters.visibleRows.length}
-          itemLabel="lớp"
-          onPageChange={pagination.setPage}
-        />
-      </div>
-    </div>
-  );
-};
-
-const ScopeAnalysisDetail: React.FC<{
-  semesterSurveyId: number;
-  selection: ScopeSelection;
-  onBack: () => void;
-  onDrillDown: (selection: ScopeSelection) => void;
-  onOpenSurvey: (courseSectionSurveyId: number) => void;
-}> = ({ semesterSurveyId, selection, onBack, onDrillDown, onOpenSurvey }) => {
-  const [data, setData] = useState<SurveyScopeAnalysis | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setData(await surveyApi.semesterSurveyScopeAnalysis(
-        semesterSurveyId,
-        selection.type,
-        selection.id,
-      ));
-      setError(null);
-    } catch (nextError) {
-      setData(null);
-      setError(messageFrom(nextError));
-    } finally {
-      setLoading(false);
-    }
-  }, [semesterSurveyId, selection.id, selection.type]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (loading) {
-    return (
-      <div className="operations-empty" role="status">
-        <LoaderCircle className="operation-icon auth-spin" aria-hidden="true" />
-        <strong>Đang tải thống kê điểm chi tiết...</strong>
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className="analysis-scope-error">
-        <div className="admin-alert" role="alert">
-          <CircleAlert aria-hidden="true" />
-          <span>{error ?? 'Không có dữ liệu chi tiết cho dòng này.'}</span>
-        </div>
-        <div className="analysis-scope-actions">
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>
-            <ArrowLeft aria-hidden="true" size={16} />
-            Quay lại bảng
-          </button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void load()}>
-            <RefreshCw aria-hidden="true" size={16} />
-            Thử lại
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="analysis-scope-detail">
-      <section className="section-responses-summary" aria-label="Thông tin phạm vi phân tích">
-        <div className="section-responses-heading">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm section-responses-back"
-            onClick={onBack}
-            title="Quay lại bảng phân tích"
-            aria-label="Quay lại bảng phân tích"
-          >
-            <ArrowLeft className="operation-icon" aria-hidden="true" />
-          </button>
-          <h2>{data.scopeName}</h2>
-          <p>
-            {scopeLabels[data.scopeType]} · {data.templateName} · {data.semesterName} · {data.academicYearName}
-          </p>
-        </div>
-        <div className="section-responses-stats">
-          <span>{data.sectionCount} lớp · tổng sĩ số {data.totalClassSize.toLocaleString('vi-VN')}</span>
-          <span>Điểm trung bình {data.averageScore.toFixed(2)}</span>
-          <span>{data.responseCount.toLocaleString('vi-VN')} phiếu hợp lệ</span>
-        </div>
-      </section>
-
-      <QuestionAnalysisChart
-        questions={data.questions}
-        overallAverageScore={data.averageScore}
-        responseCount={data.responseCount}
-        title={`Phân tích điểm chi tiết theo câu hỏi · ${scopeLabels[data.scopeType]}`}
-        showDistributionTable
-      />
-
-      {data.scopeType === 'faculty' && data.departments && data.departments.length > 0 && (
-        <ScopeDepartmentsTable
-          departments={data.departments}
-          onOpenDetail={onDrillDown}
-        />
-      )}
-
-      {data.scopeType === 'department' && data.courses && data.courses.length > 0 && (
-        <ScopeCoursesTable
-          courses={data.courses}
-          onOpenDetail={onDrillDown}
-        />
-      )}
-
-      {data.scopeType === 'course' && data.sections && data.sections.length > 0 && (
-        <ScopeSectionsTable
-          sections={data.sections}
-          onOpenSurvey={onOpenSurvey}
-        />
-      )}
-    </div>
-  );
-};
 
 const NormalizationSummary: React.FC<{
   data: SemesterSurveyNormalization;
@@ -1838,7 +1271,7 @@ const emptyWithNote = (note: React.ReactNode, message: string) => (
 
 const NormalizationGroupTab: React.FC<{
   data: SemesterSurveyNormalization | null;
-  onOpenDetail: (selection: ScopeSelection) => void;
+  onOpenDetail: (selection: AnalysisScopeTarget) => void;
   note?: React.ReactNode;
 }> = ({ data, onOpenDetail, note }) => {
   const groups = useMemo(() => data?.groups ?? [], [data]);
@@ -2114,7 +1547,7 @@ const NormalizationSectionTab: React.FC<{
 
 const DepartmentTab: React.FC<{
   data: SemesterSurveyDepartmentSummary | null;
-  onOpenDetail: (selection: ScopeSelection) => void;
+  onOpenDetail: (selection: AnalysisScopeTarget) => void;
   note?: React.ReactNode;
 }> = ({ data, onOpenDetail, note }) => {
   const rows = useMemo(() => data?.rows ?? [], [data]);
@@ -2178,7 +1611,7 @@ const DepartmentTab: React.FC<{
         {note}
       </section>
 
-      <div className="statistics-table-scroll" tabIndex={0} aria-label="Tổng hợp theo bộ môn">
+      <div className="statistics-table-scroll" tabIndex={0} aria-label="Phân tích theo bộ môn">
         <table className="statistics-table statistics-table--fill">
           <thead>
             <tr>
@@ -2292,7 +1725,7 @@ const DepartmentTab: React.FC<{
 
 const CourseDiagnosisTab: React.FC<{
   data: SemesterSurveyCourseDiagnosis | null;
-  onOpenDetail: (selection: ScopeSelection) => void;
+  onOpenDetail: (selection: AnalysisScopeTarget) => void;
   note?: React.ReactNode;
 }> = ({ data, onOpenDetail, note }) => {
   const rows = useMemo(() => data?.rows ?? [], [data]);
@@ -2340,7 +1773,7 @@ const CourseDiagnosisTab: React.FC<{
         {note}
       </section>
 
-      <div className="statistics-table-scroll" tabIndex={0} aria-label="Chẩn đoán theo học phần">
+      <div className="statistics-table-scroll" tabIndex={0} aria-label="Phân tích theo học phần">
         <table className="statistics-table">
           <thead>
             <tr>

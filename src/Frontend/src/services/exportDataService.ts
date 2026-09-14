@@ -838,8 +838,10 @@ export async function exportToPdf(options: AnyExportOptions): Promise<void> {
     );
 
     entries.forEach(([key, val]) => {
-      doc.text(`• ${key}: ${val}`, margin, currentY);
-      currentY += 4.2;
+      const fullText = `• ${key}: ${val}`;
+      const lines = doc.splitTextToSize(fullText, pageWidth - margin * 2);
+      doc.text(lines, margin, currentY);
+      currentY += lines.length * 4.2;
     });
   }
 

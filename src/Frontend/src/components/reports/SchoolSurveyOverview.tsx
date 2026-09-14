@@ -27,8 +27,6 @@ interface SchoolSurveyOverviewProps {
   semesterSurveyId?: number;
   analysisView: ReportAnalysisView;
   onAnalysisViewChange: (view: ReportAnalysisView) => void;
-  /** Nội dung tab con "Tổng hợp đơn vị", do trang cha dựng và truyền xuống. */
-  unitsPanel?: React.ReactNode;
   onDrillDown?: (filter: SchoolOverviewDrillDown) => void;
 }
 
@@ -47,7 +45,6 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
   semesterSurveyId,
   analysisView,
   onAnalysisViewChange,
-  unitsPanel,
   onDrillDown,
 }) => {
   const [data, setData] = useState<SchoolSurveyOverviewData | null>(null);
@@ -368,15 +365,6 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
             <button
               type="button"
               role="tab"
-              aria-selected={analysisView === 'units'}
-              className={analysisView === 'units' ? 'is-active' : ''}
-              onClick={() => onAnalysisViewChange('units')}
-            >
-              Tổng hợp khoa/viện
-            </button>
-            <button
-              type="button"
-              role="tab"
               aria-selected={analysisView === 'quality'}
               className={analysisView === 'quality' ? 'is-active' : ''}
               onClick={() => onAnalysisViewChange('quality')}
@@ -454,9 +442,6 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
             </div>
           </div>
           )}
-
-          {/* Tổng hợp đơn vị — trang cha dựng, ở đây chỉ đặt vào đúng tab. */}
-          {analysisView === 'units' && unitsPanel}
         </>
       )}
     </section>

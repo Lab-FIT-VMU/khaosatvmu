@@ -15,6 +15,36 @@ export const COMPLETED_COMPLETION_RATE = 50;
 /** Dưới mốc này thì lớp bị coi là chậm tiến độ. Giữa hai mốc là "đang thu". */
 export const LAGGING_COMPLETION_RATE = 20;
 
+/**
+ * Bốn bậc tô màu ô điểm trung bình: đỏ → cam → vàng → xanh. PHẢI trùng
+ * `ReportThresholds.LowScore` / `FairScore` / `GoodScore` bên backend, không thì
+ * cùng một lớp lại được tô hai màu ở hai trang.
+ */
+export const LOW_SCORE = 3.2;
+export const FAIR_SCORE = 3.5;
+export const GOOD_SCORE = 3.8;
+
+/** Lớp CSS của ô điểm, dùng chung cho mọi bảng điểm dựng tay. */
+export const scoreBandClass = (score: number | null): string => {
+  if (score === null) return 'num';
+  if (score < LOW_SCORE) return 'num score-band score-band--bad';
+  if (score < FAIR_SCORE) return 'num score-band score-band--poor';
+  if (score < GOOD_SCORE) return 'num score-band score-band--fair';
+  return 'num score-band score-band--good';
+};
+
+/**
+ * Chênh lệch dưới nửa bậc điểm thì coi như ngang nhau. Giữ ở đây để mọi bảng so
+ * sánh trên trang báo cáo tô cùng một ngưỡng.
+ */
+export const SCORE_DELTA_TOLERANCE = 0.15;
+
+/** Lớp CSS của ô chênh lệch điểm: trên mặt bằng thì xanh, dưới thì cam. */
+export const scoreDeltaClass = (delta: number | null): string => {
+  if (delta === null || Math.abs(delta) < SCORE_DELTA_TOLERANCE) return 'num';
+  return delta > 0 ? 'num score-band score-band--good' : 'num score-band score-band--poor';
+};
+
 /** Tỷ lệ hoàn thành của một lớp: phiếu hợp lệ chia sĩ số, theo phần trăm. */
 export const completionRateOf = (validResponseCount: number, classSize: number): number =>
   classSize > 0 ? (validResponseCount / classSize) * 100 : 0;

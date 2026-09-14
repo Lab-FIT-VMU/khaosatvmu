@@ -370,10 +370,17 @@ export const SurveyStatisticsPage: React.FC = () => {
     const eligible: SectionStatisticsRow[] = [];
     const ineligible: SectionStatisticsRow[] = [];
     for (const row of rows) {
-      (row.averageScore === null ? ineligible : eligible).push(row);
+      const isEligibleNow = hasEnoughResponsesToScore(
+        row.classSize,
+        row.totalResponseCount,
+        row.validResponseCount,
+        thresholds
+      );
+      const isEligible = isEligibleNow || row.averageScore !== null;
+      (isEligible ? eligible : ineligible).push(row);
     }
     return { eligible, ineligible };
-  }, [rows]);
+  }, [rows, thresholds]);
 
   // Trong nhóm đủ điều kiện, lớp đã chốt điểm lên trên, lớp chưa có điểm xuống
   // dưới — phần lớn việc cần làm nằm ở nhóm trên. Sort của JS ổn định nên vẫn
@@ -846,8 +853,8 @@ export const SurveyStatisticsPage: React.FC = () => {
           <div className="operations-empty">
             <strong>
               {tab === 'eligible'
-                ? 'Lần chốt gần nhất chưa có lớp nào qua được hai vòng lọc.'
-                : 'Lần chốt gần nhất mọi lớp đều qua được hai vòng lọc.'}
+                ? 'Hiện chưa có lớp nào đạt đủ ngưỡng số lượng phiếu.'
+                : 'Hiện mọi lớp đều đã đạt đủ ngưỡng số lượng phiếu.'}
             </strong>
           </div>
         ) : (
@@ -1019,13 +1026,35 @@ export const SurveyStatisticsPage: React.FC = () => {
                     })}
                     <td
                       className={
-                        row.averageScore === null && !enoughNow
-                          ? 'num is-total is-muted col-right col-right-4'
+                        row.averageScore === null
+                          ? 'num is-total col-right col-right-4'
                           : 'num is-total col-right col-right-4'
                       }
                       title={row.averageScore === null ? missingScoreReason : undefined}
                     >
-                      {row.averageScore === null ? '—' : row.averageScore.toFixed(2)}
+                      {row.averageScore === null ? (
+                        enoughNow ? (
+                          <span
+                            className="badge badge--warning"
+                            style={{
+                              fontSize: '0.75rem',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: '#fef3c7',
+                              color: '#92400e',
+                              fontWeight: 600,
+                              whiteSpace: 'nowrap',
+                            }}
+                            title="Đã đủ số phiếu, bấm Tính lại điểm để chốt điểm"
+                          >
+                            Chờ chốt điểm
+                          </span>
+                        ) : (
+                          '—'
+                        )
+                      ) : (
+                        row.averageScore.toFixed(2)
+                      )}
                     </td>
                     <td className="col-right col-right-3" title={weakest?.questionText}>
                       {weakest === null || weakest === undefined ? '—' : `C${weakest.order}`}

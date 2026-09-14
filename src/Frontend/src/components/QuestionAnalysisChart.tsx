@@ -1,6 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   BarChart3,
+  ChevronDown,
+  Download,
+  File,
+  FileSpreadsheet,
+  FileText,
+  Image,
+  LoaderCircle,
   Star,
 } from 'lucide-react';
 import {
@@ -16,6 +23,11 @@ import {
   YAxis,
 } from 'recharts';
 import type { QuestionRating } from '../types';
+import {
+  exportQuestionAnalysis,
+  type QuestionAnalysisExportMetadata,
+  type QuestionExportFormat,
+} from '../services/exportQuestionAnalysisService';
 import '../styles/catalogs.css';
 
 export interface QuestionAnalysisChartProps {
@@ -27,6 +39,7 @@ export interface QuestionAnalysisChartProps {
   title?: string;
   showDistributionTable?: boolean;
   emptyMessage?: string;
+  exportMetadata?: QuestionAnalysisExportMetadata;
 }
 
 const getScoreColor = (score: number): string => {
@@ -137,8 +150,49 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
   title = 'Phân tích kết quả theo câu hỏi',
   showDistributionTable = true,
   emptyMessage = 'Chưa có dữ liệu phân tích câu hỏi cho bài khảo sát này.',
+  exportMetadata,
 }) => {
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [activeExportFormat, setActiveExportFormat] = useState<QuestionExportFormat | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setIsExportOpen(false);
+      }
+    };
+    if (isExportOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isExportOpen]);
+
+  const handleExport = async (format: QuestionExportFormat) => {
+    setIsExportOpen(false);
+    if (isExporting) return;
+    setIsExporting(true);
+    setActiveExportFormat(format);
+    try {
+      await exportQuestionAnalysis(format, {
+        questions,
+        overallAverageScore: computedAverage,
+        averageLabel,
+        responseCount,
+        title,
+        metadata: exportMetadata,
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExporting(false);
+      setActiveExportFormat(null);
+    }
+  };
 
   if (!questions || questions.length === 0) {
     return (
@@ -205,7 +259,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
           </span>
         </div>
 
-        <div className="section-analysis-meta">
+        <div className="section-analysis-meta" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {responseCount !== undefined && (
             <span className="analysis-meta-count">
               <strong>{responseCount}</strong> phiếu hợp lệ
@@ -218,6 +272,163 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
               {computedAverage > 0 ? computedAverage.toFixed(2) : '—'} / 5.0
             </strong>
           </span>
+
+          {/* Menu Xuất kết quả các câu hỏi & biểu đồ */}
+          <div className="export-dropdown-wrapper" ref={exportMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm export-dropdown-trigger"
+              onClick={() => setIsExportOpen(!isExportOpen)}
+              disabled={isExporting}
+              aria-haspopup="true"
+              aria-expanded={isExportOpen}
+              title="Xuất kết quả các câu hỏi kèm biểu đồ ra PDF, Word, Excel hoặc PNG"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              {isExporting ? (
+                <LoaderCircle className="animate-spin" size={14} aria-hidden="true" />
+              ) : (
+                <Download size={14} aria-hidden="true" />
+              )}
+              <span>
+                {isExporting ? `Đang xuất ${activeExportFormat?.toUpperCase()}...` : 'Xuất kết quả & biểu đồ'}
+              </span>
+              <ChevronDown size={13} aria-hidden="true" className={isExportOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
+            </button>
+
+            {isExportOpen && (
+              <div
+                className="export-dropdown-menu"
+                role="menu"
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: 'calc(100% + 4px)',
+                  zIndex: 1000,
+                  minWidth: '220px',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '6px',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.08)',
+                  padding: '4px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                }}
+              >
+                <button
+                  type="button"
+                  className="export-menu-item"
+                  role="menuitem"
+                  onClick={() => void handleExport('pdf')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: '#1e293b',
+                    background: 'none',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <File size={16} color="#dc2626" aria-hidden="true" />
+                  <span>Xuất PDF (<strong>kèm biểu đồ in ấn</strong>)</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="export-menu-item"
+                  role="menuitem"
+                  onClick={() => void handleExport('docx')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: '#1e293b',
+                    background: 'none',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <FileText size={16} color="#2563eb" aria-hidden="true" />
+                  <span>Xuất Word (<strong>kèm biểu đồ .docx</strong>)</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="export-menu-item"
+                  role="menuitem"
+                  onClick={() => void handleExport('xlsx')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: '#1e293b',
+                    background: 'none',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <FileSpreadsheet size={16} color="#16a34a" aria-hidden="true" />
+                  <span>Xuất Excel (<strong>bảng điểm & phân bố</strong>)</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="export-menu-item"
+                  role="menuitem"
+                  onClick={() => void handleExport('png')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: '#1e293b',
+                    background: 'none',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <Image size={16} color="#8b5cf6" aria-hidden="true" />
+                  <span>Tải ảnh biểu đồ (<strong>.png</strong>)</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

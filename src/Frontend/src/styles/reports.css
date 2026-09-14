@@ -1025,6 +1025,10 @@
   scroll-margin-top: 16px;
 }
 
+.reports-aggregate-workspace {
+  padding-top: 12px;
+}
+
 /* Chip phạm vi khi bảng bị khoanh vùng từ drill-down của tab Tổng quan. */
 .reports-scope-chips {
   display: flex;
@@ -1326,6 +1330,7 @@
 
 @media (max-width: 600px) {
   .reports-workspace-tabs {
+    flex-wrap: wrap;
     gap: 4px;
     padding: 4px;
   }

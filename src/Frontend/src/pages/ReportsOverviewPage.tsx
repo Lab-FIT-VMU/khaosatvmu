@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import {
   BarChart3,
+  BookOpen,
+  Building2,
   Check,
   ChevronDown,
   ChevronRight,
@@ -12,6 +14,7 @@ import {
   LayoutDashboard,
   ListFilter,
   LoaderCircle,
+  Network,
   ShieldAlert,
   X,
 } from 'lucide-react';
@@ -20,8 +23,10 @@ import { useSemester } from '../context/semesterContext';
 import { DataTable, type Column, type DataTableSortDirection } from '../components/DataTable';
 import { QuestionAnalysisTabs } from '../components/QuestionAnalysisTabs';
 import { SchoolSurveyOverview } from '../components/reports/SchoolSurveyOverview';
+import { ScopeAnalysisDetail, type ScopeSelection } from '../components/reports/ScopeAnalysisDetail';
 import { SectionSurveyResponsesPage } from './SectionSurveyResponsesPage';
 import { catalogApi } from '../services/catalogApi';
+import type { ExportColumn } from '../services/exportDataService';
 import { reportApi } from '../services/reportApi';
 import { surveyApi } from '../services/surveyApi';
 import {
@@ -30,12 +35,14 @@ import {
   type ReportAnalysisView,
   type ReportRouteState,
   type ReportResultSortKey,
+  type ReportScopeType,
   type ReportWorkspace,
   type UnidentifiedLecturerRef,
 } from './reportRoute';
 import type {
   Department,
   Faculty,
+  Course,
   Lecturer,
   LecturerPerformanceReport,
   SemesterSurvey,
@@ -48,6 +55,8 @@ import {
   hasEnoughResponsesToScore,
   responseRateOf,
 } from '../utils/reportThresholds';
+import { toVietnameseFileSlug } from '../utils/vietnamese';
+import type { QuestionAnalysisExportMetadata } from '../services/exportQuestionAnalysisService';
 import '../styles/survey-operations.css';
 import '../styles/reports.css';
 // Thanh chọn học kỳ / đợt dùng .statistics-toolbar nằm trong tệp này.
@@ -262,6 +271,12 @@ interface RankedUnit {
   sectionCount: number;
 }
 
+interface RankedCourse extends RankedUnit {
+  code: string;
+  facultyName: string;
+  departmentName: string;
+}
+
 const scoreColor = (score: number): string =>
   score >= 4.5 ? '#137b3b' : score >= 4.0 ? '#0788b8' : '#b86216';
 
@@ -272,6 +287,186 @@ const completionColor = (rate: number): string =>
       ? '#0788b8'
       : '#b86216';
 
+/**
+ * Bảng xếp hạng đã mở ra một phạm vi — đích của nút Quay lại ở trang chi tiết.
+ * Trang này vốn lùi bằng cách trỏ về màn hình cố định chứ không dựa vào lịch sử
+ * trình duyệt, nên nút Quay lại cũng theo đúng lối đó.
+ */
+const scopeParentWorkspace = (type?: ReportScopeType): ReportWorkspace => {
+  if (type === 'faculty') return 'faculties';
+  if (type === 'department') return 'departments';
+  return 'courses';
+};
+
+/** Số dòng mỗi trang của ba bảng xếp hạng — cùng một mức cho cả ba, không lệch nhau. */
+const rankedPageSize = 20;
+
+/** Bề rộng phần trăm của sáu cột số; mỗi bảng một tỷ lệ vì số cột định danh khác nhau. */
+interface RankMetricWidths {
+  sectionCount: string;
+  classSize: string;
+  responseCount: string;
+  invalidResponseCount: string;
+  completionRate: string;
+  averageScore: string;
+}
+
+const unitMetricWidths: RankMetricWidths = {
+  sectionCount: '9%',
+  classSize: '9%',
+  responseCount: '13%',
+  invalidResponseCount: '14%',
+  completionRate: '19%',
+  averageScore: '12%',
+};
+
+const courseMetricWidths: RankMetricWidths = {
+  sectionCount: '7%',
+  classSize: '7%',
+  responseCount: '10%',
+  invalidResponseCount: '10%',
+  completionRate: '14%',
+  averageScore: '10%',
+};
+
+/**
+ * Sáu cột số dùng chung cho cả ba bảng xếp hạng ở cấp tổng hợp.
+ *
+ * Bảng Học phần trước đây tự khai lại sáu cột này theo cách riêng nên thiếu hẳn
+ * hai cột phiếu, còn cột Hoàn thành chỉ là con số trần không có thanh tiến độ —
+ * cùng nằm một cấp bậc mà nhìn như hai trang khác nhau. Gom về một chỗ thì ba
+ * bảng không còn lệch nhau được nữa.
+ */
+const rankMetricColumns = <T extends RankedUnit>(widths: RankMetricWidths): Column<T>[] => [
+  {
+    key: 'sectionCount',
+    header: 'Số lớp',
+    width: widths.sectionCount,
+    numeric: true,
+    sortValue: (item) => item.sectionCount,
+    filterValue: (item) => String(item.sectionCount),
+    render: (item) => <span className="catalog-cell-number">{item.sectionCount}</span>,
+  },
+  {
+    key: 'classSize',
+    header: 'Sĩ số',
+    width: widths.classSize,
+    numeric: true,
+    sortValue: (item) => item.classSize,
+    filterValue: (item) => String(item.classSize),
+    render: (item) => <span className="catalog-cell-number">{item.classSize}</span>,
+  },
+  {
+    key: 'responseCount',
+    header: 'Số phiếu thu được',
+    width: widths.responseCount,
+    numeric: true,
+    sortValue: (item) => item.responseCount,
+    filterValue: (item) => String(item.responseCount),
+    render: (item) => <span className="catalog-cell-number">{item.responseCount}</span>,
+  },
+  {
+    key: 'invalidResponseCount',
+    header: 'Số phiếu không hợp lệ',
+    width: widths.invalidResponseCount,
+    numeric: true,
+    sortValue: (item) => item.invalidResponseCount,
+    filterValue: (item) => String(item.invalidResponseCount),
+    render: (item) => (
+      <span
+        className={item.invalidResponseCount > 0
+          ? 'catalog-cell-number reports-invalid-count'
+          : 'catalog-cell-number'}
+      >
+        {item.invalidResponseCount}
+      </span>
+    ),
+  },
+  {
+    key: 'completionRate',
+    header: 'Hoàn thành',
+    width: widths.completionRate,
+    numeric: true,
+    sortValue: (item) => item.completionRate,
+    filterValue: (item) => String(Math.round(item.completionRate)),
+    render: (item) => (
+      <>
+        <span className="reports-progress-cell">
+          <span className="reports-progress">
+            <span style={{ width: `${Math.min(100, item.completionRate)}%`, background: completionColor(item.completionRate) }} />
+          </span>
+          <span style={{ color: completionColor(item.completionRate), fontWeight: 700, fontSize: 12 }}>
+            {item.completionRate.toFixed(0)}%
+          </span>
+        </span>
+        <span className="catalog-secondary-value reports-progress-sub">
+          {item.validResponseCount}/{item.classSize} hợp lệ
+        </span>
+      </>
+    ),
+  },
+  {
+    key: 'averageScore',
+    header: 'Điểm trung bình',
+    width: widths.averageScore,
+    numeric: true,
+    sortValue: (item) => item.averageScore,
+    filterValue: (item) => item.averageScore.toFixed(2),
+    render: (item) => (
+      <span className="reports-rank-score" style={{ color: scoreColor(item.averageScore) }}>
+        {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'}
+      </span>
+    ),
+  },
+];
+
+/** Cột "Xem KQ". Bảng nào không mở được chi tiết thì không có cột này. */
+const rankActionColumn = <T extends RankedUnit>(
+  onOpenDetail: ((id: number) => void) | undefined,
+): Column<T>[] => (onOpenDetail ? [{
+  key: 'actions',
+  header: 'Thao tác',
+  width: '112px',
+  render: (item) => (
+    <button
+      type="button"
+      className="btn btn-secondary btn-sm reports-row-action"
+      onClick={() => onOpenDetail(item.id)}
+    >
+      <ClipboardList className="operation-icon" aria-hidden="true" />
+      Xem KQ
+    </button>
+  ),
+}] : []);
+
+/**
+ * Cột số của tệp xuất, cũng dùng chung cho cả ba bảng — cùng lý do với
+ * `rankMetricColumns`: bảng nào cũng phải ra đúng một bộ cột như nhau.
+ */
+const rankMetricExportColumns = <T extends RankedUnit>(): ExportColumn<T>[] => [
+  { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number' as const, align: 'right' as const },
+  { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
+  { key: 'responseCount', header: 'Số phiếu thu được', width: 16, type: 'number' as const, align: 'right' as const },
+  { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number' as const, align: 'right' as const },
+  { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
+  {
+    key: 'completionRate',
+    header: 'Hoàn thành',
+    width: 14,
+    type: 'string' as const,
+    align: 'right' as const,
+    format: (val: any) => `${Number(val).toFixed(0)}%`,
+  },
+  {
+    key: 'averageScore',
+    header: 'Điểm trung bình',
+    width: 14,
+    type: 'number' as const,
+    align: 'right' as const,
+    format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+  },
+];
+
 interface RankedUnitTableProps {
   title: string;
   data: RankedUnit[];
@@ -280,6 +475,7 @@ interface RankedUnitTableProps {
   /** Danh từ đếm trong tiêu đề, ví dụ "khoa/viện". */
   itemLabel: string;
   onVisibleDataChange?: (rows: RankedUnit[]) => void;
+  onOpenDetail?: (id: number) => void;
 }
 
 const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
@@ -288,6 +484,7 @@ const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
   unitHeader,
   itemLabel,
   onVisibleDataChange,
+  onOpenDetail,
 }) => {
   // Cùng bộ cột và cùng cách tính với bảng tra cứu chi tiết, chỉ khác là gộp
   // theo đơn vị. Lọc và sắp xếp đều nằm trong menu trên tiêu đề cột.
@@ -300,86 +497,8 @@ const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
       filterValue: (item) => item.name,
       render: (item) => <span className="catalog-cell-primary">{item.name}</span>,
     },
-    {
-      key: 'sectionCount',
-      header: 'Số lớp',
-      width: '9%',
-      numeric: true,
-      sortValue: (item) => item.sectionCount,
-      filterValue: (item) => String(item.sectionCount),
-      render: (item) => <span className="catalog-cell-number">{item.sectionCount}</span>,
-    },
-    {
-      key: 'classSize',
-      header: 'Sĩ số',
-      width: '9%',
-      numeric: true,
-      sortValue: (item) => item.classSize,
-      filterValue: (item) => String(item.classSize),
-      render: (item) => <span className="catalog-cell-number">{item.classSize}</span>,
-    },
-    {
-      key: 'responseCount',
-      header: 'Số phiếu thu được',
-      width: '13%',
-      numeric: true,
-      sortValue: (item) => item.responseCount,
-      filterValue: (item) => String(item.responseCount),
-      render: (item) => <span className="catalog-cell-number">{item.responseCount}</span>,
-    },
-    {
-      key: 'invalidResponseCount',
-      header: 'Số phiếu không hợp lệ',
-      width: '14%',
-      numeric: true,
-      sortValue: (item) => item.invalidResponseCount,
-      filterValue: (item) => String(item.invalidResponseCount),
-      render: (item) => (
-        <span
-          className={item.invalidResponseCount > 0
-            ? 'catalog-cell-number reports-invalid-count'
-            : 'catalog-cell-number'}
-        >
-          {item.invalidResponseCount}
-        </span>
-      ),
-    },
-    {
-      key: 'completionRate',
-      header: 'Hoàn thành',
-      width: '19%',
-      numeric: true,
-      sortValue: (item) => item.completionRate,
-      filterValue: (item) => String(Math.round(item.completionRate)),
-      render: (item) => (
-        <>
-          <span className="reports-progress-cell">
-            <span className="reports-progress">
-              <span style={{ width: `${Math.min(100, item.completionRate)}%`, background: completionColor(item.completionRate) }} />
-            </span>
-            <span style={{ color: completionColor(item.completionRate), fontWeight: 700, fontSize: 12 }}>
-              {item.completionRate.toFixed(0)}%
-            </span>
-          </span>
-          <span className="catalog-secondary-value reports-progress-sub">
-            {item.validResponseCount}/{item.classSize} hợp lệ
-          </span>
-        </>
-      ),
-    },
-    {
-      key: 'averageScore',
-      header: 'Điểm trung bình',
-      width: '12%',
-      numeric: true,
-      sortValue: (item) => item.averageScore,
-      filterValue: (item) => item.averageScore.toFixed(2),
-      render: (item) => (
-        <span className="reports-rank-score" style={{ color: scoreColor(item.averageScore) }}>
-          {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'}
-        </span>
-      ),
-    },
+    ...rankMetricColumns<RankedUnit>(unitMetricWidths),
+    ...rankActionColumn<RankedUnit>(onOpenDetail),
   ];
 
   const exportConfig = useMemo(() => ({
@@ -388,27 +507,7 @@ const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
     subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
     columns: [
       { key: 'name', header: unitHeader, width: 28 },
-      { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number' as const, align: 'right' as const },
-      { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
-      { key: 'responseCount', header: 'Số phiếu thu được', width: 16, type: 'number' as const, align: 'right' as const },
-      { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number' as const, align: 'right' as const },
-      { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
-      {
-        key: 'completionRate',
-        header: 'Hoàn thành',
-        width: 14,
-        type: 'string' as const,
-        align: 'right' as const,
-        format: (val: any) => `${Number(val).toFixed(0)}%`,
-      },
-      {
-        key: 'averageScore',
-        header: 'Điểm trung bình',
-        width: 14,
-        type: 'number' as const,
-        align: 'right' as const,
-        format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
-      },
+      ...rankMetricExportColumns<RankedUnit>(),
     ],
   }), [title, unitHeader]);
 
@@ -425,9 +524,64 @@ const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
         keyExtractor={(item) => String(item.id)}
         onVisibleDataChange={onVisibleDataChange}
         showIndex={false}
-        pageSize={10}
+        pageSize={rankedPageSize}
         exportConfig={exportConfig}
         emptyMessage="Chưa có dữ liệu tổng hợp."
+      />
+    </section>
+  );
+};
+
+const RankedCourseTable: React.FC<{
+  data: RankedCourse[];
+  onOpenDetail: (id: number) => void;
+}> = ({ data, onOpenDetail }) => {
+  // Ba cột định danh đứng trước, sáu cột số dùng chung với bảng Khoa/Viện và
+  // bảng Bộ môn — cùng một cấp bậc thì phải cùng một bộ cột.
+  const columns: Column<RankedCourse>[] = [
+    {
+      key: 'code', header: 'Mã học phần', width: '11%',
+      sortValue: (item) => item.code, filterValue: (item) => item.code,
+      render: (item) => <span className="catalog-cell-primary">{item.code}</span>,
+    },
+    {
+      key: 'name', header: 'Học phần', width: '21%',
+      sortValue: (item) => item.name, filterValue: (item) => item.name,
+      render: (item) => <span className="catalog-cell-primary">{item.name}</span>,
+    },
+    {
+      key: 'departmentName', header: 'Bộ môn', width: '16%',
+      sortValue: (item) => item.departmentName, filterValue: (item) => item.departmentName,
+    },
+    ...rankMetricColumns<RankedCourse>(courseMetricWidths),
+    ...rankActionColumn<RankedCourse>(onOpenDetail),
+  ];
+
+  const exportConfig = useMemo(() => ({
+    title: 'BÁO CÁO XẾP HẠNG KẾT QUẢ THEO HỌC PHẦN',
+    fileName: 'xep-hang-hoc-phan',
+    subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+    columns: [
+      { key: 'code', header: 'Mã học phần', width: 14 },
+      { key: 'name', header: 'Học phần', width: 32 },
+      { key: 'departmentName', header: 'Bộ môn', width: 24 },
+      ...rankMetricExportColumns<RankedCourse>(),
+    ],
+  }), []);
+
+  return (
+    <section className="reports-rank" aria-label="Kết quả theo Học phần">
+      <header className="reports-rank-header">
+        <span className="reports-rank-title"><h3>Kết quả theo Học phần ({data.length} học phần)</h3></span>
+      </header>
+      <DataTable
+        columns={columns}
+        data={data}
+        keyExtractor={(item) => String(item.id)}
+        showIndex={false}
+        pageSize={rankedPageSize}
+        exportConfig={exportConfig}
+        emptyMessage="Chưa có học phần nào đủ điều kiện tính điểm."
       />
     </section>
   );
@@ -469,6 +623,7 @@ export const ReportsOverviewPage: React.FC = () => {
   // Danh sách lựa chọn bộ lọc.
   const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [catalogCourses, setCatalogCourses] = useState<Course[]>([]);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
 
@@ -480,7 +635,13 @@ export const ReportsOverviewPage: React.FC = () => {
   const [search, setSearch] = useState(initialRoute.search ?? '');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [workspace, setWorkspace] = useState<ReportWorkspace>(
-    initialRoute.screen === 'overview' ? 'overview' : 'details',
+    initialRoute.screen === 'overview'
+      || initialRoute.screen === 'details'
+      || initialRoute.screen === 'faculties'
+      || initialRoute.screen === 'departments'
+      || initialRoute.screen === 'courses'
+      ? initialRoute.screen
+      : 'details',
   );
   const [analysisView, setAnalysisView] = useState<ReportAnalysisView>(
     initialRoute.analysisView ?? 'faculties',
@@ -520,6 +681,12 @@ export const ReportsOverviewPage: React.FC = () => {
   const [surveyId, setSurveyId] = useState<number | null>(initialRoute.surveyId ?? null);
   const [surveyTitle, setSurveyTitle] = useState<string | null>(
     initialRoute.surveyId ? 'Chi tiết bài khảo sát' : null,
+  );
+  // Trang chi tiết theo phạm vi, mở từ nút "Xem KQ" của ba bảng xếp hạng.
+  const [scope, setScope] = useState<ScopeSelection | null>(
+    initialRoute.screen === 'scope' && initialRoute.scopeType && initialRoute.scopeId
+      ? { type: initialRoute.scopeType, id: initialRoute.scopeId }
+      : null,
   );
 
   const routeFromState = useCallback(
@@ -563,7 +730,14 @@ export const ReportsOverviewPage: React.FC = () => {
 
   const navigateToWorkspace = useCallback(
     (nextWorkspace: ReportWorkspace) => {
-      navigateToRoute(routeFromState(nextWorkspace));
+      navigateToRoute(routeFromState(nextWorkspace, nextWorkspace === 'details' ? {} : {
+        facultyId: undefined,
+        departmentId: undefined,
+        lecturerFilterId: undefined,
+        search: undefined,
+        resultSortKey: undefined,
+        resultSortDirection: undefined,
+      }));
     },
     [navigateToRoute, routeFromState],
   );
@@ -672,6 +846,11 @@ export const ReportsOverviewPage: React.FC = () => {
       setComparisonSemesterId(route.comparisonSemesterId);
       setResultSortKey(route.resultSortKey);
       setResultSortDirection(route.resultSortDirection ?? 'asc');
+      // Trang chi tiết theo phạm vi không nằm trong thanh tab, nên tách hẳn ra
+      // khỏi `workspace`: đóng nó lại là quay về đúng bảng xếp hạng đã mở nó.
+      setScope(route.screen === 'scope' && route.scopeType && route.scopeId
+        ? { type: route.scopeType, id: route.scopeId }
+        : null);
 
       if (route.screen === 'survey' && route.surveyId) {
         setWorkspace('details');
@@ -705,7 +884,9 @@ export const ReportsOverviewPage: React.FC = () => {
             ? current
             : named);
         setLecturer({ lecturerId: 0, fullName: named.name } as LecturerPerformanceReport);
-      } else if (route.screen === 'overview' || route.screen === 'details') {
+      } else if (route.screen === 'overview' || route.screen === 'details'
+        || route.screen === 'faculties' || route.screen === 'departments'
+        || route.screen === 'courses') {
         setWorkspace(route.screen);
         setSurveyId(null);
         setSurveyTitle(null);
@@ -726,23 +907,28 @@ export const ReportsOverviewPage: React.FC = () => {
       ? 'survey'
       : lecturer
         ? 'lecturer'
-        : workspace;
+        : scope
+          ? 'scope'
+          : workspace;
     const canonicalRoute = routeFromState(screen, {
       surveyId: surveyId ?? undefined,
       lecturerId: !surveyId ? lecturer?.lecturerId : undefined,
       parentLecturerId: surveyId ? lecturer?.lecturerId : undefined,
+      scopeType: scope?.type,
+      scopeId: scope?.id,
     });
     const canonicalHash = buildReportHash(canonicalRoute);
     if (window.location.hash !== canonicalHash) {
       window.history.replaceState(null, '', canonicalHash);
     }
-  }, [lecturer, routeFromState, surveyId, workspace]);
+  }, [lecturer, routeFromState, scope, surveyId, workspace]);
 
   // Nạp danh mục để dựng bộ lọc.
   useEffect(() => {
     if (!canLoadCatalog) {
       setFaculties([]);
       setDepartments([]);
+      setCatalogCourses([]);
       setLecturers([]);
       return;
     }
@@ -750,14 +936,16 @@ export const ReportsOverviewPage: React.FC = () => {
     let cancelled = false;
     async function load() {
       try {
-        const [nextFaculties, nextDepartments, nextLecturers] = await Promise.all([
+        const [nextFaculties, nextDepartments, nextCourses, nextLecturers] = await Promise.all([
           catalogApi.faculties(),
           catalogApi.departments(),
+          catalogApi.courses(),
           catalogApi.lecturers(),
         ]);
         if (cancelled) return;
         setFaculties(nextFaculties);
         setDepartments(nextDepartments);
+        setCatalogCourses(nextCourses);
         setLecturers(nextLecturers);
       } catch {
         if (!cancelled) setLoadError('Không tải được danh mục để lọc báo cáo.');
@@ -997,7 +1185,7 @@ export const ReportsOverviewPage: React.FC = () => {
     [results],
   );
 
-  // Xếp hạng Khoa / Bộ môn từ kết quả.
+  // Xếp hạng Khoa / Bộ môn / Học phần từ kết quả.
   const buildRanking = useCallback(
     (key: 'faculty' | 'department'): RankedUnit[] => {
       const groups = new Map<number, RankedUnit>();
@@ -1077,53 +1265,95 @@ export const ReportsOverviewPage: React.FC = () => {
   const facultyRankings = useMemo(() => buildRanking('faculty'), [buildRanking]);
   const departmentRankings = useMemo(() => buildRanking('department'), [buildRanking]);
 
-  // Lọc Khoa ở bảng bên trái thì bảng Bộ môn bên phải chỉ còn bộ môn của các Khoa
-  // đó. null nghĩa là bảng Khoa chưa lọc gì, giữ nguyên toàn bộ Bộ môn.
-  const [visibleFacultyIds, setVisibleFacultyIds] = useState<number[] | null>(null);
+  const courseRankings = useMemo<RankedCourse[]>(() => {
+    const groups = new Map<number, RankedCourse>();
+    const scoreSums = new Map<number, number>();
+    const scoreCounts = new Map<number, number>();
+    const courseIdByCode = new Map(catalogCourses.map((course) => [course.courseCode, course.courseId]));
 
-  const handleFacultyRowsChange = useCallback(
-    (rows: RankedUnit[]) => {
-      const next = rows.length === facultyRankings.length ? null : rows.map((row) => row.id);
-      setVisibleFacultyIds((previous) => {
-        if (previous === null && next === null) return previous;
-        if (previous && next && previous.length === next.length
-          && previous.every((value, index) => value === next[index])) {
-          return previous;
-        }
-        return next;
-      });
-    },
-    [facultyRankings.length],
-  );
+    for (const item of results) {
+      const courseId = courseIdByCode.get(item.courseCode);
+      if (!courseId || !hasEnoughResponsesToScore(
+        item.classSize,
+        item.responseCount,
+        item.validResponseCount,
+        thresholds,
+      )) continue;
 
-  const visibleDepartmentRankings = useMemo(() => {
-    if (!visibleFacultyIds) return departmentRankings;
-    const allowed = new Set(visibleFacultyIds);
-    return departmentRankings.filter((item) => allowed.has(item.facultyId));
-  }, [departmentRankings, visibleFacultyIds]);
+      const current = groups.get(courseId);
+      if (!current) {
+        groups.set(courseId, {
+          id: courseId,
+          code: item.courseCode,
+          name: item.courseName,
+          facultyId: item.facultyId,
+          facultyName: item.facultyName,
+          departmentName: item.departmentName,
+          classSize: item.classSize,
+          responseCount: item.responseCount,
+          validResponseCount: item.validResponseCount,
+          invalidResponseCount: item.invalidResponseCount,
+          completionRate: 0,
+          averageScore: 0,
+          sectionCount: 1,
+        });
+      } else {
+        current.classSize += item.classSize;
+        current.responseCount += item.responseCount;
+        current.validResponseCount += item.validResponseCount;
+        current.invalidResponseCount += item.invalidResponseCount;
+        current.sectionCount += 1;
+      }
+      if (item.averageScore > 0) {
+        scoreSums.set(courseId, (scoreSums.get(courseId) ?? 0)
+          + item.averageScore * item.validResponseCount);
+        scoreCounts.set(courseId, (scoreCounts.get(courseId) ?? 0)
+          + item.validResponseCount);
+      }
+    }
+
+    return Array.from(groups.values()).map((group) => {
+      const scoreCount = scoreCounts.get(group.id) ?? 0;
+      group.averageScore = scoreCount > 0 ? (scoreSums.get(group.id) ?? 0) / scoreCount : 0;
+      group.completionRate = group.classSize > 0
+        ? group.validResponseCount / group.classSize * 100
+        : 0;
+      return group;
+    }).sort((left, right) => left.code.localeCompare(right.code, 'vi'));
+  }, [catalogCourses, results, thresholds]);
 
   /**
-   * Nội dung tab con "Tổng hợp đơn vị". Trước đây là một tab lớn ngang hàng với
-   * Tổng quan; giờ nằm trong Tổng quan nên dựng ở đây rồi truyền xuống, khỏi phải
-   * mang cả logic xếp hạng sang component kia.
+   * Mở trang chi tiết của một khoa/viện, bộ môn hay học phần. Trang này ở lại
+   * trong chính module Thống kê & Báo cáo: trước đây nút "Xem KQ" đẩy người dùng
+   * sang module Thống kê chi tiết nên thanh điều hướng nhảy sang mục khác giữa
+   * chừng, và người chỉ có quyền xem báo cáo thì bị đá ngược về trang đầu.
    */
-  const unitsPanel = (
-    <div className="reports-rank-grid reports-analysis-panel" role="tabpanel">
-      <RankedUnitTable
-        title="Kết quả theo Khoa/Viện"
-        data={facultyRankings}
-        unitHeader="Khoa / Viện"
-        itemLabel="khoa/viện"
-        onVisibleDataChange={handleFacultyRowsChange}
-      />
-      <RankedUnitTable
-        title="Kết quả theo Bộ môn"
-        data={visibleDepartmentRankings}
-        unitHeader="Bộ môn"
-        itemLabel={visibleFacultyIds ? 'bộ môn theo Khoa đang lọc' : 'bộ môn'}
-      />
-    </div>
-  );
+  const openAnalysisDetail = useCallback((type: ReportScopeType, id: number) => {
+    if (!selectedSemesterId || !semesterSurveyId) return;
+    navigateToRoute({
+      screen: 'scope',
+      semesterId: selectedSemesterId,
+      semesterSurveyId,
+      scopeType: type,
+      scopeId: id,
+    });
+  }, [navigateToRoute, selectedSemesterId, semesterSurveyId]);
+
+  /** Đi xuống một cấp trong trang chi tiết: khoa/viện → bộ môn → học phần → lớp. */
+  const drillDownScope = useCallback((selection: ScopeSelection) => {
+    if (!semesterSurveyId) return;
+    navigateToRoute({
+      screen: 'scope',
+      semesterId: selectedSemesterId,
+      semesterSurveyId,
+      scopeType: selection.type,
+      scopeId: selection.id,
+    });
+  }, [navigateToRoute, selectedSemesterId, semesterSurveyId]);
+
+  const backFromScope = useCallback(() => {
+    navigateToWorkspace(scopeParentWorkspace(scope?.type));
+  }, [navigateToWorkspace, scope?.type]);
 
   const semesterLabel = useMemo(() => {
     for (const year of academicYears) {
@@ -1149,8 +1379,26 @@ export const ReportsOverviewPage: React.FC = () => {
 
   const isSurveyMode = surveyId !== null;
   const isLecturerMode = !isSurveyMode && lecturer !== null;
+  // Trang chi tiết theo phạm vi đứng riêng một cấp, không nằm trong thanh tab.
+  const isScopeMode = !isSurveyMode && !isLecturerMode && scope !== null;
 
   const renderQuestionAnalysis = (questions: LecturerPerformanceReport['questionRatings']) => {
+    const lecturerExportMetadata: QuestionAnalysisExportMetadata = {
+      title: `BÁO CÁO PHÂN TÍCH KẾT QUẢ CÂU HỎI KHẢO SÁT · GIẢNG VIÊN ${lecturerDetail?.fullName.toUpperCase() ?? ''}`.trim(),
+      subtitle: lecturerDetail
+        ? `${lecturerDetail.departmentName} · ${lecturerDetail.facultyName} · ${semesterLabel}`
+        : semesterLabel,
+      fileName: `bao-cao-cau-hoi-giang-vien-${toVietnameseFileSlug(lecturerDetail?.fullName || 'gv')}-${toVietnameseFileSlug(semesterLabel)}`,
+      info: {
+        'Giảng viên': lecturerDetail?.fullName,
+        'Đơn vị': lecturerDetail ? `${lecturerDetail.departmentName} · ${lecturerDetail.facultyName}` : undefined,
+        'Học kỳ': semesterLabel,
+        'Điểm trung bình': lecturerDetail ? `${lecturerDetail.averageScore.toFixed(2)} / 5.0` : undefined,
+        'Phiếu dùng tính điểm': lecturerDetail?.scoredValidResponseCount.toLocaleString('vi-VN'),
+        'Số lớp học phần': lecturerDetail?.courseSectionCount,
+      },
+    };
+
     return (
       <QuestionAnalysisTabs
         questions={questions}
@@ -1162,6 +1410,7 @@ export const ReportsOverviewPage: React.FC = () => {
         title="Phân tích kết quả theo câu hỏi"
         showDistributionTable={true}
         emptyMessage="Chưa có lớp nào của giảng viên này đủ điều kiện tính điểm trong học kỳ đã chọn."
+        exportMetadata={lecturerExportMetadata}
       />
     );
   };
@@ -1670,8 +1919,20 @@ export const ReportsOverviewPage: React.FC = () => {
         </div>
       )}
 
+      {/* CẤP CHI TIẾT THEO PHẠM VI: khoa/viện → bộ môn → học phần → lớp học phần */}
+      {isScopeMode && scope && semesterSurveyId !== undefined && (
+        <ScopeAnalysisDetail
+          key={`${scope.type}-${scope.id}`}
+          semesterSurveyId={semesterSurveyId}
+          selection={scope}
+          onBack={backFromScope}
+          onDrillDown={drillDownScope}
+          onOpenSurvey={(courseSectionSurveyId) => openSurvey(courseSectionSurveyId)}
+        />
+      )}
+
       {/* CẤP TỔNG HỢP: tổng quan toàn trường + bộ lọc + KPI + xếp hạng + bảng kết quả */}
-      {!isLecturerMode && !isSurveyMode && (
+      {!isLecturerMode && !isSurveyMode && !isScopeMode && (
         <div className="reports-overview">
           <nav className="reports-workspace-tabs" aria-label="Chế độ xem báo cáo" role="tablist">
             <button
@@ -1685,6 +1946,38 @@ export const ReportsOverviewPage: React.FC = () => {
               <LayoutDashboard className="operation-icon" aria-hidden="true" />
               <strong>Tổng quan</strong>
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspace === 'faculties'}
+              className={`reports-workspace-tab${workspace === 'faculties' ? ' is-active' : ''}`}
+              onClick={() => navigateToWorkspace('faculties')}
+            >
+              <Building2 className="operation-icon" aria-hidden="true" />
+              <strong>Theo Khoa/Viện</strong>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspace === 'departments'}
+              className={`reports-workspace-tab${workspace === 'departments' ? ' is-active' : ''}`}
+              onClick={() => navigateToWorkspace('departments')}
+            >
+              <Network className="operation-icon" aria-hidden="true" />
+              <strong>Theo Bộ môn</strong>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspace === 'courses'}
+              className={`reports-workspace-tab${workspace === 'courses' ? ' is-active' : ''}`}
+              onClick={() => navigateToWorkspace('courses')}
+            >
+              <BookOpen className="operation-icon" aria-hidden="true" />
+              <strong>Theo Học phần</strong>
+            </button>
+            {/* Ba tab trên là ba cách gộp số liệu; tab này là bảng từng dòng lớp để
+                lọc và mở chi tiết nên đứng cuối cùng. */}
             <button
               type="button"
               role="tab"
@@ -1706,9 +1999,41 @@ export const ReportsOverviewPage: React.FC = () => {
               semesterSurveyId={semesterSurveyId}
               analysisView={analysisView}
               onAnalysisViewChange={changeAnalysisView}
-              unitsPanel={unitsPanel}
               onDrillDown={handleOverviewDrillDown}
             />
+          )}
+
+          {workspace === 'faculties' && (
+            <div className="reports-aggregate-workspace" role="tabpanel">
+              <RankedUnitTable
+                title="Kết quả theo Khoa/Viện"
+                data={facultyRankings}
+                unitHeader="Khoa / Viện"
+                itemLabel="khoa/viện"
+                onOpenDetail={(id) => openAnalysisDetail('faculty', id)}
+              />
+            </div>
+          )}
+
+          {workspace === 'departments' && (
+            <div className="reports-aggregate-workspace" role="tabpanel">
+              <RankedUnitTable
+                title="Kết quả theo Bộ môn"
+                data={departmentRankings}
+                unitHeader="Bộ môn"
+                itemLabel="bộ môn"
+                onOpenDetail={(id) => openAnalysisDetail('department', id)}
+              />
+            </div>
+          )}
+
+          {workspace === 'courses' && (
+            <div className="reports-aggregate-workspace" role="tabpanel">
+              <RankedCourseTable
+                data={courseRankings}
+                onOpenDetail={(id) => openAnalysisDetail('course', id)}
+              />
+            </div>
           )}
 
           {/*

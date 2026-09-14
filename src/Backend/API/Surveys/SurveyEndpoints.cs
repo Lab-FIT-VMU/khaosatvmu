@@ -297,7 +297,11 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSemesterSurveyCourseDiagnosisAsync(semesterSurveyId, cancellationToken)));
 
-        surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/scope-analysis", async (
+        // Trang chi tiết theo phạm vi giờ nằm trong module Thống kê & Báo cáo, nên
+        // endpoint phải mở cho mọi quyền của nhóm Báo cáo. Nhóm này là hợp của bốn
+        // quyền báo cáo (gồm cả SURVEY_ANALYSIS_ACCESS), nên ai đang xem được ở
+        // trang Thống kê chi tiết vẫn mở được y như trước.
+        reportingReadGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/scope-analysis", async (
             int semesterSurveyId,
             string scopeType,
             int scopeId,

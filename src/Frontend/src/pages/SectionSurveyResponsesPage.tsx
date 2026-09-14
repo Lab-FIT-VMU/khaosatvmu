@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   BarChart3,
@@ -27,7 +27,9 @@ import type {
 } from '../types';
 import '../styles/survey-operations.css';
 import '../styles/reports.css';
-import { foldVietnamese } from '../utils/vietnamese';
+import { foldVietnamese, toVietnameseFileSlug } from '../utils/vietnamese';
+import { hasEnoughResponsesToScore } from '../utils/reportThresholds';
+import type { QuestionAnalysisExportMetadata } from '../services/exportQuestionAnalysisService';
 
 interface SectionSurveyResponsesPageProps {
   courseSectionSurveyId: number;
@@ -300,6 +302,23 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     },
   ];
 
+  const surveyExportMetadata = useMemo<QuestionAnalysisExportMetadata>(() => ({
+    title: `BÁO CÁO PHÂN TÍCH KẾT QUẢ CÂU HỎI KHẢO SÁT · LỚP ${sectionSurvey?.sectionName || ''}`.trim(),
+    subtitle: sectionSurvey
+      ? `${sectionSurvey.courseCode} - ${sectionSurvey.courseName} · GV: ${sectionSurvey.lecturerName || 'Chưa gắn GV'}`
+      : undefined,
+    fileName: `bao-cao-cau-hoi-lop-${toVietnameseFileSlug(sectionSurvey?.sectionName || String(courseSectionSurveyId))}`,
+    info: {
+      'Học phần': sectionSurvey ? `${sectionSurvey.courseCode} - ${sectionSurvey.courseName}` : undefined,
+      'Lớp học phần': sectionSurvey?.sectionName,
+      'Giảng viên': sectionSurvey?.lecturerName || 'Chưa gắn GV',
+      'Đơn vị': sectionSurvey ? `${sectionSurvey.departmentName || ''} · ${sectionSurvey.facultyName || ''}` : undefined,
+      'Sĩ số': sectionSurvey?.classSize,
+      'Phiếu hợp lệ': analysis?.responseCount ?? sectionSurvey?.validResponseCount,
+      'Điểm trung bình': analysis?.averageScore ? `${analysis.averageScore.toFixed(2)} / 5.0` : undefined,
+    },
+  }), [sectionSurvey, analysis, courseSectionSurveyId]);
+
   return (
     <div className="survey-operations-page section-responses-page">
       {loadError && (
@@ -417,12 +436,24 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
       {showAnalysis && !analysisLoading && analysis && !analysis.isScored && (
         <div className="operations-empty" role="status">
           <BarChart3 className="operation-icon" aria-hidden="true" />
-          <strong>Lớp chưa đủ điều kiện tính điểm</strong>
-          <span>
-            Lớp phải qua cả ngưỡng tỷ lệ phản hồi và ngưỡng tỷ lệ phiếu hợp lệ, sau đó
-            được chốt bằng nút "Tính lại điểm" ở trang Bảng dữ liệu khảo sát thì mới có
-            số liệu phân tích.
-          </span>
+          {hasEnoughResponsesToScore(sectionSurvey?.classSize || 0, responses.length, validResponses.length) ? (
+            <>
+              <strong>Lớp đã thu đủ phiếu (Đang chờ chốt điểm)</strong>
+              <span>
+                Lớp đã đạt đủ số lượng phiếu theo quy định. Vui lòng bấm &quot;Tính lại điểm&quot; ở
+                trang Bảng dữ liệu khảo sát để tạo báo cáo phân tích theo câu hỏi.
+              </span>
+            </>
+          ) : (
+            <>
+              <strong>Lớp chưa đủ điều kiện tính điểm</strong>
+              <span>
+                Lớp phải qua cả ngưỡng tỷ lệ phản hồi và ngưỡng tỷ lệ phiếu hợp lệ, sau đó
+                được chốt bằng nút &quot;Tính lại điểm&quot; ở trang Bảng dữ liệu khảo sát thì mới có
+                số liệu phân tích.
+              </span>
+            </>
+          )}
         </div>
       )}
 
@@ -434,6 +465,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
           responseCount={analysis.responseCount}
           title="Phân tích kết quả theo câu hỏi"
           showDistributionTable={true}
+          exportMetadata={surveyExportMetadata}
         />
       )}
 
