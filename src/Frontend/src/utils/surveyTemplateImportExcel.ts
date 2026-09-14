@@ -236,13 +236,34 @@ export async function downloadSurveyTemplateImportTemplate(
     },
   ];
 
+  // Lưu ý đặt ở cột F, cách bốn cột nhập một cột trống và gộp dọc suốt các dòng mẫu.
+  // Trình đọc tệp chỉ lấy đúng bốn cột có tiêu đề nên ô này không bị hiểu thành dữ liệu.
+  const sectionNote =
+    'LƯU Ý: KHÔNG được sửa tên mục ở cột "Mục". Chỉ dùng đúng một trong ba tên sau: '
+    + `(1) ${courseSection}; (2) ${lecturerSection}; (3) ${facilitiesSection}. `
+    + 'Tên mục khác sẽ bị báo lỗi khi nhập tệp.';
+
   const data: SheetData = [
-    templateHeaderRow(surveyTemplateImportColumns),
+    [
+      ...templateHeaderRow(surveyTemplateImportColumns),
+      null,
+      {
+        value: sectionNote,
+        type: String,
+        fontWeight: 'bold',
+        textColor: '#B42318',
+        wrap: true,
+        alignVertical: 'top',
+        rowSpan: sampleRows.length + 1,
+      },
+    ],
     ...sampleRows.map((question) => [
       { value: question.sectionName, type: String },
       { value: question.questionText, type: String },
       { value: question.answerScaleId, type: Number },
       question.trap ? { value: question.trap, type: Number } : null,
+      null,
+      null,
     ]),
   ];
 
@@ -251,7 +272,8 @@ export async function downloadSurveyTemplateImportTemplate(
       {
         data,
         sheet: 'Bo cau hoi',
-        columns: surveyTemplateColumnWidths.map((width) => ({ width })),
+        // Cột E để trống làm khoảng cách, cột F rộng cho dòng lưu ý.
+        columns: [...surveyTemplateColumnWidths, 4, 60].map((width) => ({ width })),
       } as never,
       buildAnswerScaleLookupSheet(answerScales),
     ],

@@ -836,7 +836,9 @@ public static class SurveySectionCatalog
     [
         new(CourseContent, "Nội dung đánh giá học phần"),
         new(Lecturer, "Nội dung đánh giá về giảng viên"),
-        new(Facilities, "Nội dung đánh giá về cơ sở vật chất, phục vụ học tập"),
+        // Giữ nguyên chính tả đang lưu trên hệ thống thật ("cơ sơ"): lưu mới hay xuất tệp mẫu
+        // đều ra đúng tên các đợt đã chạy đang đọc. Gõ "cơ sở" vẫn quy về mục này.
+        new(Facilities, "Nội dung đánh giá về cơ sơ vật chất, phục vụ học tập"),
     ];
 
     private static readonly Dictionary<string, string> KeyByMatchKey =

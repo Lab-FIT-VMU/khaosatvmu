@@ -60,7 +60,7 @@ public class SurveySectionCatalogTests
     public void NameOf_TraVeTenChuan()
     {
         SurveySectionCatalog.NameOf(SurveySectionCatalog.Facilities)
-            .Should().Be("Nội dung đánh giá về cơ sở vật chất, phục vụ học tập");
+            .Should().Be("Nội dung đánh giá về cơ sơ vật chất, phục vụ học tập");
     }
 
     [Fact]

@@ -136,7 +136,8 @@ export const maximumSectionsPerTemplate = 10;
 export const surveySectionCatalog = [
   { key: 'COURSE_CONTENT', name: 'Nội dung đánh giá học phần' },
   { key: 'LECTURER', name: 'Nội dung đánh giá về giảng viên' },
-  { key: 'FACILITIES', name: 'Nội dung đánh giá về cơ sở vật chất, phục vụ học tập' },
+  // Giữ nguyên chính tả đang lưu trên hệ thống thật ("cơ sơ"); gõ "cơ sở" vẫn quy về mục này.
+  { key: 'FACILITIES', name: 'Nội dung đánh giá về cơ sơ vật chất, phục vụ học tập' },
 ] as const;
 
 export type SurveySectionKey = (typeof surveySectionCatalog)[number]['key'];
