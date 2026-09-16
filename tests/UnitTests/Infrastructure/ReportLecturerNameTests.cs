@@ -49,7 +49,11 @@ public class ReportLecturerNameTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
 
-        await body(db, new EfReportService(db, cache, new SchoolOverviewCacheVersion()));
+        await body(db, new EfReportService(
+            db,
+            cache,
+            new SchoolOverviewCacheVersion(),
+            new FixedScoringThresholdProvider()));
     }
 
     /// <summary>Một bài khảo sát của lớp chưa gắn mã giảng viên nhưng có tên từ tệp import.</summary>

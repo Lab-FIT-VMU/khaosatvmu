@@ -1,0 +1,25 @@
+/*
+  Dòng thông báo cấu hình tính điểm đang áp, dùng chung cho mọi trang thống kê, báo
+  cáo. Tách tệp riêng vì các trang không cùng nạp một bộ CSS.
+*/
+.scoring-config-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border: 1px solid #b9d9e5;
+  border-left: 3px solid #0788b8;
+  background: #f2f9fb;
+  color: #20262c;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.scoring-config-note svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  margin-top: 1px;
+  color: #0788b8;
+}

@@ -9,6 +9,21 @@ import { getHashRoot } from './pages/reportRoute';
 // Shared Components
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { ScoringChangeNotifier } from './components/ScoringChangeNotifier';
+
+/**
+ * Các trang thống kê, báo cáo đọc điểm theo cấu hình tính điểm. Đang mở một trong
+ * các trang này thì nhận thông báo khi người khác đổi cấu hình hoặc cập nhật điểm.
+ */
+const scoringNotificationTabs = new Set([
+  'overview',
+  'survey-dashboard',
+  'progress',
+  'survey-statistics',
+  'reports',
+  'survey-analysis',
+  'survey-section-scores',
+]);
 import { QRCodeModal } from './components/QRCodeModal';
 
 // Lazy-loaded Pages (Code Splitting for Production Performance)
@@ -598,6 +613,8 @@ function DashboardApp() {
         activeCampaignsCount={stats.activeCampaigns}
         permissions={permissions}
       />
+
+      <ScoringChangeNotifier active={scoringNotificationTabs.has(currentTab)} />
 
       {/* Main Content Area */}
       <div className="main-wrapper">

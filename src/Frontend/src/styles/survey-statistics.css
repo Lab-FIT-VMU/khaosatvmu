@@ -95,33 +95,10 @@
   margin-left: auto;
 }
 
-/* Hai ngưỡng đang áp và nút bánh răng, dồn về mép phải của dòng mô tả. */
+/* Hai ngưỡng đang áp, dồn về mép phải của dòng mô tả. */
 .statistics-threshold-note {
   margin-left: auto;
   color: #40505a;
-}
-
-.statistics-threshold-button {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid #d7dee2;
-  border-radius: 3px;
-  background: #ffffff;
-  color: #52616b;
-  cursor: pointer;
-}
-
-.statistics-threshold-button:hover {
-  border-color: #0788b8;
-  color: #036e99;
-}
-
-.statistics-threshold-button svg {
-  width: 15px;
-  height: 15px;
 }
 
 .statistics-summary {

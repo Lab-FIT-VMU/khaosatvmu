@@ -62,7 +62,8 @@ public sealed class ReportQueryOptimizationTests
         var service = new EfReportService(
             db,
             scope.ServiceProvider.GetRequiredService<IMemoryCache>(),
-            new SchoolOverviewCacheVersion());
+            new SchoolOverviewCacheVersion(),
+            new FixedScoringThresholdProvider());
         var overview = await service.GetSchoolSurveyOverviewAsync(semesterId, semesterId);
 
         overview.Should().NotBeNull();

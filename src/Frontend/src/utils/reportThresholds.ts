@@ -58,6 +58,14 @@ export interface ScoringThresholds {
   minimumResponseRate: number;
   /** Vòng 2 — Số phiếu hợp lệ ÷ Số phiếu đã thu, phần trăm. */
   minimumValidRate: number;
+  /**
+   * Ba luật của bộ lọc nhiễu có đang được áp không. Tắt một luật thì phiếu chỉ
+   * dính đúng luật đó quay lại được tính vào thống kê — phiếu không bị ghi lại,
+   * chỉ đổi cách đọc lý do đã lưu từ lúc nộp.
+   */
+  rejectTooFast: boolean;
+  rejectSingleAnswer: boolean;
+  rejectAttentionCheckFailed: boolean;
 }
 
 /**
@@ -67,6 +75,9 @@ export interface ScoringThresholds {
 export const DEFAULT_SCORING_THRESHOLDS: ScoringThresholds = {
   minimumResponseRate: 50,
   minimumValidRate: 80,
+  rejectTooFast: true,
+  rejectSingleAnswer: true,
+  rejectAttentionCheckFailed: true,
 };
 
 /** Tỷ lệ phản hồi: số phiếu đã thu chia sĩ số, theo phần trăm. */

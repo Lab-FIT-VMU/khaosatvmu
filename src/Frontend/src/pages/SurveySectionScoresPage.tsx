@@ -4,6 +4,8 @@ import { Check, ChevronDown, ChevronRight, CircleAlert, LoaderCircle, RefreshCw 
 import { useSemester } from '../context/semesterContext';
 import { NoteModalButton } from '../components/NoteModalButton';
 import { ExportDropdown } from '../components/ExportDropdown';
+import { UpdateScoresButton } from '../components/UpdateScoresButton';
+import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { ApiError } from '../services/apiClient';
 import type { ExportColumn, MultiSheetExportOptions } from '../services/exportDataService';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
@@ -406,7 +408,7 @@ const overallScoreNote =
   'Điểm tổng hợp tính trên cả bộ câu hỏi, gồm cả mục cơ sở vật chất đang ẩn, và gộp theo phiếu. Vì vậy điểm tổng hợp KHÔNG bằng trung bình cộng điểm các mục — đó là bình thường, không phải tính sai.';
 
 const usageNotes = [
-  'Điểm mục gộp từ điểm từng câu đã chốt ở lần bấm "Tính lại điểm" gần nhất: chỉ tính phiếu hợp lệ, không tính câu bẫy. Đây cùng một lần chốt với mọi trang thống kê khác.',
+  'Điểm mục gộp từ điểm từng câu đã chốt ở lần bấm "Cập nhật điểm" gần nhất: chỉ tính phiếu hợp lệ, không tính câu bẫy. Đây cùng một lần chốt với mọi trang thống kê khác.',
   'Chỉ lớp đủ điều kiện tính điểm mới góp vào số liệu. Lớp chưa đủ phiếu không có mặt ở bất kỳ con số nào trên trang này.',
   'Mỗi mục gộp có trọng số theo số lượt trả lời: lớp nhiều phiếu nặng hơn lớp ít phiếu.',
   overallScoreNote,
@@ -681,8 +683,11 @@ export const SurveySectionScoresPage: React.FC = () => {
             <RefreshCw aria-hidden="true" size={16} />
             Tải lại
           </button>
+          <UpdateScoresButton semesterSurveyId={semesterSurveyId} onUpdated={loadData} />
         </div>
       </section>
+
+      <ScoringConfigNote />
 
       {loadError && (
         <div className="admin-alert" role="alert">
@@ -706,7 +711,7 @@ export const SurveySectionScoresPage: React.FC = () => {
         </div>
       ) : data.school.sectionCount === 0 ? (
         <div className="operations-empty">
-          <strong>Đợt này chưa có lớp nào được chốt điểm. Bấm "Tính lại điểm" ở Bảng dữ liệu khảo sát trước.</strong>
+          <strong>Đợt này chưa có lớp nào được chốt điểm. Bấm "Cập nhật điểm" trước.</strong>
         </div>
       ) : (
         <SectionScoresLevel

@@ -11,7 +11,8 @@ namespace Infrastructure.Reports;
 public sealed class EfReportService(
     AppDbContext db,
     IMemoryCache cache,
-    SchoolOverviewCacheVersion cacheVersion) : IReportService
+    SchoolOverviewCacheVersion cacheVersion,
+    IScoringThresholdProvider scoringThresholds) : IReportService
 {
     /// <summary>Prefix key cache cho báo cáo tổng quan toàn trường (theo học kỳ).</summary>
     private const string SchoolOverviewCachePrefix = "school-overview:";
@@ -70,6 +71,15 @@ public sealed class EfReportService(
     {
         if (courseSectionSurveyIds.Count == 0) return [];
 
+        // Luật nào của bộ lọc nhiễu đang được áp là do quản trị bật tắt, nên phải
+        // đọc lại "RejectionReasons" chứ không dùng cột "IsValid" đã chốt lúc nộp.
+        // Viết thẳng ra đây thay vì gọi ResponseInclusion.CountsTowardScore() vì
+        // EF không dịch được một Expression lồng trong Count(...) của GroupBy.
+        var thresholds = await scoringThresholds.GetAsync(cancellationToken);
+        var rejectTooFast = thresholds.RejectTooFast;
+        var rejectSingleAnswer = thresholds.RejectSingleAnswer;
+        var rejectAttentionCheck = thresholds.RejectAttentionCheckFailed;
+
         // Đếm sống số phiếu thực tế từ bảng SurveyResponses để phản ánh đúng tiến độ
         var liveCounts = await db.SurveyResponses.AsNoTracking()
             .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId) && !x.IsDeleted)
@@ -78,7 +88,14 @@ public sealed class EfReportService(
             {
                 Id = g.Key,
                 Total = g.Count(),
-                Valid = g.Count(r => r.IsValid)
+                Valid = g.Count(r =>
+                    r.RejectionReasons == null
+                    || ((!rejectTooFast
+                            || !r.RejectionReasons.Contains(RejectionReasonCodes.TooFast))
+                        && (!rejectSingleAnswer
+                            || !r.RejectionReasons.Contains(RejectionReasonCodes.SingleAnswer))
+                        && (!rejectAttentionCheck
+                            || !r.RejectionReasons.Contains(RejectionReasonCodes.AttentionCheckFailed))))
             })
             .ToDictionaryAsync(x => x.Id, cancellationToken);
 
@@ -221,6 +238,11 @@ public sealed class EfReportService(
         // trường. Trước đây chỗ này cố ý đếm cả phiếu bị lọc với lý do "nộp ẩu vẫn
         // là đã tham gia"; lý do đó đã bị bỏ khi cả hệ thống chuyển sang đo bằng
         // phiếu hợp lệ, chỉ riêng đây bị sót vì không màn hình nào gọi tới.
+        var countThresholds = await scoringThresholds.GetAsync(cancellationToken);
+        var countRejectTooFast = countThresholds.RejectTooFast;
+        var countRejectSingleAnswer = countThresholds.RejectSingleAnswer;
+        var countRejectAttentionCheck = countThresholds.RejectAttentionCheckFailed;
+
         var responseCounts = await db.SurveyResponses
             .AsNoTracking()
             .Where(x => sectionSurveyIds.Contains(x.CourseSectionSurveyId))
@@ -228,7 +250,14 @@ public sealed class EfReportService(
             .Select(g => new
             {
                 CourseSectionSurveyId = g.Key,
-                Count = g.Count(x => x.IsValid),
+                Count = g.Count(x =>
+                    x.RejectionReasons == null
+                    || ((!countRejectTooFast
+                            || !x.RejectionReasons.Contains(RejectionReasonCodes.TooFast))
+                        && (!countRejectSingleAnswer
+                            || !x.RejectionReasons.Contains(RejectionReasonCodes.SingleAnswer))
+                        && (!countRejectAttentionCheck
+                            || !x.RejectionReasons.Contains(RejectionReasonCodes.AttentionCheckFailed)))),
             })
             .ToDictionaryAsync(x => x.CourseSectionSurveyId, x => x.Count, cancellationToken);
 
@@ -620,9 +649,12 @@ public sealed class EfReportService(
 
         var questionSnapshots = await QuestionScoreSnapshotsAsync(scoredCssIds, cancellationToken);
 
-        // Điểm từng câu của giảng viên là số liệu chất lượng: chỉ gộp phiếu hợp lệ.
+        // Điểm từng câu của giảng viên là số liệu chất lượng: chỉ gộp phiếu qua được
+        // những luật lọc nhiễu đang bật.
+        var lecturerThresholds = await scoringThresholds.GetAsync(cancellationToken);
         var validResponseIds = db.SurveyResponses.AsNoTracking()
-            .Where(x => scoredCssIds.Contains(x.CourseSectionSurveyId) && x.IsValid)
+            .Where(x => scoredCssIds.Contains(x.CourseSectionSurveyId))
+            .Where(lecturerThresholds.CountsTowardScore())
             .Select(x => x.ResponseId);
 
         var validAnswersQuery = db.SurveyResponseAnswers.AsNoTracking()
@@ -864,9 +896,11 @@ public sealed class EfReportService(
             .ToListAsync(cancellationToken);
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
 
-        // Báo cáo chất lượng nên chỉ gộp phiếu qua bộ lọc nhiễu.
+        // Báo cáo chất lượng nên chỉ gộp phiếu qua được những luật lọc nhiễu đang bật.
+        var summaryThresholds = await scoringThresholds.GetAsync(cancellationToken);
         var validResponsesQuery = db.SurveyResponses.AsNoTracking()
-            .Where(x => cssIds.Contains(x.CourseSectionSurveyId) && x.IsValid);
+            .Where(x => cssIds.Contains(x.CourseSectionSurveyId))
+            .Where(summaryThresholds.CountsTowardScore());
 
         var responsesCount = await validResponsesQuery.CountAsync(cancellationToken);
         if (responsesCount == 0)
@@ -996,9 +1030,12 @@ public sealed class EfReportService(
             : await db.Lecturers.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.LecturerId == section.LecturerId, cancellationToken);
 
-        // Phân tích theo câu hỏi là số liệu chất lượng nên chỉ gộp phiếu hợp lệ.
+        // Phân tích theo câu hỏi là số liệu chất lượng nên chỉ gộp phiếu qua được
+        // những luật lọc nhiễu đang bật.
+        var sectionThresholds = await scoringThresholds.GetAsync(cancellationToken);
         var responseIds = await db.SurveyResponses.AsNoTracking()
-            .Where(x => x.CourseSectionSurveyId == courseSectionSurveyId && x.IsValid)
+            .Where(x => x.CourseSectionSurveyId == courseSectionSurveyId)
+            .Where(sectionThresholds.CountsTowardScore())
             .Select(x => x.ResponseId)
             .ToListAsync(cancellationToken);
 
@@ -1403,11 +1440,13 @@ public sealed class EfReportService(
         var responseStats = await ResponseTalliesAsync(cssIds, cancellationToken);
 
         // Phân bố điểm theo nhóm (band 2..5) gộp ngay trong SQL.
-        // Là số liệu chất lượng nên chỉ gộp phiếu hợp lệ.
+        // Là số liệu chất lượng nên chỉ gộp phiếu qua được những luật lọc nhiễu đang bật.
+        var bandThresholds = await scoringThresholds.GetAsync(cancellationToken);
         var bandCounts = cssIds.Count == 0
             ? new List<BandCount>()
             : (await db.SurveyResponses.AsNoTracking()
-                .Where(x => cssIds.Contains(x.CourseSectionSurveyId) && x.IsValid)
+                .Where(x => cssIds.Contains(x.CourseSectionSurveyId))
+                .Where(bandThresholds.CountsTowardScore())
                 .Select(x => new
                 {
                     Band = x.Score >= 4.5m ? 5 : x.Score >= 4.0m ? 4 : x.Score >= 3.0m ? 3 : 2
@@ -1713,12 +1752,18 @@ public sealed class EfReportService(
         var candidateQuestionIds = candidates.Select(x => x.QuestionId).ToList();
 
         // Phân bố lựa chọn vẫn cần dữ liệu gốc, nhưng chỉ cho tối đa WeakQuestionCount câu.
-        // Chỉ gộp phiếu hợp lệ vì đây là số liệu chất lượng.
+        // Chỉ gộp phiếu qua được những luật lọc nhiễu đang bật.
+        var weakThresholds = await scoringThresholds.GetAsync(cancellationToken);
+        var countedResponseIds = db.SurveyResponses.AsNoTracking()
+            .Where(r => scoredIds.Contains(r.CourseSectionSurveyId))
+            .Where(weakThresholds.CountsTowardScore())
+            .Select(r => r.ResponseId);
+
         var valueCounts = await (from r in db.SurveyResponses.AsNoTracking()
                                  join a in db.SurveyResponseAnswers.AsNoTracking()
                                      on r.ResponseId equals a.ResponseId
                                  where scoredIds.Contains(r.CourseSectionSurveyId)
-                                       && r.IsValid
+                                       && countedResponseIds.Contains(r.ResponseId)
                                        && candidateQuestionIds.Contains(a.QuestionId)
                                  group a by new { a.QuestionId, a.AnswerValue } into g
                                  select new { g.Key.QuestionId, g.Key.AnswerValue, Count = g.Count() })

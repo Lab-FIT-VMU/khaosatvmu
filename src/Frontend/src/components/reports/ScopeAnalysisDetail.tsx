@@ -56,7 +56,7 @@ interface ScopeDetailRow {
   classSize?: number;
   responseCount?: number;
   validResponseCount?: number;
-  /** Phiếu hợp lệ chia tổng sĩ số, theo phần trăm. */
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
   validRate?: number | null;
   averageScore: number | null;
   /** Bấm vào tên để mở cấp dưới; thiếu thì dòng đứng yên. */
@@ -207,7 +207,7 @@ const ScopeRowsTable: React.FC<{
                 </th>
               )}
               {showsValidRate && (
-                <th scope="col" title="Số phiếu hợp lệ chia tổng sĩ số">
+                <th scope="col" title="Số phiếu hợp lệ chia số phiếu thu về">
                   {filters.filterHeader('validRate', 'Tỷ lệ hợp lệ')}
                 </th>
               )}

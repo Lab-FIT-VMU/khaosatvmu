@@ -440,8 +440,8 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
             <>
               <strong>Lớp đã thu đủ phiếu (Đang chờ chốt điểm)</strong>
               <span>
-                Lớp đã đạt đủ số lượng phiếu theo quy định. Vui lòng bấm &quot;Tính lại điểm&quot; ở
-                trang Bảng dữ liệu khảo sát để tạo báo cáo phân tích theo câu hỏi.
+                Lớp đã đạt đủ số lượng phiếu theo quy định. Vui lòng bấm &quot;Cập nhật điểm&quot; ở
+                các trang thống kê để tạo báo cáo phân tích theo câu hỏi.
               </span>
             </>
           ) : (
@@ -449,7 +449,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
               <strong>Lớp chưa đủ điều kiện tính điểm</strong>
               <span>
                 Lớp phải qua cả ngưỡng tỷ lệ phản hồi và ngưỡng tỷ lệ phiếu hợp lệ, sau đó
-                được chốt bằng nút &quot;Tính lại điểm&quot; ở trang Bảng dữ liệu khảo sát thì mới có
+                được chốt bằng nút &quot;Cập nhật điểm&quot; ở các trang thống kê thì mới có
                 số liệu phân tích.
               </span>
             </>

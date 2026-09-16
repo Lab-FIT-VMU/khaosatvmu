@@ -57,7 +57,8 @@ public class ScoringThresholdTests
         decimal validRate,
         bool expected)
     {
-        new ScoringThresholds(responseRate, validRate).IsValid.Should().Be(expected);
+        new ScoringThresholds(responseRate, validRate, true, true, true)
+            .IsValid.Should().Be(expected);
     }
 
     [Fact]
@@ -66,7 +67,7 @@ public class ScoringThresholdTests
         // Lớp phản hồi 40%, hợp lệ 75%: rớt cả hai vòng ở mức mặc định.
         Default.HasEnoughResponsesToScore(100, 40, 30).Should().BeFalse();
 
-        var loose = new ScoringThresholds(30m, 70m);
+        var loose = new ScoringThresholds(30m, 70m, true, true, true);
         loose.HasEnoughResponsesToScore(100, 40, 30).Should().BeTrue();
     }
 }

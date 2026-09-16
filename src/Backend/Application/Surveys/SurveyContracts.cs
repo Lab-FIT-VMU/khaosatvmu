@@ -144,7 +144,21 @@ public sealed record NormalizationGroupDto(
     /// sẽ dồn mọi khoa về sát 0 và cột này thành vô dụng.
     /// Null khi độ lệch chuẩn toàn trường bằng 0 hoặc không xác định.
     /// </summary>
-    decimal? MeanZScore);
+    decimal? MeanZScore,
+    /// <summary>Số giảng viên khác nhau đứng lớp trong khoa.</summary>
+    int LecturerCount,
+    /// <summary>Tổng sĩ số các lớp của khoa — mẫu số của tỷ lệ phản hồi.</summary>
+    int TotalClassSize,
+    /// <summary>Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại.</summary>
+    int ResponseCount,
+    /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
+    int ValidResponseCount,
+    /// <summary>Phiếu thu về chia tổng sĩ số, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
+    decimal ValidResponseRate,
+    /// <summary>Số lớp của khoa ở mức cảnh báo: điểm ≤ mốc Z-Score −1 của toàn đợt.</summary>
+    int WarningSectionCount);
 
 /// <summary>Một lớp trong bảng chi tiết của sheet chuẩn hoá điểm.</summary>
 public sealed record NormalizedSectionDto(
@@ -164,7 +178,15 @@ public sealed record NormalizedSectionDto(
     /// <summary>Z trong khoa trừ Z toàn trường. Lệch nhiều nghĩa là chuẩn hoá đổi kết luận.</summary>
     decimal? ZDifference,
     /// <summary>Mã trong <see cref="NormalizationVerdicts"/>.</summary>
-    string Verdict);
+    string Verdict,
+    /// <summary>Tổng phiếu thu về của lớp, kể cả phiếu bị bộ lọc nhiễu loại.</summary>
+    int ResponseCount,
+    /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
+    int ValidResponseCount,
+    /// <summary>Phiếu thu về chia sĩ số lớp, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
+    decimal ValidResponseRate);
 
 /// <summary>Toàn bộ sheet chuẩn hoá điểm của một đợt khảo sát.</summary>
 public sealed record SemesterSurveyNormalizationDto(
@@ -189,18 +211,27 @@ public sealed record DepartmentSummaryRowDto(
     string DepartmentName,
     int SectionCount,
     int LecturerCount,
-    /// <summary>Tổng sĩ số các lớp của bộ môn — mẫu số của tỷ lệ phiếu hợp lệ.</summary>
+    /// <summary>Tổng sĩ số các lớp của bộ môn — mẫu số của tỷ lệ phản hồi.</summary>
     int TotalClassSize,
     /// <summary>Tổng số phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại.</summary>
     int ResponseCount,
     /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
     int ValidResponseCount,
-    /// <summary>Phiếu hợp lệ chia tổng sĩ số, tính theo phần trăm.</summary>
+    /// <summary>Phiếu thu về chia tổng sĩ số, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
     decimal ValidResponseRate,
     /// <summary>Điểm tổng hợp, chỉ gộp phiếu hợp lệ. Null khi chưa có phiếu nào.</summary>
     decimal? AverageScore,
     /// <summary>Số lớp có điểm ở mức cảnh báo: Z-Score ≤ −1 so với mặt bằng toàn đợt.</summary>
-    int WarningSectionCount);
+    int WarningSectionCount,
+    /// <summary>Độ lệch chuẩn điểm các lớp trong bộ môn; null khi bộ môn có ít hơn hai lớp.</summary>
+    decimal? StandardDeviation,
+    /// <summary>
+    /// Mặt bằng bộ môn lệch mặt bằng toàn trường bao nhiêu lần sai số chuẩn σ/√n —
+    /// cùng công thức với MeanZScore của khoa, để hai tab đọc ngang được nhau.
+    /// </summary>
+    decimal? MeanZScore);
 
 public sealed record SemesterSurveyDepartmentSummaryDto(
     int SemesterSurveyId,
@@ -239,7 +270,23 @@ public sealed record CourseDiagnosisRowDto(
     decimal? WeakestQuestionScore,
     string? WeakestQuestionText,
     /// <summary>Mã trong <see cref="CourseDiagnosisVerdicts"/>.</summary>
-    string Verdict);
+    string Verdict,
+    /// <summary>Tổng sĩ số các lớp của học phần — mẫu số của tỷ lệ phản hồi.</summary>
+    int TotalClassSize,
+    /// <summary>Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại.</summary>
+    int ResponseCount,
+    /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
+    int ValidResponseCount,
+    /// <summary>Phiếu thu về chia tổng sĩ số, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
+    decimal ValidResponseRate,
+    /// <summary>
+    /// Mặt bằng học phần lệch mặt bằng toàn trường bao nhiêu lần sai số chuẩn σ/√n.
+    /// </summary>
+    decimal? MeanZScore,
+    /// <summary>Số lớp của học phần ở mức cảnh báo: điểm ≤ mốc Z-Score −1 của toàn đợt.</summary>
+    int WarningSectionCount);
 
 public sealed record SemesterSurveyCourseDiagnosisDto(
     int SemesterSurveyId,
@@ -366,6 +413,9 @@ public sealed record LecturerOptionDto(
     int TotalClassSize,
     int ResponseCount,
     int ValidResponseCount,
+    /// <summary>Phiếu thu về chia tổng sĩ số, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
     decimal ValidResponseRate,
     decimal? AverageScore,
     decimal? MinScore,
@@ -383,7 +433,9 @@ public sealed record LecturerSectionDto(
     int ResponseCount,
     /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
     int ValidResponseCount,
-    /// <summary>Phiếu hợp lệ chia sĩ số, theo phần trăm.</summary>
+    /// <summary>Phiếu thu về chia sĩ số, theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, theo phần trăm.</summary>
     decimal ValidResponseRate,
     decimal AverageScore,
     /// <summary>

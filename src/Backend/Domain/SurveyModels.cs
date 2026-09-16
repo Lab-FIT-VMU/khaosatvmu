@@ -323,5 +323,68 @@ public sealed class SurveyScoringSetting
     /// <summary>Vòng 2 — Số phiếu hợp lệ ÷ Số phiếu đã thu, phần trăm.</summary>
     public decimal MinimumValidRate { get; set; }
 
+    /// <summary>
+    /// Ba luật của bộ lọc nhiễu có đang được áp hay không. Tắt một luật thì phiếu
+    /// chỉ dính đúng luật đó quay lại được tính vào thống kê.
+    ///
+    /// KHÔNG sửa gì trong bảng "SurveyResponses": cột "RejectionReasons" đã ghi sẵn
+    /// phiếu dính luật nào từ lúc nộp, ba cờ này chỉ đổi cách ĐỌC lại chỗ đó.
+    /// </summary>
+    public bool RejectTooFast { get; set; } = true;
+
+    public bool RejectSingleAnswer { get; set; } = true;
+
+    public bool RejectAttentionCheckFailed { get; set; } = true;
+
     public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>Mã loại sự kiện trong bảng "SurveyScoringChangeLogs".</summary>
+public static class ScoringChangeKinds
+{
+    /// <summary>Quản trị lưu cấu hình tính điểm với giá trị khác trước.</summary>
+    public const string ConfigUpdated = "CONFIG_UPDATED";
+
+    /// <summary>Quản trị bấm Tính lại điểm cho một đợt khảo sát.</summary>
+    public const string ScoresRecalculated = "SCORES_RECALCULATED";
+}
+
+/// <summary>
+/// Bảng "SurveyScoringChangeLogs": mỗi lần đổi cấu hình tính điểm hoặc tính lại điểm
+/// một đợt là một dòng, kèm NGUYÊN BỘ cấu hình tại thời điểm đó và người thực hiện.
+///
+/// Cấu hình là một dòng dùng chung cho cả hệ thống, còn điểm đã chốt là ảnh chụp theo
+/// từng đợt. Người A tính theo cấu hình x, người B đổi sang y rồi tính — không có bảng
+/// này thì A không có cách nào biết số đang xem thuộc cấu hình nào. Các trang thống
+/// kê đọc bảng này để báo cho những người KHÁC người vừa thao tác.
+///
+/// Chỉ thêm dòng, không sửa không xoá.
+/// </summary>
+public sealed class SurveyScoringChangeLog
+{
+    public long SurveyScoringChangeLogId { get; set; }
+
+    /// <summary>Mã trong <see cref="ScoringChangeKinds"/>.</summary>
+    public string Kind { get; set; } = string.Empty;
+
+    /// <summary>Đợt được tính lại điểm; null với sự kiện đổi cấu hình.</summary>
+    public int? SemesterSurveyId { get; set; }
+
+    public decimal MinimumResponseRate { get; set; }
+
+    public decimal MinimumValidRate { get; set; }
+
+    public bool RejectTooFast { get; set; }
+
+    public bool RejectSingleAnswer { get; set; }
+
+    public bool RejectAttentionCheckFailed { get; set; }
+
+    /// <summary>Null khi không xác định được người gọi.</summary>
+    public Guid? ChangedByUserId { get; set; }
+
+    /// <summary>Tên hiển thị (hoặc email) lúc thao tác, để thông báo khỏi phải tra lại.</summary>
+    public string ChangedByName { get; set; } = string.Empty;
+
+    public DateTime ChangedAt { get; set; }
 }

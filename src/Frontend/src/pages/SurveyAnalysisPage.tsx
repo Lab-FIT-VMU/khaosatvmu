@@ -17,6 +17,8 @@ import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilte
 import { NoteModalButton } from '../components/NoteModalButton';
 import { useScoringThresholds } from '../hooks/useScoringThresholds';
 import { ExportDropdown } from '../components/ExportDropdown';
+import { UpdateScoresButton } from '../components/UpdateScoresButton';
+import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { ApiError } from '../services/apiClient';
 import {
   courseDiagnosisLabels,
@@ -32,7 +34,7 @@ import type {
   SemesterSurveyNormalization,
   SurveyAnalysisScopeType,
 } from '../services/surveyApi';
-import type { SemesterSurvey } from '../types';
+import { rejectionReasonLabels, type SemesterSurvey } from '../types';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/reports.css';
@@ -692,6 +694,15 @@ export const SurveyAnalysisPage: React.FC = () => {
   }, [navigateAnalysis, semesterId, semesterSurveyId, tab, visibleTabs]);
   const thresholds = useScoringThresholds();
 
+  // Bẫy lỗi nào đang được áp khi đếm Số phiếu hợp lệ, theo cấu hình hiện tại.
+  const trapRules = [
+    { label: rejectionReasonLabels.SINGLE_ANSWER, enabled: thresholds.rejectSingleAnswer },
+    { label: rejectionReasonLabels.ATTENTION_CHECK_FAILED, enabled: thresholds.rejectAttentionCheckFailed },
+    { label: rejectionReasonLabels.TOO_FAST, enabled: thresholds.rejectTooFast },
+  ];
+  const enabledTraps = trapRules.filter((rule) => rule.enabled).map((rule) => rule.label);
+  const disabledTraps = trapRules.filter((rule) => !rule.enabled).map((rule) => rule.label);
+
   // Nút chú thích của tab được truyền xuống để mỗi tab đặt nó vào cuối dòng tóm
   // tắt số liệu của mình — hai thứ nằm chung một hàng thay vì ăn hai dòng.
   const tabNote = (
@@ -705,7 +716,43 @@ export const SurveyAnalysisPage: React.FC = () => {
           Số liệu chỉ gộp lớp qua cả hai tiêu chí: tỷ lệ phản hồi ≥{' '}
           <strong>{thresholds.minimumResponseRate}%</strong> và tỷ lệ phiếu hợp lệ ≥{' '}
           <strong>{thresholds.minimumValidRate}%</strong>. Hai ngưỡng này đổi được ở
-          trang Bảng dữ liệu khảo sát.
+          nút Cập nhật điểm.
+        </p>
+        {/* Nhãn Hợp lệ / Bị lọc của từng phiếu được ghi vào cơ sở dữ liệu lúc nộp và
+            không đổi, còn Số phiếu hợp lệ ở đây đếm theo bẫy lỗi đang bật. Hai chỗ
+            có thể lệch nhau nên phải nói rõ cách đếm. */}
+        <p className="z-legend__note">
+          <strong>Tỷ lệ phản hồi</strong> = Số phiếu thu về ÷ Tổng sĩ số.
+        </p>
+        <p className="z-legend__note">
+          <strong>Tỷ lệ phiếu hợp lệ</strong> = Số phiếu hợp lệ ÷ Số phiếu thu về.
+        </p>
+        <p className="z-legend__note">
+          <strong>Số phiếu hợp lệ</strong> là số phiếu thu về không dính bẫy lỗi nào
+          đang được áp.{' '}
+          {enabledTraps.length === 0 ? (
+            <>
+              Hiện <strong>không áp bẫy lỗi nào</strong>, nên mọi phiếu thu về đều được
+              tính là hợp lệ.
+            </>
+          ) : (
+            <>
+              Đang áp: <strong>{enabledTraps.join(', ')}</strong>.
+              {disabledTraps.length > 0 && (
+                <>
+                  {' '}Đang bỏ qua: <strong>{disabledTraps.join(', ')}</strong> — phiếu chỉ
+                  dính các lỗi này vẫn được tính là hợp lệ.
+                </>
+              )}
+            </>
+          )}
+        </p>
+        <p className="z-legend__note">
+          Nhãn <strong>Hợp lệ / Bị lọc</strong> và lý do bị lọc trong danh sách phiếu của
+          từng lớp được lưu lúc sinh viên nộp phiếu, xét đủ cả ba bẫy lỗi, nên không đổi
+          khi bật tắt bẫy lỗi. Vì vậy số phiếu hợp lệ ở đây có thể khác số phiếu mang
+          nhãn Hợp lệ. Số liệu trang này lấy theo lần bấm Cập nhật điểm gần nhất: đổi
+          bẫy lỗi hoặc ngưỡng xong cần bấm Cập nhật điểm.
         </p>
       </div>
     </NoteModalButton>
@@ -1140,8 +1187,14 @@ export const SurveyAnalysisPage: React.FC = () => {
             <RefreshCw className={loading ? 'operation-icon auth-spin' : 'operation-icon'} />
             Tải lại
           </button>
+          <UpdateScoresButton
+            semesterSurveyId={semesterSurveyId}
+            onUpdated={() => loadAnalysis(true)}
+          />
         </div>
       </div>
+
+      <ScoringConfigNote />
 
       <nav className="analysis-tabs" aria-label="Các góc nhìn phân tích">
         {visibleTabs.map((item) => (
@@ -1289,9 +1342,31 @@ const NormalizationGroupTab: React.FC<{
       value: (row) => (row.meanZScore === null ? '—' : row.meanZScore.toFixed(2)),
       sortValue: (row) => row.meanZScore,
     },
+    { key: 'lecturerCount', value: (row) => String(row.lecturerCount), numeric: true },
+    { key: 'totalClassSize', value: (row) => String(row.totalClassSize), numeric: true },
+    { key: 'responseCount', value: (row) => String(row.responseCount), numeric: true },
+    { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
+    {
+      key: 'responseRate',
+      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      sortValue: (row) => row.responseRate,
+    },
+    {
+      key: 'validResponseRate',
+      value: (row) => `${row.validResponseRate.toFixed(1)}%`,
+      sortValue: (row) => row.validResponseRate,
+    },
+    { key: 'warningSectionCount', value: (row) => String(row.warningSectionCount), numeric: true },
   ], []);
   const groupFilters = useColumnFilters(groups, groupColumns);
   const groupPagination = usePaginatedItems(groupFilters.visibleRows, analysisPageSize);
+
+  // Dòng TOÀN TRƯỜNG cộng từ tất cả các khoa chứ không phải từ trang đang xem.
+  // Riêng Số GV để trống: một giảng viên dạy lớp của hai khoa sẽ bị đếm hai lần.
+  const schoolClassSize = groups.reduce((sum, row) => sum + row.totalClassSize, 0);
+  const schoolResponses = groups.reduce((sum, row) => sum + row.responseCount, 0);
+  const schoolValidResponses = groups.reduce((sum, row) => sum + row.validResponseCount, 0);
+  const schoolWarnings = groups.reduce((sum, row) => sum + row.warningSectionCount, 0);
 
   if (!data || data.sections.length === 0) {
     return emptyWithNote(note, 'Đợt này chưa có lớp nào thu được phiếu hợp lệ.');
@@ -1306,24 +1381,49 @@ const NormalizationGroupTab: React.FC<{
           <thead>
             {/* Bảng này không có cột ghim nên bề rộng để theo phần trăm được. */}
             <tr>
-              <th scope="col" style={{ width: '34%' }}>
+              <th scope="col" style={{ width: '20%' }}>
                 {groupFilters.filterHeader('facultyName', 'Khoa / Viện')}
               </th>
-              <th scope="col" style={{ width: '12%' }}>
+              <th scope="col" style={{ width: '5%' }}>
                 {groupFilters.filterHeader('sectionCount', 'Số lớp')}
               </th>
-              <th scope="col" style={{ width: '18%' }}>
+              <th scope="col" style={{ width: '5%' }}>
+                {groupFilters.filterHeader('lecturerCount', 'Số GV')}
+              </th>
+              <th scope="col" style={{ width: '7%' }}>
+                {groupFilters.filterHeader('totalClassSize', 'Tổng sĩ số')}
+              </th>
+              <th scope="col" style={{ width: '8%' }}>
+                {groupFilters.filterHeader('responseCount', 'Số phiếu thu về')}
+              </th>
+              <th scope="col" style={{ width: '8%' }}>
+                {groupFilters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
+              </th>
+              <th scope="col" style={{ width: '8%' }} title="Số phiếu thu về chia tổng sĩ số">
+                {groupFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+              </th>
+              <th scope="col" style={{ width: '8%' }} title="Số phiếu hợp lệ chia số phiếu thu về">
+                {groupFilters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
+              </th>
+              <th scope="col" style={{ width: '8%' }}>
                 {groupFilters.filterHeader('averageScore', 'Điểm TB khoa')}
               </th>
-              <th scope="col" style={{ width: '18%' }}>
+              <th scope="col" style={{ width: '8%' }}>
                 {groupFilters.filterHeader('standardDeviation', 'Độ lệch chuẩn')}
               </th>
               <th
                 scope="col"
-                style={{ width: '18%' }}
+                style={{ width: '9%' }}
                 title="Điểm TB khoa lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
               >
                 {groupFilters.filterHeader('meanZScore', 'Z-Score so toàn trường')}
+              </th>
+              <th
+                scope="col"
+                style={{ width: '6%' }}
+                title="Số lớp của khoa thấp hơn trung bình toàn trường từ 1 độ lệch chuẩn trở lên"
+              >
+                {groupFilters.filterHeader('warningSectionCount', 'Lớp cảnh báo')}
               </th>
             </tr>
           </thead>
@@ -1356,6 +1456,12 @@ const NormalizationGroupTab: React.FC<{
                     )}
                   </td>
                   <td className="num">{group.sectionCount}</td>
+                  <td className="num">{group.lecturerCount}</td>
+                  <td className="num">{group.totalClassSize}</td>
+                  <td className="num">{group.responseCount}</td>
+                  <td className="num">{group.validResponseCount}</td>
+                  <td className="num">{group.responseRate.toFixed(1)}%</td>
+                  <td className="num">{group.validResponseRate.toFixed(1)}%</td>
                   {/* Tô theo bậc Z chứ không theo thang điểm tuyệt đối: cả bảng này
                       đọc bằng một thước duy nhất là 68-95-99.7. */}
                   <td className={zTierClass(group.meanZScore)}>{group.averageScore.toFixed(3)}</td>
@@ -1367,12 +1473,30 @@ const NormalizationGroupTab: React.FC<{
                       ? '—'
                       : `${group.meanZScore > 0 ? '+' : ''}${group.meanZScore.toFixed(2)}`}
                   </td>
+                  <td className={group.warningSectionCount > 0 ? 'num is-flagged' : 'num'}>
+                    {group.warningSectionCount}
+                  </td>
                 </tr>
               );
             })}
             <tr>
               <th scope="row">TOÀN TRƯỜNG</th>
               <td className="num is-sum">{data.schoolSectionCount}</td>
+              {/* Số GV để trống: cộng số của từng khoa sẽ đếm trùng người dạy liên khoa. */}
+              <td />
+              <td className="num is-sum">{schoolClassSize}</td>
+              <td className="num is-sum">{schoolResponses}</td>
+              <td className="num is-sum">{schoolValidResponses}</td>
+              <td className="num is-mean">
+                {schoolClassSize === 0
+                  ? '—'
+                  : `${((schoolResponses / schoolClassSize) * 100).toFixed(1)}%`}
+              </td>
+              <td className="num is-mean">
+                {schoolResponses === 0
+                  ? '—'
+                  : `${((schoolValidResponses / schoolResponses) * 100).toFixed(1)}%`}
+              </td>
               <td className="num is-mean">{data.schoolAverageScore.toFixed(3)}</td>
               <td className="num is-mean">
                 {data.schoolStandardDeviation === null
@@ -1381,6 +1505,7 @@ const NormalizationGroupTab: React.FC<{
               </td>
               {/* Toàn trường là chính mốc so, nên Z của nó luôn bằng 0 — để trống. */}
               <td />
+              <td className="num is-sum">{schoolWarnings}</td>
             </tr>
           </tbody>
         </table>
@@ -1412,6 +1537,18 @@ const NormalizationSectionTab: React.FC<{
     { key: 'departmentName', value: (row) => row.departmentName },
     { key: 'facultyName', value: (row) => row.facultyName },
     { key: 'classSize', value: (row) => String(row.classSize), numeric: true },
+    { key: 'responseCount', value: (row) => String(row.responseCount), numeric: true },
+    { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
+    {
+      key: 'responseRate',
+      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      sortValue: (row) => row.responseRate,
+    },
+    {
+      key: 'validResponseRate',
+      value: (row) => `${row.validResponseRate.toFixed(1)}%`,
+      sortValue: (row) => row.validResponseRate,
+    },
     { key: 'averageScore', value: (row) => row.averageScore.toFixed(2), numeric: true },
     {
       key: 'zSchool',
@@ -1455,17 +1592,29 @@ const NormalizationSectionTab: React.FC<{
               </th>
               {/* Ba cột đầu bị ghim nên bề rộng phải giữ pixel — giá trị `left` của
                   cột sau cộng dồn từ chúng. Các cột còn lại để theo phần trăm. */}
-              <th scope="col" style={{ width: '13%' }}>
+              <th scope="col" style={{ width: '11%' }}>
                 {sectionFilters.filterHeader('lecturerName', 'Giảng viên')}
               </th>
-              <th scope="col" style={{ width: '11%' }}>
+              <th scope="col" style={{ width: '10%' }}>
                 {sectionFilters.filterHeader('departmentName', 'Bộ môn')}
               </th>
-              <th scope="col" style={{ width: '11%' }}>
+              <th scope="col" style={{ width: '10%' }}>
                 {sectionFilters.filterHeader('facultyName', 'Khoa / Viện')}
               </th>
               <th scope="col" style={{ width: '5%' }}>
                 {sectionFilters.filterHeader('classSize', 'Sĩ số')}
+              </th>
+              <th scope="col" style={{ width: '7%' }}>
+                {sectionFilters.filterHeader('responseCount', 'Số phiếu thu về')}
+              </th>
+              <th scope="col" style={{ width: '7%' }}>
+                {sectionFilters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
+              </th>
+              <th scope="col" style={{ width: '7%' }} title="Số phiếu thu về chia sĩ số lớp">
+                {sectionFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+              </th>
+              <th scope="col" style={{ width: '7%' }} title="Số phiếu hợp lệ chia số phiếu thu về">
+                {sectionFilters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
               </th>
               <th scope="col" style={{ width: '7%' }}>
                 {sectionFilters.filterHeader('averageScore', 'Điểm')}
@@ -1509,6 +1658,10 @@ const NormalizationSectionTab: React.FC<{
                 <td>{section.departmentName}</td>
                 <td>{section.facultyName}</td>
                 <td className="num">{section.classSize}</td>
+                <td className="num">{section.responseCount}</td>
+                <td className="num">{section.validResponseCount}</td>
+                <td className="num">{section.responseRate.toFixed(1)}%</td>
+                <td className="num">{section.validResponseRate.toFixed(1)}%</td>
                 <td className={zTierClass(section.zFaculty)}>
                   {section.averageScore.toFixed(2)}
                 </td>
@@ -1560,6 +1713,11 @@ const DepartmentTab: React.FC<{
     { key: 'responseCount', value: (row) => String(row.responseCount), numeric: true },
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
+      key: 'responseRate',
+      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      sortValue: (row) => row.responseRate,
+    },
+    {
       key: 'validResponseRate',
       value: (row) => `${row.validResponseRate.toFixed(1)}%`,
       sortValue: (row) => row.validResponseRate,
@@ -1568,6 +1726,16 @@ const DepartmentTab: React.FC<{
       key: 'averageScore',
       value: (row) => (row.averageScore === null ? '—' : row.averageScore.toFixed(2)),
       sortValue: (row) => row.averageScore,
+    },
+    {
+      key: 'standardDeviation',
+      value: (row) => (row.standardDeviation === null ? '—' : row.standardDeviation.toFixed(3)),
+      sortValue: (row) => row.standardDeviation,
+    },
+    {
+      key: 'meanZScore',
+      value: (row) => (row.meanZScore === null ? '—' : row.meanZScore.toFixed(2)),
+      sortValue: (row) => row.meanZScore,
     },
     { key: 'warningSectionCount', value: (row) => String(row.warningSectionCount), numeric: true },
   ], []);
@@ -1585,8 +1753,9 @@ const DepartmentTab: React.FC<{
   const totalWarnings = data.schoolWarningCount;
   const overallScore = data.schoolAverageScore;
   // Dòng tổng cộng từ các dòng đang hiện. Trưởng bộ môn chỉ thấy dòng của mình
-  // nên hai số này là của bộ môn đó, khác các số toàn trường ở trên.
+  // nên các số này là của bộ môn đó, khác các số toàn trường ở trên.
   const totalClassSize = rows.reduce((sum, row) => sum + row.totalClassSize, 0);
+  const totalRowResponses = rows.reduce((sum, row) => sum + row.responseCount, 0);
   const totalValidResponses = rows.reduce((sum, row) => sum + row.validResponseCount, 0);
   const isScoped = data.rows.length < data.schoolDepartmentCount;
 
@@ -1626,10 +1795,20 @@ const DepartmentTab: React.FC<{
               <th scope="col">{filters.filterHeader('totalClassSize', 'Tổng sĩ số')}</th>
               <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu thu về')}</th>
               <th scope="col">{filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}</th>
-              <th scope="col" title="Số phiếu hợp lệ chia tổng sĩ số">
+              <th scope="col" title="Số phiếu thu về chia tổng sĩ số">
+                {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+              </th>
+              <th scope="col" title="Số phiếu hợp lệ chia số phiếu thu về">
                 {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
               </th>
               <th scope="col">{filters.filterHeader('averageScore', 'Điểm trung bình')}</th>
+              <th scope="col">{filters.filterHeader('standardDeviation', 'Độ lệch chuẩn')}</th>
+              <th
+                scope="col"
+                title="Điểm TB bộ môn lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
+              >
+                {filters.filterHeader('meanZScore', 'Z-Score so toàn trường')}
+              </th>
               <th
                 scope="col"
                 title="Lớp có điểm thấp hơn trung bình toàn trường từ 1 độ lệch chuẩn trở lên"
@@ -1673,9 +1852,18 @@ const DepartmentTab: React.FC<{
                 <td className="num">{row.totalClassSize}</td>
                 <td className="num">{row.responseCount}</td>
                 <td className="num">{row.validResponseCount}</td>
+                <td className="num">{row.responseRate.toFixed(1)}%</td>
                 <td className="num">{row.validResponseRate.toFixed(1)}%</td>
                 <td className={scoreClass(row.averageScore)}>
                   {row.averageScore === null ? '—' : row.averageScore.toFixed(2)}
+                </td>
+                <td className="num">
+                  {row.standardDeviation === null ? '—' : row.standardDeviation.toFixed(3)}
+                </td>
+                <td className={zTierClass(row.meanZScore)}>
+                  {row.meanZScore === null
+                    ? '—'
+                    : `${row.meanZScore > 0 ? '+' : ''}${row.meanZScore.toFixed(2)}`}
                 </td>
                 <td className={row.warningSectionCount > 0 ? 'num is-flagged' : 'num'}>
                   {row.warningSectionCount}
@@ -1684,7 +1872,7 @@ const DepartmentTab: React.FC<{
             ))}
             {/* Ô đệm nuốt chỗ thừa để dòng tổng kết luôn nằm sát đáy khung. */}
             <tr className="table-spacer" aria-hidden="true">
-              <td colSpan={10} />
+              <td colSpan={13} />
             </tr>
           </tbody>
 
@@ -1700,11 +1888,20 @@ const DepartmentTab: React.FC<{
               <td className="num is-mean">
                 {totalClassSize === 0
                   ? '—'
-                  : `${((totalValidResponses / totalClassSize) * 100).toFixed(1)}%`}
+                  : `${((totalRowResponses / totalClassSize) * 100).toFixed(1)}%`}
+              </td>
+              <td className="num is-mean">
+                {totalRowResponses === 0
+                  ? '—'
+                  : `${((totalValidResponses / totalRowResponses) * 100).toFixed(1)}%`}
               </td>
               <td className="num is-mean is-total">
                 {overallScore === null ? '—' : overallScore.toFixed(2)}
               </td>
+              {/* Độ lệch chuẩn và Z-Score của dòng tổng để trống: toàn trường chính là
+                  mốc so, Z của nó luôn bằng 0. */}
+              <td />
+              <td />
               <td className="num is-sum">{totalWarnings}</td>
             </tr>
           </tfoot>
@@ -1736,10 +1933,29 @@ const CourseDiagnosisTab: React.FC<{
     { key: 'facultyName', value: (row) => row.facultyName },
     { key: 'sectionCount', value: (row) => String(row.sectionCount), numeric: true },
     { key: 'lecturerCount', value: (row) => String(row.lecturerCount), numeric: true },
+    { key: 'totalClassSize', value: (row) => String(row.totalClassSize), numeric: true },
+    { key: 'responseCount', value: (row) => String(row.responseCount), numeric: true },
+    { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
+    {
+      key: 'responseRate',
+      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      sortValue: (row) => row.responseRate,
+    },
+    {
+      key: 'validResponseRate',
+      value: (row) => `${row.validResponseRate.toFixed(1)}%`,
+      sortValue: (row) => row.validResponseRate,
+    },
     { key: 'averageScore', value: (row) => row.averageScore.toFixed(2), numeric: true },
     { key: 'minScore', value: (row) => row.minScore.toFixed(2), numeric: true },
     { key: 'maxScore', value: (row) => row.maxScore.toFixed(2), numeric: true },
     { key: 'spread', value: (row) => row.spread.toFixed(2), numeric: true },
+    {
+      key: 'meanZScore',
+      value: (row) => (row.meanZScore === null ? '—' : row.meanZScore.toFixed(2)),
+      sortValue: (row) => row.meanZScore,
+    },
+    { key: 'warningSectionCount', value: (row) => String(row.warningSectionCount), numeric: true },
     {
       key: 'weakestQuestionOrder',
       value: (row) => (row.weakestQuestionOrder === null ? '—' : `C${row.weakestQuestionOrder}`),
@@ -1796,6 +2012,21 @@ const CourseDiagnosisTab: React.FC<{
               <th scope="col" style={{ width: '5%' }}>
                 {filters.filterHeader('lecturerCount', 'Số GV')}
               </th>
+              <th scope="col" style={{ width: '6%' }}>
+                {filters.filterHeader('totalClassSize', 'Tổng sĩ số')}
+              </th>
+              <th scope="col" style={{ width: '7%' }}>
+                {filters.filterHeader('responseCount', 'Số phiếu thu về')}
+              </th>
+              <th scope="col" style={{ width: '7%' }}>
+                {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
+              </th>
+              <th scope="col" style={{ width: '7%' }} title="Số phiếu thu về chia tổng sĩ số">
+                {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+              </th>
+              <th scope="col" style={{ width: '7%' }} title="Số phiếu hợp lệ chia số phiếu thu về">
+                {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
+              </th>
               <th scope="col" style={{ width: '7%' }}>
                 {filters.filterHeader('averageScore', 'Điểm TB')}
               </th>
@@ -1807,6 +2038,20 @@ const CourseDiagnosisTab: React.FC<{
               </th>
               <th scope="col" style={{ width: '8%' }} title="Điểm lớp cao nhất trừ điểm lớp thấp nhất">
                 {filters.filterHeader('spread', 'Chênh lệch giữa các lớp')}
+              </th>
+              <th
+                scope="col"
+                style={{ width: '7%' }}
+                title="Điểm TB học phần lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
+              >
+                {filters.filterHeader('meanZScore', 'Z-Score so toàn trường')}
+              </th>
+              <th
+                scope="col"
+                style={{ width: '6%' }}
+                title="Số lớp của học phần thấp hơn trung bình toàn trường từ 1 độ lệch chuẩn trở lên"
+              >
+                {filters.filterHeader('warningSectionCount', 'Lớp cảnh báo')}
               </th>
               <th scope="col" style={{ width: '8%' }}>
                 {filters.filterHeader('weakestQuestionOrder', 'Câu hỏi yếu nhất')}
@@ -1848,10 +2093,23 @@ const CourseDiagnosisTab: React.FC<{
                 <td>{row.facultyName}</td>
                 <td className="num">{row.sectionCount}</td>
                 <td className="num">{row.lecturerCount}</td>
+                <td className="num">{row.totalClassSize}</td>
+                <td className="num">{row.responseCount}</td>
+                <td className="num">{row.validResponseCount}</td>
+                <td className="num">{row.responseRate.toFixed(1)}%</td>
+                <td className="num">{row.validResponseRate.toFixed(1)}%</td>
                 <td className={scoreClass(row.averageScore)}>{row.averageScore.toFixed(2)}</td>
                 <td className={scoreClass(row.minScore)}>{row.minScore.toFixed(2)}</td>
                 <td className={scoreClass(row.maxScore)}>{row.maxScore.toFixed(2)}</td>
                 <td className={spreadClass(row.spread)}>{row.spread.toFixed(2)}</td>
+                <td className={zTierClass(row.meanZScore)}>
+                  {row.meanZScore === null
+                    ? '—'
+                    : `${row.meanZScore > 0 ? '+' : ''}${row.meanZScore.toFixed(2)}`}
+                </td>
+                <td className={row.warningSectionCount > 0 ? 'num is-flagged' : 'num'}>
+                  {row.warningSectionCount}
+                </td>
                 <td title={row.weakestQuestionText ?? undefined}>
                   {row.weakestQuestionOrder === null ? '—' : `C${row.weakestQuestionOrder}`}
                 </td>
@@ -1933,6 +2191,11 @@ const LecturerTab: React.FC<{
     { key: 'totalClassSize', value: (row) => String(row.totalClassSize), numeric: true },
     { key: 'responseCount', value: (row) => String(row.responseCount), numeric: true },
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
+    {
+      key: 'responseRate',
+      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      sortValue: (row) => row.responseRate,
+    },
     {
       key: 'validResponseRate',
       value: (row) => `${row.validResponseRate.toFixed(1)}%`,
@@ -2018,8 +2281,10 @@ const LecturerTab: React.FC<{
         </span>
         <span>
           Tổng sĩ số: <strong>{totalClassSize.toLocaleString('vi-VN')}</strong> ·{' '}
+          Phiếu thu về: <strong>{totalResponses.toLocaleString('vi-VN')}</strong> (
+          {totalClassSize === 0 ? 0 : ((totalResponses / totalClassSize) * 100).toFixed(1)}%) ·{' '}
           Phiếu hợp lệ: <strong>{totalValidResponses.toLocaleString('vi-VN')}</strong> (
-          {totalClassSize === 0 ? 0 : ((totalValidResponses / totalClassSize) * 100).toFixed(1)}%)
+          {totalResponses === 0 ? 0 : ((totalValidResponses / totalResponses) * 100).toFixed(1)}%)
         </span>
         <span>
           Điểm trung bình chung:{' '}
@@ -2046,7 +2311,10 @@ const LecturerTab: React.FC<{
               <th scope="col">{filters.filterHeader('totalClassSize', 'Tổng sĩ số')}</th>
               <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu thu')}</th>
               <th scope="col">{filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}</th>
-              <th scope="col" title="Số phiếu hợp lệ chia tổng sĩ số">
+              <th scope="col" title="Số phiếu thu về chia tổng sĩ số">
+                {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+              </th>
+              <th scope="col" title="Số phiếu hợp lệ chia số phiếu thu về">
                 {filters.filterHeader('validResponseRate', 'Tỷ lệ hợp lệ')}
               </th>
               <th scope="col">{filters.filterHeader('averageScore', 'Điểm TB')}</th>
@@ -2085,6 +2353,7 @@ const LecturerTab: React.FC<{
                 <td className="num">{row.totalClassSize}</td>
                 <td className="num">{row.responseCount}</td>
                 <td className="num">{row.validResponseCount}</td>
+                <td className="num">{(row.responseRate ?? 0).toFixed(1)}%</td>
                 <td className="num">{(row.validResponseRate ?? 0).toFixed(1)}%</td>
                 <td className={scoreClass(row.averageScore)}>
                   {typeof row.averageScore === 'number' ? row.averageScore.toFixed(2) : '—'}
@@ -2101,7 +2370,7 @@ const LecturerTab: React.FC<{
               </tr>
             ))}
             <tr className="table-spacer" aria-hidden="true">
-              <td colSpan={12} />
+              <td colSpan={13} />
             </tr>
           </tbody>
 
@@ -2116,7 +2385,12 @@ const LecturerTab: React.FC<{
               <td className="num is-mean">
                 {totalClassSize === 0
                   ? '—'
-                  : `${((totalValidResponses / totalClassSize) * 100).toFixed(1)}%`}
+                  : `${((totalResponses / totalClassSize) * 100).toFixed(1)}%`}
+              </td>
+              <td className="num is-mean">
+                {totalResponses === 0
+                  ? '—'
+                  : `${((totalValidResponses / totalResponses) * 100).toFixed(1)}%`}
               </td>
               <td className="num is-mean is-total">
                 {overallAvgScore === null ? '—' : overallAvgScore.toFixed(2)}
@@ -2151,6 +2425,11 @@ const LecturerReportView: React.FC<{
     { key: 'classSize', value: (row) => String(row.classSize), numeric: true },
     { key: 'responseCount', value: (row) => String(row.responseCount), numeric: true },
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
+    {
+      key: 'responseRate',
+      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      sortValue: (row) => row.responseRate,
+    },
     {
       key: 'validResponseRate',
       value: (row) => `${row.validResponseRate.toFixed(1)}%`,
@@ -2233,7 +2512,10 @@ const LecturerReportView: React.FC<{
                 <th scope="col">{filters.filterHeader('classSize', 'Sĩ số')}</th>
                 <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu thu về')}</th>
                 <th scope="col">{filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}</th>
-                <th scope="col" title="Số phiếu hợp lệ chia sĩ số">
+                <th scope="col" title="Số phiếu thu về chia sĩ số">
+                  {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+                </th>
+                <th scope="col" title="Số phiếu hợp lệ chia số phiếu thu về">
                   {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
                 </th>
                 <th scope="col">{filters.filterHeader('averageScore', 'Điểm')}</th>
@@ -2276,6 +2558,7 @@ const LecturerReportView: React.FC<{
                     <td className="num">{section.classSize}</td>
                     <td className="num">{section.responseCount}</td>
                     <td className="num">{section.validResponseCount}</td>
+                    <td className="num">{section.responseRate.toFixed(1)}%</td>
                     <td className="num">{section.validResponseRate.toFixed(1)}%</td>
                     <td className={zTierClass(section.zDepartment)}>
                       {section.averageScore.toFixed(2)}

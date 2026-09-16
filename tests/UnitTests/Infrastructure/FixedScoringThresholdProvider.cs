@@ -18,4 +18,16 @@ internal sealed class FixedScoringThresholdProvider(ScoringThresholds? threshold
         ScoringThresholds newThresholds,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(new SurveyOperationResult<ScoringThresholds>(true, null, newThresholds));
+
+    public Task RecordRecalculationAsync(
+        int semesterSurveyId,
+        ScoringThresholds usedThresholds,
+        DateTime calculatedAt,
+        CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task<ScoringChangeFeedDto> GetChangesAsync(
+        long? afterId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ScoringChangeFeedDto(0, []));
 }

@@ -1073,6 +1073,74 @@
   grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(220px, 2fr);
 }
 
+/*
+  Danh sách bật tắt nhiều lựa chọn trong hộp thoại, ví dụ ba luật của bộ lọc nhiễu.
+
+  Xếp dọc chứ không dàn ngang: nhãn dài ngắn khác nhau nên dàn ngang thì các ô chọn
+  không thẳng cột, mắt phải dò từng dòng mới biết ô nào ứng với nhãn nào.
+*/
+.catalog-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8ee;
+  background: #fbfcfd;
+}
+
+/*
+  Phải đủ nặng để thắng luật `.catalog-form .form-group label` (display: block) —
+  không thì khoảng cách giữa ô chọn và chữ mất hẳn, chữ dính sát vào ô.
+*/
+.catalog-form .form-group .catalog-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  color: #20262c;
+  cursor: pointer;
+}
+
+/* Các dòng ghi chú dưới danh sách ô chọn cách nhau một chút cho dễ đọc. */
+.catalog-checkbox-list ~ .answer-scale-hint {
+  margin-top: 6px;
+}
+
+/*
+  Nút Lưu cấu hình trong hộp thoại Cập nhật điểm: nằm ngay dưới phần cấu hình, dạt
+  phải, tách khỏi nút Cập nhật ở chân hộp thoại. Lời nhắc chưa lưu đứng bên trái nút.
+*/
+.threshold-save-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/*
+  Phải đủ nặng để thắng luật `.catalog-form .form-group input` dàn ô nhập rộng hết
+  dòng — không thì ô chọn bị kéo thành một thanh ngang suốt chiều rộng hộp thoại.
+*/
+.catalog-form .form-group .catalog-checkbox input {
+  width: 15px;
+  height: 15px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 auto;
+  accent-color: #0788b8;
+  cursor: pointer;
+}
+
+.catalog-form .form-group .catalog-checkbox input:disabled {
+  cursor: not-allowed;
+}
+
+.catalog-checkbox input:disabled + span {
+  color: #8c969f;
+}
+
 .catalog-form-actions.modal-footer {
   margin: 8px -24px -20px;
 }

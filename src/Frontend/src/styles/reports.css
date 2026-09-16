@@ -2268,28 +2268,6 @@
 
 /* Ngưỡng lọc lớp đang áp cho toàn trang. Đứng ngay dưới thanh chọn để người xem
    biết bảng bên dưới đang loại lớp theo tiêu chí nào. */
-.reports-threshold-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0 0 12px;
-  padding: 8px 10px;
-  border: 1px solid #b9d9e5;
-  border-left: 3px solid #0788b8;
-  background: #f2f9fb;
-  color: #20262c;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.reports-threshold-note svg {
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
-  margin-top: 1px;
-  color: #0788b8;
-}
-
 /* Số lượng đã nằm trong tiêu đề bảng, không lặp lại ở thanh công cụ. */
 .reports-rank .catalog-result-count {
   display: none;

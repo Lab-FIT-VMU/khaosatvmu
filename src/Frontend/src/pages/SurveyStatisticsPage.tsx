@@ -1,16 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Calculator,
   Check,
   ChevronDown,
   CircleAlert,
   LoaderCircle,
   RefreshCw,
-  Settings,
   TriangleAlert,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { useSemester } from '../context/semesterContext';
 import { TablePagination } from '../components/TablePagination';
 import { ExportDropdown } from '../components/ExportDropdown';
@@ -19,19 +16,14 @@ import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import type { SemesterSurvey } from '../types';
 import type { SectionStatisticsRow, SemesterSurveyStatistics } from '../services/surveyApi';
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
-import { useAuth } from '../auth/authContext';
-import { isUnrestrictedRole } from '../auth/roles';
 import { buildReportHash } from './reportRoute';
-import { Modal } from '../components/Modal';
-import {
-  publishScoringThresholds,
-  useScoringThresholds,
-} from '../hooks/useScoringThresholds';
+import { UpdateScoresButton } from '../components/UpdateScoresButton';
+import { ScoringConfigNote } from '../components/ScoringConfigNote';
+import { useScoringThresholds } from '../hooks/useScoringThresholds';
 import {
   hasEnoughResponsesToScore,
   responseRateOf,
   validRateOf,
-  type ScoringThresholds,
 } from '../utils/reportThresholds';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
@@ -257,13 +249,11 @@ export const SurveyStatisticsPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [recalculating, setRecalculating] = useState(false);
   const [page, setPage] = useState(1);
 
   // Hai vòng lọc lớp được tính điểm. Đọc từ cấu hình chung để bảng này và các
   // trang báo cáo luôn nói cùng một con số.
   const thresholds = useScoringThresholds();
-  const [isThresholdOpen, setIsThresholdOpen] = useState(false);
   const [tab, setTab] = useState<'eligible' | 'ineligible'>('eligible');
 
   // Đổi học kỳ thì nạp lại danh sách đợt khảo sát của kỳ đó.
@@ -313,22 +303,6 @@ export const SurveyStatisticsPage: React.FC = () => {
     void loadStatistics();
   }, [loadStatistics]);
 
-  const handleRecalculate = async () => {
-    if (!semesterSurveyId || recalculating) return;
-    setRecalculating(true);
-    try {
-      const result = await surveyApi.recalculateScores(Number(semesterSurveyId));
-      toast.success(`Đã tính lại ${result.updatedSectionCount} lớp học phần`, {
-        description: `Thời điểm tính: ${formatDateTime(result.calculatedAt)}`,
-      });
-      await loadStatistics();
-    } catch (error) {
-      toast.error('Không tính lại được điểm', { description: messageFrom(error) });
-    } finally {
-      setRecalculating(false);
-    }
-  };
-
   const semesterOptions = useMemo(
     () =>
       academicYears.flatMap((year) =>
@@ -342,9 +316,6 @@ export const SurveyStatisticsPage: React.FC = () => {
 
   // Bám vào chính statistics chứ không vào mảng dẫn xuất, vì mảng dẫn xuất tạo
   // tham chiếu mới mỗi lần render nên useMemo sẽ chạy lại vô ích.
-  const { activeProfile } = useAuth();
-  const canRecalculate = isUnrestrictedRole(activeProfile?.roleCode);
-
   const columns = useMemo(() => statistics?.questionColumns ?? [], [statistics]);
   const rows = useMemo(() => statistics?.rows ?? [], [statistics]);
   const lastCalculatedAt = statistics?.lastCalculatedAt ?? null;
@@ -722,26 +693,11 @@ export const SurveyStatisticsPage: React.FC = () => {
             <RefreshCw aria-hidden="true" size={16} />
             Tải lại
           </button>
-          {/* Tính lại điểm ghi đè điểm của MỌI lớp trong đợt, không cắt được theo
-              bộ môn — nên chỉ quản trị toàn hệ thống mới thấy nút. Backend cũng
-              chặn, đây chỉ là để người không có quyền khỏi bấm rồi ăn lỗi. */}
-          {canRecalculate && (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => void handleRecalculate()}
-              disabled={!semesterSurveyId || recalculating}
-            >
-              {recalculating ? (
-                <LoaderCircle className="auth-spin" aria-hidden="true" size={16} />
-              ) : (
-                <Calculator aria-hidden="true" size={16} />
-              )}
-              {recalculating ? 'Đang tính...' : 'Tính lại điểm'}
-            </button>
-          )}
+          <UpdateScoresButton semesterSurveyId={semesterSurveyId} onUpdated={loadStatistics} />
         </div>
       </section>
+
+      <ScoringConfigNote />
 
       {loadError && (
         <div className="admin-alert" role="alert">
@@ -775,20 +731,11 @@ export const SurveyStatisticsPage: React.FC = () => {
             Tính điểm lần cuối: <strong>{formatDateTime(statistics.lastCalculatedAt)}</strong>
           </span>
           {/* Hai vòng lọc đang áp, in ra ngay cạnh số liệu để không ai phải đoán
-              bảng đang bỏ lớp nào. Nút bánh răng nằm ngoài cùng bên phải. */}
+              bảng đang bỏ lớp nào. Đổi cấu hình ở nút Cập nhật điểm. */}
           <span className="statistics-threshold-note">
             Tỷ lệ phản hồi ≥ <strong>{thresholds.minimumResponseRate}%</strong> · Tỷ lệ phiếu
             hợp lệ ≥ <strong>{thresholds.minimumValidRate}%</strong>
           </span>
-          <button
-            type="button"
-            className="statistics-threshold-button"
-            onClick={() => setIsThresholdOpen(true)}
-            title="Đặt lại ngưỡng lọc lớp được tính điểm"
-            aria-label="Đặt lại ngưỡng lọc lớp được tính điểm"
-          >
-            <Settings aria-hidden="true" />
-          </button>
         </section>
       )}
 
@@ -798,7 +745,7 @@ export const SurveyStatisticsPage: React.FC = () => {
           <TriangleAlert aria-hidden="true" />
           <span>
             Có <strong>{statistics.responsesSinceLastCalculation} phiếu</strong> về sau lần tính gần
-            nhất. Bấm <strong>Tính lại điểm</strong> để cập nhật.
+            nhất. Bấm <strong>Cập nhật điểm</strong> để cập nhật.
           </span>
         </div>
       )}
@@ -810,7 +757,7 @@ export const SurveyStatisticsPage: React.FC = () => {
           <CircleAlert aria-hidden="true" />
           <span>
             Đợt này chưa chốt điểm lần nào, nên các cột điểm (C1, C2…, Điểm trung bình, Câu yếu
-            nhất) đang để trống. Bấm <strong>Tính lại điểm</strong> để tính.
+            nhất) đang để trống. Bấm <strong>Cập nhật điểm</strong> để tính.
           </span>
         </div>
       )}
@@ -826,7 +773,7 @@ export const SurveyStatisticsPage: React.FC = () => {
         </div>
       ) : (
         <>
-        {/* Hai nhóm chia theo đúng hai vòng lọc đang áp. Nút Tính lại điểm nằm
+        {/* Hai nhóm chia theo đúng hai vòng lọc đang áp. Nút Cập nhật điểm nằm
             trên thanh công cụ phía trên, tức trên thanh tab này. */}
         <nav className="statistics-tabs" aria-label="Nhóm lớp theo điều kiện tính điểm">
           <button
@@ -959,7 +906,7 @@ export const SurveyStatisticsPage: React.FC = () => {
                   ? 'Đợt chưa được bấm tính điểm.'
                   : enoughNow
                     ? 'Số phiếu hiện tại đã đủ hai vòng lọc nhưng lần chốt gần nhất thì chưa.'
-                      + ' Bấm "Tính lại điểm" để cập nhật.'
+                      + ' Bấm "Cập nhật điểm" để cập nhật.'
                     : 'Lớp không qua vòng lọc: cần tỷ lệ phản hồi ≥ '
                       + `${thresholds.minimumResponseRate}% và tỷ lệ phiếu hợp lệ ≥ `
                       + `${thresholds.minimumValidRate}%.`;
@@ -1045,7 +992,7 @@ export const SurveyStatisticsPage: React.FC = () => {
                               fontWeight: 600,
                               whiteSpace: 'nowrap',
                             }}
-                            title="Đã đủ số phiếu, bấm Tính lại điểm để chốt điểm"
+                            title="Đã đủ số phiếu, bấm Cập nhật điểm để chốt điểm"
                           >
                             Chờ chốt điểm
                           </span>
@@ -1091,139 +1038,7 @@ export const SurveyStatisticsPage: React.FC = () => {
           onPageChange={setPage}
         />
       )}
-
-      <ScoringThresholdDialog
-        isOpen={isThresholdOpen}
-        current={thresholds}
-        canEdit={canRecalculate}
-        onClose={() => setIsThresholdOpen(false)}
-      />
     </div>
   );
 };
 
-/**
- * Đặt lại hai vòng lọc. Ngưỡng là cấu hình chung của cả hệ thống nên chỉ quản trị
- * mới sửa được; vai trò khác vẫn mở xem được con số đang áp dụng.
- */
-const ScoringThresholdDialog: React.FC<{
-  isOpen: boolean;
-  current: ScoringThresholds;
-  canEdit: boolean;
-  onClose: () => void;
-}> = ({ isOpen, current, canEdit, onClose }) => {
-  const [responseRate, setResponseRate] = useState(String(current.minimumResponseRate));
-  const [validRate, setValidRate] = useState(String(current.minimumValidRate));
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  // Mở lại hộp thoại thì đọc lại giá trị đang áp, không giữ bản nháp lần trước.
-  useEffect(() => {
-    if (!isOpen) return;
-    setResponseRate(String(current.minimumResponseRate));
-    setValidRate(String(current.minimumValidRate));
-    setError(null);
-  }, [isOpen, current]);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const next = {
-      minimumResponseRate: Number(responseRate),
-      minimumValidRate: Number(validRate),
-    };
-    const outOfRange = [next.minimumResponseRate, next.minimumValidRate].some(
-      (value) => !Number.isFinite(value) || value < 0 || value > 100
-    );
-    if (outOfRange) {
-      setError('Cả hai ngưỡng phải là số trong khoảng 0 đến 100.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const saved = await surveyApi.updateScoringThresholds(next);
-      publishScoringThresholds(saved);
-      toast.success('Đã lưu ngưỡng tính điểm', {
-        description:
-          `Tỷ lệ phản hồi ≥ ${saved.minimumResponseRate}% · `
-          + `Tỷ lệ phiếu hợp lệ ≥ ${saved.minimumValidRate}%. `
-          + 'Bấm "Tính lại điểm" để chốt lại điểm theo ngưỡng mới.',
-      });
-      onClose();
-    } catch (caught) {
-      setError(messageFrom(caught));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Ngưỡng lọc lớp được tính điểm">
-      <form className="catalog-form" onSubmit={(event) => void handleSubmit(event)}>
-        {error && <div className="catalog-validation-error" role="alert">{error}</div>}
-
-        <div className="catalog-context-band">
-          Một lớp phải qua cả hai tiêu chí thì điểm của nó mới được gộp vào mọi bảng thống
-          kê và báo cáo. Đổi ngưỡng xong hãy bấm <strong>Tính lại điểm</strong> để chốt
-          lại điểm đã lưu theo ngưỡng mới.
-        </div>
-
-        <div className="catalog-form-grid catalog-form-grid--2">
-          <div className="form-group">
-            <label htmlFor="threshold-response-rate">
-              Tiêu chí 1 — Tỷ lệ phản hồi tối thiểu (%)
-            </label>
-            <input
-              id="threshold-response-rate"
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={responseRate}
-              disabled={!canEdit || saving}
-              onChange={(event) => setResponseRate(event.target.value)}
-              required
-            />
-            <p className="answer-scale-hint">Số phiếu đã thu ÷ Sĩ số. Mặc định 50%.</p>
-          </div>
-          <div className="form-group">
-            <label htmlFor="threshold-valid-rate">
-              Tiêu chí 2 — Tỷ lệ phiếu hợp lệ tối thiểu (%)
-            </label>
-            <input
-              id="threshold-valid-rate"
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={validRate}
-              disabled={!canEdit || saving}
-              onChange={(event) => setValidRate(event.target.value)}
-              required
-            />
-            <p className="answer-scale-hint">
-              Số phiếu hợp lệ ÷ Số phiếu đã thu. Mặc định 80%.
-            </p>
-          </div>
-        </div>
-
-        {!canEdit && (
-          <div className="catalog-context-band">
-            Chỉ quản trị mới đổi được ngưỡng. Bạn đang xem con số đang áp dụng.
-          </div>
-        )}
-
-        <div className="modal-footer catalog-form-actions">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
-            {canEdit ? 'Hủy' : 'Đóng'}
-          </button>
-          {canEdit && (
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Đang lưu...' : 'Lưu ngưỡng'}
-            </button>
-          )}
-        </div>
-      </form>
-    </Modal>
-  );
-};

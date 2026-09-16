@@ -7,7 +7,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Info,
   CircleAlert,
   ClipboardList,
   GraduationCap,
@@ -24,6 +23,8 @@ import { DataTable, type Column, type DataTableSortDirection } from '../componen
 import { QuestionAnalysisTabs } from '../components/QuestionAnalysisTabs';
 import { SchoolSurveyOverview } from '../components/reports/SchoolSurveyOverview';
 import { ScopeAnalysisDetail, type ScopeSelection } from '../components/reports/ScopeAnalysisDetail';
+import { UpdateScoresButton } from '../components/UpdateScoresButton';
+import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { SectionSurveyResponsesPage } from './SectionSurveyResponsesPage';
 import { catalogApi } from '../services/catalogApi';
 import type { ExportColumn } from '../services/exportDataService';
@@ -632,6 +633,9 @@ export const ReportsOverviewPage: React.FC = () => {
   const [departmentId, setDepartmentId] = useState<number | undefined>(initialRoute.departmentId);
   const [lecturerId, setLecturerId] = useState<number | undefined>(initialRoute.lecturerFilterId);
   const [semesterSurveyId, setSemesterSurveyId] = useState<number | undefined>(initialRoute.semesterSurveyId);
+  // Tăng lên sau mỗi lần Cập nhật điểm: các khối số liệu của trang theo dõi số này
+  // để nạp lại, các khối con dùng nó làm key để dựng lại từ đầu.
+  const [reloadToken, setReloadToken] = useState(0);
   const [search, setSearch] = useState(initialRoute.search ?? '');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [workspace, setWorkspace] = useState<ReportWorkspace>(
@@ -1020,7 +1024,7 @@ export const ReportsOverviewPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [selectedSemesterId, facultyId, departmentId, lecturerId, semesterSurveyId, debouncedSearch]);
+  }, [selectedSemesterId, facultyId, departmentId, lecturerId, semesterSurveyId, debouncedSearch, reloadToken]);
 
   useEffect(() => {
     if (!lecturer?.lecturerId || !selectedSemesterId) return;
@@ -1044,7 +1048,7 @@ export const ReportsOverviewPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [lecturer?.lecturerId, selectedSemesterId]);
+  }, [lecturer?.lecturerId, selectedSemesterId, reloadToken]);
 
   // Giảng viên chưa gắn mã: tra theo tên, khoanh trong khoa/viện của lớp đã bấm.
   const unidentifiedName = unidentifiedLecturer?.name;
@@ -1071,7 +1075,7 @@ export const ReportsOverviewPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [unidentifiedName, unidentifiedFacultyId, selectedSemesterId]);
+  }, [unidentifiedName, unidentifiedFacultyId, selectedSemesterId, reloadToken]);
 
   const openLecturer = useCallback(
     (nextLecturerId: number, lecturerName: string) => {
@@ -1759,6 +1763,13 @@ export const ReportsOverviewPage: React.FC = () => {
             }))}
           />
         </div>
+
+        <div className="statistics-toolbar-actions">
+          <UpdateScoresButton
+            semesterSurveyId={semesterSurveyId}
+            onUpdated={() => setReloadToken((value) => value + 1)}
+          />
+        </div>
       </section>
 
       <div className="reports-header">
@@ -1770,15 +1781,7 @@ export const ReportsOverviewPage: React.FC = () => {
 
       {/* Ngưỡng quyết định lớp nào được gộp vào mọi con số của trang này, nên in
           thẳng ra thay vì để người xem đoán vì sao thiếu lớp. */}
-      <p className="reports-threshold-note">
-        <Info className="operation-icon" aria-hidden="true" />
-        <span>
-          Số liệu chỉ gộp lớp qua cả hai tiêu chí: tỷ lệ phản hồi ≥{' '}
-          <strong>{thresholds.minimumResponseRate}%</strong> và tỷ lệ phiếu hợp lệ ≥{' '}
-          <strong>{thresholds.minimumValidRate}%</strong>. Hai ngưỡng này đổi được ở trang
-          Bảng dữ liệu khảo sát.
-        </span>
-      </p>
+      <ScoringConfigNote />
 
       {/* Breadcrumb chỉ có việc khi đã đi sâu vào giảng viên / bài khảo sát; ở mức
           danh sách nó chỉ lặp lại đúng những gì thanh tab và ô chọn kỳ đã nói. */}
@@ -1815,6 +1818,7 @@ export const ReportsOverviewPage: React.FC = () => {
       {/* CẤP CHI TIẾT BÀI KHẢO SÁT */}
       {isSurveyMode && surveyId !== null && (
         <SectionSurveyResponsesPage
+          key={reloadToken}
           courseSectionSurveyId={surveyId}
           onBack={backToLecturer}
           backLabel={lecturer ? `Quay lại đánh giá ${lecturer.fullName}` : 'Quay lại kết quả khảo sát'}
@@ -1922,7 +1926,7 @@ export const ReportsOverviewPage: React.FC = () => {
       {/* CẤP CHI TIẾT THEO PHẠM VI: khoa/viện → bộ môn → học phần → lớp học phần */}
       {isScopeMode && scope && semesterSurveyId !== undefined && (
         <ScopeAnalysisDetail
-          key={`${scope.type}-${scope.id}`}
+          key={`${scope.type}-${scope.id}-${reloadToken}`}
           semesterSurveyId={semesterSurveyId}
           selection={scope}
           onBack={backFromScope}
@@ -1994,7 +1998,7 @@ export const ReportsOverviewPage: React.FC = () => {
           {/* Bảng tổng quan toàn trường (executive dashboard) */}
           {workspace === 'overview' && selectedSemesterId !== undefined && (
             <SchoolSurveyOverview
-              key={selectedSemesterId}
+              key={`${selectedSemesterId}-${reloadToken}`}
               semesterId={selectedSemesterId}
               semesterSurveyId={semesterSurveyId}
               analysisView={analysisView}

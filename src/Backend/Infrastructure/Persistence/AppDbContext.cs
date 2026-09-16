@@ -33,6 +33,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<SurveyResponse> SurveyResponses => Set<SurveyResponse>();
     public DbSet<SurveyResponseAnswer> SurveyResponseAnswers => Set<SurveyResponseAnswer>();
     public DbSet<SurveyScoringSetting> SurveyScoringSettings => Set<SurveyScoringSetting>();
+    public DbSet<SurveyScoringChangeLog> SurveyScoringChangeLogs => Set<SurveyScoringChangeLog>();
     public DbSet<GraduationAnalyticsDataset> GraduationAnalyticsDatasets =>
         Set<GraduationAnalyticsDataset>();
     public DbSet<GraduationAnalyticsRow> GraduationAnalyticsRows => Set<GraduationAnalyticsRow>();
@@ -210,13 +211,32 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Bảng cấu hình một dòng: cặp ngưỡng lọc lớp được tính điểm.
+        // Bảng cấu hình một dòng: cặp ngưỡng lọc lớp được tính điểm, và ba cờ bật
+        // tắt từng luật của bộ lọc nhiễu.
         modelBuilder.Entity<SurveyScoringSetting>(entity =>
         {
             entity.ToTable("SurveyScoringSettings");
             entity.HasKey(x => x.SurveyScoringSettingId);
             entity.Property(x => x.MinimumResponseRate).HasColumnType("numeric(5,2)");
             entity.Property(x => x.MinimumValidRate).HasColumnType("numeric(5,2)");
+            // Mặc định true để dòng cấu hình đang có sẵn trên máy chủ giữ nguyên
+            // hành vi cũ: cả ba luật đều áp, y như trước khi có ba cờ này.
+            entity.Property(x => x.RejectTooFast).HasDefaultValue(true);
+            entity.Property(x => x.RejectSingleAnswer).HasDefaultValue(true);
+            entity.Property(x => x.RejectAttentionCheckFailed).HasDefaultValue(true);
+        });
+
+        // Lịch sử đổi cấu hình và tính lại điểm, chỉ thêm dòng. Không gắn khoá ngoại
+        // sang "SemesterSurveys": đợt bị xoá thì dòng lịch sử vẫn phải còn nguyên.
+        modelBuilder.Entity<SurveyScoringChangeLog>(entity =>
+        {
+            entity.ToTable("SurveyScoringChangeLogs");
+            entity.HasKey(x => x.SurveyScoringChangeLogId);
+            entity.Property(x => x.Kind).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.MinimumResponseRate).HasColumnType("numeric(5,2)");
+            entity.Property(x => x.MinimumValidRate).HasColumnType("numeric(5,2)");
+            entity.Property(x => x.ChangedByName).HasMaxLength(256).IsRequired();
+            entity.HasIndex(x => x.SemesterSurveyId);
         });
 
         modelBuilder.Entity<AcademicYear>(entity =>

@@ -74,6 +74,17 @@ export interface NormalizationGroup {
    * Không phải bao nhiêu lần σ — đây là trung bình của n lớp, không phải một lớp.
    */
   meanZScore: number | null;
+  lecturerCount: number;
+  /** Tổng sĩ số các lớp của khoa — mẫu số của tỷ lệ phản hồi. */
+  totalClassSize: number;
+  /** Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại. */
+  responseCount: number;
+  validResponseCount: number;
+  /** Phiếu thu về chia tổng sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
+  validResponseRate: number;
+  warningSectionCount: number;
 }
 
 export interface NormalizedSection {
@@ -91,6 +102,13 @@ export interface NormalizedSection {
   zDifference: number | null;
   /** Mã diễn giải, xem normalizationVerdictLabels. */
   verdict: string;
+  /** Tổng phiếu thu về của lớp, kể cả phiếu bị bộ lọc nhiễu loại. */
+  responseCount: number;
+  validResponseCount: number;
+  /** Phiếu thu về chia sĩ số lớp, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
+  validResponseRate: number;
 }
 
 export interface SemesterSurveyNormalization {
@@ -122,15 +140,21 @@ export interface DepartmentSummaryRow {
   departmentName: string;
   sectionCount: number;
   lecturerCount: number;
-  /** Tổng sĩ số các lớp của bộ môn — mẫu số của tỷ lệ phiếu hợp lệ. */
+  /** Tổng sĩ số các lớp của bộ môn — mẫu số của tỷ lệ phản hồi. */
   totalClassSize: number;
   /** Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại. */
   responseCount: number;
   validResponseCount: number;
-  /** Phiếu hợp lệ chia tổng sĩ số, theo phần trăm. */
+  /** Phiếu thu về chia tổng sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
   validResponseRate: number;
   averageScore: number | null;
   warningSectionCount: number;
+  /** Null khi bộ môn có ít hơn hai lớp. */
+  standardDeviation: number | null;
+  /** Mặt bằng bộ môn lệch mặt bằng toàn trường bao nhiêu lần sai số chuẩn σ/√n. */
+  meanZScore: number | null;
 }
 
 export interface SemesterSurveyDepartmentSummary {
@@ -167,6 +191,18 @@ export interface CourseDiagnosisRow {
   weakestQuestionText: string | null;
   /** Mã kết luận, xem courseDiagnosisLabels. */
   verdict: string;
+  /** Tổng sĩ số các lớp của học phần — mẫu số của tỷ lệ phản hồi. */
+  totalClassSize: number;
+  /** Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại. */
+  responseCount: number;
+  validResponseCount: number;
+  /** Phiếu thu về chia tổng sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
+  validResponseRate: number;
+  /** Mặt bằng học phần lệch mặt bằng toàn trường bao nhiêu lần sai số chuẩn σ/√n. */
+  meanZScore: number | null;
+  warningSectionCount: number;
 }
 
 export interface SemesterSurveyCourseDiagnosis {
@@ -255,6 +291,9 @@ export interface LecturerOption {
   totalClassSize: number;
   responseCount: number;
   validResponseCount: number;
+  /** Phiếu thu về chia tổng sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
   validResponseRate: number;
   averageScore: number | null;
   minScore: number | null;
@@ -271,7 +310,9 @@ export interface LecturerSection {
   /** Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại. */
   responseCount: number;
   validResponseCount: number;
-  /** Phiếu hợp lệ chia sĩ số, theo phần trăm. */
+  /** Phiếu thu về chia sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
   validResponseRate: number;
   averageScore: number;
   /** Trung bình mọi lớp cùng học phần, kể cả lớp người khác dạy. Null khi chỉ có một lớp. */
@@ -310,6 +351,29 @@ export interface DashboardFacultyScore {
   facultyName: string;
   sectionCount: number;
   averageScore: number;
+}
+
+/** Một lần đổi cấu hình tính điểm hoặc cập nhật điểm, kèm nguyên bộ cấu hình lúc đó. */
+export interface ScoringChange {
+  id: number;
+  /** CONFIG_UPDATED hoặc SCORES_RECALCULATED. */
+  kind: string;
+  semesterSurveyId: number | null;
+  semesterSurveyName: string | null;
+  minimumResponseRate: number;
+  minimumValidRate: number;
+  rejectTooFast: boolean;
+  rejectSingleAnswer: boolean;
+  rejectAttentionCheckFailed: boolean;
+  changedByName: string;
+  changedAt: string;
+}
+
+export interface ScoringChangeFeed {
+  /** Mốc mới nhất, kể cả sự kiện của chính người đang xem. */
+  latestId: number;
+  /** Cũ trước mới sau; không gồm sự kiện của chính người đang xem. */
+  items: ScoringChange[];
 }
 
 export interface SemesterSurveyDashboard {
@@ -565,16 +629,22 @@ export const surveyApi = {
     apiRequest<LecturerOption[]>(`/api/surveys/semester-surveys/${semesterSurveyId}/lecturers`)
       .then((rows) => rows.map((row) => {
         const totalClassSize = Number.isFinite(row.totalClassSize) ? row.totalClassSize : 0;
+        const responseCount = Number.isFinite(row.responseCount) ? row.responseCount : 0;
         const validResponseCount = Number.isFinite(row.validResponseCount) ? row.validResponseCount : 0;
         return {
           ...row,
           totalClassSize,
-          responseCount: Number.isFinite(row.responseCount) ? row.responseCount : 0,
+          responseCount,
           validResponseCount,
+          responseRate: Number.isFinite(row.responseRate)
+            ? row.responseRate
+            : totalClassSize > 0
+              ? (responseCount / totalClassSize) * 100
+              : 0,
           validResponseRate: Number.isFinite(row.validResponseRate)
             ? row.validResponseRate
-            : totalClassSize > 0
-              ? (validResponseCount / totalClassSize) * 100
+            : responseCount > 0
+              ? (validResponseCount / responseCount) * 100
               : 0,
           averageScore: typeof row.averageScore === 'number' && Number.isFinite(row.averageScore)
             ? row.averageScore
@@ -635,6 +705,16 @@ export const surveyApi = {
   /** Chỉ quản trị mới đổi được; server tự chặn các vai trò khác. */
   updateScoringThresholds: (thresholds: ScoringThresholds) =>
     csrfRequest<ScoringThresholds>('/api/surveys/scoring-thresholds', 'PUT', thresholds),
+  /**
+   * Các lần đổi cấu hình / cập nhật điểm do NGƯỜI KHÁC làm sau mốc `afterId`.
+   * Không truyền `afterId` thì chỉ nhận mốc mới nhất để bắt đầu theo dõi.
+   */
+  scoringChanges: (afterId?: number) =>
+    apiRequest<ScoringChangeFeed>(
+      afterId === undefined
+        ? '/api/surveys/scoring-changes'
+        : `/api/surveys/scoring-changes?afterId=${afterId}`,
+    ),
   /** Đếm trước số lớp của một phạm vi, tính ở server để khớp đúng lúc tạo thật. */
   previewSectionScope: (params: {
     semesterId: number;

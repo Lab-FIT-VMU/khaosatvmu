@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260916160631_AddScoringFilterToggles")]
+    partial class AddScoringFilterToggles
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1066,55 +1069,6 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("QuestionId");
 
                     b.ToTable("SurveyResponseAnswers", (string)null);
-                });
-
-            modelBuilder.Entity("Domain.SurveyScoringChangeLog", b =>
-                {
-                    b.Property<long>("SurveyScoringChangeLogId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("SurveyScoringChangeLogId"));
-
-                    b.Property<DateTime>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ChangedByName")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<Guid?>("ChangedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<decimal>("MinimumResponseRate")
-                        .HasColumnType("numeric(5,2)");
-
-                    b.Property<decimal>("MinimumValidRate")
-                        .HasColumnType("numeric(5,2)");
-
-                    b.Property<bool>("RejectAttentionCheckFailed")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("RejectSingleAnswer")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("RejectTooFast")
-                        .HasColumnType("boolean");
-
-                    b.Property<int?>("SemesterSurveyId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("SurveyScoringChangeLogId");
-
-                    b.HasIndex("SemesterSurveyId");
-
-                    b.ToTable("SurveyScoringChangeLogs", (string)null);
                 });
 
             modelBuilder.Entity("Domain.SurveyScoringSetting", b =>

@@ -160,12 +160,25 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await provider.GetAsync(cancellationToken)));
 
+        // Các trang thống kê hỏi định kỳ để báo khi người khác đổi cấu hình hoặc tính
+        // lại điểm. Không truyền afterId thì chỉ nhận mốc mới nhất.
+        operationalReadGroup.MapGet("/scoring-changes", async (
+            long? afterId,
+            [FromServices] IScoringThresholdProvider provider,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await provider.GetChangesAsync(afterId, cancellationToken)));
+
         campaignGroup.MapPut("/scoring-thresholds", async (
             SaveScoringThresholdsRequest request,
             [FromServices] IScoringThresholdProvider provider,
             CancellationToken cancellationToken) =>
             ToResult(await provider.UpdateAsync(
-                new ScoringThresholds(request.MinimumResponseRate, request.MinimumValidRate),
+                new ScoringThresholds(
+                    request.MinimumResponseRate,
+                    request.MinimumValidRate,
+                    request.RejectTooFast,
+                    request.RejectSingleAnswer,
+                    request.RejectAttentionCheckFailed),
                 cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>();
 
@@ -439,10 +452,19 @@ public static class SurveyEndpoints
         return Results.Json(new { errorCode = result.ErrorCode }, statusCode: statusCode);
     }
 
-    /// <summary>Hai vòng lọc lớp được tính điểm, đơn vị phần trăm.</summary>
+    /// <summary>
+    /// Hai vòng lọc lớp được tính điểm (đơn vị phần trăm) và ba cờ bật tắt từng
+    /// luật của bộ lọc nhiễu.
+    ///
+    /// Ba cờ mặc định true: bản giao diện cũ không gửi chúng lên thì hành vi giữ
+    /// nguyên như trước, cả ba luật đều áp.
+    /// </summary>
     public sealed record SaveScoringThresholdsRequest(
         decimal MinimumResponseRate,
-        decimal MinimumValidRate);
+        decimal MinimumValidRate,
+        bool RejectTooFast = true,
+        bool RejectSingleAnswer = true,
+        bool RejectAttentionCheckFailed = true);
 
     public sealed record SaveAnswerScaleOptionRequest(int Value, string? DisplayText);
 
