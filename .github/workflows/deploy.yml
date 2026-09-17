@@ -53,7 +53,7 @@ jobs:
             git fetch origin master
             git reset --hard origin/master
             git clean -fd
-            docker compose down
+            docker compose stop api frontend
             docker compose build api
             docker compose build frontend
             docker compose up -d
