@@ -1,0 +1,57 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build-check:
+    name: Build check (backend + frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore & build backend
+        working-directory: src/Backend
+        run: |
+          dotnet restore KhaosatVMU.sln
+          dotnet build KhaosatVMU.sln -c Release --no-restore
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: src/Frontend/package-lock.json
+
+      - name: Install & build frontend
+        working-directory: src/Frontend
+        run: |
+          npm ci
+          npm run build
+
+  deploy:
+    name: Deploy to VPS
+    needs: build-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.VPS_PROJECT_PATH }}
+            git pull origin master
+            docker compose build --no-parallel api
+            docker compose build --no-parallel frontend
+            docker compose up -d
+            docker image prune -f
