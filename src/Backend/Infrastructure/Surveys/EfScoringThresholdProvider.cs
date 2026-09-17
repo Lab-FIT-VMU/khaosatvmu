@@ -33,14 +33,17 @@ public sealed class EfScoringThresholdProvider(
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.SurveyScoringSettingId == SettingId, cancellationToken);
 
+        // Đã bỏ phần chọn bẫy lỗi: luôn áp cả ba luật của bộ lọc nhiễu, không đọc ba cột
+        // cờ trong bảng nữa (cột vẫn giữ để không phải đổi CSDL). Áp đủ ba luật thì phiếu
+        // được tính trùng khít cột "IsValid" đã chốt lúc nộp.
         return setting is null
             ? ScoringThresholds.Default
             : new ScoringThresholds(
                 setting.MinimumResponseRate,
                 setting.MinimumValidRate,
-                setting.RejectTooFast,
-                setting.RejectSingleAnswer,
-                setting.RejectAttentionCheckFailed);
+                RejectTooFast: true,
+                RejectSingleAnswer: true,
+                RejectAttentionCheckFailed: true);
     }
 
     public async Task<SurveyOperationResult<ScoringThresholds>> UpdateAsync(
@@ -75,9 +78,10 @@ public sealed class EfScoringThresholdProvider(
         var now = DateTime.UtcNow;
         setting.MinimumResponseRate = thresholds.MinimumResponseRate;
         setting.MinimumValidRate = thresholds.MinimumValidRate;
-        setting.RejectTooFast = thresholds.RejectTooFast;
-        setting.RejectSingleAnswer = thresholds.RejectSingleAnswer;
-        setting.RejectAttentionCheckFailed = thresholds.RejectAttentionCheckFailed;
+        // Ba cờ không còn chọn được; ghi true để dòng cấu hình khớp với cách tính.
+        setting.RejectTooFast = true;
+        setting.RejectSingleAnswer = true;
+        setting.RejectAttentionCheckFailed = true;
         setting.UpdatedAt = now;
 
         // Bấm lưu mà không đổi gì thì không báo ai: không có gì để nhầm lẫn.

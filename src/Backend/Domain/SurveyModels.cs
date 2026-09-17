@@ -324,11 +324,9 @@ public sealed class SurveyScoringSetting
     public decimal MinimumValidRate { get; set; }
 
     /// <summary>
-    /// Ba luật của bộ lọc nhiễu có đang được áp hay không. Tắt một luật thì phiếu
-    /// chỉ dính đúng luật đó quay lại được tính vào thống kê.
-    ///
-    /// KHÔNG sửa gì trong bảng "SurveyResponses": cột "RejectionReasons" đã ghi sẵn
-    /// phiếu dính luật nào từ lúc nộp, ba cờ này chỉ đổi cách ĐỌC lại chỗ đó.
+    /// Ba cờ bật tắt từng luật của bộ lọc nhiễu. ĐÃ BỎ phần chọn trên giao diện: hệ
+    /// thống luôn áp cả ba luật và không đọc ba cột này nữa. Cột vẫn giữ trong bảng để
+    /// không phải đổi CSDL; lưu cấu hình thì ghi true cả ba.
     /// </summary>
     public bool RejectTooFast { get; set; } = true;
 

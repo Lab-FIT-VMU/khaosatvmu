@@ -57,12 +57,7 @@ public sealed record QuestionRatingDto(
     IReadOnlyList<OptionCountDto> OptionDistribution,
     string ScaleKind = "Options",
     string AnswerScaleName = "",
-    IReadOnlyList<string>? TextAnswers = null,
-    /// <summary>
-    /// Khoá mục của câu trong <see cref="SurveySectionCatalog"/>, để giao diện tách phần
-    /// phân tích theo mục. Chỉ gắn ở trang giảng viên và trang kết quả một lớp.
-    /// </summary>
-    string? SectionKey = null);
+    IReadOnlyList<string>? TextAnswers = null);
 
 /// <summary>Tóm tắt kết quả của một lớp học phần mà giảng viên đảm nhận.</summary>
 public sealed record LecturerSectionSummaryDto(
@@ -98,12 +93,7 @@ public sealed record LecturerPerformanceReportDto(
     /// những lớp đã chốt điểm. <paramref name="TotalResponses"/> đếm cả lớp chưa đủ
     /// điều kiện vì đó là tiến độ, không phải mẫu số của điểm.
     /// </summary>
-    int ScoredValidResponseCount = 0,
-    /// <summary>
-    /// Điểm từng mục câu hỏi của các lớp đã chốt điểm, cùng công thức với trang Thống kê
-    /// theo mục — cho tab Học phần / Giảng viên của phần phân tích theo câu hỏi.
-    /// </summary>
-    IReadOnlyList<QuestionSectionScoreDto>? SectionScores = null);
+    int ScoredValidResponseCount = 0);
 
 /// <summary>Báo cáo thống kê cấp Bộ môn.</summary>
 public sealed record DepartmentSummaryDto(
@@ -151,12 +141,7 @@ public sealed record SectionSurveyAnalysisDto(
     /// mọi con số phân tích đều rỗng — giống hệt ô điểm bỏ trống ở trang Bảng dữ
     /// liệu khảo sát, chứ không tự tính lấy một con số riêng.
     /// </summary>
-    bool IsScored = true,
-    /// <summary>
-    /// Điểm từng mục câu hỏi của lớp, cùng công thức với trang Thống kê theo mục — cho tab
-    /// Học phần / Giảng viên của phần phân tích theo câu hỏi. Null khi lớp chưa chốt điểm.
-    /// </summary>
-    IReadOnlyList<QuestionSectionScoreDto>? SectionScores = null);
+    bool IsScored = true);
 
 /// <summary>Một dòng kết quả chi tiết của một bài khảo sát lớp học phần.</summary>
 public sealed record SurveyResultDetailDto(

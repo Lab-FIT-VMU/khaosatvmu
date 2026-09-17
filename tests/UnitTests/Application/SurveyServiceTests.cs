@@ -18,9 +18,9 @@ public class SurveyServiceTests
         new(sectionId, name);
 
     [Fact]
-    public void SurveyRules_MaximumSectionsPerTemplate_ShouldBeTen()
+    public void SurveyRules_MaximumSectionsPerTemplate_ShouldBeThree()
     {
-        SurveyRules.MaximumSectionsPerTemplate.Should().Be(10);
+        SurveyRules.MaximumSectionsPerTemplate.Should().Be(3);
     }
 
     [Fact]

@@ -1,6 +1,3 @@
-using System.Globalization;
-using System.Text;
-
 namespace Application.Surveys;
 
 public sealed record AnswerScaleOptionDto(
@@ -188,6 +185,13 @@ public sealed record NormalizedSectionDto(
     /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
     decimal ValidResponseRate);
 
+/// <summary>Một mục của bộ câu hỏi trong ô chọn tính điểm theo mục.</summary>
+public sealed record NormalizationQuestionSectionDto(
+    int SectionId,
+    string SectionName,
+    /// <summary>Số câu được chấm điểm của mục: không đếm câu bẫy và câu tự nhập.</summary>
+    int QuestionCount);
+
 /// <summary>Toàn bộ sheet chuẩn hoá điểm của một đợt khảo sát.</summary>
 public sealed record SemesterSurveyNormalizationDto(
     int SemesterSurveyId,
@@ -199,7 +203,14 @@ public sealed record SemesterSurveyNormalizationDto(
     decimal SchoolAverageScore,
     decimal? SchoolStandardDeviation,
     IReadOnlyList<NormalizationGroupDto> Groups,
-    IReadOnlyList<NormalizedSectionDto> Sections);
+    IReadOnlyList<NormalizedSectionDto> Sections,
+    /// <summary>Các mục của bộ câu hỏi của đợt, theo thứ tự trên phiếu — để giao diện dựng ô chọn.</summary>
+    IReadOnlyList<NormalizationQuestionSectionDto> QuestionSections,
+    /// <summary>
+    /// Mục đang dùng để tính điểm và Z-Score; null là toàn bộ bài khảo sát. Khi có
+    /// mục, điểm của mỗi lớp chỉ gộp các câu thuộc mục đó.
+    /// </summary>
+    int? QuestionSectionId);
 
 // --------------------------------------- Sheet 3: tổng hợp theo bộ môn
 
@@ -231,7 +242,12 @@ public sealed record DepartmentSummaryRowDto(
     /// Mặt bằng bộ môn lệch mặt bằng toàn trường bao nhiêu lần sai số chuẩn σ/√n —
     /// cùng công thức với MeanZScore của khoa, để hai tab đọc ngang được nhau.
     /// </summary>
-    decimal? MeanZScore);
+    decimal? MeanZScore,
+    /// <summary>
+    /// Mặt bằng bộ môn lệch mặt bằng khoa của nó bao nhiêu lần sai số chuẩn σ/√n.
+    /// Null khi khoa quá ít lớp để chuẩn hoá hoặc mọi lớp của khoa cùng điểm.
+    /// </summary>
+    decimal? FacultyMeanZScore);
 
 public sealed record SemesterSurveyDepartmentSummaryDto(
     int SemesterSurveyId,
@@ -286,7 +302,12 @@ public sealed record CourseDiagnosisRowDto(
     /// </summary>
     decimal? MeanZScore,
     /// <summary>Số lớp của học phần ở mức cảnh báo: điểm ≤ mốc Z-Score −1 của toàn đợt.</summary>
-    int WarningSectionCount);
+    int WarningSectionCount,
+    /// <summary>
+    /// Mặt bằng học phần lệch mặt bằng khoa của nó bao nhiêu lần sai số chuẩn σ/√n.
+    /// Null khi khoa quá ít lớp để chuẩn hoá hoặc mọi lớp của khoa cùng điểm.
+    /// </summary>
+    decimal? FacultyMeanZScore);
 
 public sealed record SemesterSurveyCourseDiagnosisDto(
     int SemesterSurveyId,
@@ -311,9 +332,7 @@ public sealed record ScopeAnalysisQuestionDto(
     IReadOnlyList<ScopeAnalysisOptionDto> OptionDistribution,
     string ScaleKind,
     string AnswerScaleName,
-    IReadOnlyList<string>? TextAnswers,
-    /// <summary>Khoá mục của câu trong <see cref="SurveySectionCatalog"/>, để giao diện tách theo mục.</summary>
-    string SectionKey);
+    IReadOnlyList<string>? TextAnswers);
 
 /// <summary>
 /// Kết quả chi tiết theo từng câu hỏi cho một khoa/viện, bộ môn hoặc học phần
@@ -332,74 +351,9 @@ public sealed record SurveyScopeAnalysisDto(
     int ResponseCount,
     decimal AverageScore,
     IReadOnlyList<ScopeAnalysisQuestionDto> Questions,
-    /// <summary>Điểm từng mục câu hỏi, cùng công thức với trang bài khảo sát của một lớp.</summary>
-    IReadOnlyList<QuestionSectionScoreDto> SectionScores,
     IReadOnlyList<DepartmentSummaryRowDto>? Departments = null,
     IReadOnlyList<CourseDiagnosisRowDto>? Courses = null,
     IReadOnlyList<NormalizedSectionDto>? Sections = null);
-
-// ------------------------------------------- Thống kê theo mục câu hỏi
-
-/// <summary>
-/// Một mục của trang Thống kê theo mục, tức một cột điểm. Luôn đủ ba mục của
-/// <see cref="SurveySectionCatalog"/> theo đúng thứ tự trên phiếu, kể cả mục chưa có
-/// số. Mục ngoài danh mục gộp chung vào <see cref="SurveySectionCatalog.Other"/> và
-/// chỉ xuất hiện khi thật sự có.
-/// </summary>
-public sealed record QuestionSectionColumnDto(
-    string SectionKey,
-    string SectionName,
-    /// <summary>Số câu được chấm điểm của mục: không tính câu bẫy và câu tự nhập.</summary>
-    int QuestionCount);
-
-/// <summary>Điểm một mục trong phạm vi một nhóm lớp.</summary>
-public sealed record QuestionSectionScoreDto(
-    string SectionKey,
-    /// <summary>Null khi nhóm lớp chưa có lượt trả lời nào cho mục này.</summary>
-    decimal? AverageScore,
-    int AnswerCount);
-
-/// <summary>
-/// Một dòng ở một cấp: toàn trường, khoa/viện, bộ môn, học phần hoặc lớp học phần.
-/// Mọi cấp dùng chung kiểu này và để trống các trường của cấp dưới, nên con của một
-/// dòng lọc ra được chỉ bằng cách so các trường của cấp trên.
-/// </summary>
-public sealed record QuestionSectionScoreRowDto(
-    int? FacultyId,
-    string FacultyName,
-    int? DepartmentId,
-    string DepartmentName,
-    int? CourseId,
-    string CourseCode,
-    string CourseName,
-    /// <summary>Chỉ có ở dòng lớp học phần.</summary>
-    int? CourseSectionSurveyId,
-    string SectionName,
-    string LecturerName,
-    /// <summary>Số lớp đã chốt điểm của nhóm; chỉ những lớp này góp vào các con số của dòng.</summary>
-    int SectionCount,
-    int ValidResponseCount,
-    /// <summary>
-    /// Điểm tổng hợp của cả bộ câu hỏi, đúng con số ở các trang thống kê khác. KHÔNG
-    /// bằng trung bình cộng các mục: gồm cả mục không hiển thị, và gộp theo phiếu chứ
-    /// không theo mục.
-    /// </summary>
-    decimal? OverallAverageScore,
-    IReadOnlyList<QuestionSectionScoreDto> Scores);
-
-public sealed record SemesterSurveyQuestionSectionScoresDto(
-    int SemesterSurveyId,
-    string TemplateName,
-    string SemesterName,
-    string AcademicYearName,
-    IReadOnlyList<QuestionSectionColumnDto> Columns,
-    QuestionSectionScoreRowDto School,
-    IReadOnlyList<QuestionSectionScoreRowDto> Faculties,
-    IReadOnlyList<QuestionSectionScoreRowDto> Departments,
-    /// <summary>Học phần gom trong từng bộ môn: học phần có lớp ở hai bộ môn thì thành hai dòng.</summary>
-    IReadOnlyList<QuestionSectionScoreRowDto> Courses,
-    /// <summary>Từng lớp học phần đã chốt điểm.</summary>
-    IReadOnlyList<QuestionSectionScoreRowDto> CourseSections);
 
 // ------------------------------ Sheet 5: báo cáo cá nhân giảng viên
 
@@ -587,7 +541,9 @@ public sealed record SectionStatisticsRowDto(
     /// Điểm từng câu, theo đúng thứ tự cột C của bảng. Cũng là ảnh chụp của lần
     /// bấm tính gần nhất: câu chưa được chốt có <c>AnswerCount = 0</c>.
     /// </summary>
-    IReadOnlyList<SectionQuestionScoreDto> QuestionScores);
+    IReadOnlyList<SectionQuestionScoreDto> QuestionScores,
+    /// <summary>Khoa/viện suy từ bộ môn của dòng; rỗng khi bộ môn chưa thuộc khoa nào.</summary>
+    string FacultyName = "");
 
 /// <summary>Một cột C của bảng thống kê, sinh theo bộ câu hỏi của đợt.</summary>
 public sealed record StatisticsQuestionColumnDto(int QuestionId, int Order, string QuestionText);
@@ -848,110 +804,16 @@ public sealed record SurveyOperationResult<T>(bool Succeeded, string? ErrorCode,
 public static class SurveyRules
 {
     /// <summary>
-    /// Số mục tối đa của một bộ câu hỏi. Số câu thì không giới hạn — bộ dài bao
-    /// nhiêu là việc của người soạn phiếu.
+    /// Số mục tối đa của một bộ câu hỏi; tên mục đặt tuỳ ý. Số câu thì không giới hạn
+    /// — bộ dài bao nhiêu là việc của người soạn phiếu.
     /// </summary>
-    public const int MaximumSectionsPerTemplate = 10;
+    public const int MaximumSectionsPerTemplate = 3;
 
     /// <summary>Số mức tối đa của một thang: "AnswerScaleOptions"."Value" CHECK 1..5.</summary>
     public const int MaximumAnswerScaleOptions = 5;
 
     /// <summary>Độ dài tối đa của câu trả lời tự nhập ("SurveyResponseAnswers"."AnswerValue").</summary>
     public const int MaximumTextAnswerLength = 2000;
-}
-
-/// <summary>Một mục trong <see cref="SurveySectionCatalog"/>.</summary>
-public sealed record SurveySectionCatalogEntry(string Key, string Name);
-
-/// <summary>
-/// Danh mục mục câu hỏi CỐ ĐỊNH. Đây là lớp xử lý TẠM cho đợt khảo sát hiện tại: bộ
-/// đề do phòng Khảo thí &amp; ĐBCL ban hành đã gộp ba mục vào chung một bài và không
-/// còn kịp tách, nên phải khoá tên mục lại thì mới gộp được điểm theo từng mục.
-///
-/// Không có cột nào trong CSDL lưu khoá — thêm cột là đổi schema, buộc làm lại cả
-/// đợt. Mục trong DB nhận ra khoá bằng TÊN đã chuẩn hoá, nên tên gõ lệch dấu kiểu
-/// "cơ sơ" vẫn quy đúng về "cơ sở" mà không phải sửa dòng dữ liệu nào.
-///
-/// Khi bộ đề được tách thành các bài riêng thì chỉ cần gỡ phần chặn tên mục lúc lưu
-/// bộ câu hỏi; trang Thống kê theo mục vẫn dùng tiếp vì nó gộp theo mục.
-/// </summary>
-public static class SurveySectionCatalog
-{
-    public const string CourseContent = "COURSE_CONTENT";
-    public const string Lecturer = "LECTURER";
-    public const string Facilities = "FACILITIES";
-
-    /// <summary>
-    /// Khoá gom mọi mục KHÔNG thuộc danh mục, chỉ gặp ở bộ đề soạn trước khi khoá.
-    /// Không bao giờ lưu mới được mục loại này.
-    /// </summary>
-    public const string Other = "OTHER";
-    public const string OtherName = "Mục khác";
-
-    /// <summary>Theo đúng thứ tự mục trên phiếu.</summary>
-    public static readonly IReadOnlyList<SurveySectionCatalogEntry> Entries =
-    [
-        new(CourseContent, "Nội dung đánh giá học phần"),
-        new(Lecturer, "Nội dung đánh giá về giảng viên"),
-        // Giữ nguyên chính tả đang lưu trên hệ thống thật ("cơ sơ"): lưu mới hay xuất tệp mẫu
-        // đều ra đúng tên các đợt đã chạy đang đọc. Gõ "cơ sở" vẫn quy về mục này.
-        new(Facilities, "Nội dung đánh giá về cơ sơ vật chất, phục vụ học tập"),
-    ];
-
-    private static readonly Dictionary<string, string> KeyByMatchKey =
-        Entries.ToDictionary(x => MatchKey(x.Name), x => x.Key);
-
-    /// <summary>Khoá của một tên mục; null khi tên không thuộc danh mục.</summary>
-    public static string? Resolve(string? sectionName) =>
-        string.IsNullOrWhiteSpace(sectionName)
-            ? null
-            : KeyByMatchKey.GetValueOrDefault(MatchKey(sectionName));
-
-    public static string NameOf(string key) => Entries.First(x => x.Key == key).Name;
-
-    /// <summary>
-    /// Kiểm tên các mục của một bộ câu hỏi: mọi tên phải thuộc danh mục và không hai
-    /// tên nào quy về cùng một khoá. Trả mã lỗi, hoặc null nếu hợp lệ.
-    /// </summary>
-    public static string? Validate(IReadOnlyList<string> sectionNames)
-    {
-        var keys = sectionNames.Select(Resolve).ToList();
-        if (keys.Any(x => x is null)) return SurveyErrorCodes.SectionNameNotAllowed;
-        return keys.Distinct().Count() == keys.Count ? null : SurveyErrorCodes.SectionNameExists;
-    }
-
-    /// <summary>
-    /// Khoá so tên: bỏ dấu thanh, đ thành d, hạ chữ thường, mọi chuỗi ký tự không phải
-    /// chữ/số gộp thành một dấu cách. Bản sao phía giao diện nằm ở
-    /// src/Frontend/src/utils/surveySectionCatalog.ts — hai nơi phải cho ra cùng kết quả.
-    /// </summary>
-    private static string MatchKey(string value)
-    {
-        var decomposed = value.Normalize(NormalizationForm.FormD);
-        var builder = new StringBuilder(decomposed.Length);
-        var pendingSpace = false;
-
-        foreach (var character in decomposed)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(character) == UnicodeCategory.NonSpacingMark)
-            {
-                continue;
-            }
-
-            var folded = character is 'đ' or 'Đ' ? 'd' : char.ToLowerInvariant(character);
-            if (!char.IsLetterOrDigit(folded))
-            {
-                pendingSpace = builder.Length > 0;
-                continue;
-            }
-
-            if (pendingSpace) builder.Append(' ');
-            pendingSpace = false;
-            builder.Append(folded);
-        }
-
-        return builder.ToString();
-    }
 }
 
 public interface ISurveyService
@@ -1082,7 +944,8 @@ public interface ISurveyService
     /// </summary>
     Task<SurveyOperationResult<SemesterSurveyNormalizationDto>> GetSemesterSurveyNormalizationAsync(
         int semesterSurveyId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? questionSectionId = null);
 
     /// <summary>Tổng hợp theo bộ môn của một đợt khảo sát, phục vụ trưởng khoa.</summary>
     Task<SurveyOperationResult<SemesterSurveyDepartmentSummaryDto>> GetSemesterSurveyDepartmentSummaryAsync(
@@ -1117,14 +980,6 @@ public interface ISurveyService
 
     /// <summary>Tổng quan một đợt khảo sát ở phạm vi toàn trường.</summary>
     Task<SurveyOperationResult<SemesterSurveyDashboardDto>> GetSemesterSurveyDashboardAsync(
-        int semesterSurveyId,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Điểm tách theo mục câu hỏi (học phần / giảng viên / cơ sở vật chất) ở cấp toàn
-    /// trường, khoa/viện và bộ môn, gộp từ ảnh chụp điểm từng câu. Chỉ dành cho quản trị.
-    /// </summary>
-    Task<SurveyOperationResult<SemesterSurveyQuestionSectionScoresDto>> GetSemesterSurveyQuestionSectionScoresAsync(
         int semesterSurveyId,
         CancellationToken cancellationToken = default);
 
@@ -1204,11 +1059,8 @@ public static class SurveyErrorCodes
     /// <summary>Tên mục để trống hoặc chỉ có khoảng trắng.</summary>
     public const string SectionNameRequired = "SURVEY_SECTION_NAME_REQUIRED";
 
-    /// <summary>Hai mục trong cùng một bộ quy về cùng một mục của <see cref="SurveySectionCatalog"/>.</summary>
+    /// <summary>Hai mục trong cùng một bộ trùng tên sau khi chuẩn hoá.</summary>
     public const string SectionNameExists = "SURVEY_SECTION_NAME_EXISTS";
-
-    /// <summary>Tên mục không thuộc danh mục mục cố định <see cref="SurveySectionCatalog"/>.</summary>
-    public const string SectionNameNotAllowed = "SURVEY_SECTION_NAME_NOT_ALLOWED";
 
     /// <summary>"SectionId" gửi lên không phải mục của chính bộ đang lưu.</summary>
     public const string SectionNotFound = "SURVEY_SECTION_NOT_FOUND";

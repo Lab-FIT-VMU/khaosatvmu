@@ -732,20 +732,11 @@ public sealed class EfReportService(
                 questionSnapshots))
             .ToList();
 
-        // Gắn mục cho từng câu và điểm từng mục, để giao diện tách tab Học phần / Giảng viên.
-        var sectionKeys = await QuestionSectionScores.KeysAsync(
-            db,
-            questionRatings.Select(x => x.QuestionId).ToList(),
-            cancellationToken);
-        var sectionScores = await QuestionSectionScores.ScoresAsync(db, scoredCssIds, cancellationToken);
-
         return report with
         {
             QuestionRatings = questionRatings
-                .Select(x => x with { SectionKey = sectionKeys.GetValueOrDefault(x.QuestionId) })
                 .OrderBy(x => x.QuestionOrder)
                 .ToList(),
-            SectionScores = sectionScores,
         };
     }
 
@@ -1100,21 +1091,9 @@ public sealed class EfReportService(
             [courseSectionSurveyId],
             cancellationToken);
 
-        // Gắn mục cho từng câu và điểm từng mục, để giao diện tách tab Học phần / Giảng viên.
-        var sectionKeys = await QuestionSectionScores.KeysAsync(
-            db,
-            questionRatings.Select(x => x.QuestionId).ToList(),
-            cancellationToken);
         questionRatings = questionRatings
-            .Select(rating => WithSnapshotScore(rating, questionSnapshots) with
-            {
-                SectionKey = sectionKeys.GetValueOrDefault(rating.QuestionId),
-            })
+            .Select(rating => WithSnapshotScore(rating, questionSnapshots))
             .ToList();
-        var sectionScores = await QuestionSectionScores.ScoresAsync(
-            db,
-            [courseSectionSurveyId],
-            cancellationToken);
 
         return new SectionSurveyAnalysisDto(
             courseSectionSurveyId,
@@ -1127,8 +1106,7 @@ public sealed class EfReportService(
             sectionSurvey.AverageScore!.Value,
             template?.TemplateName ?? string.Empty,
             questionRatings,
-            true,
-            sectionScores
+            true
         );
     }
 

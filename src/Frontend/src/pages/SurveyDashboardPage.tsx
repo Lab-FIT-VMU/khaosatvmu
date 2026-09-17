@@ -15,7 +15,6 @@ import {
 import { useSemester } from '../context/semesterContext';
 import { NoteModalButton } from '../components/NoteModalButton';
 import { ExportDropdown } from '../components/ExportDropdown';
-import { UpdateScoresButton } from '../components/UpdateScoresButton';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { ApiError } from '../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
@@ -398,7 +397,6 @@ export const SurveyDashboardPage: React.FC = () => {
             <RefreshCw aria-hidden="true" size={16} />
             Tải lại
           </button>
-          <UpdateScoresButton semesterSurveyId={semesterSurveyId} onUpdated={loadData} />
         </div>
       </section>
 

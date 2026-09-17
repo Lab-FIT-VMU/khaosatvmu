@@ -99,9 +99,8 @@ export const UpdateScoresButton: React.FC<{
 };
 
 /**
- * Hộp thoại cấu hình tính điểm của nút Cập nhật điểm. Nút Lưu cấu hình nằm ngay dưới
- * phần cấu hình, còn chân hộp thoại là nút Cập nhật để chạy tính điểm theo cấu hình
- * ĐÃ LƯU.
+ * Hộp thoại cấu hình tính điểm của nút Cập nhật điểm. Bấm Cập nhật thì lưu hai ngưỡng
+ * (nếu có đổi) rồi tính điểm luôn theo đúng cấu hình vừa lưu.
  */
 const ScoringThresholdDialog: React.FC<{
   isOpen: boolean;
@@ -113,11 +112,6 @@ const ScoringThresholdDialog: React.FC<{
 }> = ({ isOpen, current, onClose, onUpdate, updating }) => {
   const [responseRate, setResponseRate] = useState(String(current.minimumResponseRate));
   const [validRate, setValidRate] = useState(String(current.minimumValidRate));
-  const [rejectTooFast, setRejectTooFast] = useState(current.rejectTooFast);
-  const [rejectSingleAnswer, setRejectSingleAnswer] = useState(current.rejectSingleAnswer);
-  const [rejectAttentionCheck, setRejectAttentionCheck] = useState(
-    current.rejectAttentionCheckFailed
-  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -126,35 +120,23 @@ const ScoringThresholdDialog: React.FC<{
     if (!isOpen) return;
     setResponseRate(String(current.minimumResponseRate));
     setValidRate(String(current.minimumValidRate));
-    setRejectTooFast(current.rejectTooFast);
-    setRejectSingleAnswer(current.rejectSingleAnswer);
-    setRejectAttentionCheck(current.rejectAttentionCheckFailed);
     setError(null);
   }, [isOpen, current]);
 
-  // Còn chỉnh mà chưa lưu thì chưa cho Cập nhật: tính điểm đọc cấu hình đã lưu trên
-  // máy chủ, không đọc những gì đang gõ trong hộp thoại.
-  const hasUnsavedChanges =
+  const hasChanges =
     responseRate !== String(current.minimumResponseRate)
-    || validRate !== String(current.minimumValidRate)
-    || rejectTooFast !== current.rejectTooFast
-    || rejectSingleAnswer !== current.rejectSingleAnswer
-    || rejectAttentionCheck !== current.rejectAttentionCheckFailed;
+    || validRate !== String(current.minimumValidRate);
   const busy = saving || updating;
 
-  const handleUpdate = async () => {
-    if (hasUnsavedChanges || busy) return;
-    if (await onUpdate()) onClose();
-  };
-
+  // Tính điểm đọc cấu hình ĐÃ LƯU trên máy chủ, nên phải lưu xong mới tính. Lưu lỗi
+  // thì dừng luôn, không tính theo cấu hình cũ.
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (busy) return;
+
     const next = {
       minimumResponseRate: Number(responseRate),
       minimumValidRate: Number(validRate),
-      rejectTooFast,
-      rejectSingleAnswer,
-      rejectAttentionCheckFailed: rejectAttentionCheck,
     };
     const outOfRange = [next.minimumResponseRate, next.minimumValidRate].some(
       (value) => !Number.isFinite(value) || value < 0 || value > 100
@@ -163,23 +145,22 @@ const ScoringThresholdDialog: React.FC<{
       setError('Cả hai ngưỡng phải là số trong khoảng 0 đến 100.');
       return;
     }
+    setError(null);
 
-    setSaving(true);
-    try {
-      const saved = await surveyApi.updateScoringThresholds(next);
-      publishScoringThresholds(saved);
-      toast.success('Đã lưu ngưỡng tính điểm', {
-        description:
-          `Tỷ lệ phản hồi ≥ ${saved.minimumResponseRate}% · `
-          + `Tỷ lệ phiếu hợp lệ ≥ ${saved.minimumValidRate}%. `
-          + 'Bấm "Cập nhật" để tính lại điểm theo cấu hình mới.',
-      });
-      // Giữ hộp thoại lại để bấm Cập nhật ngay sau đó.
-    } catch (caught) {
-      setError(messageFrom(caught));
-    } finally {
-      setSaving(false);
+    if (hasChanges) {
+      setSaving(true);
+      try {
+        const saved = await surveyApi.updateScoringThresholds(next);
+        publishScoringThresholds(saved);
+      } catch (caught) {
+        setError(messageFrom(caught));
+        return;
+      } finally {
+        setSaving(false);
+      }
     }
+
+    if (await onUpdate()) onClose();
   };
 
   return (
@@ -189,8 +170,8 @@ const ScoringThresholdDialog: React.FC<{
 
         <div className="catalog-context-band">
           Một lớp phải qua cả hai tiêu chí thì điểm của nó mới được gộp vào mọi bảng thống
-          kê và báo cáo. Chỉnh cấu hình nếu cần rồi bấm <strong>Lưu cấu hình</strong>, sau
-          đó bấm <strong>Cập nhật</strong> để tính lại điểm cho mọi lớp trong đợt.
+          kê và báo cáo. Chỉnh hai tiêu chí nếu cần rồi bấm <strong>Cập nhật</strong>: hệ
+          thống lưu cấu hình và tính lại điểm cho mọi lớp trong đợt.
         </div>
 
         <div className="catalog-form-grid catalog-form-grid--2">
@@ -232,94 +213,17 @@ const ScoringThresholdDialog: React.FC<{
           </div>
         </div>
 
-        {/* Ba luật của bộ lọc nhiễu. Bỏ chọn luật nào thì phiếu chỉ dính đúng luật
-            đó quay lại được tính vào thống kê — phiếu không bị ghi lại, chỉ đổi
-            cách đọc lý do đã lưu từ lúc nộp, nên chọn lại là mọi số về như cũ. */}
-        <div className="form-group">
-          <label>Bẫy lỗi được áp khi tính thống kê</label>
-          <div className="catalog-checkbox-list">
-            <label className="catalog-checkbox">
-              <input
-                type="checkbox"
-                checked={rejectSingleAnswer}
-                disabled={busy}
-                onChange={(event) => setRejectSingleAnswer(event.target.checked)}
-              />
-              <span>Chọn cùng đáp án</span>
-            </label>
-            <label className="catalog-checkbox">
-              <input
-                type="checkbox"
-                checked={rejectAttentionCheck}
-                disabled={busy}
-                onChange={(event) => setRejectAttentionCheck(event.target.checked)}
-              />
-              <span>Sai câu độ tập trung</span>
-            </label>
-            <label className="catalog-checkbox">
-              <input
-                type="checkbox"
-                checked={rejectTooFast}
-                disabled={busy}
-                onChange={(event) => setRejectTooFast(event.target.checked)}
-              />
-              <span>Làm bài quá nhanh</span>
-            </label>
-          </div>
-          <p className="answer-scale-hint">
-            Bỏ chọn luật nào thì phiếu dính lỗi đó được tính vào thống kê trở lại. Phiếu
-            đã thu không bị sửa, chọn lại là mọi con số quay về như cũ. Ngưỡng "làm bài
-            quá nhanh" cố định 1,5 giây mỗi câu.
-          </p>
-          {/* Nhãn của từng phiếu nằm trong cơ sở dữ liệu từ lúc nộp và không đổi theo
-              ba ô chọn này, nên phải nói rõ Số phiếu hợp lệ ở các bảng thống kê đếm
-              theo cách nào — không thì người xem tưởng hai chỗ mâu thuẫn nhau. */}
-          <p className="answer-scale-hint">
-            <strong>Số phiếu hợp lệ</strong> ở các bảng thống kê là số phiếu thu về không
-            dính bẫy lỗi nào đang được chọn. Bỏ chọn cả ba thì mọi phiếu thu về đều được
-            tính là hợp lệ.
-          </p>
-          <p className="answer-scale-hint">
-            Nhãn <strong>Hợp lệ / Bị lọc</strong> và lý do bị lọc trong danh sách phiếu của
-            từng lớp được lưu lúc sinh viên nộp phiếu, xét đủ cả ba bẫy lỗi, nên không đổi
-            theo các ô chọn này. Vì vậy số phiếu hợp lệ ở bảng thống kê có thể khác số
-            phiếu mang nhãn Hợp lệ.
-          </p>
-        </div>
-
-        {/* Nút lưu nằm ngay dưới phần cấu hình, tách khỏi nút Cập nhật ở chân hộp thoại. */}
-        <div className="threshold-save-row">
-          {hasUnsavedChanges && (
-            <span className="answer-scale-hint">
-              Có thay đổi chưa lưu. Lưu cấu hình trước rồi mới bấm Cập nhật.
-            </span>
-          )}
-          <button
-            type="submit"
-            className="btn btn-secondary"
-            disabled={busy || !hasUnsavedChanges}
-          >
-            {saving ? 'Đang lưu...' : 'Lưu cấu hình'}
-          </button>
-        </div>
-
         <div className="modal-footer catalog-form-actions">
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>
             Hủy
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void handleUpdate()}
-            disabled={busy || hasUnsavedChanges}
-            title={hasUnsavedChanges ? 'Lưu cấu hình trước khi cập nhật' : undefined}
-          >
-            {updating ? (
+          <button type="submit" className="btn btn-primary" disabled={busy}>
+            {busy ? (
               <LoaderCircle className="auth-spin" aria-hidden="true" size={16} />
             ) : (
               <Calculator aria-hidden="true" size={16} />
             )}
-            {updating ? 'Đang cập nhật...' : 'Cập nhật'}
+            {saving ? 'Đang lưu cấu hình...' : updating ? 'Đang cập nhật...' : 'Cập nhật'}
           </button>
         </div>
       </form>

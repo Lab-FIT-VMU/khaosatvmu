@@ -11,7 +11,6 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { useSemester } from '../context/semesterContext';
-import { UpdateScoresButton } from '../components/UpdateScoresButton';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
@@ -583,11 +582,6 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
                   label: `${survey.surveyName} · ${survey.sectionSurveyCount} lớp`,
                 }))}
               />
-            </div>
-
-            {/* Tiến độ đếm phiếu trực tiếp nên không cần nạp lại sau khi cập nhật điểm. */}
-            <div className="statistics-toolbar-actions">
-              <UpdateScoresButton semesterSurveyId={selectedSurveyId} />
             </div>
           </section>
 

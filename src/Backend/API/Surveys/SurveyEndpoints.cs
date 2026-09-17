@@ -173,12 +173,13 @@ public static class SurveyEndpoints
             [FromServices] IScoringThresholdProvider provider,
             CancellationToken cancellationToken) =>
             ToResult(await provider.UpdateAsync(
+                // Không còn chọn bẫy lỗi: luôn áp cả ba luật của bộ lọc nhiễu.
                 new ScoringThresholds(
                     request.MinimumResponseRate,
                     request.MinimumValidRate,
-                    request.RejectTooFast,
-                    request.RejectSingleAnswer,
-                    request.RejectAttentionCheckFailed),
+                    RejectTooFast: true,
+                    RejectSingleAnswer: true,
+                    RejectAttentionCheckFailed: true),
                 cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>();
 
@@ -270,11 +271,17 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSemesterSurveyStatisticsAsync(semesterSurveyId, cancellationToken)));
 
+        // questionSectionId: tính điểm và Z-Score chỉ trên các câu của một mục; bỏ trống
+        // là toàn bộ bài khảo sát.
         surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/normalization", async (
             int semesterSurveyId,
+            int? questionSectionId,
             ISurveyService service,
             CancellationToken cancellationToken) =>
-            ToResult(await service.GetSemesterSurveyNormalizationAsync(semesterSurveyId, cancellationToken)));
+            ToResult(await service.GetSemesterSurveyNormalizationAsync(
+                semesterSurveyId,
+                cancellationToken,
+                questionSectionId)));
 
         surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/department-summary", async (
             int semesterSurveyId,
@@ -295,14 +302,6 @@ public static class SurveyEndpoints
             ISurveyService service,
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSemesterSurveyDashboardAsync(semesterSurveyId, cancellationToken)));
-
-        // Điểm tách theo mục câu hỏi. Tạm thời chỉ quản trị xem được: service tự chặn
-        // theo vai trò, nhóm quyền ở đây chỉ là lớp gác bên ngoài.
-        reportingReadGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/question-section-scores", async (
-            int semesterSurveyId,
-            ISurveyService service,
-            CancellationToken cancellationToken) =>
-            ToResult(await service.GetSemesterSurveyQuestionSectionScoresAsync(semesterSurveyId, cancellationToken)));
 
         surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/course-diagnosis", async (
             int semesterSurveyId,
@@ -452,19 +451,10 @@ public static class SurveyEndpoints
         return Results.Json(new { errorCode = result.ErrorCode }, statusCode: statusCode);
     }
 
-    /// <summary>
-    /// Hai vòng lọc lớp được tính điểm (đơn vị phần trăm) và ba cờ bật tắt từng
-    /// luật của bộ lọc nhiễu.
-    ///
-    /// Ba cờ mặc định true: bản giao diện cũ không gửi chúng lên thì hành vi giữ
-    /// nguyên như trước, cả ba luật đều áp.
-    /// </summary>
+    /// <summary>Hai vòng lọc lớp được tính điểm, đơn vị phần trăm.</summary>
     public sealed record SaveScoringThresholdsRequest(
         decimal MinimumResponseRate,
-        decimal MinimumValidRate,
-        bool RejectTooFast = true,
-        bool RejectSingleAnswer = true,
-        bool RejectAttentionCheckFailed = true);
+        decimal MinimumValidRate);
 
     public sealed record SaveAnswerScaleOptionRequest(int Value, string? DisplayText);
 

@@ -23,10 +23,9 @@ import {
   surveyErrorMessage,
   type SaveSurveyTemplatePayload,
 } from '../services/surveyApi';
-import { maximumAnswerScaleOptions, surveySectionCatalog } from '../types';
-import type { AnswerScale, AnswerScaleKind, SurveySectionKey, SurveyTemplate } from '../types';
+import { maximumAnswerScaleOptions, maximumSectionsPerTemplate } from '../types';
+import type { AnswerScale, AnswerScaleKind, SurveyTemplate } from '../types';
 import '../styles/survey-operations.css';
-import { resolveSurveySectionKey, surveySectionName } from '../utils/surveySectionCatalog';
 import { foldVietnamese } from '../utils/vietnamese';
 
 /** Một dòng câu hỏi trong trình soạn: nội dung kèm thang trả lời của riêng nó. */
@@ -251,20 +250,9 @@ export const SurveyTemplatesPage: React.FC = () => {
     }));
   };
 
-  /** Khoá danh mục của các mục đang có trong trình soạn, trừ mục ở vị trí `exceptIndex`. */
-  const usedSectionKeys = (sections: SectionForm[], exceptIndex?: number) =>
-    new Set(
-      sections
-        .filter((_, position) => position !== exceptIndex)
-        .map((section) => resolveSurveySectionKey(section.sectionName))
-    );
-
   const addSection = () => {
-    // Danh mục mục đã cố định nên mỗi mục chỉ dùng được một lần.
-    const used = usedSectionKeys(form.sections);
-    const nextEntry = surveySectionCatalog.find((entry) => !used.has(entry.key));
-    if (!nextEntry) {
-      setValidationError(`Mỗi bộ câu hỏi chỉ có tối đa ${surveySectionCatalog.length} mục cố định.`);
+    if (form.sections.length >= maximumSectionsPerTemplate) {
+      setValidationError(`Mỗi bộ câu hỏi chỉ được tối đa ${maximumSectionsPerTemplate} mục.`);
       return;
     }
     setValidationError(null);
@@ -274,8 +262,7 @@ export const SurveyTemplatesPage: React.FC = () => {
         ...prev.sections,
         {
           sectionId: null,
-          // Chọn sẵn mục đầu tiên chưa dùng; đổi được ở ô chọn mục.
-          sectionName: nextEntry.name,
+          sectionName: '',
           collapsed: false,
           questions: [{ questionText: '', answerScaleId: defaultScaleId, attentionCheckValue: '' }],
         },
@@ -352,14 +339,13 @@ export const SurveyTemplatesPage: React.FC = () => {
       setValidationError('Bộ câu hỏi cần ít nhất một mục có câu hỏi.');
       return;
     }
-    // Cùng luật với backend: mục phải chọn trong danh mục cố định, mỗi mục một lần.
-    const sectionKeys = filledSections.map((section) => resolveSurveySectionKey(section.sectionName));
-    if (sectionKeys.some((key) => key === null)) {
-      setValidationError('Vui lòng chọn mục trong danh mục cố định cho từng nhóm câu hỏi.');
+    if (filledSections.some((section) => section.sectionName.length === 0)) {
+      setValidationError('Vui lòng đặt tên cho từng mục.');
       return;
     }
+    const sectionKeys = filledSections.map((section) => foldVietnamese(section.sectionName));
     if (new Set(sectionKeys).size !== sectionKeys.length) {
-      setValidationError('Mỗi mục chỉ được dùng một lần trong một bộ câu hỏi.');
+      setValidationError('Hai mục trong cùng một bộ không được trùng tên.');
       return;
     }
     if (
@@ -740,7 +726,7 @@ export const SurveyTemplatesPage: React.FC = () => {
             <header className="survey-question-editor-header">
               <strong>Danh sách câu hỏi</strong>
               <span className="survey-question-counter">
-                {questionCount} câu · {form.sections.length}/{surveySectionCatalog.length} mục
+                {questionCount} câu · {form.sections.length}/{maximumSectionsPerTemplate} mục
               </span>
             </header>
 
@@ -770,44 +756,17 @@ export const SurveyTemplatesPage: React.FC = () => {
                         <ChevronDown aria-hidden="true" size={15} />
                       )}
                     </button>
-                    {(() => {
-                      // Mục đã cố định: chỉ chọn trong danh mục, mục đã dùng ở chỗ khác
-                      // thì không hiện nữa. Tên đang lưu gõ lệch dấu vẫn nhận ra đúng mục.
-                      const selectedKey = resolveSurveySectionKey(section.sectionName);
-                      const usedElsewhere = usedSectionKeys(form.sections, sectionIndex);
-
-                      return (
-                        <select
-                          className="survey-section-name"
-                          aria-label={`Mục ${sectionIndex + 1}`}
-                          value={selectedKey ?? ''}
-                          // Bộ đã thu phiếu mà đổi mục thì điểm theo mục của các đợt đã
-                          // chạy đổi nghĩa, nên khoá lại giống thang trả lời.
-                          disabled={form.locked}
-                          title={form.locked ? 'Bộ đã thu phiếu nên không đổi được mục' : undefined}
-                          onChange={(event) =>
-                            updateSection(sectionIndex, {
-                              sectionName: surveySectionName(event.target.value as SurveySectionKey),
-                            })
-                          }
-                        >
-                          {selectedKey === null && (
-                            <option value="" disabled>
-                              {section.sectionName
-                                ? `${section.sectionName} (ngoài danh mục, chọn lại)`
-                                : 'Chọn mục'}
-                            </option>
-                          )}
-                          {surveySectionCatalog
-                            .filter((entry) => entry.key === selectedKey || !usedElsewhere.has(entry.key))
-                            .map((entry) => (
-                              <option key={entry.key} value={entry.key}>
-                                {entry.name}
-                              </option>
-                            ))}
-                        </select>
-                      );
-                    })()}
+                    {/* Tên mục đặt tuỳ ý, tối đa maximumSectionsPerTemplate mục. */}
+                    <input
+                      type="text"
+                      className="survey-section-name"
+                      placeholder="Tên mục, VD: Nội dung đánh giá học phần"
+                      aria-label={`Tên mục ${sectionIndex + 1}`}
+                      value={section.sectionName}
+                      onChange={(event) =>
+                        updateSection(sectionIndex, { sectionName: event.target.value })
+                      }
+                    />
                     <span className="survey-section-count">{section.questions.length} câu</span>
                     {!form.locked && (
                       <button
@@ -956,7 +915,7 @@ export const SurveyTemplatesPage: React.FC = () => {
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={addSection}
-                disabled={form.sections.length >= surveySectionCatalog.length}
+                disabled={form.sections.length >= maximumSectionsPerTemplate}
               >
                 <Plus aria-hidden="true" size={16} />
                 Thêm mục

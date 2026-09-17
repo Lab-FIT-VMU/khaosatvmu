@@ -161,10 +161,10 @@
   --col-left-2: max(54px, 5cqw);
   --col-left-3: max(150px, 13cqw);
 
-  --col-right-1: max(74px, 6cqw);
-  --col-right-2: max(74px, 6.5cqw);
-  --col-right-3: max(74px, 6.5cqw);
-  --col-right-4: max(84px, 7cqw);
+  /* Ba cột ghim phải: Mô tả, Số ý kiến mở, Điểm trung bình. Hai cột số để hẹp. */
+  --col-right-1: max(132px, 9.5cqw);
+  --col-right-2: max(56px, 4cqw);
+  --col-right-3: max(64px, 4.5cqw);
 }
 
 .statistics-table-scroll:focus-visible {
@@ -348,7 +348,7 @@
 }
 
 /*
-  Bốn cột phải, đánh số từ mép phải vào trong. Cùng nguyên tắc: width lấy từ biến,
+  Ba cột phải, đánh số từ mép phải vào trong. Cùng nguyên tắc: width lấy từ biến,
   `right` cộng dồn các biến đứng ngoài nó. Cả ba thuộc tính width/min/max phải
   cùng một giá trị — trước đây chỉ đặt min-width nên tiêu đề dài đẩy ô rộng ra và
   cột nọ trườn lên cột kia.
@@ -372,14 +372,66 @@
   width: var(--col-right-3);
   min-width: var(--col-right-3);
   max-width: var(--col-right-3);
+  border-left: 1px solid #cfd7dc;
 }
 
-.statistics-table .col-right-4 {
-  right: calc(var(--col-right-1) + var(--col-right-2) + var(--col-right-3));
-  width: var(--col-right-4);
-  min-width: var(--col-right-4);
-  max-width: var(--col-right-4);
-  border-left: 1px solid #cfd7dc;
+/*
+  Hàng tìm kiếm + chọn nhóm lớp phía trên bảng dữ liệu khảo sát. Ô tìm kiếm bên trái,
+  ba ô chọn nằm ngay bên phải; màn hẹp thì ô chọn xuống dòng.
+*/
+.statistics-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e0e6ea;
+  background: #ffffff;
+  flex: 0 0 auto;
+}
+
+.statistics-filter-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+
+.statistics-filter-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #20262c;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.statistics-filter-option input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: #0788b8;
+  cursor: pointer;
+}
+
+/* Cột Mô tả: đủ / không đủ điều kiện tính điểm. Chữ dài thì xuống dòng trong ô. */
+.statistics-table .statistics-eligibility {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.statistics-table .statistics-eligibility--yes {
+  color: #1a6b2f;
+}
+
+.statistics-table .statistics-eligibility--no {
+  color: #a3321f;
 }
 
 /*
@@ -530,6 +582,46 @@
   gap: 8px 16px;
   margin-bottom: 12px;
   flex: 0 0 auto;
+}
+
+/*
+  Hàng chọn tính điểm và Z-Score theo toàn bài hay theo một mục, ở tab Phân tích theo
+  lớp học phần. Nằm ngay trên dòng tóm tắt; tên mục dài thì xuống dòng chứ không tràn.
+*/
+.analysis-section-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px solid #e0e6ea;
+  background: #ffffff;
+  color: #20262c;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.analysis-section-picker__label {
+  color: #40505a;
+  font-weight: 650;
+}
+
+.analysis-section-picker__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.analysis-section-picker__option input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: #0788b8;
+  cursor: pointer;
 }
 
 /* Nút chú thích nằm cuối dòng tóm tắt của tab, dồn sát mép phải. Hàng riêng chỉ
@@ -972,54 +1064,3 @@
   }
 }
 
-/* ----- Hai nhóm lớp: đủ / chưa đủ điều kiện tính điểm ----- */
-
-.statistics-tabs {
-  display: flex;
-  gap: 2px;
-  margin-bottom: 8px;
-  flex: 0 0 auto;
-}
-
-.statistics-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  border: 1px solid #dfe4e8;
-  border-bottom: 0;
-  background: #f2f5f7;
-  color: #52616b;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.statistics-tab:hover {
-  background: #eef7fb;
-}
-
-.statistics-tab.is-active {
-  border-color: #0788b8;
-  background: #ffffff;
-  color: #036e99;
-  box-shadow: inset 0 2px 0 #0788b8;
-}
-
-/* Số lớp của nhóm, đọc được ngay mà không phải mở tab kia. */
-.statistics-tab-count {
-  min-width: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: #e3e9ed;
-  color: #40505a;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-
-.statistics-tab.is-active .statistics-tab-count {
-  background: #d6eef8;
-  color: #036e99;
-}

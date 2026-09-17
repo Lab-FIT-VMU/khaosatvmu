@@ -123,24 +123,11 @@ export interface Criterion {
   status: 'Kích hoạt' | 'Tạm ẩn';
 }
 
-/** Số mục tối đa của một bộ câu hỏi. Số câu thì không giới hạn. */
-export const maximumSectionsPerTemplate = 10;
-
 /**
- * Danh mục mục câu hỏi CỐ ĐỊNH, bản sao của `SurveySectionCatalog` bên backend.
- *
- * Tạm khoá cho đợt khảo sát hiện tại: bộ đề gộp ba mục vào một bài nên phải cố
- * định tên mục thì mới gộp được điểm theo mục. Mục trong CSDL nhận ra khoá bằng tên
- * đã chuẩn hoá, xem `resolveSurveySectionKey`.
+ * Số mục tối đa của một bộ câu hỏi, tên mục đặt tuỳ ý. Số câu thì không giới hạn.
+ * Phải trùng `SurveyRules.MaximumSectionsPerTemplate` bên backend.
  */
-export const surveySectionCatalog = [
-  { key: 'COURSE_CONTENT', name: 'Nội dung đánh giá học phần' },
-  { key: 'LECTURER', name: 'Nội dung đánh giá về giảng viên' },
-  // Giữ nguyên chính tả đang lưu trên hệ thống thật ("cơ sơ"); gõ "cơ sở" vẫn quy về mục này.
-  { key: 'FACILITIES', name: 'Nội dung đánh giá về cơ sơ vật chất, phục vụ học tập' },
-] as const;
-
-export type SurveySectionKey = (typeof surveySectionCatalog)[number]['key'];
+export const maximumSectionsPerTemplate = 3;
 
 /** Số mức tối đa của một thang trả lời ("AnswerScaleOptions"."Value" CHECK 1..5). */
 export const maximumAnswerScaleOptions = 5;
@@ -593,16 +580,6 @@ export interface QuestionRating {
   answerScaleName: string;
   /** Nội dung người học tự nhập, chỉ có với câu thang `Text`. */
   textAnswers: string[] | null;
-  /** Khoá mục của câu trong `surveySectionCatalog`, 'OTHER' là mục ngoài danh mục. */
-  sectionKey?: string | null;
-}
-
-/** Điểm một mục câu hỏi trong phạm vi một trang phân tích (một lớp hoặc một giảng viên). */
-export interface QuestionAnalysisSectionScore {
-  sectionKey: string;
-  /** Null khi chưa có lượt trả lời nào cho mục này. */
-  averageScore: number | null;
-  answerCount: number;
 }
 
 export interface LecturerSectionSummary {
@@ -638,8 +615,6 @@ export interface LecturerPerformanceReport {
    * `totalResponses` đếm cả lớp chưa đủ điều kiện vì đó là tiến độ.
    */
   scoredValidResponseCount: number;
-  /** Điểm từng mục câu hỏi của các lớp đã chốt điểm, cho tab Học phần / Giảng viên. */
-  sectionScores?: QuestionAnalysisSectionScore[] | null;
 }
 
 export interface DepartmentSummary {
@@ -688,8 +663,6 @@ export interface SectionSurveyAnalysis {
    * mọi số liệu phân tích đều rỗng, đúng như ô điểm bỏ trống ở Bảng dữ liệu khảo sát.
    */
   isScored: boolean;
-  /** Điểm từng mục câu hỏi của lớp, cho tab Học phần / Giảng viên. */
-  sectionScores?: QuestionAnalysisSectionScore[] | null;
 }
 
 /** Một dòng kết quả chi tiết của một bài khảo sát lớp học phần. */

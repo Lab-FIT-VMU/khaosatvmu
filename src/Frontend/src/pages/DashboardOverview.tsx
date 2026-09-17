@@ -19,7 +19,6 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useSemester } from '../context/semesterContext';
-import { UpdateScoresButton } from '../components/UpdateScoresButton';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { reportApi } from '../services/reportApi';
 import { surveyApi } from '../services/surveyApi';
@@ -636,11 +635,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <ArrowRight aria-hidden="true" />
           </button>
           )}
-
-          <UpdateScoresButton
-            semesterSurveyId={selectedSemesterSurveyId}
-            onUpdated={loadOverview}
-          />
         </div>
       </section>
 

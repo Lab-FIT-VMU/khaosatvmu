@@ -33,14 +33,8 @@ function formatDateTime(value: string): string {
 }
 
 function describeConfig(change: ScoringChange): string {
-  const traps = [
-    change.rejectSingleAnswer && 'Chọn cùng đáp án',
-    change.rejectAttentionCheckFailed && 'Sai câu độ tập trung',
-    change.rejectTooFast && 'Làm bài quá nhanh',
-  ].filter(Boolean);
   return `Tỷ lệ phản hồi ≥ ${change.minimumResponseRate}% · `
-    + `Tỷ lệ phiếu hợp lệ ≥ ${change.minimumValidRate}% · `
-    + `Bẫy lỗi áp: ${traps.length > 0 ? traps.join(', ') : 'không áp bẫy lỗi nào'}`;
+    + `Tỷ lệ phiếu hợp lệ ≥ ${change.minimumValidRate}%`;
 }
 
 function notify(change: ScoringChange): void {

@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import { ConfirmDialog, Modal } from '../components/Modal';
-import { QuestionAnalysisTabs } from '../components/QuestionAnalysisTabs';
+import { QuestionAnalysisChart } from '../components/QuestionAnalysisChart';
 import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole } from '../auth/roles';
 import { ApiError } from '../services/apiClient';
@@ -458,9 +458,8 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
       )}
 
       {showAnalysis && !analysisLoading && analysis && analysis.isScored && (
-        <QuestionAnalysisTabs
+        <QuestionAnalysisChart
           questions={analysis.questions}
-          sectionScores={analysis.sectionScores}
           overallAverageScore={analysis.averageScore}
           responseCount={analysis.responseCount}
           title="Phân tích kết quả theo câu hỏi"

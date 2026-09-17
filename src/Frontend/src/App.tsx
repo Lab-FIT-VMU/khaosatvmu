@@ -22,7 +22,6 @@ const scoringNotificationTabs = new Set([
   'survey-statistics',
   'reports',
   'survey-analysis',
-  'survey-section-scores',
 ]);
 import { QRCodeModal } from './components/QRCodeModal';
 
@@ -46,7 +45,6 @@ const ReportsOverviewPage = lazy(() => import('./pages/ReportsOverviewPage').the
 const SurveyStatisticsPage = lazy(() => import('./pages/SurveyStatisticsPage').then(m => ({ default: m.SurveyStatisticsPage })));
 const SurveyAnalysisPage = lazy(() => import('./pages/SurveyAnalysisPage').then(m => ({ default: m.SurveyAnalysisPage })));
 const SurveyDashboardPage = lazy(() => import('./pages/SurveyDashboardPage').then(m => ({ default: m.SurveyDashboardPage })));
-const SurveySectionScoresPage = lazy(() => import('./pages/SurveySectionScoresPage').then(m => ({ default: m.SurveySectionScoresPage })));
 const GraduationAnalyticsPage = lazy(() => import('./pages/GraduationAnalyticsPage').then(m => ({ default: m.GraduationAnalyticsPage })));
 const StudentSurveyView = lazy(() => import('./pages/StudentSurveyView').then(m => ({ default: m.StudentSurveyView })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
@@ -181,18 +179,16 @@ function DashboardApp() {
     : ['progress', 'course-campaigns', 'survey-statistics', 'reports', 'classes', 'users-admin']
         .find((moduleId) => canAccessModule(permissions, moduleId)) ?? 'progress';
 
-  // Thống kê theo mục tạm thời chỉ dành cho quản trị.
-  const sectionScoresAllowed = isUnrestrictedRole(auth.activeProfile?.roleCode);
-
   useEffect(() => {
     const blocked =
       !canAccessModule(permissions, currentTab)
       || (currentTab === 'overview' && !dashboardAllowed)
-      || (currentTab === 'survey-section-scores' && !sectionScoresAllowed);
+      // Trang Thống kê theo mục đã bỏ khỏi menu; địa chỉ cũ còn lưu thì đưa về trang đầu.
+      || currentTab === 'survey-section-scores';
     if (blocked) {
       setCurrentTab(landingTab);
     }
-  }, [currentTab, permissions, setCurrentTab, dashboardAllowed, sectionScoresAllowed, landingTab]);
+  }, [currentTab, permissions, setCurrentTab, dashboardAllowed, landingTab]);
 
   // Nạp danh mục đã lưu trong database khi vào hệ thống.
   useEffect(() => {
@@ -675,10 +671,6 @@ function DashboardApp() {
 
             {currentTab === 'survey-analysis' && (
               <SurveyAnalysisPage />
-            )}
-
-            {currentTab === 'survey-section-scores' && sectionScoresAllowed && (
-              <SurveySectionScoresPage />
             )}
 
             {currentTab === 'graduation-analytics' && (

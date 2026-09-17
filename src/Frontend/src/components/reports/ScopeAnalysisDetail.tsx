@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CircleAlert, LoaderCircle, RefreshCw } from 'lucide-react';
-import { QuestionAnalysisTabs } from '../QuestionAnalysisTabs';
+import { QuestionAnalysisChart } from '../QuestionAnalysisChart';
 import { TablePagination } from '../TablePagination';
 import { useColumnFilters, type FilterableColumn } from '../../hooks/useColumnFilters';
 import { usePaginatedItems } from '../../hooks/usePaginatedItems';
@@ -413,11 +413,9 @@ export const ScopeAnalysisDetail: React.FC<{
         </div>
       </section>
 
-      {/* Cùng bộ tab Toàn bài / Học phần / Giảng viên với trang bài khảo sát của một
-          lớp: bộ đề gộp ba mục vào một bài nên phải xem riêng được từng mục. */}
-      <QuestionAnalysisTabs
+      {/* Chỉ xem toàn bài, đã bỏ hai tab Học phần / Giảng viên theo yêu cầu. */}
+      <QuestionAnalysisChart
         questions={data.questions}
-        sectionScores={data.sectionScores}
         overallAverageScore={data.averageScore}
         responseCount={data.responseCount}
         title="Phân tích điểm chi tiết theo câu hỏi"
