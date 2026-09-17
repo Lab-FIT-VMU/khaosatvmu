@@ -50,7 +50,9 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.VPS_PROJECT_PATH }}
-            git pull origin master
+            git fetch origin master
+            git reset --hard origin/master
+            git clean -fd
             docker compose build --no-parallel api
             docker compose build --no-parallel frontend
             docker compose up -d
