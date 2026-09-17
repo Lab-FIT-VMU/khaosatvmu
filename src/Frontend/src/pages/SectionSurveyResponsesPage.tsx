@@ -228,21 +228,21 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     {
       key: 'isValid',
       header: 'Trạng thái',
-      width: '104px',
-      filterValue: (item) => (item.isValid ? 'Hợp lệ' : 'Bị lọc'),
+      width: '136px',
+      filterValue: (item) => (item.isValid ? 'Hợp lệ' : 'Không hợp lệ'),
       render: (item) =>
         item.isValid ? (
           <span className="response-validity">Hợp lệ</span>
         ) : (
           <span className="response-validity is-rejected">
             <TriangleAlert aria-hidden="true" size={13} />
-            Bị lọc
+            Không hợp lệ
           </span>
         ),
     },
     {
       key: 'rejectionReasons',
-      header: 'Lý do bị lọc',
+      header: 'Mô tả',
       width: '220px',
       // Dịch mã sang tiếng Việt, không phơi TOO_FAST ra màn hình.
       filterValue: (item) => rejectionReasonTexts(item.rejectionReasons).join(' · ') || '—',
@@ -501,8 +501,8 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
             { key: 'responseId', header: 'Mã phiếu', width: 12, align: 'center' as const },
             { key: 'submittedAt', header: 'Thời gian nộp', width: 18, format: (val: any) => formatDateTime(val) },
             { key: 'score', header: 'Điểm', width: 10, type: 'number' as const, align: 'right' as const, format: (val: any) => Number(val).toFixed(2) },
-            { key: 'isValid', header: 'Trạng thái', width: 12, align: 'center' as const, format: (val: any) => (val ? 'Hợp lệ' : 'Bị lọc') },
-            { key: 'rejectionReasons', header: 'Lý do bị lọc', width: 20, format: (_: any, item: any) => rejectionReasonTexts(item.rejectionReasons).join('; ') || '—' },
+            { key: 'isValid', header: 'Trạng thái', width: 12, align: 'center' as const, format: (val: any) => (val ? 'Hợp lệ' : 'Không hợp lệ') },
+            { key: 'rejectionReasons', header: 'Mô tả', width: 20, format: (_: any, item: any) => rejectionReasonTexts(item.rejectionReasons).join('; ') || '—' },
             { key: 'additionalComments', header: 'Ý kiến đóng góp', width: 35, format: (val: any) => val || '—' },
           ],
         }}
