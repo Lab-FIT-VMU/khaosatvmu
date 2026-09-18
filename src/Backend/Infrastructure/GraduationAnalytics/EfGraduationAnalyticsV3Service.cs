@@ -196,6 +196,139 @@ public sealed class EfGraduationAnalyticsV3Service(
         return revisions.Select(ToRevisionDto).ToList();
     }
 
+    public async Task<GraduationExploreResultV3Dto> ExploreAsync(
+        GraduationExploreQuery query,
+        CancellationToken cancellationToken)
+    {
+        var mode = query.Mode?.Trim() ?? string.Empty;
+        if (mode != GraduationExploreModes.Period && mode != GraduationExploreModes.CohortCumulative)
+        {
+            throw new GraduationAnalyticsException(
+                GraduationAnalyticsErrorCodes.InvalidQuery,
+                "Chế độ phân tích phải là period hoặc cohortCumulative.");
+        }
+
+        var cohort = NormalizeFilter(query.Cohort);
+        if (mode == GraduationExploreModes.CohortCumulative && cohort is null)
+        {
+            throw new GraduationAnalyticsException(
+                GraduationAnalyticsErrorCodes.InvalidQuery,
+                "Phải chọn một khóa khi xem số liệu tích lũy.");
+        }
+
+        var cutoff = await db.GraduationPeriods.AsNoTracking()
+            .SingleOrDefaultAsync(
+                x => x.PeriodId == query.CutoffPeriodId && x.ActiveRevisionId.HasValue,
+                cancellationToken);
+        if (cutoff is null)
+        {
+            throw new GraduationAnalyticsException(
+                GraduationAnalyticsV3ErrorCodes.PeriodNotFound,
+                "Không tìm thấy đợt cutoff hoặc đợt chưa có dữ liệu.");
+        }
+
+        var periodQuery = db.GraduationPeriods.AsNoTracking()
+            .Where(x => x.ActiveRevisionId.HasValue);
+        periodQuery = mode == GraduationExploreModes.Period
+            ? periodQuery.Where(x => x.PeriodId == cutoff.PeriodId)
+            : periodQuery.Where(x =>
+                x.AcademicYearStart < cutoff.AcademicYearStart ||
+                (x.AcademicYearStart == cutoff.AcademicYearStart && x.RoundNumber <= cutoff.RoundNumber));
+        var periodRows = await periodQuery
+            .OrderBy(x => x.AcademicYearStart)
+            .ThenBy(x => x.RoundNumber)
+            .Select(x => new
+            {
+                x.PeriodId,
+                x.AcademicYearStart,
+                x.RoundNumber,
+                x.ReviewMonth,
+                x.ReviewYear,
+                RevisionId = x.ActiveRevisionId!.Value,
+            })
+            .ToListAsync(cancellationToken);
+        var revisionIds = periodRows.Select(x => x.RevisionId).ToList();
+
+        var aggregateQuery = db.GraduationAggregateRows.AsNoTracking()
+            .Where(x => revisionIds.Contains(x.RevisionId));
+        var facultyRows = await aggregateQuery
+            .Select(x => new { x.FacultyKey, x.FacultyNameRaw })
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var programRows = await aggregateQuery
+            .Select(x => new { x.ProgramKey, x.ProgramNameRaw, x.FacultyKey })
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var cohorts = await aggregateQuery
+            .Select(x => x.CohortCode)
+            .Distinct()
+            .OrderBy(x => x)
+            .ToListAsync(cancellationToken);
+        var facets = new GraduationExploreFacetsV3Dto(
+            facultyRows
+                .GroupBy(x => x.FacultyKey)
+                .Select(x => new GraduationFacetOptionDto(x.Key, FirstLabel(x.Select(y => y.FacultyNameRaw))))
+                .OrderBy(x => x.Label, StringComparer.CurrentCulture)
+                .ToList(),
+            programRows
+                .GroupBy(x => new { x.ProgramKey, x.FacultyKey })
+                .Select(x => new GraduationFacetOptionDto(
+                    x.Key.ProgramKey,
+                    FirstLabel(x.Select(y => y.ProgramNameRaw)),
+                    x.Key.FacultyKey))
+                .OrderBy(x => x.Label, StringComparer.CurrentCulture)
+                .ToList(),
+            cohorts);
+
+        var facultyKey = NormalizeFilter(query.FacultyKey);
+        var programKey = NormalizeFilter(query.ProgramKey);
+        if (cohort is not null)
+        {
+            aggregateQuery = aggregateQuery.Where(x => x.CohortCode == cohort);
+        }
+        if (facultyKey is not null)
+        {
+            aggregateQuery = aggregateQuery.Where(x => x.FacultyKey == facultyKey);
+        }
+        if (programKey is not null)
+        {
+            aggregateQuery = aggregateQuery.Where(x => x.ProgramKey == programKey);
+        }
+        var filtered = await aggregateQuery
+            .Select(x => new
+            {
+                x.RevisionId,
+                x.FacultyNameRaw,
+                x.FacultyKey,
+                x.ProgramNameRaw,
+                x.ProgramKey,
+                x.CohortCode,
+                x.GraduationRank,
+                x.IsWorkStudy,
+                x.StudentCount,
+            })
+            .ToListAsync(cancellationToken);
+        var periodByRevision = periodRows.ToDictionary(x => x.RevisionId, x => x.PeriodId);
+        var cells = filtered.Select(x => new GraduationExploreCell(
+            periodByRevision[x.RevisionId],
+            x.FacultyNameRaw,
+            x.FacultyKey,
+            x.ProgramNameRaw,
+            x.ProgramKey,
+            x.CohortCode,
+            x.GraduationRank,
+            x.IsWorkStudy,
+            x.StudentCount)).ToList();
+        var periods = periodRows.Select(x => new GraduationExplorePeriod(
+            x.PeriodId,
+            x.AcademicYearStart,
+            x.RoundNumber,
+            x.ReviewMonth,
+            x.ReviewYear)).ToList();
+
+        return GraduationExploreCalculator.Calculate(mode, cohort, periods, cells, facets);
+    }
+
     private static void ValidateMetadata(ImportGraduationRevisionCommand command)
     {
         if (command.AcademicYearStart is < 1900 or > 2200 || command.RoundNumber <= 0)
@@ -311,4 +444,10 @@ public sealed class EfGraduationAnalyticsV3Service(
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeFilter(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+
+    private static string FirstLabel(IEnumerable<string> values) =>
+        values.OrderBy(x => x, StringComparer.Ordinal).First();
 }

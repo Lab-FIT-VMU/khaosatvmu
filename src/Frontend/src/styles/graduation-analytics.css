@@ -292,6 +292,60 @@
 .graduation-import__actions { padding-top: 10px; border-top: 1px solid #dfe4e8; }
 .graduation-import__actions > :first-child { margin-left: auto; }
 
+.graduation-import__metadata {
+  display: grid;
+  grid-template-columns: 150px 170px minmax(260px, 1fr);
+  gap: 10px;
+}
+.graduation-import__metadata label { display: grid; gap: 5px; color: #59636c; font-size: 11px; font-weight: 700; }
+.graduation-import__metadata input { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid #cfd7dc; background: #fff; font: inherit; }
+.graduation-warning { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border: 1px solid #e7cc8d; background: #fff9e8; color: #775715; font-size: 12px; }
+.graduation-warning svg { flex: 0 0 auto; margin-top: 1px; }
+.graduation-warning > div { display: grid; gap: 3px; }
+.graduation-warning span { color: #806d43; }
+.graduation-preview table { min-width: 900px; }
+
+.graduation-v3-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, .8fr) minmax(250px, 1.5fr) minmax(130px, .7fr) minmax(170px, 1fr) minmax(190px, 1fr) auto;
+  align-items: end;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 11px 12px;
+  border: 1px solid #dfe4e8;
+  background: #fff;
+}
+.graduation-v3-controls label, .graduation-year-picker label { display: grid; gap: 5px; color: #59636c; font-size: 11px; font-weight: 700; }
+.graduation-v3-controls select, .graduation-year-picker select { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid #cfd7dc; background: #fff; color: #20262c; font: inherit; }
+.graduation-scope-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 9px 12px; border: 1px solid #c8dce4; background: #f3fafc; font-size: 12px; }
+.graduation-scope-note span { color: #68737d; }
+.graduation-kpis--three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 8px; }
+.graduation-kpis--three > div:last-child { border-right: 0; }
+.graduation-kpis small, .graduation-rank-grid small { color: #68737d; font-size: 11px; }
+.graduation-v3-card { margin-top: 10px; border: 1px solid #dfe4e8; background: #fff; }
+.graduation-v3-card > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; border-bottom: 1px solid #e6eaed; }
+.graduation-v3-card > header span { color: #68737d; font-size: 10px; font-weight: 700; letter-spacing: .05em; }
+.graduation-v3-card h2 { margin: 3px 0 0; font-size: 15px; }
+.graduation-rank-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.graduation-rank-grid > div { display: grid; gap: 4px; padding: 14px; border-right: 1px solid #edf0f2; }
+.graduation-rank-grid > div:last-child { border-right: 0; }
+.graduation-rank-grid span { color: #59636c; font-size: 12px; }
+.graduation-rank-grid strong { font-size: 23px; }
+.graduation-v3-chart { height: 360px; padding: 8px 10px; }
+.graduation-v3-table > div, .graduation-period-manager, .graduation-history { overflow: auto; }
+.graduation-v3-table table, .graduation-period-manager table, .graduation-history table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 12px; }
+.graduation-v3-table th, .graduation-v3-table td, .graduation-period-manager th, .graduation-period-manager td, .graduation-history th, .graduation-history td { padding: 9px 10px; border-right: 1px solid #edf0f2; border-bottom: 1px solid #edf0f2; text-align: right; }
+.graduation-v3-table th:first-child, .graduation-v3-table td:first-child, .graduation-v3-table th:nth-child(2), .graduation-v3-table td:nth-child(2), .graduation-period-manager th:nth-child(-n+3), .graduation-period-manager td:nth-child(-n+3), .graduation-history th:nth-child(-n+4), .graduation-history td:nth-child(-n+4) { text-align: left; }
+.graduation-v3-table th, .graduation-period-manager th, .graduation-history th { background: #f7f9fa; color: #4d5962; }
+.graduation-year-picker { display: flex; padding: 10px 12px; border: 1px solid #dfe4e8; border-top: 0; background: #fff; }
+.graduation-year-picker label { width: 220px; }
+.graduation-period-manager { margin-top: 8px; border: 1px solid #dfe4e8; background: #fff; }
+.graduation-period-manager td:nth-child(3) { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.graduation-period-manager .has-warning { color: #9a6812; font-weight: 700; }
+.graduation-row-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.graduation-history { margin-top: 9px; border: 1px solid #dfe4e8; background: #fff; }
+.graduation-history h3 { margin: 0; padding: 11px 12px; border-bottom: 1px solid #dfe4e8; font-size: 14px; }
+
 .spin { animation: graduation-spin .8s linear infinite; }
 @keyframes graduation-spin { to { transform: rotate(360deg); } }
 
@@ -325,6 +379,11 @@
   .catalog-modal-card--data-preview .catalog-modal-body.modal-body { padding: 14px; overflow-y: auto; }
   .graduation-import { height: auto; }
   .graduation-preview { height: 46dvh; min-height: 240px; flex: none; }
+  .graduation-import__metadata { grid-template-columns: 1fr 1fr; }
+  .graduation-import__reason { grid-column: 1 / -1; }
+  .graduation-v3-controls { grid-template-columns: 1fr 1fr; }
+  .graduation-v3-controls .btn { width: 100%; }
+  .graduation-scope-note { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 560px) {
@@ -336,6 +395,11 @@
   .graduation-overview-chart, .graduation-overview-chart--wide { height: 330px; }
   .catalog-modal-card--import.modal-card { width: 100%; max-height: 100dvh; border: 0; }
   .catalog-modal-card--import .catalog-modal-body.modal-body { padding: 14px; }
+  .graduation-import__metadata, .graduation-v3-controls { grid-template-columns: 1fr; }
+  .graduation-import__reason { grid-column: auto; }
+  .graduation-kpis--three, .graduation-rank-grid { grid-template-columns: 1fr; }
+  .graduation-kpis--three > div, .graduation-rank-grid > div { border-right: 0; border-bottom: 1px solid #edf0f2; }
+  .graduation-row-actions { align-items: stretch; flex-direction: column; }
 }
 
 /* Cấu trúc ba tab theo mô hình một file = một đợt. */

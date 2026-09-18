@@ -13,11 +13,11 @@ Mỗi đợt phải build/test độc lập trước khi chuyển tiếp; schema
 | Đợt | Phạm vi | Trạng thái |
 |---:|---|---|
 | 1 | Parser backend, chuẩn hóa, bỏ dòng không tách được khóa, cảnh báo không chứa PII, regression 11 file | **Hoàn thành** |
-| 2 | Ba bảng v3, migration, preview/commit multipart, revision và import lại | **Đã triển khai mã nguồn; cần smoke test trên PostgreSQL trước khi áp dụng migration** |
-| 3 | Query riêng đợt/tích lũy theo khóa, ba KPI và bốn xếp loại | Chưa bắt đầu |
-| 4 | Giao diện quản lý năm học–đợt–tháng–file, preview và import lại | Chưa bắt đầu |
-| 5 | Chuyển Khám phá chi tiết, chart/table/export sang dữ liệu v3 | Chưa bắt đầu |
-| 6 | UAT 11 file, feature flag, cutover và cleanup schema cũ sau nghiệm thu | Chưa bắt đầu |
+| 2 | Ba bảng v3, migration, preview/commit multipart, revision và import lại | **Hoàn thành** |
+| 3 | Query riêng đợt/tích lũy theo khóa, ba KPI và bốn xếp loại | **Hoàn thành** |
+| 4 | Giao diện quản lý năm học–đợt–tháng–file, preview và import lại | **Hoàn thành** |
+| 5 | Chuyển Khám phá chi tiết, chart/table/export sang dữ liệu v3 | **Hoàn thành** |
+| 6 | UAT 11 file, feature flag, cutover và cleanup schema cũ sau nghiệm thu | **Đã xong parser 11 file, PostgreSQL migration smoke, build và unit test; còn E2E/UAT trên môi trường đích và cutover** |
 
 ## 1. Mục tiêu
 
@@ -441,20 +441,16 @@ Trục X là chuỗi các đợt theo thời gian của khóa đang chọn, khô
 
 ### 9.1. Đợt và import
 
-- `GET /api/v1/graduation-analytics/academic-years`
-- `GET /api/v1/graduation-analytics/periods?academicYearStart=2024`
-- `POST /api/v1/graduation-analytics/imports/preview` – multipart gồm file và metadata đợt.
-- `POST /api/v1/graduation-analytics/periods` – tạo đợt/revision đầu tiên.
-- `PUT /api/v1/graduation-analytics/periods/{periodId}` – import lại, bắt buộc reason và expected revision.
-- `GET /api/v1/graduation-analytics/periods/{periodId}/revisions`
-- `GET /api/v1/graduation-analytics/periods/{periodId}/aggregates`
+- `GET /api/v1/graduation-analytics/managed-periods?academicYearStart=2024`
+- `POST /api/v1/graduation-analytics/imports/preview` – multipart gồm file; metadata đợt được kiểm tra lại ở bước commit.
+- `POST /api/v1/graduation-analytics/imports/commit` – tạo revision đầu tiên hoặc import lại; multipart gồm file, metadata, hash preview, expected revision và reason khi thay thế.
+- `GET /api/v1/graduation-analytics/managed-periods/{periodId}/revisions`
 
 Response preview và kết quả import phải trả `sourceRowCount`, `importedRowCount`, `skippedRowCount` cùng danh sách cảnh báo dòng bị bỏ đã làm sạch. Dòng bị bỏ là warning không chặn commit.
 
 ### 9.2. Phân tích
 
 - `POST /api/v1/graduation-analytics/explore/summary`
-- `POST /api/v1/graduation-analytics/explore/query`
 - Request dùng `mode = period|cohortCumulative`, `periodId` hoặc `cutoffPeriodId`, `cohort`, faculty/program filters. `cohort` là bắt buộc khi dùng `cohortCumulative`.
 - Response trả cả giá trị, mẫu số và cảnh báo chất lượng dữ liệu.
 

@@ -81,6 +81,23 @@ public static class GraduationAnalyticsEndpoints
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
         }).AddEndpointFilter<RequireAntiforgeryFilter>();
 
+        group.MapPost("/explore/summary", async (
+            GraduationExploreV3Request request,
+            [FromServices] IGraduationAnalyticsV3Service service,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await service.ExploreAsync(new GraduationExploreQuery(
+                    request.Mode ?? string.Empty,
+                    request.CutoffPeriodId,
+                    request.Cohort,
+                    request.FacultyKey,
+                    request.ProgramKey), ct));
+            }
+            catch (GraduationAnalyticsException exception) { return ToError(exception); }
+        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+
         group.MapGet("/metadata", (IGraduationAnalyticsService service) =>
             Results.Ok(service.GetMetadata()));
 
@@ -231,6 +248,13 @@ public static class GraduationAnalyticsEndpoints
         string? OriginalFileName,
         string? SourceSheetName,
         IReadOnlyList<GraduationImportRowRequest>? Rows);
+
+    public sealed record GraduationExploreV3Request(
+        string? Mode,
+        long CutoffPeriodId,
+        string? Cohort,
+        string? FacultyKey,
+        string? ProgramKey);
 
     public sealed record GraduationImportRowRequest(
         int SourceRowNumber,
