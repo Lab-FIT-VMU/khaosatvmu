@@ -191,6 +191,8 @@ builder.Services.AddSingleton(_ =>
 builder.Services.AddSingleton<SchoolOverviewCacheVersion>();
 builder.Services.AddScoped<IReportService, EfReportService>();
 builder.Services.AddScoped<IGraduationAnalyticsService, EfGraduationAnalyticsService>();
+builder.Services.AddScoped<IGraduationImportParser, ClosedXmlGraduationImportParser>();
+builder.Services.AddScoped<IGraduationAnalyticsV3Service, EfGraduationAnalyticsV3Service>();
 builder.Services.AddScoped<ApplicationCookieEvents>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
