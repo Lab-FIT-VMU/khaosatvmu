@@ -37,6 +37,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<GraduationAnalyticsDataset> GraduationAnalyticsDatasets =>
         Set<GraduationAnalyticsDataset>();
     public DbSet<GraduationAnalyticsRow> GraduationAnalyticsRows => Set<GraduationAnalyticsRow>();
+    public DbSet<GraduationPeriod> GraduationPeriods => Set<GraduationPeriod>();
+    public DbSet<GraduationImportRevision> GraduationImportRevisions => Set<GraduationImportRevision>();
+    public DbSet<GraduationAggregateRow> GraduationAggregateRows => Set<GraduationAggregateRow>();
     public DbSet<ChangeAuditLog> ChangeAuditLogs => Set<ChangeAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -561,6 +564,81 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasForeignKey(x => x.DatasetId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<GraduationPeriod>(entity =>
+        {
+            entity.ToTable("GraduationPeriods", table =>
+            {
+                table.HasCheckConstraint("CK_GraduationPeriods_AcademicYearStart", "\"AcademicYearStart\" BETWEEN 1900 AND 2200");
+                table.HasCheckConstraint("CK_GraduationPeriods_RoundNumber", "\"RoundNumber\" > 0");
+                table.HasCheckConstraint("CK_GraduationPeriods_ReviewMonth", "\"ReviewMonth\" BETWEEN 1 AND 12");
+                table.HasCheckConstraint("CK_GraduationPeriods_ReviewYear", "\"ReviewYear\" BETWEEN 1900 AND 2200");
+            });
+            entity.HasKey(x => x.PeriodId);
+            entity.HasIndex(x => new { x.AcademicYearStart, x.RoundNumber }).IsUnique();
+            entity.HasIndex(x => new { x.AcademicYearStart, x.ReviewYear, x.ReviewMonth });
+        });
+
+        modelBuilder.Entity<GraduationImportRevision>(entity =>
+        {
+            entity.ToTable("GraduationImportRevisions", table =>
+            {
+                table.HasCheckConstraint("CK_GraduationImportRevisions_RevisionNumber", "\"RevisionNumber\" > 0");
+                table.HasCheckConstraint("CK_GraduationImportRevisions_RowCounts", "\"SourceRowCount\" = \"ImportedRowCount\" + \"SkippedRowCount\" AND \"ImportedRowCount\" > 0 AND \"SkippedRowCount\" >= 0");
+            });
+            entity.HasKey(x => x.RevisionId);
+            entity.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.Property(x => x.SourceSheetName).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.FileHash).HasMaxLength(64).IsFixedLength().IsRequired();
+            entity.Property(x => x.AggregateHash).HasMaxLength(64).IsFixedLength().IsRequired();
+            entity.Property(x => x.SkippedSummaryJson).HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.ImportedByName).HasMaxLength(320).IsRequired();
+            entity.Property(x => x.ReplaceReason).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.PeriodId, x.RevisionNumber }).IsUnique();
+            entity.HasIndex(x => x.FileHash);
+            entity.HasOne<GraduationPeriod>()
+                .WithMany()
+                .HasForeignKey(x => x.PeriodId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<GraduationImportRevision>()
+                .WithMany()
+                .HasForeignKey(x => x.ReplacedRevisionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GraduationAggregateRow>(entity =>
+        {
+            entity.ToTable("GraduationAggregateRows", table =>
+                table.HasCheckConstraint("CK_GraduationAggregateRows_StudentCount", "\"StudentCount\" > 0"));
+            entity.HasKey(x => x.AggregateRowId);
+            entity.Property(x => x.FacultyNameRaw).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.FacultyKey).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.ProgramNameRaw).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.ProgramKey).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.DerivedProgramCode).HasMaxLength(50);
+            entity.Property(x => x.CohortCode).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.GraduationRank).HasConversion<string>().HasMaxLength(20).IsRequired();
+            entity.HasIndex(x => new
+            {
+                x.RevisionId,
+                x.FacultyKey,
+                x.ProgramKey,
+                x.CohortCode,
+                x.GraduationRank,
+                x.IsWorkStudy,
+            }).IsUnique();
+            entity.HasIndex(x => new { x.RevisionId, x.CohortCode });
+            entity.HasOne<GraduationImportRevision>()
+                .WithMany()
+                .HasForeignKey(x => x.RevisionId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<GraduationPeriod>()
+            .HasOne<GraduationImportRevision>()
+            .WithMany()
+            .HasForeignKey(x => x.ActiveRevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<ChangeAuditLog>(entity =>
         {

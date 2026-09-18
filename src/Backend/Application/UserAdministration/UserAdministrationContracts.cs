@@ -97,7 +97,7 @@ public static class ProfileNaming
     public static readonly IReadOnlyDictionary<string, (string Name, string Suffix)> ByRoleCode =
         new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
         {
-            ["ADMIN"] = ("Admin hệ thống", "AD"),
+            ["ADMIN"] = ("Quản trị hệ thống", "AD"),
             ["DEPARTMENT_MANAGER"] = ("Trưởng bộ môn", "BM"),
             ["LECTURER"] = ("Giảng viên", "GV"),
             ["SURVEY_ADMIN"] = ("Quản trị khảo sát", "QT"),

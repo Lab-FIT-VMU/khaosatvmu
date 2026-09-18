@@ -35,6 +35,7 @@ interface GraduationEChartProps {
   series: Array<{
     key: string;
     label: string;
+    chartType?: 'bar' | 'line';
     stack?: string;
     stackLabel?: string;
     stackLabelKey?: string;
@@ -81,6 +82,7 @@ export function GraduationEChart({
   yAxisName,
 }: GraduationEChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null);
   const option = useMemo<EChartsOption>(() => {
     const palette = customColors?.length ? customColors : colors;
     const categories = data.map((row) => String(row.name ?? ''));
@@ -88,20 +90,26 @@ export function GraduationEChart({
     const isStacked = type === 'stacked-bar' || type === 'stacked-column';
     const isPie = type === 'pie' || type === 'donut';
     const isLineChart = type === 'line' || type === 'area';
+    const isCombo = type === 'combo';
     const hasStackLabels = series.some((item) => Boolean(item.stackLabel || item.stackLabelKey));
-    const visibleCategoryCount = isHorizontal ? 14 : 12;
+    const visibleCategoryCount = isHorizontal ? 9 : 8;
+    // Hai loại zoom giải quyết hai vấn đề khác nhau: nhiều nhóm thì cuộn theo trục
+    // danh mục; nhiều chuỗi hoặc ít nhóm thì zoom trục giá trị để tách các đường/cột
+    // đang nằm sát nhau. Với biểu đồ dọc, zoom giá trị chính là thanh dọc bên phải.
     const needsCategoryZoom = categories.length > visibleCategoryCount;
+    const needsValueZoom = unit === 'percent'
+      || series.length > 1
+      || (categories.length > 1 && !needsCategoryZoom);
     const categoryZoomEnd = Math.min(100, (visibleCategoryCount / categories.length) * 100);
-    const needsPercentZoom = unit === 'percent';
     const maximumPercentValue = Math.max(
       referenceLine?.value ?? 0,
       ...data.map((row) => isStacked
         ? series.reduce((sum, item) => sum + (typeof row[item.key] === 'number' ? Number(row[item.key]) : 0), 0)
         : Math.max(0, ...series.map((item) => typeof row[item.key] === 'number' ? Number(row[item.key]) : 0))),
     );
-    const percentZoomEnd = isStacked
-      ? 100
-      : Math.min(100, Math.max(10, Math.ceil(maximumPercentValue * 1.2 / 5) * 5));
+    const valueZoomEnd = unit === 'percent' && !isStacked
+      ? Math.min(100, Math.max(10, Math.ceil(maximumPercentValue * 1.2 / 5) * 5))
+      : 100;
     const valueAxis = {
       type: 'value' as const,
       min: 0,
@@ -136,6 +144,22 @@ export function GraduationEChart({
       },
     };
 
+    const formatItemTooltip = (params?: CallbackDataParams) => {
+      if (!params) return '';
+      const item = typeof params.seriesIndex === 'number' ? series[params.seriesIndex] : undefined;
+      const row = data[params.dataIndex];
+      const count = item?.tooltipCountKey ? row?.[item.tooltipCountKey] : null;
+      const total = item?.tooltipTotalKey ? row?.[item.tooltipTotalKey] : null;
+      const details = [
+        `<strong>${escapeHtml(params.name)}</strong>`,
+        `${typeof params.marker === 'string' ? params.marker : ''}${escapeHtml(item?.label ?? params.seriesName ?? '')}: <strong>${escapeHtml(formatValue(params.value, unit))}</strong>`,
+      ];
+      if (unit === 'percent' && typeof count === 'number' && typeof total === 'number') {
+        details.push(`Số lượng: ${escapeHtml(formatValue(count))}/${escapeHtml(formatValue(total))} sinh viên`);
+      }
+      return details.join('<br/>');
+    };
+
     if (isPie) {
       const selected = series[0];
       return {
@@ -163,56 +187,72 @@ export function GraduationEChart({
       };
     }
 
-    const chartSeries = series.map((item, index) => ({
-      name: item.label,
-      type: isLineChart ? 'line' as const : 'bar' as const,
-      data: data.map((row) => typeof row[item.key] === 'number' ? row[item.key] : null),
-      stack: item.stack ?? (isStacked ? 'total' : undefined),
-      smooth: isLineChart ? 0.55 : false,
-      smoothMonotone: isLineChart ? 'x' as const : undefined,
-      symbol: isLineChart ? 'circle' as const : undefined,
-      symbolSize: isLineChart ? 8 : 7,
-      showSymbol: data.length <= 30,
-      areaStyle: type === 'area' ? { opacity: 0.14 } : undefined,
-      itemStyle: {
-        color: palette[index % palette.length],
-        borderColor: isLineChart ? '#fff' : undefined,
-        borderWidth: isLineChart ? 1.5 : undefined,
-      },
-      lineStyle: isLineChart ? { width: 2.5, cap: 'round' as const, join: 'round' as const } : undefined,
-      barMaxWidth: 52,
-      label: {
-        show: Boolean(item.stackLabel || item.stackLabelKey) || showLabels,
-        position: isHorizontal ? 'right' as const : 'top' as const,
-        formatter: item.stackLabelKey
-          ? (params: CallbackDataParams) => String(data[params.dataIndex]?.[item.stackLabelKey!] ?? '')
-          : item.stackLabel
-            ? item.stackLabel
-            : (params: { value?: unknown }) => formatValue(params.value, unit),
-        color: '#4d5962',
-        fontSize: 11,
-        fontWeight: item.stackLabel || item.stackLabelKey ? 650 : 400,
-        lineHeight: item.stackLabelKey ? 15 : undefined,
-      },
-      labelLayout: item.stackLabel || item.stackLabelKey ? { hideOverlap: true } : undefined,
-      emphasis: { focus: tooltipTrigger === 'item' ? 'self' as const : 'series' as const },
-      markLine: index === 0 && referenceLine ? {
-        silent: true,
-        symbol: 'none',
-        lineStyle: { color: '#df3d35', type: 'dashed' as const, width: 1.5 },
-        label: {
-          show: true,
-          formatter: referenceLine.label,
-          position: 'insideEndTop' as const,
-          color: '#fff',
-          backgroundColor: '#df3d35',
-          padding: [3, 5],
-          fontSize: 11,
-          fontWeight: 700,
+    const chartSeries = series.map((item, index) => {
+      const seriesChartType = item.chartType ?? (isLineChart ? 'line' : 'bar');
+      const seriesIsLine = seriesChartType === 'line';
+      return {
+        name: item.label,
+        type: seriesChartType,
+        data: data.map((row) => typeof row[item.key] === 'number' ? row[item.key] : null),
+        stack: item.stack ?? (isStacked ? 'total' : undefined),
+        smooth: seriesIsLine ? 0.35 : false,
+        smoothMonotone: seriesIsLine ? 'x' as const : undefined,
+        symbol: seriesIsLine ? 'circle' as const : undefined,
+        symbolSize: seriesIsLine ? 9 : 7,
+        showSymbol: data.length <= 30,
+        areaStyle: type === 'area' && seriesIsLine ? { opacity: 0.14 } : undefined,
+        itemStyle: {
+          color: palette[index % palette.length],
+          borderColor: seriesIsLine ? '#fff' : undefined,
+          borderWidth: seriesIsLine ? 1.5 : undefined,
         },
-        data: [{ yAxis: referenceLine.value }],
-      } : undefined,
-    }));
+        lineStyle: seriesIsLine ? { width: 3, cap: 'round' as const, join: 'round' as const } : undefined,
+        barMaxWidth: 52,
+        label: {
+          show: Boolean(item.stackLabel || item.stackLabelKey) || showLabels,
+          position: isHorizontal
+            ? 'right' as const
+            : isCombo && !seriesIsLine
+              ? 'insideTop' as const
+              : 'top' as const,
+          formatter: item.stackLabelKey
+            ? (params: CallbackDataParams) => String(data[params.dataIndex]?.[item.stackLabelKey!] ?? '')
+            : item.stackLabel
+              ? item.stackLabel
+              : (params: { value?: unknown }) => formatValue(params.value, unit),
+          color: isCombo && !seriesIsLine
+            ? '#fff'
+            : seriesIsLine && series.length > 1
+              ? palette[index % palette.length]
+              : '#4d5962',
+          fontSize: 11,
+          fontWeight: item.stackLabel || item.stackLabelKey || (isCombo && seriesIsLine) ? 650 : 400,
+          lineHeight: item.stackLabelKey ? 15 : undefined,
+        },
+        labelLayout: item.stackLabel || item.stackLabelKey ? { hideOverlap: true } : undefined,
+        emphasis: { focus: tooltipTrigger === 'item' ? 'self' as const : 'series' as const },
+        tooltip: tooltipTrigger === 'axis' ? {
+          trigger: 'item' as const,
+          formatter: (params: CallbackDataParams) => formatItemTooltip(params),
+        } : undefined,
+        markLine: index === 0 && referenceLine ? {
+          silent: true,
+          symbol: 'none',
+          lineStyle: { color: '#df3d35', type: 'dashed' as const, width: 1.5 },
+          label: {
+            show: true,
+            formatter: referenceLine.label,
+            position: 'insideEndTop' as const,
+            color: '#fff',
+            backgroundColor: '#df3d35',
+            padding: [3, 5],
+            fontSize: 11,
+            fontWeight: 700,
+          },
+          data: [{ yAxis: referenceLine.value }],
+        } : undefined,
+      };
+    });
     const categoryDataZoom = !needsCategoryZoom ? [] : isHorizontal ? [
       { type: 'inside' as const, yAxisIndex: 0, start: 0, end: categoryZoomEnd },
       {
@@ -223,27 +263,27 @@ export function GraduationEChart({
       { type: 'inside' as const, xAxisIndex: 0, start: 0, end: categoryZoomEnd },
       {
         type: 'slider' as const, xAxisIndex: 0, start: 0, end: categoryZoomEnd,
-        left: 52, right: needsPercentZoom ? 48 : 24, bottom: 4, height: 18,
+        left: 52, right: needsValueZoom ? 48 : 24, bottom: 4, height: 18,
         showDetail: false, brushSelect: false,
       },
     ];
-    const percentDataZoom = !needsPercentZoom ? [] : isHorizontal ? [
+    const valueDataZoom = !needsValueZoom ? [] : isHorizontal ? [
       {
-        type: 'inside' as const, xAxisIndex: 0, start: 0, end: percentZoomEnd,
+        type: 'inside' as const, xAxisIndex: 0, start: 0, end: valueZoomEnd,
         filterMode: 'none' as const,
       },
       {
-        type: 'slider' as const, xAxisIndex: 0, start: 0, end: percentZoomEnd,
+        type: 'slider' as const, xAxisIndex: 0, start: 0, end: valueZoomEnd,
         filterMode: 'none' as const, left: 184, right: 24, bottom: 4, height: 18,
         showDetail: true, brushSelect: false,
       },
     ] : [
       {
-        type: 'inside' as const, yAxisIndex: 0, start: 0, end: percentZoomEnd,
+        type: 'inside' as const, yAxisIndex: 0, start: 0, end: valueZoomEnd,
         filterMode: 'none' as const,
       },
       {
-        type: 'slider' as const, yAxisIndex: 0, start: 0, end: percentZoomEnd,
+        type: 'slider' as const, yAxisIndex: 0, start: 0, end: valueZoomEnd,
         filterMode: 'none' as const, right: 4, top: 48, bottom: 48, width: 14,
         showDetail: true, brushSelect: false,
       },
@@ -258,32 +298,20 @@ export function GraduationEChart({
           trigger: 'item',
           formatter: (rawParams: CallbackDataParams | CallbackDataParams[]) => {
             const params = Array.isArray(rawParams) ? rawParams[0] : rawParams;
-            if (!params) return '';
-            const item = typeof params.seriesIndex === 'number' ? series[params.seriesIndex] : undefined;
-            const row = data[params.dataIndex];
-            const count = item?.tooltipCountKey ? row?.[item.tooltipCountKey] : null;
-            const total = item?.tooltipTotalKey ? row?.[item.tooltipTotalKey] : null;
-            const details = [
-              `<strong>${escapeHtml(params.name)}</strong>`,
-              `${typeof params.marker === 'string' ? params.marker : ''}${escapeHtml(item?.label ?? params.seriesName ?? '')}: <strong>${escapeHtml(formatValue(params.value, unit))}</strong>`,
-            ];
-            if (unit === 'percent' && typeof count === 'number' && typeof total === 'number') {
-              details.push(`Số lượng: ${escapeHtml(formatValue(count))}/${escapeHtml(formatValue(total))} sinh viên`);
-            }
-            return details.join('<br/>');
+            return formatItemTooltip(params);
           },
         }
         : {
           trigger: 'axis',
-          axisPointer: { type: isLineChart ? 'line' : 'shadow' },
+          axisPointer: { type: isLineChart || isCombo ? 'line' : 'shadow' },
           valueFormatter: (value) => formatValue(value, unit),
         },
       legend: { show: showLegend && series.length > 1, type: 'scroll', top: 0 },
-      dataZoom: [...categoryDataZoom, ...percentDataZoom],
+      dataZoom: [...categoryDataZoom, ...valueDataZoom],
       grid: {
         top: showLegend && series.length > 1 ? 46 : hasStackLabels ? 48 : 20,
         left: isHorizontal ? 184 : yAxisName ? 68 : 52,
-        right: !isHorizontal && needsPercentZoom
+        right: !isHorizontal && needsValueZoom
           ? showLabels ? 86 : 48
           : isHorizontal && needsCategoryZoom ? 34 : showLabels ? 70 : 24,
         bottom: !isHorizontal && needsCategoryZoom
@@ -303,14 +331,46 @@ export function GraduationEChart({
     const host = hostRef.current;
     if (!host) return;
     const chart = echarts.init(host, undefined, { renderer: 'canvas' });
-    chart.setOption(option, { notMerge: true });
+    chartRef.current = chart;
     const observer = new ResizeObserver(() => chart.resize());
     observer.observe(host);
     return () => {
       observer.disconnect();
       chart.dispose();
+      chartRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    chartRef.current?.setOption(option, { notMerge: true, lazyUpdate: true });
   }, [option]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || tooltipTrigger !== 'axis') return;
+
+    const showOnlyHoveredItem = (params: CallbackDataParams) => {
+      if (params.componentType !== 'series') return;
+      chart.setOption({ tooltip: { trigger: 'item' } }, { lazyUpdate: true });
+      chart.dispatchAction({
+        type: 'showTip',
+        seriesIndex: params.seriesIndex,
+        dataIndex: params.dataIndex,
+      });
+    };
+    const restoreGroupTooltip = () => {
+      chart.setOption({ tooltip: { trigger: 'axis' } }, { lazyUpdate: true });
+    };
+
+    chart.on('mouseover', showOnlyHoveredItem);
+    chart.on('mouseout', restoreGroupTooltip);
+    chart.on('globalout', restoreGroupTooltip);
+    return () => {
+      chart.off('mouseover', showOnlyHoveredItem);
+      chart.off('mouseout', restoreGroupTooltip);
+      chart.off('globalout', restoreGroupTooltip);
+    };
+  }, [tooltipTrigger]);
 
   return <div ref={hostRef} className="graduation-echart" />;
 }

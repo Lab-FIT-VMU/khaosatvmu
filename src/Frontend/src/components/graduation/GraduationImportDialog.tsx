@@ -1,213 +1,195 @@
-import { useId, useRef, useState } from 'react';
-import { FileSpreadsheet, LoaderCircle, Upload } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { AlertTriangle, FileSpreadsheet, LoaderCircle, Upload } from 'lucide-react';
 import { Modal } from '../Modal';
-import type { GraduationPeriod } from '../../types/graduationAnalytics';
-import {
-  GraduationImportFileError,
-  parseGraduationImportFile,
-  type GraduationParsedFile,
-} from '../../utils/graduationImportExcel';
+import { ApiError } from '../../services/apiClient';
+import { graduationAnalyticsApi } from '../../services/graduationAnalyticsApi';
+import type {
+  GraduationImportCommitResultV3,
+  GraduationImportPreviewV3,
+  GraduationManagedPeriod,
+  GraduationRankV3,
+} from '../../types/graduationAnalytics';
+
+export interface GraduationImportTarget {
+  academicYearStart: number;
+  roundNumber: number;
+  period?: GraduationManagedPeriod | null;
+}
 
 interface GraduationImportDialogProps {
   isOpen: boolean;
+  target: GraduationImportTarget | null;
   onClose: () => void;
-  onImport: (payload: {
-    originalFileName: string;
-    sourceSheetName: string;
-    rows: GraduationParsedFile['rows'];
-  }) => Promise<GraduationPeriod>;
+  onCommitted: (result: GraduationImportCommitResultV3) => void | Promise<void>;
 }
 
-const errorMessages: Record<string, string> = {
-  FILE_TYPE: 'Chỉ chấp nhận file Excel định dạng .xlsx.',
-  FILE_SIZE: 'File Excel không được lớn hơn 5 MB.',
-  READ_FAILED: 'Không thể đọc file. Hãy kiểm tra file không bị hỏng hoặc đặt mật khẩu.',
-  SHEET_STRUCTURE_INVALID: 'Không tìm thấy đúng bộ 16 cột C–R được đánh số 1–6, 10–19.',
-  LEGACY_STRUCTURE_UNSUPPORTED: 'File còn cấu trúc 19 cột cũ (cột 7–9). Hãy dùng biểu mẫu mới 16 cột.',
-  NO_DATA_ROWS: 'File chưa có dòng dữ liệu nào.',
-  TOO_MANY_ROWS: 'Mỗi lần chỉ được import tối đa 5.000 dòng.',
-  VALUE_TYPE_INVALID: 'Có ô số lượng hoặc tỷ lệ không phải dạng số.',
-  REVIEW_PERIOD_INVALID: 'Thời điểm xét tốt nghiệp phải có dạng như T7 - 2026.',
-  MULTIPLE_REVIEW_PERIODS: 'Mỗi file chỉ được chứa một đợt tốt nghiệp.',
+const rankLabel = (rank: GraduationRankV3) => ({
+  1: 'Xuất sắc',
+  2: 'Giỏi',
+  3: 'Khá',
+  4: 'Trung bình',
+}[rank]);
+
+const errorMessage = (error: unknown) => {
+  if (!(error instanceof ApiError)) return 'Không thể xử lý file. Vui lòng thử lại.';
+  const messages: Record<string, string> = {
+    GRADUATION_IMPORT_INVALID: 'File hoặc metadata import không hợp lệ.',
+    GRADUATION_IMPORT_TOO_LARGE: 'File có quá nhiều dòng dữ liệu.',
+    GRADUATION_V3_CONCURRENT_REPLACE: 'Đợt đã được người khác cập nhật. Hãy đóng cửa sổ và tải lại.',
+    GRADUATION_V3_DUPLICATE_SOURCE_FILE: 'File này đã được dùng cho một đợt khác.',
+    GRADUATION_V3_REPLACE_REASON_REQUIRED: 'Phải nhập lý do khi import lại.',
+  };
+  return messages[error.errorCode] ?? 'Không thể xử lý file. Vui lòng kiểm tra lại dữ liệu.';
 };
 
-const display = (value: string | number | null, percent = false) => {
-  if (value === null || value === '') return '—';
-  return percent ? `${Number(value).toLocaleString('vi-VN', { maximumFractionDigits: 4 })}%` : value;
+const defaultReview = (academicYearStart: number) => {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const currentStart = month >= 8 ? year : year - 1;
+  return currentStart === academicYearStart
+    ? { month, year }
+    : { month: 4, year: academicYearStart + 1 };
 };
 
-export function GraduationImportDialog({ isOpen, onClose, onImport }: GraduationImportDialogProps) {
+const monthLabel = (month: number) => `Tháng ${String(month).padStart(2, '0')}`;
+const reviewMonthsFor = (year: number, academicYearStart: number) => year === academicYearStart
+  ? [8, 9, 10, 11, 12]
+  : [1, 2, 3, 4, 5, 6, 7];
+
+export function GraduationImportDialog({
+  isOpen,
+  target,
+  onClose,
+  onCommitted,
+}: GraduationImportDialogProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [fileName, setFileName] = useState('');
-  const [parsed, setParsed] = useState<GraduationParsedFile | null>(null);
-  const [previewMode, setPreviewMode] = useState<'all' | 'metrics'>('all');
-  const [parsing, setParsing] = useState(false);
-  const [importing, setImporting] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<GraduationImportPreviewV3 | null>(null);
+  const [reviewMonth, setReviewMonth] = useState(4);
+  const [reviewYear, setReviewYear] = useState(new Date().getFullYear());
+  const [replaceReason, setReplaceReason] = useState('');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reset = () => {
-    if (inputRef.current) inputRef.current.value = '';
-    setFileName('');
-    setParsed(null);
-    setPreviewMode('all');
+  useEffect(() => {
+    if (!isOpen || !target) return;
+    const fallback = defaultReview(target.academicYearStart);
+    setReviewMonth(target.period?.reviewMonth ?? fallback.month);
+    setReviewYear(target.period?.reviewYear ?? fallback.year);
+    setFile(null);
+    setPreview(null);
+    setReplaceReason('');
     setError(null);
+    if (inputRef.current) inputRef.current.value = '';
+  }, [isOpen, target]);
+
+  const close = () => {
+    if (!busy) onClose();
   };
 
-  const handleClose = () => {
-    if (parsing || importing) return;
-    reset();
-    onClose();
-  };
-
-  const handleFile = async (file?: File) => {
-    reset();
-    if (!file) return;
-    setFileName(file.name);
-    setParsing(true);
+  const chooseFile = async (next?: File) => {
+    setFile(next ?? null);
+    setPreview(null);
+    setError(null);
+    if (!next) return;
+    setBusy(true);
     try {
-      setParsed(await parseGraduationImportFile(file));
+      setPreview(await graduationAnalyticsApi.previewImport(next));
     } catch (caught) {
-      const code = caught instanceof GraduationImportFileError ? caught.code : 'READ_FAILED';
-      const row = caught instanceof GraduationImportFileError && caught.rowNumber
-        ? ` Dòng ${caught.rowNumber}.`
-        : '';
-      const periods = caught instanceof GraduationImportFileError && caught.periods?.length
-        ? ` Các đợt tìm thấy: ${caught.periods.join(', ')}.`
-        : '';
-      setError(`${errorMessages[code] ?? errorMessages.READ_FAILED}${row}${periods}`);
+      setError(errorMessage(caught));
     } finally {
-      setParsing(false);
+      setBusy(false);
     }
   };
 
-  const handleImport = async () => {
-    if (!parsed || !fileName) return;
-    setImporting(true);
+  const commit = async () => {
+    if (!target || !file || !preview) return;
+    const expectedStart = reviewMonth >= 8 ? reviewYear : reviewYear - 1;
+    if (expectedStart !== target.academicYearStart) {
+      setError(`Tháng ${reviewMonth}/${reviewYear} không thuộc năm học ${target.academicYearStart}–${target.academicYearStart + 1}.`);
+      return;
+    }
+    if (target.period && !replaceReason.trim()) {
+      setError('Phải nhập lý do khi import lại một đợt đã có dữ liệu.');
+      return;
+    }
+
+    setBusy(true);
     setError(null);
     try {
-      await onImport({
-        originalFileName: fileName,
-        sourceSheetName: parsed.sheetName,
-        rows: parsed.rows,
+      const result = await graduationAnalyticsApi.commitImport({
+        file,
+        academicYearStart: target.academicYearStart,
+        roundNumber: target.roundNumber,
+        reviewMonth,
+        reviewYear,
+        previewFileHash: preview.fileHash,
+        expectedActiveRevisionId: target.period?.activeRevisionId,
+        replaceReason,
       });
-      reset();
+      await onCommitted(result);
       onClose();
     } catch (caught) {
-      const message = caught instanceof Error ? caught.message : '';
-      setError(message === 'GRADUATION_PERIOD_EXISTS'
-        ? `Đợt ${parsed.reviewPeriod.label} đã tồn tại. Hãy dùng thao tác thay thế đợt khi cần sửa dữ liệu.`
-        : 'Không thể lưu đợt tốt nghiệp. Dữ liệu preview vẫn được giữ để bạn thử lại.');
+      setError(errorMessage(caught));
     } finally {
-      setImporting(false);
+      setBusy(false);
     }
   };
 
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title="Import đợt tốt nghiệp"
-      size={parsed ? 'data-preview' : 'import'}
-    >
-      <div className="graduation-import" aria-busy={parsing || importing}>
-        <div className={`graduation-import__picker${fileName ? ' has-file' : ''}`}>
-          <div className="graduation-import__file-icon" aria-hidden="true">
-            <FileSpreadsheet size={24} />
-          </div>
-          <div className="graduation-import__file-copy">
-            <strong>{fileName || 'Chọn file dữ liệu tốt nghiệp'}</strong>
-            <span>Excel .xlsx · tối đa 5 MB · 16 cột C–R · một file là một đợt</span>
-          </div>
-          <label htmlFor={inputId} className="btn btn-secondary">
-            {fileName ? 'Chọn file khác' : 'Chọn file Excel'}
-          </label>
-          <input
-            ref={inputRef}
-            id={inputId}
-            type="file"
-            accept=".xlsx"
-            onChange={(event) => void handleFile(event.target.files?.[0])}
-            disabled={parsing || importing}
-          />
-        </div>
+  if (!target) return null;
+  const isReplace = Boolean(target.period);
+  const reviewYears = [target.academicYearStart, target.academicYearStart + 1];
+  const reviewMonths = reviewMonthsFor(reviewYear, target.academicYearStart);
 
-        {parsing && <div className="graduation-state"><LoaderCircle className="spin" /> Đang đọc file...</div>}
-        {error && <div className="graduation-alert" role="alert">{error}</div>}
+  const changeReviewYear = (year: number) => {
+    setReviewYear(year);
+    const nextMonths = reviewMonthsFor(year, target.academicYearStart);
+    if (!nextMonths.includes(reviewMonth)) setReviewMonth(nextMonths[0]);
+  };
 
-        {parsed && (
-          <>
-            <div className="graduation-import__summary">
-              <div><strong>{parsed.reviewPeriod.label}</strong><span>đợt phát hiện</span></div>
-              <div><strong>{parsed.rows.length}</strong><span>dòng sẵn sàng import</span></div>
-              <div><strong>16</strong><span>cột dữ liệu nguồn</span></div>
-              <div><strong>{parsed.sheetName}</strong><span>sheet được đọc</span></div>
-            </div>
-
-            {parsed.warnings.map((warning) => (
-              <div className="graduation-alert" role="status" key={warning.code}>
-                Có {warning.groups.length} nhóm trùng Khoa + CTĐT + Khóa. Các dòng nguồn vẫn được giữ
-                riêng và sẽ được cộng khi phân tích: {warning.groups.map((group) =>
-                  `${group.label} (dòng ${group.sourceRowNumbers.join(', ')})`).join('; ')}.
-              </div>
-            ))}
-
-            <div className="graduation-preview-toolbar" aria-label="Tùy chọn cột xem trước">
-              <span>Xem trước dữ liệu</span>
-              <div role="group" aria-label="Nhóm cột hiển thị">
-                <button type="button" className={previewMode === 'all' ? 'is-selected' : ''} onClick={() => setPreviewMode('all')}>Tất cả cột</button>
-                <button type="button" className={previewMode === 'metrics' ? 'is-selected' : ''} onClick={() => setPreviewMode('metrics')}>Chỉ tiêu</button>
-              </div>
-            </div>
-            <div className="graduation-preview" aria-label="Xem trước dữ liệu import">
-              <table className={previewMode === 'metrics' ? 'is-metrics-only' : ''}>
-                <thead>
-                  <tr>
-                    <th rowSpan={2}>Dòng</th>
-                    {previewMode === 'all' && <th colSpan={6}>Thông tin chính</th>}
-                    <th colSpan={10}>Thông số trong đợt xét tốt nghiệp</th>
-                  </tr>
-                  <tr>
-                    {previewMode === 'all' && <><th>Khoa</th><th>Mã CTĐT</th><th>Tên CTĐT</th><th>Khóa</th><th>Nhập học</th><th>Thời điểm</th></>}
-                    <th>XS</th><th>% XS</th>
-                    <th>Giỏi</th><th>% Giỏi</th><th>Khá</th><th>% Khá</th><th>T.Bình</th><th>% T.Bình</th>
-                    <th>VHVL</th><th>% VHVL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {parsed.rows.slice(0, 100).map((row) => (
-                    <tr key={row.sourceRowNumber}>
-                      <td>{row.sourceRowNumber}</td>
-                      {previewMode === 'all' && <><td>{row.facultyName}</td><td>{display(row.programCode)}</td>
-                        <td>{row.programName}</td><td>{row.cohort}</td><td>{display(row.initialEnrollmentCount)}</td>
-                        <td>{row.reviewPeriodText}</td></>}
-                      <td>{display(row.excellentCount)}</td><td>{display(row.excellentRate, true)}</td>
-                      <td>{display(row.veryGoodCount)}</td><td>{display(row.veryGoodRate, true)}</td>
-                      <td>{display(row.goodCount)}</td><td>{display(row.goodRate, true)}</td>
-                      <td>{display(row.averageCount)}</td><td>{display(row.averageRate, true)}</td>
-                      <td>{display(row.workStudyTransferCount)}</td><td>{display(row.workStudyTransferRate, true)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {parsed.rows.length > 100 && <p className="graduation-note">Đang xem 100/{parsed.rows.length} dòng đầu tiên.</p>}
-          </>
-        )}
-
-        <div className="graduation-import__actions">
-          <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={parsing || importing}>Hủy</button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void handleImport()}
-            disabled={!parsed || importing}
-          >
-            {importing ? <LoaderCircle className="spin" aria-hidden="true" /> : <Upload aria-hidden="true" size={17} />}
-            {importing ? 'Đang lưu...' : `Import đợt ${parsed?.reviewPeriod.label ?? ''}`}
-          </button>
-        </div>
+  return <Modal
+    isOpen={isOpen}
+    onClose={close}
+    title={`${isReplace ? 'Tải lên lại' : 'Tải lên'} đợt ${target.roundNumber} · ${target.academicYearStart}–${target.academicYearStart + 1}`}
+    size={preview ? 'data-preview' : 'import'}
+  >
+    <div className="graduation-import" aria-busy={busy}>
+      <div className="graduation-import__metadata">
+        <label>Năm xét<select value={reviewYear} onChange={(event) => changeReviewYear(Number(event.target.value))} disabled={busy}>{reviewYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
+        <label>Tháng xét<select value={reviewMonth} onChange={(event) => setReviewMonth(Number(event.target.value))} disabled={busy}>{reviewMonths.map((month) => <option key={month} value={month}>{monthLabel(month)}</option>)}</select></label>
+        {isReplace && <label className="graduation-import__reason">Lý do import lại<input value={replaceReason} maxLength={1000} onChange={(event) => setReplaceReason(event.target.value)} placeholder="Ví dụ: sửa danh sách bị thiếu sinh viên" disabled={busy} /></label>}
+        <button type="button" className="btn btn-primary graduation-import__submit" onClick={() => void commit()} disabled={!preview || busy}>
+          {busy ? <LoaderCircle className="spin" size={17} /> : <Upload size={17} />}
+          {busy ? 'Đang lưu...' : isReplace ? 'Tải lên lại đợt' : 'Tải lên đợt'}
+        </button>
       </div>
-    </Modal>
-  );
+
+      <div className={`graduation-import__picker${file ? ' has-file' : ''}`}>
+        <div className="graduation-import__file-icon"><FileSpreadsheet size={24} /></div>
+        <div className="graduation-import__file-copy"><strong>{file?.name ?? 'Chọn danh sách sinh viên tốt nghiệp'}</strong><span>Excel .xlsx · tối đa 10 MB · hệ thống chỉ lưu số lượng tổng hợp</span></div>
+        <label htmlFor={inputId} className="btn btn-secondary">{file ? 'Chọn file khác' : 'Chọn file Excel'}</label>
+        <input ref={inputRef} id={inputId} type="file" accept=".xlsx" disabled={busy} onChange={(event) => void chooseFile(event.target.files?.[0])} />
+      </div>
+
+      {busy && !preview && <div className="graduation-state"><LoaderCircle className="spin" /> Đang bóc tách dữ liệu...</div>}
+      {error && <div className="graduation-alert" role="alert">{error}</div>}
+
+      {preview && <>
+        <div className="graduation-import__summary">
+          <div><strong>{preview.sourceRowCount.toLocaleString('vi-VN')}</strong><span>dòng nguồn</span></div>
+          <div><strong>{preview.importedRowCount.toLocaleString('vi-VN')}</strong><span>dòng được tính</span></div>
+          <div><strong>{preview.skippedRowCount.toLocaleString('vi-VN')}</strong><span>dòng bị bỏ</span></div>
+          <div><strong>{preview.sourceSheetName}</strong><span>sheet được đọc</span></div>
+        </div>
+        {preview.warnings.map((warning) => <div className="graduation-warning" role="status" key={`${warning.code}-${warning.classCode}`}>
+          <AlertTriangle size={17} /><div><strong>{warning.message}</strong><span>Sheet {warning.sourceSheetName}, dòng {warning.sourceRowNumbers.join(', ')}. Dòng này không tham gia bất kỳ KPI nào.</span></div>
+        </div>)}
+        <div className="graduation-preview"><table><thead><tr><th>Khoa</th><th>Chuyên ngành</th><th>Khóa</th><th>Xếp loại</th><th>Trạng thái</th><th>Số lượng</th></tr></thead><tbody>{preview.aggregates.slice(0, 150).map((row, index) => <tr key={`${row.facultyKey}-${row.programKey}-${row.cohortCode}-${row.graduationRank}-${row.isWorkStudy}-${index}`}><td>{row.facultyNameRaw}</td><td>{row.programNameRaw}</td><td>{row.cohortCode}</td><td>{rankLabel(row.graduationRank)}</td><td>{row.isWorkStudy ? 'Hệ VLVH' : 'Đúng hạn'}</td><td>{row.studentCount}</td></tr>)}</tbody></table></div>
+        {preview.aggregates.length > 150 && <p className="graduation-note">Hiển thị 150/{preview.aggregates.length} tổ hợp tổng hợp.</p>}
+      </>}
+
+    </div>
+  </Modal>;
 }
