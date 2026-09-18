@@ -16,9 +16,9 @@
   border-left: 3px solid var(--vmu-blue, #0788b8);
   border-radius: 3px;
   background: #ffffff;
-  color: var(--text-dark, #20262c);
+  color: #000000;
   box-shadow: 0 8px 20px rgba(32, 38, 44, 0.14);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .app-toaster [data-sonner-toast].app-toast--success {
@@ -69,15 +69,15 @@
 
 .app-toast__title {
   overflow-wrap: anywhere;
-  color: var(--text-dark, #20262c);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
 }
 
 .app-toast__description {
   overflow-wrap: anywhere;
-  color: var(--text-muted, #68737d);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .app-toast__close {
@@ -92,14 +92,14 @@
   border: 1px solid transparent;
   border-radius: 3px;
   background: transparent;
-  color: var(--text-muted, #68737d);
+  color: #000000;
   cursor: pointer;
 }
 
 .app-toast__close:hover {
   border-color: var(--border-color, #dfe4e8);
   background: #f7f9fa;
-  color: var(--text-dark, #20262c);
+  color: #000000;
 }
 
 .app-toast__close:focus-visible,
@@ -117,7 +117,7 @@
   padding: 5px 9px;
   border-radius: 3px;
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -136,7 +136,7 @@
 .app-toast__cancel {
   border: 1px solid #c9d2d8;
   background: #ffffff;
-  color: #44515a;
+  color: #000000;
 }
 
 .app-toast__cancel:hover {

@@ -10,7 +10,7 @@
   min-height: 100%;
   min-width: 0;
   background: var(--operations-muted);
-  color: var(--operations-text);
+  color: #000000;
 }
 
 .operations-actions,
@@ -26,7 +26,7 @@
   min-height: 34px;
   padding: 7px 12px;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0;
   box-shadow: none;
 }
@@ -105,7 +105,7 @@
   border: 0;
   border-bottom: 3px solid transparent;
   background: transparent;
-  color: var(--operations-text-muted);
+  color: #000000;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -114,7 +114,7 @@
 
 .operations-tab:hover {
   background: var(--operations-muted);
-  color: var(--operations-text);
+  color: #000000;
 }
 
 .operations-tab.is-active {
@@ -137,8 +137,8 @@
   padding: 1px 6px;
   border: 1px solid var(--operations-border);
   background: var(--operations-muted);
-  color: var(--operations-text-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -158,8 +158,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -176,8 +176,8 @@
 
 .operations-field label,
 .inline-tree-wizard label {
-  color: var(--operations-text);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -193,9 +193,9 @@
   padding: 6px 9px;
   border: 1px solid var(--operations-border);
   background: #ffffff;
-  color: var(--operations-text);
+  color: #000000;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 /*
@@ -227,7 +227,7 @@
   padding: 32px 16px;
   border: 1px solid var(--operations-border);
   background: var(--operations-surface);
-  color: var(--operations-text-muted);
+  color: #000000;
   text-align: center;
   font-size: 13px;
 }
@@ -285,7 +285,7 @@
   align-items: center;
   min-width: 0;
   gap: 7px;
-  color: var(--operations-text);
+  color: #000000;
   font-size: 13px;
   font-weight: 700;
 }
@@ -344,7 +344,7 @@
 }
 
 .campaign-semester-toggle .operation-icon:last-child {
-  color: var(--operations-text-muted);
+  color: #000000;
 }
 
 .campaign-semester-body {
@@ -363,8 +363,8 @@
   width: 100%;
   min-width: 880px;
   border-collapse: collapse;
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .campaign-table th,
@@ -374,9 +374,9 @@
   border-right: 1px solid var(--operations-border);
   border-bottom: 1px solid var(--operations-border);
   background: var(--operations-muted);
-  color: var(--operations-text);
+  color: #000000;
   text-align: left;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -415,7 +415,7 @@
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  color: var(--operations-text);
+  color: #000000;
   font-weight: 700;
   line-height: 1.35;
 }
@@ -426,8 +426,8 @@
   align-items: center;
   gap: 5px;
   margin-top: 3px;
-  color: var(--operations-text-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .campaign-link-cell {
@@ -466,7 +466,7 @@
   padding: 2px 7px;
   border: 1px solid currentColor;
   background: #ffffff;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -516,8 +516,8 @@
   border: 1px solid #b9d9e5;
   border-left: 3px solid var(--operations-primary);
   background: #f2f9fb;
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .operations-feedback {
@@ -531,7 +531,7 @@
   border-left-width: 3px;
   border-radius: 2px;
   background: var(--operations-surface);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .operations-feedback > svg {
@@ -624,7 +624,7 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
-  color: var(--operations-text);
+  color: #000000;
   font-size: 13px;
   font-weight: 700;
 }
@@ -657,8 +657,8 @@
   gap: 7px;
   padding: 6px 10px;
   border-right: 1px solid var(--operations-border);
-  color: var(--operations-text-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -683,7 +683,7 @@
   justify-content: center;
   flex: 0 0 22px;
   border: 1px solid currentColor;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .wizard-panel {
@@ -746,15 +746,15 @@
 
 .wizard-criteria-preview h4 {
   margin-bottom: 6px;
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .wizard-criteria-preview ul {
   margin: 0;
   padding-left: 18px;
-  color: var(--operations-text-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .wizard-summary {
@@ -776,15 +776,15 @@
 }
 
 .wizard-summary dt {
-  color: var(--operations-text-muted);
-  font-size: 10px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .wizard-summary dd {
   margin: 2px 0 0;
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -821,7 +821,7 @@
 
 .operations-table-page .vmu-table {
   min-width: 880px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .operations-table-page .vmu-table th {
@@ -829,8 +829,8 @@
   padding: 7px 10px;
   border-right: 1px solid var(--operations-border);
   border-bottom: 1px solid var(--operations-border);
-  color: var(--operations-text);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -839,7 +839,7 @@
   height: 46px;
   padding: 7px 10px;
   border-right: 1px solid var(--operations-border);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .operations-table-page .vmu-table th:last-child,
@@ -850,19 +850,19 @@
 .operations-table-page .pagination {
   min-height: 46px;
   padding: 8px 10px;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .operations-code {
   color: var(--operations-primary-dark);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .operations-primary-text {
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -871,8 +871,8 @@
   align-items: center;
   gap: 5px;
   margin-top: 2px;
-  color: var(--operations-text-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .operations-metrics {
@@ -926,14 +926,14 @@
 }
 
 .operation-metric-label {
-  color: var(--operations-text-muted);
-  font-size: 10px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
 }
 
 .operation-metric-value {
-  color: var(--operations-text);
+  color: #000000;
   font-size: 20px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -942,8 +942,8 @@
 
 .operation-metric-note {
   grid-column: 2;
-  color: var(--operations-text-muted);
-  font-size: 10px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .operations-progress {
@@ -955,13 +955,13 @@
   display: flex;
   justify-content: space-between;
   margin-bottom: 4px;
-  color: var(--operations-text-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
 .operations-progress-meta strong {
-  color: var(--operations-text);
+  color: #000000;
 }
 
 .operations-progress-track {
@@ -996,25 +996,25 @@
   border: 1px solid var(--operations-border);
   border-top: 4px solid var(--operations-primary);
   background: #ffffff;
-  color: var(--operations-text);
+  color: #000000;
 }
 
 .student-survey-eyebrow {
   color: var(--operations-primary-dark);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .student-survey-header h1 {
   margin: 4px 0;
-  color: var(--operations-text);
+  color: #000000;
   font-size: 20px;
   line-height: 1.35;
   letter-spacing: 0;
 }
 
 .student-survey-header p {
-  color: var(--operations-text-muted);
+  color: #000000;
   font-size: 13px;
 }
 
@@ -1025,7 +1025,7 @@
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--operations-border);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .student-context span {
@@ -1069,7 +1069,7 @@
   padding: 10px 12px;
   border-bottom: 1px solid var(--operations-border);
   background: var(--operations-muted);
-  color: var(--operations-text);
+  color: #000000;
   font-size: 13px;
   font-weight: 600;
 }
@@ -1091,7 +1091,7 @@
   padding: 7px 5px;
   border: 0;
   background: #ffffff;
-  color: var(--operations-text);
+  color: #000000;
   font: inherit;
   cursor: pointer;
 }
@@ -1111,7 +1111,7 @@
 }
 
 .student-likert-label {
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1.25;
   text-align: center;
 }
@@ -1143,13 +1143,13 @@
 }
 
 .student-success h2 {
-  color: var(--operations-text);
+  color: #000000;
   font-size: 20px;
 }
 
 .student-success p {
   max-width: 620px;
-  color: var(--operations-text-muted);
+  color: #000000;
   font-size: 13px;
 }
 
@@ -1157,26 +1157,26 @@
   padding: 7px 10px;
   border: 1px solid var(--operations-border);
   background: var(--operations-muted);
-  color: var(--operations-text);
+  color: #000000;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .qr-modal-content {
-  color: var(--operations-text);
+  color: #000000;
   text-align: center;
 }
 
 .qr-modal-heading {
   margin-bottom: 4px;
-  color: var(--operations-text);
+  color: #000000;
   font-size: 16px;
 }
 
 .qr-modal-subtitle {
   margin-bottom: 14px;
-  color: var(--operations-text-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .qr-modal-content .qr-preview-box {
@@ -1193,8 +1193,8 @@
 }
 
 .qr-caption {
-  color: var(--operations-text);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -1384,7 +1384,7 @@
   }
 
   .student-likert-label {
-    font-size: 11px;
+    font-size: 13px;
     text-align: left;
   }
 
@@ -1465,27 +1465,29 @@
 .semester-survey-title {
   min-width: 0;
   overflow: hidden;
-  color: var(--operations-text);
+  color: #000000;
   font-size: 13px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Khối mô tả bám mép trái; cụm nút mới là phần bị đẩy sang phải. Để `margin-left: auto`
+   ở đây thì mô tả trôi theo nút, chừa một khoảng trống to ở giữa hàng. */
 .semester-survey-meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 14px;
-  margin-left: auto;
+  min-width: 0;
 }
 
 .semester-survey-meta > span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--operations-text-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -1554,9 +1556,11 @@
 /*
   Cột Sĩ số và Lượt trả lời chỉ chứa một con số, căn giữa cho thẳng cột thay vì
   dạt về mép trái của ô.
+
+  Chọn theo LỚP của ô chứ không theo thứ tự cột: trước đây dùng nth-child(4) và (7),
+  thêm một cột vào bảng là hai quy tắc này nhảy sang căn giữa nhầm cột khác.
 */
-.campaign-table td:nth-child(4),
-.campaign-table td:nth-child(7) {
+.campaign-table td.campaign-number-cell {
   text-align: center;
 }
 
@@ -1567,8 +1571,8 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .section-response-link .operations-count {
@@ -1608,15 +1612,15 @@
 
 .section-responses-heading h2 {
   margin: 0;
-  color: var(--operations-text);
+  color: #000000;
   font-size: 14px;
   font-weight: 700;
 }
 
 .section-responses-heading p {
   margin: 0;
-  color: var(--operations-text-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .section-responses-stats {
@@ -1630,14 +1634,14 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--operations-text-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   white-space: nowrap;
 }
 
 .response-score {
   color: var(--operations-primary-dark);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1645,30 +1649,30 @@
 /* Chỉ là con số, khoanh tròn quanh từng ô chỉ làm bảng rối và cao thêm. */
 .response-count {
   display: inline-block;
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 .response-count.is-zero {
-  color: var(--operations-text-muted);
+  color: #000000;
   font-weight: 500;
 }
 
 .response-comment {
   display: -webkit-box;
   overflow: hidden;
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
 }
 
 .response-comment.is-empty {
-  color: var(--operations-text-muted);
+  color: #000000;
   font-style: italic;
 }
 
@@ -1683,7 +1687,7 @@
   border-radius: 999px;
   background: #f2faf6;
   color: #0f6b47;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -1697,7 +1701,7 @@
   display: block;
   overflow: hidden;
   color: #b42318;
-  font-size: 11px;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1749,12 +1753,12 @@
   padding: 10px;
   border-left: 3px solid var(--operations-primary);
   background: var(--operations-muted);
-  color: var(--operations-text-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .response-detail-meta strong {
-  color: var(--operations-text);
+  color: #000000;
 }
 
 .response-detail-table {
@@ -1774,8 +1778,8 @@
 
 .response-detail-table thead th small {
   display: block;
-  color: var(--operations-text-muted);
-  font-size: 10px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -1800,14 +1804,14 @@
 .response-detail-comment strong {
   display: block;
   margin-bottom: 4px;
-  color: var(--operations-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .response-detail-comment p {
   margin: 0;
-  color: var(--operations-text-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   white-space: pre-wrap;
 }
 
@@ -1835,9 +1839,9 @@
   border: 1px solid #cfd7dc;
   border-radius: 3px;
   background: #ffffff;
-  color: #40505a;
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1885,4 +1889,34 @@
   vertical-align: middle;
   text-align: center;
   line-height: 1.2;
+}
+
+/*
+  Thẻ đợt khảo sát: dòng mô tả bên trái, cụm nút ghim hẳn góc phải trên một hàng.
+  Trước đây nút nằm chung khối với mô tả nên chữ dài là nút bị đẩy xuống dòng, mỗi
+  đợt một kiểu.
+*/
+.semester-survey-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Cột Thao tác của bảng lớp hẹp lại, nên nút trong bảng cũng phải gọn hơn nút
+   thường: bớt padding hai bên và hạ chiều cao. */
+.campaign-table .campaign-row-actions .btn {
+  min-height: 28px;
+  padding: 3px 7px;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.campaign-table .campaign-row-actions .operation-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
 }

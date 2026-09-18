@@ -327,7 +327,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                     padding: '8px 12px',
                     fontSize: '13px',
                     fontWeight: 500,
-                    color: '#1e293b',
+                    color: '#000000',
                     background: 'none',
                     border: 'none',
                     borderRadius: '4px',
@@ -355,7 +355,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                     padding: '8px 12px',
                     fontSize: '13px',
                     fontWeight: 500,
-                    color: '#1e293b',
+                    color: '#000000',
                     background: 'none',
                     border: 'none',
                     borderRadius: '4px',
@@ -383,7 +383,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                     padding: '8px 12px',
                     fontSize: '13px',
                     fontWeight: 500,
-                    color: '#1e293b',
+                    color: '#000000',
                     background: 'none',
                     border: 'none',
                     borderRadius: '4px',
@@ -411,7 +411,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                     padding: '8px 12px',
                     fontSize: '13px',
                     fontWeight: 500,
-                    color: '#1e293b',
+                    color: '#000000',
                     background: 'none',
                     border: 'none',
                     borderRadius: '4px',
@@ -482,7 +482,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                           textAnchor="middle"
                           className={`analysis-xaxis-tick ${isHovered ? 'is-active' : ''}`}
                           style={{
-                            fontSize: '12px',
+                            fontSize: '13px',
                             fontWeight: isHovered ? 700 : 600,
                             fill: isHovered ? '#0284c7' : '#334155',
                             cursor: 'pointer',
@@ -500,7 +500,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                   ticks={[0, 1, 2, 3, 4, 5]}
                   tickLine={false}
                   axisLine={false}
-                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  tick={{ fontSize: 13, fill: '#64748b' }}
                   tickFormatter={(val) => `${val}.0`}
                 />
                 <Tooltip
@@ -528,7 +528,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                     dataKey="averageScore"
                     position="top"
                     formatter={(val: unknown) => (Number(val) > 0 ? Number(val).toFixed(2) : '')}
-                    style={{ fontSize: 11, fontWeight: 700, fill: '#475569' }}
+                    style={{ fontSize: 13, fontWeight: 700, fill: '#475569' }}
                     offset={6}
                   />
                   {chartData.map((entry) => {

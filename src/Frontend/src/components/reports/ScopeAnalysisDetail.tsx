@@ -295,7 +295,7 @@ const ScopeRowsTable: React.FC<{
               <tr>
                 <td
                   colSpan={10}
-                  style={{ textAlign: 'center', color: '#68737d', padding: '18px 12px' }}
+                  style={{ textAlign: 'center', color: '#000000', padding: '18px 12px' }}
                 >
                   {emptyMessage}
                 </td>

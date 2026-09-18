@@ -117,7 +117,7 @@ export function GraduationEChart({
       name: isHorizontal ? xAxisName : yAxisName,
       nameLocation: 'middle' as const,
       nameGap: isHorizontal ? 34 : 42,
-      nameTextStyle: { color: '#68737d', fontSize: 11 },
+      nameTextStyle: { color: '#000000', fontSize: 13 },
       axisLabel: { formatter: (value: number) => formatValue(value, unit) },
       splitLine: { lineStyle: { color: '#d9dfe3', type: 'dashed' as const } },
     };
@@ -127,11 +127,11 @@ export function GraduationEChart({
       name: isHorizontal ? yAxisName : xAxisName,
       nameLocation: 'middle' as const,
       nameGap: isHorizontal ? 118 : 34,
-      nameTextStyle: { color: '#68737d', fontSize: 11 },
+      nameTextStyle: { color: '#000000', fontSize: 13 },
       axisTick: { alignWithLabel: true },
       axisLabel: {
-        color: '#59636c',
-        fontSize: 11,
+        color: '#000000',
+        fontSize: 13,
         interval: 0,
         rotate: !isHorizontal && categories.length > 6 ? 28 : 0,
         width: isHorizontal ? 170 : 115,
@@ -225,7 +225,7 @@ export function GraduationEChart({
             : seriesIsLine && series.length > 1
               ? palette[index % palette.length]
               : '#4d5962',
-          fontSize: 11,
+          fontSize: 13,
           fontWeight: item.stackLabel || item.stackLabelKey || (isCombo && seriesIsLine) ? 650 : 400,
           lineHeight: item.stackLabelKey ? 15 : undefined,
         },
@@ -246,7 +246,7 @@ export function GraduationEChart({
             color: '#fff',
             backgroundColor: '#df3d35',
             padding: [3, 5],
-            fontSize: 11,
+            fontSize: 13,
             fontWeight: 700,
           },
           data: [{ yAxis: referenceLine.value }],

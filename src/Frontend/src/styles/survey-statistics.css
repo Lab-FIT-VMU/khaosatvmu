@@ -84,8 +84,8 @@
 }
 
 .statistics-toolbar .form-group > span {
-  color: #40505a;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -98,7 +98,7 @@
 /* Hai ngưỡng đang áp, dồn về mép phải của dòng mô tả. */
 .statistics-threshold-note {
   margin-left: auto;
-  color: #40505a;
+  color: #000000;
 }
 
 .statistics-summary {
@@ -110,8 +110,8 @@
   padding: 5px 12px;
   border-left: 3px solid #0788b8;
   background: #f2f8fa;
-  color: #40505a;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   flex: 0 0 auto;
 }
 
@@ -178,8 +178,8 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -230,8 +230,8 @@
   top: 0;
   z-index: 2;
   background: #f7f9fa;
-  color: #404a52;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -423,8 +423,8 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -440,7 +440,7 @@
 /* Cột Mô tả: đủ / không đủ điều kiện tính điểm. Chữ dài thì xuống dòng trong ô. */
 .statistics-table .statistics-eligibility {
   display: inline-block;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1.3;
   white-space: normal;
@@ -520,9 +520,9 @@
   border: 1px solid #dfe4e8;
   border-bottom: 0;
   background: #f2f5f7;
-  color: #40505a;
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -544,9 +544,21 @@
   white-space: nowrap;
 }
 
+/*
+  Ô chọn Học kỳ đứng cạnh ô chọn Đợt khảo sát, mà hai ô do hai bộ kiểu khác nhau vẽ:
+  ô này là <select> thật ăn theo `.form-group select` của index.css (padding 9px 12px,
+  chữ 14px), còn ô kia là nút tự vẽ cao 34px chữ 13px. Kết quả là hai ô lệch chiều cao
+  và lệch cỡ chữ ngay trên cùng một hàng. Chép đúng số của ô tự vẽ sang đây.
+*/
 .statistics-toolbar .form-group > select {
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #d7dee2;
+  background: #ffffff;
+  color: #000000;
+  font-size: 13px;
 }
 
 /*
@@ -625,13 +637,13 @@
   padding: 8px 12px;
   border: 1px solid #e0e6ea;
   background: #ffffff;
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   flex: 0 0 auto;
 }
 
 .analysis-section-picker__label {
-  color: #40505a;
+  color: #000000;
   font-weight: 650;
 }
 
@@ -769,13 +781,13 @@
 .analysis-subtable-heading h3 {
   font-size: 15px;
   font-weight: 700;
-  color: #1e293b;
+  color: #000000;
   margin: 0;
 }
 
 .analysis-subtable-hint {
-  font-size: 12px;
-  color: #64748b;
+  font-size: 13px;
+  color: #000000;
   margin: 0;
 }
 
@@ -819,7 +831,7 @@
   top: 50%;
   right: 9px;
   transform: translateY(-50%);
-  color: #6b7a85;
+  color: #000000;
   pointer-events: none;
 }
 
@@ -845,8 +857,8 @@
   align-items: baseline;
   gap: 12px;
   padding: 7px 10px;
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -856,21 +868,21 @@
 }
 
 .analysis-combobox__option small {
-  color: #6b7a85;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   white-space: nowrap;
 }
 
 .analysis-combobox__empty {
   padding: 8px 10px;
-  color: #6b7a85;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 /* Tên giảng viên nổi hơn phần còn lại của băng tóm tắt, nhưng vẫn nằm trong
    băng `statistics-summary` chung để không đẻ thêm một kiểu thẻ riêng. */
 .statistics-summary .summary-title {
-  color: #20262c;
+  color: #000000;
   font-size: 13px;
   font-weight: 700;
 }
@@ -896,8 +908,8 @@
 
 .analysis-section-title {
   margin: 0 0 6px;
-  color: #40505a;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -928,7 +940,7 @@
   display: inline-block;
   padding: 1px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -954,7 +966,7 @@
 .verdict--muted {
   border: 1px solid #dfe4e8;
   background: #f2f5f7;
-  color: #68737d;
+  color: #000000;
   font-style: italic;
 }
 
@@ -990,8 +1002,8 @@
 
 .z-legend__note {
   margin: 0;
-  color: #3b4850;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .z-legend__list {
@@ -1008,17 +1020,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .z-legend__list code {
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   white-space: nowrap;
 }
 
 .z-legend__list li > span[aria-hidden] {
-  color: #68737d;
+  color: #000000;
 }
 
 /* Biến thể xếp dọc: mỗi kết luận kèm một câu giải nghĩa dài. */
@@ -1037,7 +1049,7 @@
 }
 
 .z-legend__meaning {
-  color: #3b4850;
+  color: #000000;
   line-height: 1.5;
 }
 
@@ -1063,7 +1075,7 @@
   thuộc tính title của ô.
 */
 .statistics-table .is-muted {
-  color: #98a2b3;
+  color: #000000;
   font-weight: 400;
   cursor: help;
 }
@@ -1079,3 +1091,55 @@
   }
 }
 
+
+/*
+  Trang Bảng dữ liệu khảo sát: mọi chữ NGOÀI bảng và ngoài ô tìm kiếm đều in đậm cho
+  dễ đọc. Chỗ vốn đã đậm sẵn thì không đậm thêm được nữa, nên phân biệt bằng màu.
+  Chỉ áp trong trang này, các trang dùng chung mấy lớp trên vẫn như cũ.
+*/
+.survey-statistics-page .statistics-toolbar .form-group > span,
+.survey-statistics-page .statistics-toolbar .form-group > select,
+.survey-statistics-page .statistics-toolbar .btn,
+.survey-statistics-page .campaign-select__trigger,
+.survey-statistics-page .scoring-config-note,
+.survey-statistics-page .statistics-summary,
+.survey-statistics-page .catalog-result-count,
+.survey-statistics-page .statistics-filter-option,
+.survey-statistics-page .operations-empty,
+.survey-statistics-page .admin-alert,
+.survey-statistics-page .table-pagination {
+  font-weight: 700;
+}
+
+/* Ô tìm kiếm giữ chữ thường: chữ người dùng gõ vào không phải nhãn giao diện. */
+.survey-statistics-page .catalog-search input {
+  font-weight: 400;
+}
+
+/* Số đủ / không đủ điều kiện: đọc bằng màu, khỏi phải dò chữ đi kèm. */
+/* Hai lớp này phải nêu kèm trang, nếu không quy tắc chữ đậm chung của .app-container
+   (cùng một hạng cụ thể mà đứng sau) sẽ đè mất màu xanh / đỏ ở đây. */
+.survey-statistics-page .statistics-count--eligible {
+  color: #137b3b;
+}
+
+.survey-statistics-page .statistics-count--ineligible {
+  color: #b52d2d;
+}
+
+/*
+  Các số đậm còn lại của dòng tóm tắt và dòng ngưỡng: mốc thời gian, hai tỷ lệ.
+  Hai tông xanh đã thử đều chìm cạnh chữ đen — xanh sáng thì chói, xanh đậm thì
+  mờ. Dùng cam đất: nóng, nổi hẳn trên nền sáng mà vẫn khác đỏ của số "không đủ
+  điều kiện" ngay bên cạnh.
+*/
+.survey-statistics-page .statistics-summary > span > strong,
+.survey-statistics-page .statistics-threshold-note strong,
+.survey-statistics-page .scoring-config-note strong {
+  color: #b45309;
+}
+
+/* Chú thích câu bẫy vốn đã có màu cảnh báo riêng, giữ nguyên tông đó. */
+.survey-statistics-page .statistics-trap-note strong {
+  color: #b42318;
+}

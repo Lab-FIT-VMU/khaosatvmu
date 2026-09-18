@@ -78,13 +78,13 @@ const campaignSelectCss = `
 .campaign-select { position: relative; flex: 0 0 460px; min-width: 0; }
 .campaign-select__trigger {
   width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #20262c;
-  font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #000000;
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .campaign-select__trigger:disabled { background: #f4f6f8; color: #8c969f; cursor: not-allowed; }
 .campaign-select__trigger:focus-visible { outline: 2px solid rgba(7,136,184,.25); border-color: #0788b8; }
 .campaign-select__value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #68737d; }
+.campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #000000; }
 .campaign-select__list {
   position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none;
   overflow-y: auto; border: 1px solid #d7dee2; background: #fff;
@@ -93,7 +93,7 @@ const campaignSelectCss = `
 .campaign-select__option {
   position: relative; overflow: hidden; container-type: inline-size;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 8px 12px; font-size: 12px; color: #20262c; cursor: pointer;
+  padding: 8px 12px; font-size: 13px; color: #000000; cursor: pointer;
 }
 .campaign-select__option.is-active { background: #eef7fb; }
 .campaign-select__option > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -107,10 +107,10 @@ const campaignSelectCss = `
   0%, 12% { transform: translateX(0); }
   88%, 100% { transform: translateX(min(0px, calc(100cqw - 100% - 26px))); }
 }
-.campaign-select__empty { padding: 10px 12px; color: #68737d; font-size: 12px; text-align: center; }
+.campaign-select__empty { padding: 10px 12px; color: #000000; font-size: 13px; text-align: center; }
 .campaign-select__hint {
   position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid #d7dee2;
-  background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #20262c;
+  background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #000000;
   font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: none;
 }
 `;
@@ -1680,8 +1680,8 @@ export const ReportsOverviewPage: React.FC = () => {
       <div className="survey-operations-page" style={{ padding: '40px 20px', textAlign: 'center' }}>
         <div style={{ maxWidth: '500px', margin: '0 auto', background: '#fff', padding: '32px', border: '1px solid #dfe4e8', borderRadius: '4px' }}>
           <ShieldAlert style={{ width: '48px', height: '48px', color: '#b52d2d', margin: '0 auto 16px' }} />
-          <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px', color: '#20262c' }}>Không có quyền truy cập</h2>
-          <p style={{ color: '#68737d', fontSize: '14px', lineHeight: '1.5' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px', color: '#000000' }}>Không có quyền truy cập</h2>
+          <p style={{ color: '#000000', fontSize: '14px', lineHeight: '1.5' }}>
             Tài khoản của bạn chưa được cấp quyền <code>REPORTS_ACCESS</code> để xem báo cáo thống kê. Vui lòng liên hệ Quản trị viên hệ thống để được phân quyền.
           </p>
         </div>
@@ -1995,7 +1995,7 @@ export const ReportsOverviewPage: React.FC = () => {
             <span className="reports-progress">
               <span style={{ width: `${Math.min(100, item.completionRate)}%`, background: completionColor(item.completionRate) }} />
             </span>
-            <span style={{ color: completionColor(item.completionRate), fontWeight: 700, fontSize: 12 }}>
+            <span style={{ color: completionColor(item.completionRate), fontWeight: 700, fontSize: 13 }}>
               {item.completionRate.toFixed(0)}%
             </span>
           </span>

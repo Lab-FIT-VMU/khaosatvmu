@@ -44,7 +44,7 @@
   grid-template-columns: 1fr;
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--ops-canvas);
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .auth-site-header {
@@ -57,7 +57,7 @@
   border-top: 3px solid var(--ops-primary);
   border-bottom: 1px solid var(--ops-border);
   background: var(--ops-surface);
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .auth-brand-lockup {
@@ -83,8 +83,8 @@
 
 .auth-brand-lockup p {
   overflow: hidden;
-  color: var(--ops-text);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -95,8 +95,8 @@
   display: block;
   overflow: hidden;
   margin-top: 2px;
-  color: var(--ops-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -108,7 +108,7 @@
   align-items: center;
   gap: 7px;
   color: var(--ops-success);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -131,7 +131,7 @@
 .admin-section-label {
   display: block;
   color: var(--ops-primary-dark);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -145,7 +145,7 @@
 .auth-context-panel h1 {
   max-width: 500px;
   margin-top: 8px;
-  color: var(--ops-text);
+  color: #000000;
   font-size: 32px;
   font-weight: 650;
   line-height: 1.25;
@@ -155,7 +155,7 @@
 .auth-context-panel > p {
   max-width: 510px;
   margin-top: 14px;
-  color: var(--ops-muted);
+  color: #000000;
   font-size: 14px;
   line-height: 1.65;
 }
@@ -170,7 +170,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #3c4850;
+  color: #000000;
   font-size: 13px;
 }
 
@@ -197,7 +197,7 @@
 
 .auth-login-shell .auth-panel-heading h2 {
   margin-top: 5px;
-  color: var(--ops-text);
+  color: #000000;
   font-size: 21px;
   font-weight: 700;
   letter-spacing: 0;
@@ -205,7 +205,7 @@
 
 .auth-login-shell .auth-panel-copy {
   margin-bottom: 20px;
-  color: var(--ops-muted);
+  color: #000000;
   font-size: 13px;
   line-height: 1.55;
 }
@@ -220,7 +220,7 @@
   border-left: 3px solid var(--ops-danger);
   background: #fff5f5;
   color: #8d2525;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.45;
 }
@@ -254,7 +254,7 @@
 
 .auth-alert--no-profile strong {
   color: #762020;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .auth-actions {
@@ -285,7 +285,7 @@
 .auth-login-shell .auth-dev-button {
   border-color: var(--ops-border-strong);
   background: var(--ops-surface);
-  color: #34444d;
+  color: #000000;
 }
 
 .auth-login-shell .auth-dev-button:hover:not(:disabled) {
@@ -302,7 +302,7 @@
 .auth-login-shell .auth-inline-status {
   margin: -1px 0 1px;
   color: var(--ops-danger);
-  font-size: 11px;
+  font-size: 13px;
   text-align: left;
 }
 
@@ -310,8 +310,8 @@
   margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--ops-border);
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.5;
   text-align: left;
 }
@@ -325,8 +325,8 @@
   padding: 8px clamp(20px, 4vw, 56px);
   border-top: 1px solid var(--ops-border);
   background: var(--ops-surface);
-  color: var(--ops-muted);
-  font-size: 10px;
+  color: #000000;
+  font-size: 13px;
 }
 
 /* No-profile access dialog */
@@ -350,7 +350,7 @@
   padding: 11px 14px 11px 20px;
   border-bottom: 1px solid var(--ops-border);
   background: var(--ops-surface);
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .auth-login-shell .catalog-modal-header.modal-header h3 {
@@ -367,13 +367,13 @@
   place-items: center;
   border: 1px solid transparent;
   border-radius: 3px;
-  color: var(--ops-muted);
+  color: #000000;
 }
 
 .auth-login-shell .catalog-modal-close.modal-close-btn:hover {
   border-color: var(--ops-border);
   background: var(--ops-muted-surface);
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .auth-login-shell .catalog-modal-body.modal-body {
@@ -406,7 +406,7 @@
 
 .auth-access-dialog__content h4 {
   margin-top: 4px;
-  color: var(--ops-text);
+  color: #000000;
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 0;
@@ -414,7 +414,7 @@
 
 .auth-access-dialog__content p {
   margin-top: 8px;
-  color: #53616a;
+  color: #000000;
   font-size: 13px;
   line-height: 1.6;
 }
@@ -450,8 +450,8 @@
 }
 
 .auth-access-dialog__contact small {
-  color: var(--ops-muted);
-  font-size: 10px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -479,7 +479,7 @@
   gap: 8px;
   padding: 0 14px;
   border-radius: 3px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   text-decoration: none;
   cursor: pointer;
@@ -488,7 +488,7 @@
 .auth-access-dialog__dismiss {
   border: 1px solid var(--ops-border-strong);
   background: var(--ops-surface);
-  color: #34444d;
+  color: #000000;
 }
 
 .auth-access-dialog__dismiss:hover {
@@ -767,12 +767,12 @@
   display: block;
   margin-bottom: 3px;
   color: var(--ops-primary-dark);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 750;
 }
 
 .profile-session-dialog__header h1 {
-  color: var(--ops-text);
+  color: #000000;
   font-size: 21px;
   font-weight: 700;
   line-height: 1.3;
@@ -780,7 +780,7 @@
 
 .profile-session-dialog__header p {
   margin-top: 4px;
-  color: var(--ops-muted);
+  color: #000000;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -795,14 +795,14 @@
   border: 1px solid var(--ops-border);
   border-radius: 3px;
   background: #ffffff;
-  color: #5d6971;
+  color: #000000;
   cursor: pointer;
 }
 
 .profile-session-dialog__close:hover {
   border-color: #b6c3ca;
   background: #f4f7f8;
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .profile-session-dialog__close svg {
@@ -836,7 +836,7 @@
   border-left: 3px solid transparent;
   border-radius: 3px;
   background: #ffffff;
-  color: var(--ops-text);
+  color: #000000;
   text-align: left;
   cursor: pointer;
   transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
@@ -920,7 +920,7 @@
   border-radius: 10px;
   background: #fff8ec;
   color: #8d520d;
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -932,7 +932,7 @@
 
 .profile-session-option__role {
   margin-top: 2px;
-  color: #3b4850;
+  color: #000000;
   font-size: 13px;
   font-weight: 650;
 }
@@ -943,8 +943,8 @@
   gap: 5px;
   margin-top: 3px;
   overflow: hidden;
-  color: var(--ops-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -991,14 +991,14 @@
 }
 
 .profile-session-state strong {
-  color: var(--ops-text);
+  color: #000000;
   font-size: 13px;
 }
 
 .profile-session-state span {
   margin-top: 3px;
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .profile-session-dialog__footer {
@@ -1009,8 +1009,8 @@
   padding: 9px 26px;
   border-top: 1px solid var(--ops-border);
   background: #f7f9fa;
-  color: var(--ops-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .profile-session-dialog__footer svg {
@@ -1162,7 +1162,7 @@
   align-items: center;
   gap: 5px;
   color: var(--ops-primary-dark);
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -1174,14 +1174,14 @@
 .auth-loading-copy strong {
   display: block;
   margin-top: 4px;
-  color: var(--ops-text);
+  color: #000000;
   font-size: 13px;
 }
 
 .auth-loading-copy p {
   margin-top: 1px;
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .auth-loading-spinner {
@@ -1198,7 +1198,7 @@
   display: flex;
   flex-direction: column;
   background: var(--ops-canvas);
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .admin-view-tabs-bar {
@@ -1217,7 +1217,7 @@
   padding: 7px 13px;
   border-radius: 3px !important;
   background: var(--ops-primary);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .admin-view-actions {
@@ -1231,7 +1231,7 @@
   min-height: 36px;
   padding: 7px 12px;
   border-radius: 3px !important;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .admin-users-page .btn svg {
@@ -1257,9 +1257,9 @@
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: var(--ops-muted);
+  color: #000000;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1270,7 +1270,7 @@
 
 .admin-view-tabs button:hover {
   background: var(--ops-muted-surface);
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .admin-view-tabs button.active {
@@ -1307,7 +1307,7 @@
   background: #fff;
   color: #8d2525;
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -1355,15 +1355,15 @@
   width: 16px;
   height: 16px;
   flex: 0 0 16px;
-  color: var(--ops-muted);
+  color: #000000;
 }
 
 .admin-search-box input {
   min-width: 0;
   padding: 0;
-  color: var(--ops-text);
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .admin-search-box input::placeholder {
@@ -1382,8 +1382,8 @@
 }
 
 .admin-result-count {
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1397,7 +1397,7 @@
   border: 1px solid var(--ops-border-strong);
   border-radius: 3px !important;
   background: var(--ops-surface);
-  color: var(--ops-muted);
+  color: #000000;
 }
 
 .admin-filter-control:focus-within {
@@ -1415,9 +1415,9 @@
   padding: 5px 26px 5px 0;
   border: 0;
   background: transparent;
-  color: var(--ops-text);
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .admin-filter-control .filter-select:focus {
@@ -1442,7 +1442,7 @@
 .admin-users-page .vmu-table {
   min-width: 820px;
   table-layout: fixed;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .admin-users-page .vmu-table th {
@@ -1454,8 +1454,8 @@
   border-bottom: 1px solid var(--ops-border-strong);
   border-right: 1px solid #edf0f2;
   background: var(--ops-muted-surface);
-  color: #44515a;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: 0;
   text-transform: none;
@@ -1471,7 +1471,7 @@
   padding: 8px 12px;
   border-bottom: 1px solid #e8ecef;
   border-right: 1px solid #f0f2f4;
-  color: var(--ops-text);
+  color: #000000;
   vertical-align: middle;
 }
 
@@ -1504,8 +1504,8 @@
 .admin-account-summary strong {
   display: block;
   overflow: hidden;
-  color: var(--ops-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -1526,7 +1526,7 @@
 .admin-account-detail .admin-account-summary span,
 .admin-account-detail .admin-account-summary small {
   margin-top: 3px;
-  color: #46515a;
+  color: #000000;
   font-size: 14px;
 }
 
@@ -1548,7 +1548,7 @@
 
 .admin-account-detail .admin-profile-heading p {
   margin-top: 4px;
-  color: #46515a;
+  color: #000000;
   font-size: 14px;
 }
 
@@ -1564,7 +1564,7 @@
 .admin-account-detail .admin-profile-row > div > span,
 .admin-account-detail .admin-profile-row > div > small {
   margin-top: 4px;
-  color: #46515a;
+  color: #000000;
   font-size: 14px;
 }
 
@@ -1575,7 +1575,7 @@
 .admin-account-detail .admin-role-label {
   min-height: 24px;
   padding: 2px 8px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .admin-account-detail .admin-empty-state strong {
@@ -1594,8 +1594,8 @@
   display: block;
   overflow: hidden;
   margin-top: 2px;
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1605,8 +1605,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #3e4b53;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1647,7 +1647,7 @@
   border-radius: 2px !important;
   background: #f0f9fc;
   color: #086f94;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1.2;
 }
@@ -1667,7 +1667,7 @@
 }
 
 .admin-date-cell {
-  color: #4d5961 !important;
+  color: #000000 !important;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1685,7 +1685,7 @@
   border: 1px solid var(--ops-border-strong);
   border-radius: 3px !important;
   background: var(--ops-surface);
-  color: #4e5c65;
+  color: #000000;
   cursor: pointer;
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
@@ -1709,7 +1709,7 @@
 .admin-state-row {
   height: 160px !important;
   padding: 24px !important;
-  color: var(--ops-muted) !important;
+  color: #000000 !important;
   text-align: center;
 }
 
@@ -1727,14 +1727,14 @@
 }
 
 .admin-state-row strong {
-  color: #47545d;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-state-row > span {
   margin-top: 3px;
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-pagination {
@@ -1742,7 +1742,7 @@
   padding: 6px 10px;
   border-top: 1px solid var(--ops-border);
   background: var(--ops-surface);
-  font-size: 11px;
+  font-size: 13px;
   margin-top: auto;
 }
 
@@ -1758,14 +1758,14 @@
 }
 
 .admin-audit-heading h3 {
-  color: var(--ops-text);
+  color: #000000;
   font-size: 13px;
 }
 
 .admin-audit-heading p {
   margin-top: 2px;
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-audit-table th:nth-child(1) { width: 190px; }
@@ -1773,15 +1773,15 @@
 .admin-audit-table th:nth-child(3) { width: 280px; }
 
 .admin-audit-table code {
-  color: #53616a;
+  color: #000000;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .admin-audit-metadata {
   min-width: 320px;
-  color: #34434c;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   vertical-align: top;
 }
 
@@ -1798,14 +1798,14 @@
 }
 
 .admin-audit-detail-list dt {
-  color: var(--ops-muted);
+  color: #000000;
   font-weight: 600;
 }
 
 .admin-audit-detail-list dd {
   margin: 0;
   overflow-wrap: anywhere;
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .admin-audit-change-details,
@@ -1879,7 +1879,7 @@
   border-left: 3px solid var(--ops-primary);
   background: var(--ops-primary-soft);
   color: #34505d;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .admin-form-intro svg {
@@ -1895,7 +1895,7 @@
 
 .admin-users-page .form-group label {
   margin-bottom: 6px;
-  color: #20262c;
+  color: #000000;
   font-size: 14px;
   font-weight: 600;
 }
@@ -1906,14 +1906,14 @@
   padding: 8px 11px;
   border-color: var(--ops-border-strong);
   border-radius: 3px !important;
-  color: var(--ops-text);
+  color: #000000;
   font-size: 14px;
 }
 
 /* Ô chỉ đọc: nền xám để thấy ngay là giá trị hệ thống tự điền, không phải ô bỏ trống. */
 .admin-users-page .form-group input[readonly] {
   background: #f4f6f7;
-  color: #20262c;
+  color: #000000;
   font-weight: 600;
   cursor: default;
 }
@@ -1934,7 +1934,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--ops-text);
+  color: #000000;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -1956,7 +1956,7 @@
   background: transparent;
   color: var(--ops-primary-dark);
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -1977,7 +1977,7 @@
   min-height: 34px;
   padding: 7px 12px;
   border-radius: 3px !important;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .admin-import-dialog {
@@ -2019,16 +2019,16 @@
 
 .admin-import-picker strong {
   overflow: hidden;
-  color: var(--ops-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .admin-import-picker small {
   margin-top: 3px;
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-import-picker input {
@@ -2045,8 +2045,8 @@
   align-items: center;
   gap: 8px;
   margin-top: 12px;
-  color: var(--ops-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-import-state svg {
@@ -2074,13 +2074,13 @@
 }
 
 .admin-import-preview > header strong {
-  color: var(--ops-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-import-preview > header span {
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 /*
@@ -2104,15 +2104,15 @@
 
 .admin-import-export-failed-error {
   color: #8d2525;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .admin-import-table-scroll table {
   width: 100%;
   min-width: 560px;
   border-collapse: collapse;
-  color: var(--ops-text);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   text-align: left;
 }
 
@@ -2128,7 +2128,7 @@
   top: 0;
   z-index: 1;
   background: var(--ops-muted-surface);
-  color: #44515a;
+  color: #000000;
   font-weight: 650;
 }
 
@@ -2195,14 +2195,14 @@
 }
 
 .admin-import-summary strong {
-  color: var(--ops-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-import-summary span {
   margin-top: 2px;
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-import-summary.has-warnings {
@@ -2259,14 +2259,14 @@
 }
 
 .admin-profile-heading h4 {
-  color: var(--ops-text);
+  color: #000000;
   font-size: 13px;
 }
 
 .admin-profile-heading p {
   margin-top: 2px;
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-profile-list {
@@ -2288,8 +2288,8 @@
 }
 
 .admin-profile-title strong {
-  color: var(--ops-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-row-actions {
@@ -2333,7 +2333,7 @@
   border: 1px solid var(--ops-border-strong);
   border-radius: 4px;
   font-size: 13px;
-  color: var(--ops-text);
+  color: #000000;
   background: var(--ops-surface);
 }
 
@@ -2368,7 +2368,7 @@
 .perm-role-item__name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .perm-role-item--active .perm-role-item__name {
@@ -2399,7 +2399,7 @@
   border-radius: 4px;
   flex: 1;
   max-width: 320px;
-  color: var(--ops-muted);
+  color: #000000;
 }
 
 .perm-search input {
@@ -2407,7 +2407,7 @@
   outline: none;
   flex: 1;
   font-size: 13px;
-  color: var(--ops-text);
+  color: #000000;
   background: transparent;
 }
 
@@ -2430,7 +2430,7 @@
 .perm-empty {
   padding: 24px;
   text-align: center;
-  color: var(--ops-muted);
+  color: #000000;
   font-size: 13px;
 }
 
@@ -2453,11 +2453,11 @@
 
 .perm-group__title {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--ops-muted);
+  color: #000000;
 }
 
 .perm-group__list {
@@ -2484,7 +2484,7 @@
 .perm-row__name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ops-text);
+  color: #000000;
 }
 
 .perm-toggle {
@@ -2557,9 +2557,9 @@
 
   .perm-sidebar-select-label {
     display: block;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
-    color: var(--ops-muted);
+    color: #000000;
     margin-bottom: 4px;
   }
 
@@ -2598,7 +2598,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
-  color: var(--ops-muted);
+  color: #000000;
   text-align: center;
 }
 
@@ -2615,13 +2615,13 @@
 }
 
 .admin-empty-state strong {
-  color: #47545d;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .admin-empty-state span {
   margin-top: 3px;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .admin-confirmation {
@@ -2658,7 +2658,7 @@
 }
 
 .admin-confirmation p {
-  color: var(--ops-text);
+  color: #000000;
   font-size: 13px;
   font-weight: 650;
 }
@@ -2666,8 +2666,8 @@
 .admin-confirmation > div > span {
   display: block;
   margin-top: 4px;
-  color: var(--ops-muted);
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -2683,7 +2683,7 @@
   }
 
   .auth-brand-lockup p {
-    font-size: 10px;
+    font-size: 13px;
   }
 
   .auth-brand-lockup span,
@@ -2860,7 +2860,7 @@
 
 @media (max-width: 520px) {
   .admin-view-tabs button {
-    font-size: 11px;
+    font-size: 13px;
   }
 
   .admin-view-actions {

@@ -211,7 +211,7 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             {semesterSurveys.length > 0 && (
               <div className="executive-compare-select" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <label htmlFor="dept-dashboard-survey-select" style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>Đợt khảo sát:</label>
+                <label htmlFor="dept-dashboard-survey-select" style={{ fontSize: '13px', color: '#000000', fontWeight: 600 }}>Đợt khảo sát:</label>
                 <select
                   id="dept-dashboard-survey-select"
                   value={selectedSurveyId ?? ''}
@@ -221,7 +221,7 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                     height: '32px',
                     maxWidth: 'min(320px, 40vw)',
                     padding: '0 8px',
-                    fontSize: '12px',
+                    fontSize: '13px',
                     border: '1px solid #cbd5e1',
                     borderRadius: '3px',
                     textOverflow: 'ellipsis',

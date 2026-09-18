@@ -32,7 +32,7 @@
   margin: 0;
   font-size: 17px;
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
   letter-spacing: 0;
 }
 
@@ -98,7 +98,7 @@
   background: transparent;
   padding: 4px 6px;
   border-radius: 4px;
-  color: var(--reports-text-muted);
+  color: #000000;
   font-size: 13px;
   cursor: default;
 }
@@ -121,7 +121,7 @@
 }
 
 .reports-crumb--current {
-  color: var(--reports-text);
+  color: #000000;
   font-weight: 700;
   max-width: 360px;
   overflow: hidden;
@@ -137,8 +137,8 @@
 
 .reports-breadcrumb-semester {
   margin-left: auto;
-  font-size: 12px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
   background: var(--reports-muted-surface);
   border: 1px solid var(--reports-border);
   padding: 3px 8px;
@@ -193,14 +193,14 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
   letter-spacing: 0;
 }
 
 .reports-summary-main p {
   margin: 0;
-  font-size: 12px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .reports-summary-metrics {
@@ -237,9 +237,9 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--reports-text);
+  color: #000000;
   white-space: nowrap;
 }
 
@@ -257,7 +257,7 @@
 .reports-kpi-item strong {
   font-size: 16px;
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
   line-height: 1.2;
 }
 
@@ -340,7 +340,7 @@
   border: 0;
   background: transparent;
   border-radius: 4px;
-  color: var(--reports-text-muted);
+  color: #000000;
   cursor: pointer;
 }
 
@@ -360,7 +360,7 @@
 .report-department-row td {
   background: var(--reports-muted-surface);
   border-top: 1px solid #eef1f4;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .report-department-row:hover td {
@@ -373,14 +373,14 @@
 }
 
 .report-muted-cell {
-  color: var(--reports-text-muted);
+  color: #000000;
   white-space: nowrap;
 }
 
 .report-number-cell {
   text-align: right;
   font-weight: 600;
-  color: var(--reports-text);
+  color: #000000;
   font-variant-numeric: tabular-nums;
 }
 
@@ -399,13 +399,13 @@
   text-align: right;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--reports-text);
+  color: #000000;
 }
 
 .catalog-secondary-value {
   display: block;
-  font-size: 11px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
   margin-top: 2px;
 }
 
@@ -449,7 +449,7 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: #1e293b;
+  color: #000000;
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
@@ -466,7 +466,7 @@
   gap: 16px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: #64748b;
+  color: #000000;
   min-width: 0;
 }
 
@@ -476,7 +476,7 @@
   padding: 4px 10px;
   border-radius: 4px;
   font-weight: 500;
-  color: #334155;
+  color: #000000;
 }
 
 .analysis-meta-count strong,
@@ -517,12 +517,12 @@
   flex-wrap: wrap;
   gap: 4px 6px;
   margin-right: auto;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .analysis-legend-label {
   font-weight: 600;
-  color: #475569;
+  color: #000000;
   margin-right: 2px;
 }
 
@@ -532,9 +532,9 @@
   gap: 5px;
   padding: 1px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
-  color: #334155;
+  color: #000000;
   background: #ffffff;
   border: 1px solid #e2e8f0;
 }
@@ -550,7 +550,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: #0284c7;
   background: #f0f9ff;
   border: 1px solid #bae6fd;
@@ -631,7 +631,7 @@
 .analysis-tooltip-badge {
   color: #ffffff;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   padding: 3px 8px;
   border-radius: 4px;
   letter-spacing: 0.5px;
@@ -658,13 +658,13 @@
 }
 
 .analysis-tooltip-score small {
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: 13px;
+  color: #000000;
   font-weight: 500;
 }
 
 .analysis-tooltip-tag {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   padding: 2px 6px;
   border-radius: 4px;
@@ -679,13 +679,13 @@
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: #1e293b;
+  color: #000000;
   font-weight: 500;
 }
 
 .analysis-tooltip-meta {
-  font-size: 12px;
-  color: #64748b;
+  font-size: 13px;
+  color: #000000;
   margin-bottom: 8px;
 }
 
@@ -695,9 +695,9 @@
 }
 
 .analysis-tooltip-dist-title {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  color: #64748b;
+  color: #000000;
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -714,8 +714,8 @@
   grid-template-columns: 85px 1fr 65px;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  color: #475569;
+  font-size: 13px;
+  color: #000000;
 }
 
 .dist-opt-label {
@@ -741,7 +741,7 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: #334155;
+  color: #000000;
 }
 
 .section-analysis-loading {
@@ -784,9 +784,9 @@
 }
 
 .analysis-text-question-title small {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--reports-text-muted);
+  color: #000000;
 }
 
 .analysis-text-question ul {
@@ -799,27 +799,27 @@
 }
 
 .analysis-text-question li {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.55;
   color: var(--reports-text-strong, #0f172a);
 }
 
 .analysis-text-empty {
   margin: 0;
-  font-size: 12px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .distribution-table-title {
   margin: 0 0 2px 0;
   font-size: 14px;
   font-weight: 700;
-  color: #1e293b;
+  color: #000000;
 }
 
 .distribution-table-subtitle {
-  font-size: 12px;
-  color: #64748b;
+  font-size: 13px;
+  color: #000000;
 }
 
 /*
@@ -859,7 +859,7 @@
 .analysis-question-cell {
   max-width: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -875,7 +875,7 @@
 
 .analysis-code-badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 4px;
@@ -902,7 +902,7 @@
 
 .analysis-status-pill {
   display: inline-block;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 12px;
@@ -922,9 +922,9 @@
 
 .section-analysis-option-col small {
   display: block;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--reports-text-muted);
+  color: #000000;
   white-space: normal;
   line-height: 1.3;
 }
@@ -941,14 +941,14 @@
 
 .section-analysis-option-count {
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
   font-variant-numeric: tabular-nums;
 }
 
 .section-analysis-option-pct {
   margin-left: 4px;
-  font-size: 11px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .section-analysis-avg-cell {
@@ -987,14 +987,14 @@
   border: 1px solid var(--reports-border);
   border-bottom: 0;
   background: var(--reports-muted-surface);
-  color: var(--reports-text-muted);
+  color: #000000;
   text-align: left;
   cursor: pointer;
 }
 
 .reports-workspace-tab:hover {
   background: #eef7fb;
-  color: var(--reports-text);
+  color: #000000;
 }
 
 .reports-workspace-tab.is-active {
@@ -1050,9 +1050,9 @@
   border: 1px solid var(--reports-border);
   border-radius: 13px;
   background: var(--reports-muted-surface, #f7f9fa);
-  color: var(--reports-text);
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1081,7 +1081,7 @@
 .reports-search-box .operation-icon {
   position: absolute;
   left: 10px;
-  color: var(--reports-text-muted);
+  color: #000000;
   pointer-events: none;
 }
 
@@ -1214,7 +1214,7 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
   letter-spacing: 0;
 }
 
@@ -1351,7 +1351,7 @@
   }
 
   .reports-workspace-tab strong {
-    font-size: 11px;
+    font-size: 13px;
   }
 }
 
@@ -1375,7 +1375,7 @@
   background: #ffffff;
   border: 1px solid var(--reports-border);
   border-radius: 4px;
-  color: var(--reports-text-muted);
+  color: #000000;
   font-size: 14px;
 }
 
@@ -1408,14 +1408,14 @@
   margin: 0;
   font-size: 16px;
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
   letter-spacing: 0;
 }
 
 .reports-exec-heading p {
   margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .reports-exec-compare {
@@ -1430,9 +1430,9 @@
 }
 
 .reports-exec-compare-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--reports-text-muted);
+  color: #000000;
   overflow-wrap: anywhere;
 }
 
@@ -1443,8 +1443,8 @@
   border: 1px solid var(--reports-border);
   border-radius: 4px;
   background-color: #ffffff;
-  color: var(--reports-text);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   min-width: 0;
 }
 
@@ -1459,7 +1459,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   padding: 2px 6px;
@@ -1482,7 +1482,7 @@
 }
 
 .reports-exec-delta.is-flat {
-  color: var(--reports-text-muted);
+  color: #000000;
   background: #eef1f4;
 }
 
@@ -1509,9 +1509,9 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--reports-text);
+  color: #000000;
   white-space: nowrap;
 }
 
@@ -1529,28 +1529,28 @@
 .reports-exec-stat strong {
   font-size: 16px;
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
   line-height: 1.2;
 }
 
 .reports-exec-stat small {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  color: #46515a;
+  color: #000000;
 }
 
 /* Giải nghĩa hai thuật ngữ dùng xuyên suốt trang, đặt ngay dưới dải số liệu. */
 .reports-exec-band-note {
   margin: 6px 0 0;
   padding: 0 2px;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.55;
-  color: #46515a;
+  color: #000000;
 }
 
 .reports-exec-band-note strong {
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
 }
 
 /* Một nhóm phân tích tại một thời điểm, tránh bốn biểu đồ và một bảng nối dài trang. */
@@ -1573,14 +1573,14 @@
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
-  color: var(--reports-text-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .reports-analysis-tabs button:hover {
-  color: var(--reports-text);
+  color: #000000;
   background: var(--reports-muted-surface);
 }
 
@@ -1598,7 +1598,7 @@
   border-radius: 10px;
   background: #fdf1e3;
   color: #b86216;
-  font-size: 10px;
+  font-size: 13px;
 }
 
 .reports-exec-kpi {
@@ -1622,43 +1622,43 @@
 
 .reports-exec-kpi-copy span {
   display: block;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--reports-text-muted);
+  color: #000000;
 }
 
 .reports-exec-kpi-copy strong {
   display: block;
   font-size: 22px;
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
 .reports-exec-kpi-copy small {
   display: block;
-  font-size: 11px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .reports-exec-kpi-label {
   display: block;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--reports-text-muted);
+  color: #000000;
   margin-bottom: 10px;
 }
 
 .reports-exec-kpi-sub {
   display: block;
-  font-size: 11px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
   margin-top: 8px;
 }
 
 .reports-exec-kpi-sub strong {
-  color: var(--reports-text);
+  color: #000000;
 }
 
 /* Vòng tiến độ */
@@ -1686,15 +1686,15 @@
 
 .reports-gauge-center span {
   margin-top: 3px;
-  font-size: 10px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .reports-gauge-center .reports-gauge-sub {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--reports-text);
+  color: #000000;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1726,8 +1726,8 @@
 }
 
 .reports-satisfaction-score small {
-  font-size: 12px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
   font-weight: 600;
 }
 
@@ -1748,9 +1748,9 @@
 }
 
 .reports-satisfaction-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--reports-text-muted);
+  color: #000000;
 }
 
 /* Thanh trạng thái lớp */
@@ -1792,12 +1792,12 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .reports-exec-statuslegend strong {
-  color: var(--reports-text);
+  color: #000000;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1831,14 +1831,14 @@
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: var(--reports-text);
+  color: #000000;
   letter-spacing: 0;
 }
 
 .reports-exec-card-note {
   margin-left: auto;
-  font-size: 11px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -1849,8 +1849,8 @@
   align-items: center;
   gap: 6px;
   margin-left: auto;
-  font-size: 12px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .reports-question-controls label {
@@ -1864,9 +1864,9 @@
   border: 1px solid var(--reports-border);
   border-radius: 3px;
   background: #ffffff;
-  color: var(--reports-text);
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .reports-question-controls input {
@@ -1890,7 +1890,7 @@
   min-height: 120px;
   border: 1px dashed var(--reports-border);
   border-radius: 4px;
-  color: var(--reports-text-muted);
+  color: #000000;
   font-size: 13px;
   text-align: center;
   padding: 16px;
@@ -1901,8 +1901,8 @@
   align-items: center;
   gap: 6px;
   margin-top: 8px;
-  font-size: 11px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .reports-chart-note .operation-icon {
@@ -1919,16 +1919,16 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .reports-chart-tooltip strong {
   font-size: 13px;
-  color: var(--reports-text);
+  color: #000000;
 }
 
 .reports-chart-tooltip span {
-  color: var(--reports-text-muted);
+  color: #000000;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1960,13 +1960,13 @@
 .reports-donut-center strong {
   font-size: 18px;
   font-weight: 800;
-  color: var(--reports-text);
+  color: #000000;
   font-variant-numeric: tabular-nums;
 }
 
 .reports-donut-center span {
-  font-size: 11px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .reports-donut-legend {
@@ -1984,7 +1984,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .reports-donut-legend-dot {
@@ -1995,12 +1995,12 @@
 }
 
 .reports-donut-legend-label {
-  color: var(--reports-text);
+  color: #000000;
   flex: 1;
 }
 
 .reports-donut-legend-value {
-  color: var(--reports-text-muted);
+  color: #000000;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -2026,13 +2026,13 @@
 .reports-weakest-hint {
   margin: 0;
   padding: 0 16px 10px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  color: #46515a;
+  color: #000000;
 }
 
 .reports-weakest-hint strong {
-  color: var(--reports-text);
+  color: #000000;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2148,7 +2148,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2156,8 +2156,8 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 12px;
-  color: var(--reports-text-muted);
+  font-size: 13px;
+  color: #000000;
 }
 
 .reports-lagging-faculty .operation-icon {
@@ -2171,8 +2171,8 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 2px 2px;
-  color: var(--reports-text-muted);
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .reports-pagination > div {
@@ -2183,7 +2183,7 @@
 
 .reports-pagination strong {
   min-width: 76px;
-  color: var(--reports-text);
+  color: #000000;
   text-align: center;
 }
 
@@ -2220,12 +2220,12 @@
 
 .reports-exec-empty strong {
   font-size: 15px;
-  color: var(--reports-text);
+  color: #000000;
 }
 
 .reports-exec-empty span {
   font-size: 13px;
-  color: var(--reports-text-muted);
+  color: #000000;
 }
 
 /* ---------- Responsive tổng quan ---------- */

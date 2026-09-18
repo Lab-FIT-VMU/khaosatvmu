@@ -10,7 +10,6 @@ import {
   CircleAlert,
   GitCompareArrows,
   Info,
-  Lightbulb,
   LoaderCircle,
   RadioTower,
   Search,
@@ -57,13 +56,13 @@ const campaignSelectCss = `
 .campaign-select { position: relative; flex: 0 0 460px; min-width: 0; }
 .campaign-select__trigger {
   width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #20262c;
-  font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #000000;
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .campaign-select__trigger:disabled { background: #f4f6f8; color: #8c969f; cursor: not-allowed; }
 .campaign-select__trigger:focus-visible { outline: 2px solid rgba(7,136,184,.25); border-color: #0788b8; }
 .campaign-select__value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #68737d; }
+.campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #000000; }
 .campaign-select__list {
   position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none;
   overflow-y: auto; border: 1px solid #d7dee2; background: #fff;
@@ -72,7 +71,7 @@ const campaignSelectCss = `
 .campaign-select__option {
   position: relative; overflow: hidden; container-type: inline-size;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 8px 12px; font-size: 12px; color: #20262c; cursor: pointer;
+  padding: 8px 12px; font-size: 13px; color: #000000; cursor: pointer;
 }
 .campaign-select__option.is-active { background: #eef7fb; }
 .campaign-select__option > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -86,10 +85,10 @@ const campaignSelectCss = `
   0%, 12% { transform: translateX(0); }
   88%, 100% { transform: translateX(min(0px, calc(100cqw - 100% - 26px))); }
 }
-.campaign-select__empty { padding: 10px 12px; color: #68737d; font-size: 12px; text-align: center; }
+.campaign-select__empty { padding: 10px 12px; color: #000000; font-size: 13px; text-align: center; }
 .campaign-select__hint {
   position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid #d7dee2;
-  background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #20262c;
+  background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #000000;
   font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: none;
 }
 `;
@@ -713,20 +712,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <strong>chưa xác định</strong>
             )}
           </span>
-
-          <span className="executive-brief-item">
-            <Lightbulb aria-hidden="true" />
-            Tiêu chí yếu nhất:{' '}
-            {canPublishScore && aiInsights.weakestQuestion ? (
-              <strong title={aiInsights.weakestQuestion.questionText}>
-                {aiInsights.weakestQuestion.questionText} (
-                {aiInsights.weakestQuestion.averageScore.toFixed(2)}/5.0)
-              </strong>
-            ) : (
-              <strong>chưa đủ mẫu để công bố</strong>
-            )}
-          </span>
-
           <span className="executive-brief-time">Nạp lúc {formatLoadedAt(lastUpdatedAt)}</span>
         </section>
       )}
@@ -1007,7 +992,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         <section className="executive-table-card" aria-label="Bảng giám sát chi tiết theo Khoa / Viện">
           <div className="executive-table-toolbar">
             <div className="executive-search-input">
-              <Search style={{ width: 14, height: 14, color: '#94a3b8' }} aria-hidden="true" />
+              <Search style={{ width: 14, height: 14, color: '#000000' }} aria-hidden="true" />
               <input
                 type="text"
                 placeholder="Tìm kiếm Khoa / Viện..."
@@ -1029,7 +1014,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 className={`executive-chip ${filterStatus === 'good' ? 'is-active' : ''}`}
                 onClick={() => setFilterStatus('good')}
               >
-                Đạt chuẩn ≥{COMPLETED_COMPLETION_RATE}% (
+                Đạt chỉ tiêu ≥{COMPLETED_COMPLETION_RATE}% (
                 {overviewData.faculties.filter(
                   (f) => f.completionRate >= COMPLETED_COMPLETION_RATE
                 ).length}
@@ -1057,11 +1042,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <thead>
                 <tr>
                   <th scope="col" style={{ width: 48 }}>STT</th>
-                  <th scope="col">Khoa / Viện Đào tạo</th>
+                  <th scope="col">Khoa/Viện</th>
                   <th scope="col" style={{ width: 130 }}>Quy mô</th>
                   <th scope="col" style={{ width: 150 }}>Phiếu hợp lệ / Chỉ tiêu</th>
                   <th scope="col" style={{ width: 180 }}>Tiến độ thu phiếu</th>
-                  <th scope="col" style={{ width: 110 }}>Điểm TB</th>
+                  <th scope="col" style={{ width: 110 }}>Điểm trung bình</th>
                   <th scope="col" style={{ width: 130 }}>Trạng thái</th>
                   <th scope="col" style={{ width: 110, textAlign: 'right' }}>Thao tác</th>
                 </tr>
@@ -1080,14 +1065,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     const color = completionColor(faculty.completionRate);
                     return (
                       <tr key={faculty.facultyId}>
-                        <td style={{ color: '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
+                        <td style={{ color: '#000000', fontVariantNumeric: 'tabular-nums' }}>
                           {idx + 1}
                         </td>
                         <td>
                           <strong>{faculty.facultyName}</strong>
                         </td>
                         <td>
-                          <span style={{ color: '#64748b' }}>
+                          <span style={{ color: '#000000' }}>
                             {faculty.departmentCount} BM · {faculty.sectionCount} Lớp
                           </span>
                         </td>
@@ -1116,7 +1101,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                         </td>
                         <td>
                           {faculty.completionRate >= COMPLETED_COMPLETION_RATE ? (
-                            <span className="executive-status-pill is-good">Đạt chuẩn</span>
+                            <span className="executive-status-pill is-good">Đạt chi tiêu</span>
                           ) : faculty.completionRate >= LAGGING_THRESHOLD ? (
                             <span className="executive-status-pill is-ok">Đang thu</span>
                           ) : (

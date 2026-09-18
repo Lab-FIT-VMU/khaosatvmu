@@ -6,7 +6,7 @@
   min-height: 100vh;
   padding: 28px 16px 40px;
   background: #f5f7f8;
-  color: #20262c;
+  color: #000000;
   font-size: 13px;
 }
 
@@ -41,7 +41,7 @@
 
 .public-survey-header > p {
   margin: 12px 0 0;
-  color: #68737d;
+  color: #000000;
 }
 
 .public-survey-context {
@@ -60,7 +60,7 @@
   border: 1px solid #d7e7ed;
   border-radius: 999px;
   background: #f2f8fa;
-  color: #40505a;
+  color: #000000;
   font-size: 12px;
 }
 
@@ -94,7 +94,7 @@
 
 .public-survey-note p {
   margin: 0;
-  color: #40505a;
+  color: #000000;
   font-size: 12px;
 }
 
@@ -139,7 +139,7 @@
 
 .public-survey-pledge p {
   margin: 0;
-  color: #40505a;
+  color: #000000;
   font-size: 12px;
   line-height: 1.55;
 }
@@ -149,7 +149,7 @@
   align-items: center;
   gap: 12px;
   margin-top: 18px;
-  color: #68737d;
+  color: #000000;
   font-size: 12px;
 }
 
@@ -188,14 +188,14 @@
 
 .public-survey-table thead th {
   background: #f7f9fa;
-  color: #40505a;
+  color: #000000;
   font-size: 12px;
   font-weight: 650;
 }
 
 .public-survey-table thead th small {
   display: block;
-  color: #8c969f;
+  color: #000000;
   font-size: 11px;
   font-weight: 500;
 }
@@ -208,7 +208,7 @@
 }
 
 .public-survey-table tbody th {
-  color: #20262c;
+  color: #000000;
   font-size: 12px;
 }
 
@@ -251,7 +251,7 @@
 .public-survey-text-question label {
   display: block;
   margin-bottom: 6px;
-  color: #20262c;
+  color: #000000;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.5;
@@ -263,7 +263,7 @@
   border: 1px solid #d7dee2;
   border-radius: 4px;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
   font-family: inherit;
   font-size: 13px;
   resize: vertical;
@@ -283,7 +283,7 @@
 .public-survey-comments label {
   display: block;
   margin-bottom: 6px;
-  color: #40505a;
+  color: #000000;
   font-size: 12px;
   font-weight: 600;
 }
@@ -294,7 +294,7 @@
   border: 1px solid #d7dee2;
   border-radius: 4px;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
   font-family: inherit;
   font-size: 13px;
   resize: vertical;
@@ -310,7 +310,7 @@
   position: absolute;
   right: 10px;
   bottom: 10px;
-  color: #8c969f;
+  color: #000000;
   font-size: 11px;
 }
 
@@ -367,7 +367,7 @@
   margin-top: 20px;
   padding-top: 14px;
   border-top: 1px solid #e5eaee;
-  color: #8c969f;
+  color: #000000;
   font-size: 11px;
   text-align: center;
 }
@@ -383,7 +383,7 @@
   border: 1px solid #dfe4e8;
   border-radius: 6px;
   background: #ffffff;
-  color: #40505a;
+  color: #000000;
 }
 
 .public-survey-state--error {
@@ -413,7 +413,7 @@
 
 .public-survey-success p {
   margin: 0;
-  color: #68737d;
+  color: #000000;
 }
 
 /* Bố cục cho màn hình hẹp: mỗi câu hỏi là một thẻ, các mức xếp ngang thành
@@ -436,7 +436,7 @@
 
 .public-survey-question-text {
   margin: 0 0 10px;
-  color: #20262c;
+  color: #000000;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.45;
@@ -460,7 +460,7 @@
 }
 
 .public-survey-option-value {
-  color: #40505a;
+  color: #000000;
   font-size: 12px;
   font-weight: 600;
 }
@@ -477,7 +477,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 6px;
-  color: #8c969f;
+  color: #000000;
   font-size: 11px;
   line-height: 1.3;
 }
@@ -598,7 +598,7 @@
 */
 .public-intro-head h1 {
   margin: 0;
-  color: #20262c;
+  color: #000000;
   font-size: 30px;
   font-weight: 750;
   line-height: 1.25;
@@ -607,7 +607,7 @@
 
 .public-intro-head p {
   margin: 8px 0 0;
-  color: #46515a;
+  color: #000000;
   font-size: 18px;
   font-weight: 500;
 }
@@ -647,7 +647,7 @@
 }
 
 .public-intro-meta-item dt {
-  color: #46515a;
+  color: #000000;
   font-size: 14px;
   font-weight: 500;
   line-height: 1.4;
@@ -655,7 +655,7 @@
 
 .public-intro-meta-item dd {
   margin: 3px 0 0;
-  color: #20262c;
+  color: #000000;
   font-size: 17px;
   font-weight: 650;
   line-height: 1.4;
@@ -685,14 +685,14 @@
 .public-intro-notice strong {
   display: block;
   margin-bottom: 5px;
-  color: #20262c;
+  color: #000000;
   font-size: 16px;
   font-weight: 700;
 }
 
 .public-intro-notice p {
   margin: 0;
-  color: #46515a;
+  color: #000000;
   font-size: 15px;
   line-height: 1.65;
 }
@@ -743,7 +743,7 @@
 /* Dòng đánh dấu bản chạy thử, đặt ngoài thẻ để không chen vào mạch đọc của phiếu. */
 .public-intro-footnote {
   margin: 14px 0 0;
-  color: #46515a;
+  color: #000000;
   font-size: 14px;
   text-align: center;
   letter-spacing: 0.02em;
@@ -864,7 +864,7 @@
 
 .public-quiz-card h1 {
   margin: 14px 0 0;
-  color: #20262c;
+  color: #000000;
   font-size: 26px;
   font-weight: 750;
   line-height: 1.3;
@@ -912,7 +912,7 @@
 }
 
 .public-quiz-meta-item dt {
-  color: #46515a;
+  color: #000000;
   font-size: 14px;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -920,7 +920,7 @@
 
 .public-quiz-meta-item dd {
   margin: 3px 0 0;
-  color: #20262c;
+  color: #000000;
   font-size: 15px;
   font-weight: 650;
   line-height: 1.4;
@@ -938,7 +938,7 @@
 
 .public-quiz-progress-label {
   flex: 0 0 auto;
-  color: #20262c;
+  color: #000000;
   font-size: 14px;
   font-weight: 650;
 }
@@ -962,7 +962,7 @@
 .public-quiz-progress-percent {
   flex: 0 0 auto;
   min-width: 40px;
-  color: #46515a;
+  color: #000000;
   font-size: 14px;
   font-weight: 650;
   text-align: right;
@@ -1053,7 +1053,7 @@
 
 .public-quiz-question-head p {
   margin: 3px 0 0;
-  color: #20262c;
+  color: #000000;
   font-size: 16px;
   font-weight: 600;
   line-height: 1.45;
@@ -1082,7 +1082,7 @@
   border: 1px solid #e3e8eb;
   border-radius: 8px;
   background: #f8fafb;
-  color: #20262c;
+  color: #000000;
   cursor: pointer;
   text-align: center;
   transition: border-color 120ms ease, background-color 120ms ease;
@@ -1121,13 +1121,13 @@
 }
 
 .public-quiz-option-label {
-  color: #46515a;
+  color: #000000;
   font-size: 14px;
   line-height: 1.35;
 }
 
 .public-quiz-option.is-selected .public-quiz-option-label {
-  color: #20262c;
+  color: #000000;
   font-weight: 600;
 }
 
@@ -1149,7 +1149,7 @@
   border: 1px solid #d7dee2;
   border-radius: 8px;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
   font-family: inherit;
   font-size: 15px;
   line-height: 1.6;
@@ -1168,7 +1168,7 @@
   position: static;
   display: block;
   margin-top: 6px;
-  color: #6b757e;
+  color: #000000;
   font-size: 13px;
   text-align: right;
 }
@@ -1177,7 +1177,7 @@
 
 .public-quiz-comments h2 {
   margin: 14px 0 0;
-  color: #20262c;
+  color: #000000;
   font-size: 22px;
   font-weight: 750;
   line-height: 1.3;
@@ -1185,7 +1185,7 @@
 
 .public-quiz-comments-hint {
   margin: 8px 0 16px;
-  color: #46515a;
+  color: #000000;
   font-size: 15px;
   line-height: 1.6;
 }
@@ -1217,7 +1217,7 @@
 
 .public-question-review-heading h2 {
   margin: 0;
-  color: #20262c;
+  color: #000000;
   font-size: 17px;
   font-weight: 700;
   line-height: 1.4;
@@ -1225,7 +1225,7 @@
 
 .public-question-review-heading p {
   margin: 3px 0 0;
-  color: #6b757e;
+  color: #000000;
   font-size: 13px;
   line-height: 1.45;
 }
@@ -1246,7 +1246,7 @@
   border: 1px solid #b8c2c9;
   border-radius: 4px;
   background: #ffffff;
-  color: #334155;
+  color: #000000;
   font: inherit;
   font-size: 13px;
   font-weight: 650;
@@ -1261,7 +1261,7 @@
 
 .public-question-review-item > span:last-child {
   background: #e5e9ec;
-  color: #64727d;
+  color: #000000;
   font-size: 14px;
   line-height: 1;
 }
@@ -1454,7 +1454,7 @@
 
 .public-submit-confirm {
   text-align: center;
-  color: #20262c;
+  color: #000000;
 }
 
 /* Hộp xác nhận đi theo màu xanh lá của phiếu, không dùng xanh dương của trang quản trị. */
@@ -1474,20 +1474,20 @@
 
 .public-submit-confirm h2 {
   margin: 16px 0 0;
-  color: #20262c;
+  color: #000000;
   font-size: 21px;
   font-weight: 750;
 }
 
 .public-submit-confirm > p {
   margin: 10px 0 0;
-  color: #46515a;
+  color: #000000;
   font-size: 15px;
   line-height: 1.6;
 }
 
 .public-submit-confirm > p strong {
-  color: #20262c;
+  color: #000000;
   font-weight: 700;
 }
 
@@ -1513,14 +1513,14 @@
 
 .public-submit-facts dt {
   flex: 0 0 auto;
-  color: #46515a;
+  color: #000000;
   font-weight: 600;
 }
 
 .public-submit-facts dd {
   margin: 0;
   min-width: 0;
-  color: #20262c;
+  color: #000000;
   overflow-wrap: anywhere;
 }
 
@@ -1549,11 +1549,11 @@
 .public-submit-cancel {
   border: 1px solid #cfd7dc;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
 }
 
 .public-submit-cancel:hover {
-  border-color: #9fabb3;
+  border-color: #000000;
   background: #f7f9fa;
 }
 
@@ -1614,7 +1614,7 @@
 
 .public-done h1 {
   margin: 12px 0 0;
-  color: #20262c;
+  color: #000000;
   font-size: 24px;
   font-weight: 750;
   line-height: 1.3;
@@ -1623,7 +1623,7 @@
 .public-done p {
   max-width: 520px;
   margin: 12px auto 0;
-  color: #46515a;
+  color: #000000;
   font-size: 15px;
   line-height: 1.65;
 }

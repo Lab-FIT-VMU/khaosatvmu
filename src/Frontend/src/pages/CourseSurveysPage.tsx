@@ -14,7 +14,6 @@ import {
   Save,
   Trash2,
   TriangleAlert,
-  Users,
   UsersRound,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -734,14 +733,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                   <CalendarDays className="operation-icon" aria-hidden="true" />
                   {formatRange(survey.startTime, survey.endTime)}
                 </span>
-                {!hideCampaignCounts && (
-                  <span>
-                    <Users className="operation-icon" aria-hidden="true" />
-                    {survey.responseCount} lượt trả lời
-                  </span>
-                )}
                 <span>{survey.templateName}</span>
-                {!hideCampaignCounts && <span>{survey.questionCount} câu hỏi</span>}
                 {/*
                   Lớp mới của chính các bộ môn đợt đang phủ thì chưa có bài. Không
                   đếm lớp của khoa khác: đợt cố ý giới hạn phạm vi mà đem so với cả
@@ -753,6 +745,12 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                     {survey.missingSectionCount} lớp trong phạm vi chưa có bài khảo sát
                   </span>
                 )}
+              </div>
+
+              {/* Nút tách khỏi khối mô tả: để chung một hàng thì chúng bị chữ đẩy đi,
+                  lúc xuống dòng lúc không. Giờ mô tả chạy bên trái, cụm nút luôn nằm
+                  gọn một hàng ở góc phải. */}
+              <div className="semester-survey-actions">
                 {canAddScope && (
                   <button
                     type="button"
@@ -788,7 +786,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                   ) : (
                     <>
                       <Download className="operation-icon" aria-hidden="true" />
-                      Xuất Excel kèm QR
+                      Xuất Excel
                     </>
                   )}
                 </button>
@@ -821,35 +819,37 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                   <thead>
                     {/* Bề rộng theo phần trăm để tỷ lệ cột giữ nguyên ở mọi cỡ màn hình. */}
                     <tr>
-                      <th style={{ width: '19%' }}>Lớp học phần</th>
-                      <th style={{ width: '12%' }}>Bộ môn</th>
-                      <th style={{ width: '17%' }}>Giảng viên</th>
+                      <th style={{ width: '12%' }}>Khoa / Viện</th>
+                      <th style={{ width: '11%' }}>Bộ môn</th>
+                      <th style={{ width: '18%' }}>Lớp học phần</th>
+                      <th style={{ width: '14%' }}>Giảng viên</th>
                       <th style={{ width: '4%' }}>Sĩ số</th>
                       <th style={{ width: '16%' }}>Đường dẫn riêng</th>
-                      <th style={{ width: '13%' }}>Thời gian mở</th>
+                      <th style={{ width: '12%' }}>Thời gian mở</th>
                       <th style={{ width: '5%' }}>Lượt trả lời</th>
-                      <th style={{ width: '14%' }}>Thao tác</th>
+                      <th style={{ width: '8%' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sections.length === 0 && (
                       <tr>
-                        <td colSpan={8}>Đang tải danh sách lớp...</td>
+                        <td colSpan={9}>Đang tải danh sách lớp...</td>
                       </tr>
                     )}
                     {visibleSections.map((section) => (
                       <tr key={section.courseSectionSurveyId}>
-                        <td className="campaign-primary-cell">
+                        <td title={section.facultyName}>{section.facultyName}</td>
+                        <td title={section.departmentName}>{section.departmentName}</td>
+                        {/* Một dòng "Tên học phần - Nhóm lớp": mã học phần đã có ở ô
+                            đường dẫn và ở mã QR, nhắc lại ở đây chỉ tổ dài dòng. */}
+                        <td
+                          className="campaign-primary-cell"
+                          title={`${section.courseName} - ${section.sectionName}`}
+                        >
                           <div className="campaign-primary-value">
-                            <span>
-                              {section.courseCode} - {section.courseName}
-                            </span>
-                          </div>
-                          <div className="campaign-secondary-value">
-                            <span>Lớp: <strong>{section.sectionName}</strong></span>
+                            <span>{section.courseName} - {section.sectionName}</span>
                           </div>
                         </td>
-                        <td>{section.departmentName}</td>
                         <td>{section.lecturerName || 'Chưa phân công'}</td>
                         <td className="campaign-number-cell">{section.classSize}</td>
                         <td className="campaign-link-cell">
@@ -878,7 +878,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                             <span>{formatRange(section.startTime, section.endTime)}</span>
                           </div>
                         </td>
-                        <td>
+                        <td className="campaign-number-cell">
                           {/* Số lượt trả lời là lối tắt sang trang Thống kê & Báo cáo,
                               mà vai trò chỉ đọc không có quyền vào đó — câu H-e chốt
                               giảng viên chỉ xem tiến độ, không xem kết quả. */}

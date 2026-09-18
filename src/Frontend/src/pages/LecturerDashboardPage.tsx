@@ -212,7 +212,7 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             {semesterSurveys.length > 0 && (
               <div className="executive-compare-select" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <label htmlFor="lec-dashboard-survey-select" style={{ fontSize: '13px', color: '#20262c', fontWeight: 600 }}>Đợt khảo sát:</label>
+                <label htmlFor="lec-dashboard-survey-select" style={{ fontSize: '13px', color: '#000000', fontWeight: 600 }}>Đợt khảo sát:</label>
                 <select
                   id="lec-dashboard-survey-select"
                   value={selectedSurveyId ?? ''}
@@ -223,7 +223,7 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
                     maxWidth: 'min(320px, 40vw)',
                     padding: '0 8px',
                     fontSize: '13px',
-                    color: '#20262c',
+                    color: '#000000',
                     border: '1px solid #cbd5e1',
                     borderRadius: '3px',
                     textOverflow: 'ellipsis',
