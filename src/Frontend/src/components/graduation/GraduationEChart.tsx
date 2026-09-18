@@ -93,18 +93,23 @@ export function GraduationEChart({
     const isCombo = type === 'combo';
     const hasStackLabels = series.some((item) => Boolean(item.stackLabel || item.stackLabelKey));
     const visibleCategoryCount = isHorizontal ? 9 : 8;
+    // Hai loại zoom giải quyết hai vấn đề khác nhau: nhiều nhóm thì cuộn theo trục
+    // danh mục; nhiều chuỗi hoặc ít nhóm thì zoom trục giá trị để tách các đường/cột
+    // đang nằm sát nhau. Với biểu đồ dọc, zoom giá trị chính là thanh dọc bên phải.
     const needsCategoryZoom = categories.length > visibleCategoryCount;
+    const needsValueZoom = unit === 'percent'
+      || series.length > 1
+      || (categories.length > 1 && !needsCategoryZoom);
     const categoryZoomEnd = Math.min(100, (visibleCategoryCount / categories.length) * 100);
-    const needsPercentZoom = unit === 'percent';
     const maximumPercentValue = Math.max(
       referenceLine?.value ?? 0,
       ...data.map((row) => isStacked
         ? series.reduce((sum, item) => sum + (typeof row[item.key] === 'number' ? Number(row[item.key]) : 0), 0)
         : Math.max(0, ...series.map((item) => typeof row[item.key] === 'number' ? Number(row[item.key]) : 0))),
     );
-    const percentZoomEnd = isStacked
-      ? 100
-      : Math.min(100, Math.max(10, Math.ceil(maximumPercentValue * 1.2 / 5) * 5));
+    const valueZoomEnd = unit === 'percent' && !isStacked
+      ? Math.min(100, Math.max(10, Math.ceil(maximumPercentValue * 1.2 / 5) * 5))
+      : 100;
     const valueAxis = {
       type: 'value' as const,
       min: 0,
@@ -215,7 +220,11 @@ export function GraduationEChart({
             : item.stackLabel
               ? item.stackLabel
               : (params: { value?: unknown }) => formatValue(params.value, unit),
-          color: isCombo && !seriesIsLine ? '#fff' : '#4d5962',
+          color: isCombo && !seriesIsLine
+            ? '#fff'
+            : seriesIsLine && series.length > 1
+              ? palette[index % palette.length]
+              : '#4d5962',
           fontSize: 11,
           fontWeight: item.stackLabel || item.stackLabelKey || (isCombo && seriesIsLine) ? 650 : 400,
           lineHeight: item.stackLabelKey ? 15 : undefined,
@@ -254,27 +263,27 @@ export function GraduationEChart({
       { type: 'inside' as const, xAxisIndex: 0, start: 0, end: categoryZoomEnd },
       {
         type: 'slider' as const, xAxisIndex: 0, start: 0, end: categoryZoomEnd,
-        left: 52, right: needsPercentZoom ? 48 : 24, bottom: 4, height: 18,
+        left: 52, right: needsValueZoom ? 48 : 24, bottom: 4, height: 18,
         showDetail: false, brushSelect: false,
       },
     ];
-    const percentDataZoom = !needsPercentZoom ? [] : isHorizontal ? [
+    const valueDataZoom = !needsValueZoom ? [] : isHorizontal ? [
       {
-        type: 'inside' as const, xAxisIndex: 0, start: 0, end: percentZoomEnd,
+        type: 'inside' as const, xAxisIndex: 0, start: 0, end: valueZoomEnd,
         filterMode: 'none' as const,
       },
       {
-        type: 'slider' as const, xAxisIndex: 0, start: 0, end: percentZoomEnd,
+        type: 'slider' as const, xAxisIndex: 0, start: 0, end: valueZoomEnd,
         filterMode: 'none' as const, left: 184, right: 24, bottom: 4, height: 18,
         showDetail: true, brushSelect: false,
       },
     ] : [
       {
-        type: 'inside' as const, yAxisIndex: 0, start: 0, end: percentZoomEnd,
+        type: 'inside' as const, yAxisIndex: 0, start: 0, end: valueZoomEnd,
         filterMode: 'none' as const,
       },
       {
-        type: 'slider' as const, yAxisIndex: 0, start: 0, end: percentZoomEnd,
+        type: 'slider' as const, yAxisIndex: 0, start: 0, end: valueZoomEnd,
         filterMode: 'none' as const, right: 4, top: 48, bottom: 48, width: 14,
         showDetail: true, brushSelect: false,
       },
@@ -298,11 +307,11 @@ export function GraduationEChart({
           valueFormatter: (value) => formatValue(value, unit),
         },
       legend: { show: showLegend && series.length > 1, type: 'scroll', top: 0 },
-      dataZoom: [...categoryDataZoom, ...percentDataZoom],
+      dataZoom: [...categoryDataZoom, ...valueDataZoom],
       grid: {
         top: showLegend && series.length > 1 ? 46 : hasStackLabels ? 48 : 20,
         left: isHorizontal ? 184 : yAxisName ? 68 : 52,
-        right: !isHorizontal && needsPercentZoom
+        right: !isHorizontal && needsValueZoom
           ? showLabels ? 86 : 48
           : isHorizontal && needsCategoryZoom ? 34 : showLabels ? 70 : 24,
         bottom: !isHorizontal && needsCategoryZoom

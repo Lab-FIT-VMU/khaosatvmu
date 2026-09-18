@@ -6,6 +6,18 @@ export const ROLE_CODES = {
   lecturer: 'LECTURER',
 } as const;
 
+/** Tên hiển thị thống nhất; mã vai trò tiếng Anh chỉ dùng nội bộ. */
+export const ROLE_NAMES: Readonly<Record<string, string>> = {
+  [ROLE_CODES.admin]: 'Quản trị hệ thống',
+  [ROLE_CODES.surveyAdmin]: 'Quản trị khảo sát',
+  [ROLE_CODES.departmentManager]: 'Trưởng bộ môn',
+  [ROLE_CODES.lecturer]: 'Giảng viên',
+};
+
+export function roleDisplayName(roleCode: string, fallback?: string): string {
+  return ROLE_NAMES[roleCode] ?? fallback ?? roleCode;
+}
+
 /**
  * Vai trò cấp quản trị: không bị giới hạn phạm vi dữ liệu và được làm mọi thao tác
  * ghi. Các vai trò còn lại chỉ thấy và sửa được dữ liệu bộ môn của mình.

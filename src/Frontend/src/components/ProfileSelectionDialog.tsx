@@ -10,15 +10,9 @@ import {
   X,
 } from 'lucide-react';
 import { authMessage } from '../auth/authMessages';
+import { roleDisplayName } from '../auth/roles';
 import type { AuthProfile } from '../types';
 import '../styles/auth-admin.css';
-
-const roleNames: Record<string, string> = {
-  ADMIN: 'Quản trị hệ thống',
-  LECTURER: 'Giảng viên',
-  DEPARTMENT_MANAGER: 'Quản lý đơn vị',
-  SURVEY_ADMIN: 'Quản trị khảo sát',
-};
 
 interface ProfileSelectionDialogProps {
   profiles: AuthProfile[];
@@ -179,7 +173,7 @@ export function ProfileSelectionDialog({
                         )}
                       </span>
                       <span className="profile-session-option__role">
-                        {roleNames[profile.roleCode] ?? profile.roleCode}
+                        {roleDisplayName(profile.roleCode)}
                       </span>
                       <span className="profile-session-option__scope">
                         <Building2 aria-hidden="true" />

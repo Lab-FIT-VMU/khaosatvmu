@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Application.Auth;
 using Application.Catalog;
+using Application.UserAdministration;
 using Domain;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -2176,16 +2177,16 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .FirstOrDefaultAsync(cancellationToken);
 
     /// <summary>
-    /// Bảo đảm mỗi giảng viên có đúng một tài khoản đăng nhập gắn kèm qua
-    /// <c>Users.LecturerId</c>. Gọi SAU khi giảng viên đã được lưu, vì trước đó
+    /// Bảo đảm mỗi giảng viên có đúng một tài khoản đăng nhập và các hồ sơ làm việc
+    /// tương ứng. Gọi SAU khi giảng viên đã được lưu, vì trước đó
     /// <c>LecturerId</c> vẫn là 0.
     /// <para>
-    /// Cố ý KHÔNG tạo <c>UserProfiles</c>. Không có profile thì đăng nhập vẫn bị từ
-    /// chối, nên thêm giảng viên không cấp quyền cho ai — cấp quyền vẫn là việc riêng của quản trị viên.
+    /// Mọi giảng viên có hồ sơ Giảng viên. Trưởng bộ môn và Phó Trưởng bộ môn có
+    /// thêm hồ sơ Trưởng bộ môn; hồ sơ Giảng viên là mặc định nếu tài khoản chưa có
+    /// hồ sơ hoạt động nào.
     /// </para>
-    /// <para>
-    /// Tạo hoặc đồng bộ tài khoản cho một mẻ giảng viên trong 1 truy vấn SQL duy nhất.
-    /// </para>
+    /// Các truy vấn được gom theo cả mẻ để import không phát sinh một truy vấn tra cứu
+    /// tài khoản hay hồ sơ cho từng dòng.
     /// </summary>
     private async Task EnsureUsersForLecturersAsync(
         IReadOnlyList<Lecturer> lecturers,
@@ -2267,7 +2268,109 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         {
             db.Users.AddRange(newUsers);
         }
+
+        await EnsureProfilesForLecturersAsync(validLecturers, userByLecturerId, cancellationToken);
     }
+
+    private async Task EnsureProfilesForLecturersAsync(
+        IReadOnlyList<Lecturer> lecturers,
+        IReadOnlyDictionary<int, User> userByLecturerId,
+        CancellationToken cancellationToken)
+    {
+        var users = lecturers
+            .Where(x => userByLecturerId.ContainsKey(x.LecturerId))
+            .Select(x => userByLecturerId[x.LecturerId])
+            .DistinctBy(x => x.Id)
+            .ToList();
+        if (users.Count == 0) return;
+
+        var lecturerRole = await db.Roles
+            .SingleAsync(x => x.Code == RoleCodes.Lecturer, cancellationToken);
+        var departmentManagerRole = await db.Roles
+            .SingleAsync(x => x.Code == RoleCodes.DepartmentManager, cancellationToken);
+
+        var managerPositionIds = (await db.Positions
+                .Select(x => new { x.PositionId, x.PositionName })
+                .ToListAsync(cancellationToken))
+            .Where(x => IsDepartmentManagerPosition(x.PositionName))
+            .Select(x => x.PositionId)
+            .ToHashSet();
+
+        var userIds = users.Select(x => x.Id).ToList();
+        var existingProfiles = await db.UserProfiles
+            .Where(x => userIds.Contains(x.UserId))
+            .Select(x => new { x.UserId, x.RoleId, x.IsActive })
+            .ToListAsync(cancellationToken);
+        var existingPairs = existingProfiles
+            .Select(x => (x.UserId, x.RoleId))
+            .ToHashSet();
+        var usersWithActiveProfile = existingProfiles
+            .Where(x => x.IsActive)
+            .Select(x => x.UserId)
+            .ToHashSet();
+        var now = DateTime.UtcNow;
+
+        foreach (var lecturer in lecturers)
+        {
+            if (!userByLecturerId.TryGetValue(lecturer.LecturerId, out var user)) continue;
+
+            if (existingPairs.Add((user.Id, lecturerRole.Id)))
+            {
+                var isDefault = !usersWithActiveProfile.Contains(user.Id);
+                await AddAutomaticProfileAsync(
+                    user,
+                    lecturerRole,
+                    isDefault,
+                    now,
+                    cancellationToken);
+                usersWithActiveProfile.Add(user.Id);
+            }
+
+            if (lecturer.PositionId is not { } positionId
+                || !managerPositionIds.Contains(positionId)
+                || !existingPairs.Add((user.Id, departmentManagerRole.Id)))
+            {
+                continue;
+            }
+
+            await AddAutomaticProfileAsync(
+                user,
+                departmentManagerRole,
+                isDefault: false,
+                now,
+                cancellationToken);
+        }
+    }
+
+    private async Task AddAutomaticProfileAsync(
+        User user,
+        Role role,
+        bool isDefault,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var naming = ProfileNaming.ByRoleCode[role.Code];
+        var nextNumber = await db.Database
+            .SqlQueryRaw<long>("SELECT nextval('\"UserProfileCodeSequence\"') AS \"Value\"")
+            .SingleAsync(cancellationToken);
+
+        db.UserProfiles.Add(new UserProfile
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            RoleId = role.Id,
+            ProfileName = naming.Name,
+            ProfileCode = ProfileNaming.CodeFor(nextNumber, naming.Suffix),
+            IsActive = true,
+            IsDefault = isDefault,
+            CreatedAt = now,
+            UpdatedAt = now,
+        });
+        user.UpdatedAt = now;
+    }
+
+    private static bool IsDepartmentManagerPosition(string positionName) =>
+        NormalizeLooseKey(positionName) is "truong bo mon" or "pho bo mon" or "pho truong bo mon";
 
     private Task EnsureUserForLecturerAsync(
         Lecturer lecturer,

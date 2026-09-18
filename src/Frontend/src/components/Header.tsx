@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
+import { roleDisplayName } from '../auth/roles';
 import type { AuthProfile, AuthUser } from '../types';
 import { ProfileSelectionDialog } from './ProfileSelectionDialog';
 import { UserAccountMenu } from './UserAccountMenu';
@@ -37,13 +38,6 @@ const tabContexts: Record<string, TabContext> = {
   'program-criteria': { section: 'Khảo sát chương trình', title: 'Tiêu chí CTĐT' },
   'program-campaigns': { section: 'Khảo sát chương trình', title: 'Đợt khảo sát CTĐT' },
   'users-admin': { section: 'Quản trị', title: 'Người dùng & phân quyền' },
-};
-
-const roleNames: Record<string, string> = {
-  ADMIN: 'Quản trị hệ thống',
-  LECTURER: 'Giảng viên',
-  DEPARTMENT_MANAGER: 'Quản lý đơn vị',
-  SURVEY_ADMIN: 'Quản trị khảo sát',
 };
 
 export function Header({
@@ -111,7 +105,7 @@ export function Header({
         <UserAccountMenu
           user={user}
           activeProfile={activeProfile}
-          roleName={roleNames[activeProfile.roleCode] ?? activeProfile.roleCode}
+          roleName={roleDisplayName(activeProfile.roleCode)}
           busy={busy}
           onChangeProfile={() => setIsProfileDialogOpen(true)}
           onLogout={() => void handleLogout()}

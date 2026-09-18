@@ -20,8 +20,8 @@ import {
   Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { ExportDropdown } from '../components/ExportDropdown';
 import { GraduationEChart } from '../components/graduation/GraduationEChart';
+import { GraduationSummaryTable } from '../components/graduation/GraduationSummaryTable';
 import {
   GraduationImportDialog,
   type GraduationImportTarget,
@@ -603,7 +603,11 @@ export function GraduationAnalyticsPage() {
               {chartModel.data.length > 0 ? <div className="graduation-chart"><GraduationEChart type={chartType} data={chartModel.data} series={chartModel.series} unit="count" showLabels={showChartLabels} /></div> : <div className="graduation-chart-empty">{Array.isArray(explore.chartPoints) ? 'Không có dữ liệu phù hợp với cấu hình hiện tại.' : 'Backend API đang dùng phiên bản cũ. Hãy khởi động lại API để sử dụng cấu hình này.'}</div>}
             </article>
           </div>
-          <article className="graduation-v3-card graduation-v3-table"><header><div><span>BẢNG SỐ LƯỢNG TỔNG HỢP</span><h2>Theo khoa, chuyên ngành và khóa</h2></div>{explore.breakdown.length > 0 && <ExportDropdown buttonLabel="Xuất số liệu" size="sm" options={{ fileName: `thong-ke-tot-nghiep-${cohort || 'theo-dot'}`, metadata: { title: 'THỐNG KÊ KẾT QUẢ TỐT NGHIỆP', subtitle: explore.scope.cutoffPeriodLabel }, columns: [{ key: 'facultyName', header: 'Khoa', width: 24 }, { key: 'programName', header: 'Chuyên ngành', width: 28 }, { key: 'cohortCode', header: 'Khóa', width: 10 }, { key: 'graduated', header: 'Đã tốt nghiệp', type: 'number' as const, width: 14 }, { key: 'onTime', header: 'Đúng hạn', type: 'number' as const, width: 12 }, { key: 'workStudy', header: 'VLVH', type: 'number' as const, width: 10 }, { key: 'excellent', header: 'Xuất sắc', type: 'number' as const, width: 10 }, { key: 'veryGood', header: 'Giỏi', type: 'number' as const, width: 10 }, { key: 'good', header: 'Khá', type: 'number' as const, width: 10 }, { key: 'average', header: 'Trung bình', type: 'number' as const, width: 12 }], data: explore.breakdown }} />}</header><div><table><thead><tr><th>Khoa</th><th>Chuyên ngành</th><th>Khóa</th><th>Đã TN</th><th>Đúng hạn</th><th>VLVH</th><th>Xuất sắc</th><th>Giỏi</th><th>Khá</th><th>Trung bình</th></tr></thead><tbody>{explore.breakdown.map((row) => <tr key={`${row.facultyKey}-${row.programKey}-${row.cohortCode}`}><td>{row.facultyName}</td><td>{row.programName}</td><td>{row.cohortCode}</td><td>{row.graduated}</td><td>{row.onTime}</td><td>{row.workStudy}</td><td>{row.excellent}</td><td>{row.veryGood}</td><td>{row.good}</td><td>{row.average}</td></tr>)}</tbody></table></div></article>
+          <GraduationSummaryTable
+            rows={explore.breakdown}
+            fileName={`thong-ke-tot-nghiep-${cohort || 'theo-dot'}`}
+            subtitle={explore.scope.cutoffPeriodLabel}
+          />
         </>}
       </>}
     </section>}
