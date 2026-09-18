@@ -13,6 +13,7 @@ public sealed class EfSurveyService(
     IMemoryCache cache,
     IUserScopeResolver userScope,
     IScoringThresholdProvider scoringThresholds,
+    ISurveyPublicationService publication,
     SchoolOverviewCacheVersion schoolOverviewCache) : ISurveyService
 {
     private const int MaximumScaleOptions = 5;
@@ -1266,7 +1267,10 @@ public sealed class EfSurveyService(
     private async Task<bool> CanSeeSectionSurveyAsync(
         CourseSectionSurvey sectionSurvey,
         CancellationToken cancellationToken) =>
-        (await GetCourseSectionSurveysAsync(sectionSurvey.SemesterSurveyId, cancellationToken))
+        // Hai lớp chặn: đúng phạm vi của vai trò, và đợt đã được phát hành (quản trị
+        // thì luôn qua được lớp thứ hai).
+        await publication.CanSeeResultsAsync(sectionSurvey.SemesterSurveyId, cancellationToken)
+        && (await GetCourseSectionSurveysAsync(sectionSurvey.SemesterSurveyId, cancellationToken))
             .Any(x => x.CourseSectionSurveyId == sectionSurvey.CourseSectionSurveyId);
 
     public async Task<SurveyOperationResult<IReadOnlyList<SurveyResponseSummaryDto>>> GetSurveyResponsesAsync(
@@ -2079,6 +2083,13 @@ public sealed class EfSurveyService(
             return Failed<SemesterSurveyStatisticsDto>(SurveyErrorCodes.SemesterSurveyNotFound);
         }
 
+        // Chốt chặn phát hành: chưa phát hành thì chỉ quản trị xem được số liệu
+        // của đợt, bất kể quyền vào module đang mở hay đóng.
+        if (!await publication.CanSeeResultsAsync(semesterSurveyId, cancellationToken))
+        {
+            return Failed<SemesterSurveyStatisticsDto>(SurveyErrorCodes.ResultsNotPublished);
+        }
+
         var template = await db.SurveyTemplates.AsNoTracking()
             .FirstOrDefaultAsync(x => x.SurveyTemplateId == semesterSurvey.SurveyTemplateId, cancellationToken);
         var semester = await db.Semesters.AsNoTracking()
@@ -2622,6 +2633,13 @@ public sealed class EfSurveyService(
             return Failed<SemesterSurveyNormalizationDto>(SurveyErrorCodes.SemesterSurveyNotFound);
         }
 
+        // Chốt chặn phát hành: chưa phát hành thì chỉ quản trị xem được số liệu
+        // của đợt, bất kể quyền vào module đang mở hay đóng.
+        if (!await publication.CanSeeResultsAsync(semesterSurveyId, cancellationToken))
+        {
+            return Failed<SemesterSurveyNormalizationDto>(SurveyErrorCodes.ResultsNotPublished);
+        }
+
         var questionSections = await QuestionSectionsOfTemplateAsync(header.SurveyTemplateId, cancellationToken);
         if (questionSectionId is { } selectedSectionId
             && questionSections.All(x => x.SectionId != selectedSectionId))
@@ -2873,6 +2891,13 @@ public sealed class EfSurveyService(
             return Failed<SemesterSurveyDepartmentSummaryDto>(SurveyErrorCodes.SemesterSurveyNotFound);
         }
 
+        // Chốt chặn phát hành: chưa phát hành thì chỉ quản trị xem được số liệu
+        // của đợt, bất kể quyền vào module đang mở hay đóng.
+        if (!await publication.CanSeeResultsAsync(semesterSurveyId, cancellationToken))
+        {
+            return Failed<SemesterSurveyDepartmentSummaryDto>(SurveyErrorCodes.ResultsNotPublished);
+        }
+
         var sections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
 
         // Mốc cảnh báo tính trên TOÀN BỘ lớp của đợt, không phải trên từng bộ môn:
@@ -2973,6 +2998,13 @@ public sealed class EfSurveyService(
         if (header is null)
         {
             return Failed<SemesterSurveyCourseDiagnosisDto>(SurveyErrorCodes.SemesterSurveyNotFound);
+        }
+
+        // Chốt chặn phát hành: chưa phát hành thì chỉ quản trị xem được số liệu
+        // của đợt, bất kể quyền vào module đang mở hay đóng.
+        if (!await publication.CanSeeResultsAsync(semesterSurveyId, cancellationToken))
+        {
+            return Failed<SemesterSurveyCourseDiagnosisDto>(SurveyErrorCodes.ResultsNotPublished);
         }
 
         var sections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
@@ -3141,6 +3173,13 @@ public sealed class EfSurveyService(
             return Failed<DepartmentDashboardDto>(SurveyErrorCodes.SemesterSurveyNotFound);
         }
 
+        // Chốt chặn phát hành: chưa phát hành thì chỉ quản trị xem được số liệu
+        // của đợt, bất kể quyền vào module đang mở hay đóng.
+        if (!await publication.CanSeeResultsAsync(semesterSurveyId, cancellationToken))
+        {
+            return Failed<DepartmentDashboardDto>(SurveyErrorCodes.ResultsNotPublished);
+        }
+
         var scope = await userScope.ResolveAsync(cancellationToken);
 
         // Nạp TOÀN BỘ lớp của đợt, không lọc. Mặt bằng toàn trường phải tính trên tất
@@ -3198,6 +3237,13 @@ public sealed class EfSurveyService(
         if (header is null)
         {
             return Failed<SemesterSurveyDashboardDto>(SurveyErrorCodes.SemesterSurveyNotFound);
+        }
+
+        // Chốt chặn phát hành: chưa phát hành thì chỉ quản trị xem được số liệu
+        // của đợt, bất kể quyền vào module đang mở hay đóng.
+        if (!await publication.CanSeeResultsAsync(semesterSurveyId, cancellationToken))
+        {
+            return Failed<SemesterSurveyDashboardDto>(SurveyErrorCodes.ResultsNotPublished);
         }
 
         // Bốn chỉ số đầu là TIẾN ĐỘ: đếm mọi lớp của đợt và mọi phiếu thu được,
@@ -3314,6 +3360,13 @@ public sealed class EfSurveyService(
         if (header is null)
         {
             return Failed<SurveyScopeAnalysisDto>(SurveyErrorCodes.SemesterSurveyNotFound);
+        }
+
+        // Chốt chặn phát hành: chưa phát hành thì chỉ quản trị xem được số liệu
+        // của đợt, bất kể quyền vào module đang mở hay đóng.
+        if (!await publication.CanSeeResultsAsync(semesterSurveyId, cancellationToken))
+        {
+            return Failed<SurveyScopeAnalysisDto>(SurveyErrorCodes.ResultsNotPublished);
         }
 
         var allSections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
@@ -3642,6 +3695,13 @@ public sealed class EfSurveyService(
             return Failed<IReadOnlyList<LecturerOptionDto>>(SurveyErrorCodes.SemesterSurveyNotFound);
         }
 
+        // Chốt chặn phát hành: chưa phát hành thì chỉ quản trị xem được số liệu
+        // của đợt, bất kể quyền vào module đang mở hay đóng.
+        if (!await publication.CanSeeResultsAsync(semesterSurveyId, cancellationToken))
+        {
+            return Failed<IReadOnlyList<LecturerOptionDto>>(SurveyErrorCodes.ResultsNotPublished);
+        }
+
         var allSections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
 
         // Danh sách chọn giảng viên lọc theo phạm vi, nhưng báo cáo mở ra từ đó vẫn so
@@ -3702,6 +3762,13 @@ public sealed class EfSurveyService(
         if (header is null)
         {
             return Failed<LecturerReportDto>(SurveyErrorCodes.SemesterSurveyNotFound);
+        }
+
+        // Chốt chặn phát hành: chưa phát hành thì chỉ quản trị xem được số liệu
+        // của đợt, bất kể quyền vào module đang mở hay đóng.
+        if (!await publication.CanSeeResultsAsync(semesterSurveyId, cancellationToken))
+        {
+            return Failed<LecturerReportDto>(SurveyErrorCodes.ResultsNotPublished);
         }
 
         var sections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);

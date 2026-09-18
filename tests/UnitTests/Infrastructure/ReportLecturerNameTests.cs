@@ -53,7 +53,8 @@ public class ReportLecturerNameTests
             db,
             cache,
             new SchoolOverviewCacheVersion(),
-            new FixedScoringThresholdProvider()));
+            new FixedScoringThresholdProvider(),
+            new PublishedSurveyPublicationService()));
     }
 
     /// <summary>Một bài khảo sát của lớp chưa gắn mã giảng viên nhưng có tên từ tệp import.</summary>

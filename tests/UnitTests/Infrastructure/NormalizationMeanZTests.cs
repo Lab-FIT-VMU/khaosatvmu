@@ -60,6 +60,7 @@ public class NormalizationMeanZTests
             cache,
             new FixedScopeResolver(UserScope.Unrestricted(RoleCodes.Admin)),
             new FixedScoringThresholdProvider(),
+            new PublishedSurveyPublicationService(),
             new SchoolOverviewCacheVersion()));
     }
 

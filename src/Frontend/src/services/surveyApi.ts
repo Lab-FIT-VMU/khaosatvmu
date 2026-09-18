@@ -366,6 +366,20 @@ export interface DashboardFacultyScore {
   averageScore: number;
 }
 
+/**
+ * Trạng thái phát hành kết quả của một đợt. Chưa phát hành thì trưởng bộ môn và
+ * giảng viên không xem được số liệu của đợt, kể cả khi đã mở quyền vào module.
+ */
+export interface SurveyPublication {
+  semesterSurveyId: number;
+  isPublished: boolean;
+  /** Lần phát hành / thu hồi gần nhất; null khi chưa từng bấm. */
+  changedAt: string | null;
+  changedByName: string;
+  /** Đã qua thời gian thu phiếu — điều kiện để bấm phát hành. */
+  hasEnded: boolean;
+}
+
 /** Một lần đổi cấu hình tính điểm hoặc cập nhật điểm, kèm nguyên bộ cấu hình lúc đó. */
 export interface ScoringChange {
   id: number;
@@ -656,6 +670,20 @@ export const surveyApi = {
     ),
   deleteSemesterSurvey: (semesterSurveyId: number) =>
     csrfRequest<boolean>(`/api/surveys/semester-surveys/${semesterSurveyId}`, 'DELETE'),
+  /**
+   * Trạng thái phát hành kết quả của một đợt. Ai cũng đọc được để giao diện nói rõ
+   * vì sao chưa có số liệu; chỉ quản trị mới đổi được.
+   */
+  surveyPublication: (semesterSurveyId: number) =>
+    apiRequest<SurveyPublication>(
+      `/api/surveys/semester-surveys/${semesterSurveyId}/publication`,
+    ),
+  setSurveyPublication: (semesterSurveyId: number, publish: boolean) =>
+    csrfRequest<SurveyPublication>(
+      `/api/surveys/semester-surveys/${semesterSurveyId}/publication`,
+      'PUT',
+      { publish },
+    ),
   /** Hai vòng lọc lớp được tính điểm, dùng chung cho mọi trang báo cáo. */
   scoringThresholds: () =>
     apiRequest<ScoringThresholds>('/api/surveys/scoring-thresholds'),
@@ -884,6 +912,10 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_SECTION_SCHEDULE_OUTSIDE_SEMESTER_SURVEY:
     'Thời gian của lớp học phần phải nằm trọn trong thời gian mở và đóng của đợt khảo sát.',
   SURVEY_SEMESTER_SURVEY_NOT_FOUND: 'Không tìm thấy đợt khảo sát.',
+  SURVEY_RESULTS_NOT_PUBLISHED:
+    'Kết quả của đợt khảo sát này chưa được phát hành. Quản trị sẽ phát hành sau khi đợt kết thúc.',
+  SURVEY_NOT_ENDED:
+    'Đợt khảo sát chưa kết thúc nên chưa phát hành kết quả được.',
   SURVEY_SEMESTER_SURVEY_NAME_REQUIRED: 'Vui lòng đặt tên cho bài khảo sát.',
   SURVEY_SEMESTER_SURVEY_HAS_RESPONSES: 'Đợt khảo sát đã có phiếu trả lời nên không xóa được.',
   SURVEY_SCOPE_TYPE_UNSUPPORTED: 'Kiểu phạm vi không hợp lệ.',

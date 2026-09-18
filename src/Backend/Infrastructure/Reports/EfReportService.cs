@@ -12,7 +12,8 @@ public sealed class EfReportService(
     AppDbContext db,
     IMemoryCache cache,
     SchoolOverviewCacheVersion cacheVersion,
-    IScoringThresholdProvider scoringThresholds) : IReportService
+    IScoringThresholdProvider scoringThresholds,
+    ISurveyPublicationService publication) : IReportService
 {
     /// <summary>Prefix key cache cho báo cáo tổng quan toàn trường (theo học kỳ).</summary>
     private const string SchoolOverviewCachePrefix = "school-overview:";
@@ -31,6 +32,23 @@ public sealed class EfReportService(
 
     /// <summary>Trần số câu trả lời tự nhập trả kèm mỗi câu hỏi, tránh payload quá lớn.</summary>
     private const int MaxTextAnswersPerQuestion = 200;
+
+    /// <summary>
+    /// Bảng lớp đã lọc theo trạng thái phát hành. MỌI truy vấn số liệu của service này
+    /// phải đi qua đây chứ không đọc thẳng <c>db.CourseSectionSurveys</c>: quản trị thấy
+    /// tất cả, còn trưởng bộ môn và giảng viên chỉ thấy lớp thuộc đợt đã phát hành, nên
+    /// đợt chưa phát hành không lọt vào bất kỳ con số gộp nào.
+    /// </summary>
+    private async Task<IQueryable<CourseSectionSurvey>> VisibleSectionSurveysAsync(
+        CancellationToken cancellationToken)
+    {
+        var query = db.CourseSectionSurveys.AsNoTracking();
+        var visible = await publication.VisibleSurveyIdsAsync(cancellationToken);
+        if (visible is null) return query;
+
+        var ids = visible.ToList();
+        return query.Where(x => ids.Contains(x.SemesterSurveyId));
+    }
 
     /// <summary>
     /// Số phiếu của một lớp, tách làm hai nhóm theo quyết định C-e:
@@ -100,7 +118,7 @@ public sealed class EfReportService(
             .ToDictionaryAsync(x => x.Id, cancellationToken);
 
         // Đọc ảnh chụp điểm chốt trên CourseSectionSurveys
-        var snapshots = await db.CourseSectionSurveys.AsNoTracking()
+        var snapshots = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId))
             .Select(x => new
             {
@@ -138,7 +156,7 @@ public sealed class EfReportService(
     {
         if (courseSectionSurveyIds.Count == 0) return [];
 
-        return await db.CourseSectionSurveys.AsNoTracking()
+        return await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId) && x.AverageScore != null)
             .Select(x => x.CourseSectionSurveyId)
             .ToListAsync(cancellationToken);
@@ -227,8 +245,7 @@ public sealed class EfReportService(
             .Select(x => x.SemesterSurveyId)
             .ToListAsync(cancellationToken);
 
-        var sectionSurveys = await db.CourseSectionSurveys
-            .AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => semesterSurveyIds.Contains(x.SemesterSurveyId))
             .ToListAsync(cancellationToken);
 
@@ -395,7 +412,7 @@ public sealed class EfReportService(
             .Where(x => courseIds.Contains(x.CourseId))
             .ToDictionaryAsync(x => x.CourseId, x => x, cancellationToken);
 
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => sectionIds.Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
 
@@ -559,7 +576,7 @@ public sealed class EfReportService(
         if (sections.Count == 0) return null;
 
         var sectionIds = sections.Select(x => x.CourseSectionId).ToList();
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => sectionIds.Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
         var responseStats = await ResponseTalliesAsync(
@@ -634,7 +651,7 @@ public sealed class EfReportService(
         IReadOnlyCollection<int> sectionIds,
         CancellationToken cancellationToken)
     {
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => sectionIds.Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
@@ -752,7 +769,7 @@ public sealed class EfReportService(
         if (semesterId is { } semId) sectionQuery = sectionQuery.Where(x => x.SemesterId == semId);
         var sections = await sectionQuery.ToListAsync(cancellationToken);
 
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => sections.Select(s => s.CourseSectionId).Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
 
@@ -882,7 +899,7 @@ public sealed class EfReportService(
             template.SurveyTemplateId,
             cancellationToken);
 
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => x.SemesterSurveyId == semesterSurveyId)
             .ToListAsync(cancellationToken);
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
@@ -990,7 +1007,7 @@ public sealed class EfReportService(
         int courseSectionSurveyId,
         CancellationToken cancellationToken = default)
     {
-        var sectionSurvey = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurvey = await (await VisibleSectionSurveysAsync(cancellationToken))
             .FirstOrDefaultAsync(x => x.CourseSectionSurveyId == courseSectionSurveyId, cancellationToken);
         if (sectionSurvey is null) return null;
 
@@ -1119,7 +1136,7 @@ public sealed class EfReportService(
         string? search,
         CancellationToken cancellationToken = default)
     {
-        var sectionSurveyQuery = db.CourseSectionSurveys.AsNoTracking().AsQueryable();
+        var sectionSurveyQuery = (await VisibleSectionSurveysAsync(cancellationToken)).AsQueryable();
 
         if (semesterSurveyId is { } ssId)
         {
@@ -1364,8 +1381,7 @@ public sealed class EfReportService(
                 0, 0, 0, 0m, 0, 0, 0, 0m, 0, 0, [], 0m, [], [], [], null);
         }
 
-        var sectionSurveys = await db.CourseSectionSurveys
-            .AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => semesterSurveyIds.Contains(x.SemesterSurveyId))
             .ToListAsync(cancellationToken);
 
@@ -1674,8 +1690,7 @@ public sealed class EfReportService(
         var semesterSurveyIds = await SemesterSurveyIdsAsync(semesterId, semesterSurveyId, cancellationToken);
         if (semesterSurveyIds.Count == 0) return [];
 
-        var cssIds = await db.CourseSectionSurveys
-            .AsNoTracking()
+        var cssIds = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => semesterSurveyIds.Contains(x.SemesterSurveyId))
             .Select(x => x.CourseSectionSurveyId)
             .ToListAsync(cancellationToken);
@@ -1698,7 +1713,7 @@ public sealed class EfReportService(
         // toàn trường: lớp đã chốt điểm ở lần bấm "Tính lại điểm" gần nhất. Trước đây
         // phần đếm phiếu bên dưới quét mọi lớp trong phạm vi, nên cột "Phiếu hợp lệ"
         // gộp cả lớp chưa đủ điều kiện và lệch hẳn so với dải chỉ số ngay phía trên.
-        var scoredIds = await db.CourseSectionSurveys.AsNoTracking()
+        var scoredIds = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => cssIds.Contains(x.CourseSectionSurveyId) && x.AverageScore != null)
             .Select(x => x.CourseSectionSurveyId)
             .ToListAsync(cancellationToken);
@@ -1936,7 +1951,7 @@ public sealed class EfReportService(
             .ToListAsync(cancellationToken);
         if (ssIds.Count == 0) return (0, 0, 0, 0m);
 
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => ssIds.Contains(x.SemesterSurveyId))
             .Select(x => new { x.CourseSectionSurveyId, x.CourseSectionId })
             .ToListAsync(cancellationToken);

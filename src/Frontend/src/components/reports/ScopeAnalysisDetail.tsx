@@ -56,7 +56,7 @@ interface ScopeDetailRow {
   classSize?: number;
   responseCount?: number;
   validResponseCount?: number;
-  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
+  /** Phiếu hợp lệ chia phiếu thu, theo phần trăm. */
   validRate?: number | null;
   averageScore: number | null;
   /** Bấm vào tên để mở cấp dưới; thiếu thì dòng đứng yên. */
@@ -92,6 +92,10 @@ const toCourseRows = (
     sublabel: row.courseCode,
     sectionCount: row.sectionCount,
     lecturerCount: row.lecturerCount,
+    classSize: row.totalClassSize,
+    responseCount: row.responseCount,
+    validResponseCount: row.validResponseCount,
+    validRate: row.validResponseRate,
     averageScore: row.averageScore,
     onOpen: () => onOpen({ type: 'course', id: row.courseId }),
   }));
@@ -106,9 +110,30 @@ const toSectionRows = (
     label: row.sectionName,
     owner: row.lecturerName,
     classSize: row.classSize,
+    responseCount: row.responseCount,
+    validResponseCount: row.validResponseCount,
+    validRate: row.validResponseRate,
     averageScore: row.averageScore,
     onOpen: () => onOpen(row.courseSectionSurveyId),
   }));
+
+/**
+ * Bề rộng từng cột, viết thẳng số phần trăm ở chỗ gọi bảng. Ba cấp hiện ba bộ cột
+ * khác nhau nên mỗi bảng tự cộng cho đủ 100% — cột nào cấp đó không có thì bỏ trống.
+ */
+interface ScopeColumnWidths {
+  unit: string;
+  sublabel?: string;
+  owner?: string;
+  sectionCount?: string;
+  lecturerCount?: string;
+  classSize?: string;
+  responseCount?: string;
+  validResponseCount?: string;
+  validRate?: string;
+  averageScore: string;
+  delta: string;
+}
 
 const ScopeRowsTable: React.FC<{
   title: string;
@@ -120,6 +145,13 @@ const ScopeRowsTable: React.FC<{
   scopeAverageScore: number | null;
   /** Tên phạm vi đang xem, in thẳng vào tiêu đề cột Chênh lệch để không phải đoán. */
   compareLabel: string;
+  /** Tên cột đầu: mỗi cấp gọi một kiểu (Bộ môn, Học phần, Lớp học phần). */
+  unitHeader: string;
+  /** Có giá trị thì mã đi kèm tách thành cột riêng thay vì nằm sau tên. */
+  sublabelHeader?: string;
+  /** Có giá trị thì người phụ trách tách thành cột riêng thay vì nằm dưới tên. */
+  ownerHeader?: string;
+  widths: ScopeColumnWidths;
   openTitle: (row: ScopeDetailRow) => string;
 }> = ({
   title,
@@ -129,13 +161,24 @@ const ScopeRowsTable: React.FC<{
   rows,
   scopeAverageScore,
   compareLabel,
+  unitHeader,
+  sublabelHeader,
+  ownerHeader,
+  widths,
   openTitle,
 }) => {
   const columns = useMemo<FilterableColumn<ScopeDetailRow>[]>(() => [
     {
       key: 'label',
-      value: (row) => [row.label, row.sublabel, row.owner].filter(Boolean).join(' '),
+      // Mã và người phụ trách đã có cột riêng thì không gộp vào ô lọc của cột tên nữa.
+      value: (row) => [
+        row.label,
+        sublabelHeader ? '' : row.sublabel,
+        ownerHeader ? '' : row.owner,
+      ].filter(Boolean).join(' '),
     },
+    { key: 'sublabel', value: (row) => row.sublabel ?? '' },
+    { key: 'owner', value: (row) => row.owner ?? '' },
     { key: 'sectionCount', value: (row) => String(row.sectionCount ?? 0), numeric: true },
     { key: 'lecturerCount', value: (row) => String(row.lecturerCount ?? 0), numeric: true },
     { key: 'classSize', value: (row) => String(row.classSize ?? 0), numeric: true },
@@ -163,7 +206,7 @@ const ScopeRowsTable: React.FC<{
       },
       sortValue: (row) => deltaOf(row.averageScore, scopeAverageScore),
     },
-  ], [scopeAverageScore]);
+  ], [scopeAverageScore, sublabelHeader, ownerHeader]);
 
   const filters = useColumnFilters(rows, columns);
   const pagination = usePaginatedItems(filters.visibleRows, scopePageSize);
@@ -176,6 +219,8 @@ const ScopeRowsTable: React.FC<{
   const showsValidResponses = rows.some((row) => row.validResponseCount !== undefined);
   const showsValidRate = rows.some((row) => row.validRate != null);
 
+  const widthOf = (key: keyof ScopeColumnWidths) => widths[key];
+
   return (
     <div className="analysis-scope-subtable">
       <div className="analysis-subtable-heading">
@@ -183,40 +228,65 @@ const ScopeRowsTable: React.FC<{
         <p className="analysis-subtable-hint">{hint}</p>
       </div>
       <div className="statistics-table-scroll" tabIndex={0} aria-label={title}>
-        <table className="statistics-table">
+        <table className="statistics-table statistics-table--fixed">
           <thead>
             <tr>
-              <th scope="col" style={{ textAlign: 'left', minWidth: 220 }}>
-                {filters.filterHeader('label', 'Đơn vị')}
+              <th scope="col" style={{ textAlign: 'left', width: widthOf('unit') }}>
+                {filters.filterHeader('label', unitHeader)}
               </th>
+              {sublabelHeader && (
+                <th scope="col" style={{ width: widthOf('sublabel') }}>
+                  {filters.filterHeader('sublabel', sublabelHeader)}
+                </th>
+              )}
+              {ownerHeader && (
+                <th scope="col" style={{ textAlign: 'left', width: widthOf('owner') }}>
+                  {filters.filterHeader('owner', ownerHeader)}
+                </th>
+              )}
               {showsSectionCount && (
-                <th scope="col">{filters.filterHeader('sectionCount', 'Số lớp')}</th>
+                <th scope="col" style={{ width: widthOf('sectionCount') }}>
+                  {filters.filterHeader('sectionCount', 'Số lớp')}
+                </th>
               )}
               {showsLecturerCount && (
-                <th scope="col">{filters.filterHeader('lecturerCount', 'Số GV')}</th>
+                <th scope="col" style={{ width: widthOf('lecturerCount') }}>
+                  {filters.filterHeader('lecturerCount', 'Số giảng viên')}
+                </th>
               )}
               {showsClassSize && (
-                <th scope="col">{filters.filterHeader('classSize', 'Sĩ số')}</th>
+                <th scope="col" style={{ width: widthOf('classSize') }}>
+                  {filters.filterHeader('classSize', 'Sĩ số')}
+                </th>
               )}
               {showsResponses && (
-                <th scope="col">{filters.filterHeader('responseCount', 'Phiếu thu về')}</th>
+                <th scope="col" style={{ width: widthOf('responseCount') }}>
+                  {filters.filterHeader('responseCount', 'Phiếu thu')}
+                </th>
               )}
               {showsValidResponses && (
-                <th scope="col">
+                <th scope="col" style={{ width: widthOf('validResponseCount') }}>
                   {filters.filterHeader('validResponseCount', 'Phiếu hợp lệ')}
                 </th>
               )}
               {showsValidRate && (
-                <th scope="col" title="Số phiếu hợp lệ chia số phiếu thu về">
-                  {filters.filterHeader('validRate', 'Tỷ lệ hợp lệ')}
+                <th
+                  scope="col"
+                  style={{ width: widthOf('validRate') }}
+                  title="Số phiếu hợp lệ chia số phiếu thu, theo phần trăm"
+                >
+                  {filters.filterHeader('validRate', 'Tỷ lệ phiếu hợp lệ')}
                 </th>
               )}
-              <th scope="col">{filters.filterHeader('averageScore', 'Điểm trung bình')}</th>
+              <th scope="col" style={{ width: widthOf('averageScore') }}>
+                {filters.filterHeader('averageScore', 'Điểm trung bình')}
+              </th>
               <th
                 scope="col"
+                style={{ width: widthOf('delta') }}
                 title={`Điểm trung bình của dòng trừ điểm trung bình cả ${compareLabel} đang xem`}
               >
-                {filters.filterHeader('delta', `Chênh lệch so với TB ${compareLabel}`)}
+                {filters.filterHeader('delta', `Chênh lệch so với trung bình ${compareLabel}`)}
               </th>
             </tr>
           </thead>
@@ -224,7 +294,7 @@ const ScopeRowsTable: React.FC<{
             {pagination.visibleItems.length === 0 && (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={10}
                   style={{ textAlign: 'center', color: '#68737d', padding: '18px 12px' }}
                 >
                   {emptyMessage}
@@ -253,15 +323,25 @@ const ScopeRowsTable: React.FC<{
                         {row.label}
                       </button>
                     ) : row.label}
-                    {row.sublabel && (
+                    {!sublabelHeader && row.sublabel && (
                       <span className="catalog-secondary-value"> {row.sublabel}</span>
                     )}
-                    {row.owner && (
+                    {!ownerHeader && row.owner && (
                       <span className="catalog-secondary-value reports-progress-sub">
                         {row.owner}
                       </span>
                     )}
                   </td>
+                  {sublabelHeader && (
+                    <td className="num" title={row.sublabel}>
+                      <span className="operations-code">{row.sublabel ?? '—'}</span>
+                    </td>
+                  )}
+                  {ownerHeader && (
+                    <td style={{ textAlign: 'left' }} title={row.owner}>
+                      {row.owner ?? '—'}
+                    </td>
+                  )}
                   {showsSectionCount && <td className="num">{row.sectionCount}</td>}
                   {showsLecturerCount && <td className="num">{row.lecturerCount}</td>}
                   {showsClassSize && <td className="num">{row.classSize}</td>}
@@ -432,6 +512,19 @@ export const ScopeAnalysisDetail: React.FC<{
           rows={toDepartmentRows(data.departments, onDrillDown)}
           scopeAverageScore={data.averageScore}
           compareLabel={scopeLabels[data.scopeType]}
+          unitHeader="Bộ môn"
+          // 9 cột, cộng đủ 100%.
+          widths={{
+            unit: '26%',
+            sectionCount: '8%',
+            lecturerCount: '10%',
+            classSize: '8%',
+            responseCount: '10%',
+            validResponseCount: '10%',
+            validRate: '11%',
+            averageScore: '9%',
+            delta: '8%',
+          }}
           openTitle={(row) => `Xem chi tiết bộ môn ${row.label}`}
         />
       )}
@@ -445,6 +538,21 @@ export const ScopeAnalysisDetail: React.FC<{
           rows={toCourseRows(data.courses, onDrillDown)}
           scopeAverageScore={data.averageScore}
           compareLabel={scopeLabels[data.scopeType]}
+          unitHeader="Học phần"
+          sublabelHeader="Mã học phần"
+          // 10 cột, cộng đủ 100%.
+          widths={{
+            unit: '22%',
+            sublabel: '9%',
+            sectionCount: '7%',
+            lecturerCount: '9%',
+            classSize: '7%',
+            responseCount: '9%',
+            validResponseCount: '9%',
+            validRate: '10%',
+            averageScore: '9%',
+            delta: '9%',
+          }}
           openTitle={(row) => `Xem chi tiết học phần ${row.label}`}
         />
       )}
@@ -458,6 +566,19 @@ export const ScopeAnalysisDetail: React.FC<{
           rows={toSectionRows(data.sections, onOpenSurvey)}
           compareLabel={scopeLabels[data.scopeType]}
           scopeAverageScore={data.averageScore}
+          unitHeader="Lớp học phần"
+          ownerHeader="Giảng viên"
+          // 8 cột, cộng đủ 100%.
+          widths={{
+            unit: '14%',
+            owner: '22%',
+            classSize: '9%',
+            responseCount: '11%',
+            validResponseCount: '11%',
+            validRate: '11%',
+            averageScore: '11%',
+            delta: '11%',
+          }}
           openTitle={(row) => `Xem kết quả lớp ${row.label}`}
         />
       )}

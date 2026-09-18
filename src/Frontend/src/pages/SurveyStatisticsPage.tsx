@@ -19,6 +19,7 @@ import type { SectionStatisticsRow, SemesterSurveyStatistics } from '../services
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
 import { buildReportHash } from './reportRoute';
 import { UpdateScoresButton } from '../components/UpdateScoresButton';
+import { PublishResultsButton } from '../components/PublishResultsButton';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { useScoringThresholds } from '../hooks/useScoringThresholds';
 import {
@@ -384,6 +385,7 @@ export const SurveyStatisticsPage: React.FC = () => {
       { key: 'courseCode', value: (row) => row.courseCode },
       { key: 'sectionName', value: (row) => row.sectionName },
       { key: 'courseName', value: (row) => row.courseName },
+      { key: 'facultyName', value: (row) => row.facultyName },
       { key: 'departmentName', value: (row) => row.departmentName },
       { key: 'lecturerName', value: (row) => row.lecturerName },
       { key: 'classSize', value: (row) => String(row.classSize), numeric: true },
@@ -507,15 +509,16 @@ export const SurveyStatisticsPage: React.FC = () => {
           sheetName: 'Bang du lieu',
           title: `BẢNG DỮ LIỆU KHẢO SÁT (${filteredRows.length} LỚP)`,
           columns: [
+            { key: 'courseName', header: 'Học phần', width: 28 },
             { key: 'courseCode', header: 'Mã học phần', width: 12, align: 'center' as const },
             { key: 'sectionName', header: 'Lớp học phần', width: 12, align: 'center' as const },
-            { key: 'courseName', header: 'Tên học phần', width: 28 },
+            { key: 'facultyName', header: 'Khoa / Viện', width: 24 },
             { key: 'departmentName', header: 'Bộ môn', width: 22 },
             { key: 'lecturerName', header: 'Giảng viên', width: 26 },
             { key: 'classSize', header: 'Sĩ số', width: 8, type: 'number' as const, align: 'right' as const },
             { key: 'totalResponseCount', header: 'Số phiếu đã thu', width: 12, type: 'number' as const, align: 'right' as const },
-            { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
             { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 12, type: 'number' as const, align: 'right' as const },
+            { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
             {
               // Xuất SỐ kèm mã định dạng, không xuất chuỗi "18.2%": ô chữ thì Excel
               // sắp theo bảng chữ cái, "100.0%" rơi xuống dưới "18.2%".
@@ -649,6 +652,9 @@ export const SurveyStatisticsPage: React.FC = () => {
             Tải lại
           </button>
           <UpdateScoresButton semesterSurveyId={semesterSurveyId} onUpdated={loadStatistics} />
+          {/* Phát hành nằm ở đúng trang này vì đây là chỗ quản trị chốt số liệu cuối
+              đợt: xem bảng, bấm Cập nhật điểm, rồi mới mở cho đơn vị xem. */}
+          <PublishResultsButton semesterSurveyId={semesterSurveyId} onChanged={loadStatistics} />
         </div>
       </section>
 
@@ -771,13 +777,16 @@ export const SurveyStatisticsPage: React.FC = () => {
             <thead>
               <tr>
                 <th className="col-left col-left-1" scope="col">
-                  {filters.filterHeader('courseCode', 'Mã học phần')}
+                  {filters.filterHeader('courseName', 'Học phần')}
                 </th>
                 <th className="col-left col-left-2" scope="col">
-                  {filters.filterHeader('sectionName', 'Lớp học phần')}
+                  {filters.filterHeader('courseCode', 'Mã học phần')}
                 </th>
                 <th className="col-left col-left-3" scope="col">
-                  {filters.filterHeader('courseName', 'Tên học phần')}
+                  {filters.filterHeader('sectionName', 'Lớp học phần')}
+                </th>
+                <th className="col-meta" scope="col">
+                  {filters.filterHeader('facultyName', 'Khoa / Viện')}
                 </th>
                 <th className="col-meta" scope="col">
                   {filters.filterHeader('departmentName', 'Bộ môn')}
@@ -791,11 +800,11 @@ export const SurveyStatisticsPage: React.FC = () => {
                 <th className="col-metric" scope="col">
                   {filters.filterHeader('totalResponseCount', 'Số phiếu đã thu')}
                 </th>
-                <th className="col-metric" scope="col" title="Phiếu bị bộ lọc nhiễu loại">
-                  {filters.filterHeader('invalidResponseCount', 'Số phiếu không hợp lệ')}
-                </th>
                 <th className="col-metric" scope="col" title="Số phiếu qua được bộ lọc nhiễu">
                   {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
+                </th>
+                <th className="col-metric" scope="col" title="Phiếu bị bộ lọc nhiễu loại">
+                  {filters.filterHeader('invalidResponseCount', 'Số phiếu không hợp lệ')}
                 </th>
                 <th
                   className="col-metric"
@@ -866,10 +875,13 @@ export const SurveyStatisticsPage: React.FC = () => {
 
                 return (
                   <tr key={row.courseSectionSurveyId}>
-                    <td className="col-left col-left-1">
-                      <span className="operations-code">{row.courseCode}</span>
+                    <td className="col-left col-left-1" title={row.courseName}>
+                      {row.courseName}
                     </td>
                     <td className="col-left col-left-2">
+                      <span className="operations-code">{row.courseCode}</span>
+                    </td>
+                    <td className="col-left col-left-3">
                       {/* Mở trang kết quả của lớp ở Thống kê & Báo cáo, kèm học kỳ và đợt
                           đang xem. Liên kết thật nên Back và Ctrl + bấm vẫn dùng được. */}
                       <a
@@ -885,13 +897,14 @@ export const SurveyStatisticsPage: React.FC = () => {
                         {row.sectionName}
                       </a>
                     </td>
-                    <td className="col-left col-left-3" title={row.courseName}>
-                      {row.courseName}
+                    <td className="col-meta" title={row.facultyName}>{row.facultyName}</td>
+                    <td className="col-meta" title={row.departmentName}>{row.departmentName}</td>
+                    <td className="col-meta col-meta--lecturer" title={row.lecturerName}>
+                      {row.lecturerName}
                     </td>
-                    <td className="col-meta">{row.departmentName}</td>
-                    <td className="col-meta col-meta--lecturer">{row.lecturerName}</td>
                     <td className="num col-metric">{row.classSize}</td>
                     <td className="num col-metric">{row.totalResponseCount}</td>
+                    <td className="num col-metric">{row.validResponseCount}</td>
                     <td
                       className={
                         row.invalidResponseCount > 0
@@ -901,7 +914,6 @@ export const SurveyStatisticsPage: React.FC = () => {
                     >
                       {row.invalidResponseCount}
                     </td>
-                    <td className="num col-metric">{row.validResponseCount}</td>
                     <td className={`num col-metric${responseRate < thresholds.minimumResponseRate ? ' is-flagged' : ''}`}>
                       {responseRate.toFixed(1)}%
                     </td>
@@ -954,7 +966,10 @@ export const SurveyStatisticsPage: React.FC = () => {
                       )}
                     </td>
                     <td className="num col-right col-right-2">{row.openCommentCount}</td>
-                    <td className="col-right col-right-1">
+                    <td
+                      className="col-right col-right-1"
+                      title={isEligible ? 'Đủ điều kiện' : 'Không đủ điều kiện'}
+                    >
                       <span
                         className={
                           isEligible
@@ -970,7 +985,7 @@ export const SurveyStatisticsPage: React.FC = () => {
               })}
               {/* Ô đệm nuốt chỗ thừa để dòng tổng kết luôn nằm sát đáy khung. */}
               <tr className="table-spacer" aria-hidden="true">
-                <td colSpan={13 + columns.length} />
+                <td colSpan={14 + columns.length} />
               </tr>
             </tbody>
 

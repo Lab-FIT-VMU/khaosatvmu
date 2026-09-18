@@ -130,6 +130,45 @@ function sanitizeSheetName(name: string): string {
 
 const yieldToMain = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
+/**
+ * Áp mã định dạng số của Excel cho bản Word và PDF. Hai bộ xuất đó in thẳng chuỗi
+ * nên nếu không dựng lại thì mất dấu %, dấu + và số lẻ mà mã định dạng thêm vào —
+ * cùng một cột, tệp Excel hiện "18.2%" còn tệp Word hiện "18.2".
+ *
+ * Chỉ đọc phần mã định dạng đang dùng trong dự án: ba nhánh dương;âm;bằng 0, chữ
+ * đặt trong nháy kép, mẫu số dạng 0.00 và dấu +/- viết trước mẫu. Gặp mã lạ hay ô
+ * không phải số (ô "—", ô trống) thì trả nguyên chuỗi.
+ */
+export function applyNumberFormat(value: string | number, numberFormat?: string): string {
+  const raw = String(value);
+  if (!numberFormat || raw.trim() === '') return raw;
+
+  const parsed = typeof value === 'number' ? value : Number(raw);
+  if (!Number.isFinite(parsed)) return raw;
+
+  const sections = numberFormat.split(';');
+  const section = sections.length === 1 || parsed > 0
+    ? sections[0]
+    : parsed < 0
+      ? sections[1] ?? sections[0]
+      : sections[2] ?? sections[0];
+
+  const pattern = section.match(/[0#][0#,]*(\.[0#]+)?/)?.[0];
+  if (!pattern) return raw;
+
+  // Mã một nhánh tự mang dấu âm; mã nhiều nhánh đã viết sẵn dấu nên chỉ lấy trị tuyệt đối.
+  const target = sections.length === 1 ? parsed : Math.abs(parsed);
+  const decimals = pattern.includes('.') ? pattern.split('.')[1].length : 0;
+  const digits = pattern.includes(',')
+    ? target.toLocaleString('vi-VN', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    })
+    : target.toFixed(decimals);
+
+  return section.replace(pattern, digits).replace(/"([^"]*)"/g, '$1');
+}
+
 function formatCurrentDateTime(): string {
   return new Intl.DateTimeFormat('vi-VN', {
     dateStyle: 'short',
@@ -601,26 +640,19 @@ export async function exportToWord(options: AnyExportOptions): Promise<void> {
             }),
           ],
         }),
-        ...columns.map((col) => {
-          const alignment =
-            col.align === 'center'
-              ? AlignmentType.CENTER
-              : col.align === 'right' || col.type === 'number'
-              ? AlignmentType.RIGHT
-              : AlignmentType.LEFT;
-
-          return new TableCell({
-            shading: { fill: '0F4C81', type: ShadingType.CLEAR },
-            children: [
-              new Paragraph({
-                alignment,
-                children: [
-                  new TextRun({ text: col.header, bold: true, color: 'FFFFFF', size: 17 }),
-                ],
-              }),
-            ],
-          });
-        }),
+        // Tên cột luôn căn giữa, không theo căn lề của dữ liệu bên dưới: cột số căn
+        // phải làm tên cột dạt hẳn sang mép, nhìn như lệch hàng.
+        ...columns.map((col) => new TableCell({
+          shading: { fill: '0F4C81', type: ShadingType.CLEAR },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new TextRun({ text: col.header, bold: true, color: 'FFFFFF', size: 17 }),
+              ],
+            }),
+          ],
+        })),
       ],
     });
 
@@ -651,7 +683,9 @@ export async function exportToWord(options: AnyExportOptions): Promise<void> {
               if (col.format) {
                 val = col.format(val, row, rowIndex);
               }
-              const displayVal = val === null || val === undefined ? '' : String(val);
+              const displayVal = val === null || val === undefined
+                ? ''
+                : applyNumberFormat(val as string | number, col.numberFormat);
 
               const alignment =
                 col.align === 'center'
@@ -907,7 +941,9 @@ export async function exportToPdf(options: AnyExportOptions): Promise<void> {
           if (col.format) {
             val = col.format(val, row, rowIndex);
           }
-          return val === null || val === undefined ? '' : String(val);
+          return val === null || val === undefined
+            ? ''
+            : applyNumberFormat(val as string | number, col.numberFormat);
         }),
       ]);
     }

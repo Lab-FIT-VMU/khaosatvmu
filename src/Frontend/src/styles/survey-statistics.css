@@ -157,9 +157,10 @@
     Có sàn pixel để màn hình hẹp không bóp cột xuống mức không đọc nổi; sàn nằm
     trong biến nên phép cộng offset bên dưới vẫn khớp tuyệt đối.
   */
-  --col-left-1: max(64px, 6cqw);
-  --col-left-2: max(54px, 5cqw);
-  --col-left-3: max(150px, 13cqw);
+  /* Ba cột ghim trái: Học phần, Mã học phần, Lớp học phần. */
+  --col-left-1: max(200px, 17cqw);
+  --col-left-2: max(64px, 6cqw);
+  --col-left-3: max(54px, 5cqw);
 
   /* Ba cột ghim phải: Mô tả, Số ý kiến mở, Điểm trung bình. Hai cột số để hẹp. */
   --col-right-1: max(132px, 9.5cqw);
@@ -180,6 +181,25 @@
   color: #20262c;
   font-size: 12px;
   white-space: nowrap;
+}
+
+/*
+  Bảng chia cột theo phần trăm phải khoá bố cục: để `table-layout` tự động thì bề
+  rộng chạy theo nội dung, cột Học phần tên dài nở ra nuốt phần của cột khác và
+  con số phần trăm đặt ở thẻ th thành vô nghĩa.
+
+  Khoá rồi thì chữ dài phải cắt bằng ba chấm, nếu không nó tràn sang ô bên cạnh.
+  Nội dung đầy đủ vẫn đọc được ở thuộc tính `title` khi rê chuột.
+*/
+.statistics-table--fixed {
+  table-layout: fixed;
+}
+
+.statistics-table--fixed tbody td,
+.statistics-table--fixed tfoot th,
+.statistics-table--fixed tfoot td {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Dùng cho bảng CÓ dòng tổng kết: kéo bảng cao bằng khung cuộn để dòng cuối
@@ -439,10 +459,18 @@
   bảng cho các cột tự do, và cột cuối trước nhóm ghim phải — tức C30 — lãnh trọn
   chỗ thừa nên phình to hơn hẳn các cột câu khác.
 */
-.statistics-table .col-meta { width: 140px; min-width: 140px; max-width: 140px; }
+.statistics-table .col-meta { width: 180px; min-width: 180px; max-width: 180px; }
 
 /* Tên giảng viên có họ đệm dài, 140px là cắt cụt gần như dòng nào cũng cắt. */
 .statistics-table .col-meta--lecturer { width: 190px; min-width: 190px; max-width: 190px; }
+
+/* Cột đã chốt cứng bề rộng thì chữ dài phải cắt bằng ba chấm, để nguyên thì nó
+   tràn đè sang ô bên cạnh. Nội dung đầy đủ xem ở `title` khi rê chuột. */
+.statistics-table .col-meta,
+.statistics-table .col-question {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .statistics-table .col-metric { width: 78px; min-width: 78px; max-width: 78px; }
 .statistics-table .col-question { width: 56px; min-width: 56px; max-width: 56px; }
 
@@ -662,6 +690,14 @@
   text-decoration-color: transparent;
   text-underline-offset: 2px;
   cursor: pointer;
+
+  /* Ô đã khoá bề rộng nên tên dài phải cắt ngay trong nút, không thì chữ tràn ra
+     ô bên cạnh — `text-overflow` của ô không với tới nội dung nằm trong nút. */
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
 }
 
 .analysis-drill-link:hover {
@@ -751,27 +787,6 @@
 .analysis-scope-error {
   display: grid;
   gap: 12px;
-}
-
-/* Hai cột trái của tab tổng hợp bộ môn. Bề rộng khác tab chuẩn hoá nên phải có
-   bộ lớp riêng, dùng chung sẽ lệch `left` và sinh ra cảnh đè cột. */
-.statistics-table .col-dept-1 { left: 0; width: 150px; min-width: 150px; max-width: 150px; }
-.statistics-table .col-dept-2 {
-  left: 150px;
-  width: 200px;
-  min-width: 200px;
-  max-width: 200px;
-  border-right: 1px solid #cfd7dc;
-}
-
-/* Hai cột trái của tab chẩn đoán học phần: Mã HP, Tên học phần. */
-.statistics-table .col-course-1 { left: 0; width: 96px; min-width: 96px; max-width: 96px; }
-.statistics-table .col-course-2 {
-  left: 96px;
-  width: 240px;
-  min-width: 240px;
-  max-width: 240px;
-  border-right: 1px solid #cfd7dc;
 }
 
 /* Bộ lọc của tab báo cáo giảng viên. Dùng đúng khung của thanh công cụ trên đầu

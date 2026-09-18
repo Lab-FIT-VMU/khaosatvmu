@@ -345,6 +345,15 @@ public static class ScoringChangeKinds
 
     /// <summary>Quản trị bấm Tính lại điểm cho một đợt khảo sát.</summary>
     public const string ScoresRecalculated = "SCORES_RECALCULATED";
+
+    /// <summary>
+    /// Quản trị phát hành kết quả của một đợt: từ lúc này trưởng bộ môn và giảng viên
+    /// mới xem được số liệu của đợt đó.
+    /// </summary>
+    public const string ResultsPublished = "RESULTS_PUBLISHED";
+
+    /// <summary>Thu hồi phát hành: kết quả của đợt lại chỉ quản trị xem được.</summary>
+    public const string ResultsUnpublished = "RESULTS_UNPUBLISHED";
 }
 
 /// <summary>

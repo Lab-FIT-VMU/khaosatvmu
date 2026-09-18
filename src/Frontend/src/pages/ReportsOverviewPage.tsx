@@ -55,6 +55,7 @@ import {
   LAGGING_COMPLETION_RATE,
   hasEnoughResponsesToScore,
   responseRateOf,
+  validRateOf,
 } from '../utils/reportThresholds';
 import { toVietnameseFileSlug } from '../utils/vietnamese';
 import type { QuestionAnalysisExportMetadata } from '../services/exportQuestionAnalysisService';
@@ -253,8 +254,6 @@ function CampaignSelect({
   );
 }
 
-import { foldVietnamese } from '../utils/vietnamese';
-
 /** Một đơn vị (Khoa hoặc Bộ môn) gộp từ kết quả để xếp hạng. */
 interface RankedUnit {
   id: number;
@@ -268,8 +267,10 @@ interface RankedUnit {
   responseCount: number;
   validResponseCount: number;
   invalidResponseCount: number;
-  /** Tỷ lệ phản hồi: số phiếu thu được ÷ sĩ số, giống bảng tra cứu chi tiết. */
+  /** Tỷ lệ phản hồi: số phiếu đã thu ÷ sĩ số, giống bảng tra cứu chi tiết. */
   responseRate: number;
+  /** Tỷ lệ phiếu hợp lệ: số phiếu hợp lệ ÷ số phiếu đã thu. */
+  validRate: number;
   averageScore: number;
   sectionCount: number;
 }
@@ -303,63 +304,32 @@ const scopeParentWorkspace = (type?: ReportScopeType): ReportWorkspace => {
 /** Số dòng mỗi trang của ba bảng xếp hạng — cùng một mức cho cả ba, không lệch nhau. */
 const rankedPageSize = 20;
 
-/** Bề rộng phần trăm của bảy cột số; mỗi bảng một tỷ lệ vì số cột định danh khác nhau. */
-interface RankMetricWidths {
-  sectionCount: string;
-  classSize: string;
-  responseCount: string;
-  validResponseCount: string;
-  invalidResponseCount: string;
-  responseRate: string;
-  averageScore: string;
-}
+/*
+  Ba bảng xếp hạng khai cột RIÊNG, không dùng chung một hàm sinh cột nữa.
 
-/** Bảng Khoa/Viện: một cột định danh. */
-const facultyMetricWidths: RankMetricWidths = {
-  sectionCount: '7%',
-  classSize: '8%',
-  responseCount: '11%',
-  validResponseCount: '11%',
-  invalidResponseCount: '12%',
-  responseRate: '17%',
-  averageScore: '10%',
-};
+  Trước đây cả ba đi qua `rankMetricColumns` nên đổi bề rộng một cột của bảng này
+  là đụng luôn hai bảng kia, phải nghĩ qua một lớp "bộ bề rộng" trung gian mới sửa
+  được. Cột của ba bảng gần giống nhau nhưng số cột định danh khác nhau (1, 2 và 4)
+  nên chỗ cần chỉnh tay cũng khác nhau. Viết thẳng ra từng bảng: dài hơn, nhưng sửa
+  một bảng thì chỉ bảng đó đổi.
 
-/** Bảng Bộ môn: hai cột định danh (Khoa / Viện, Bộ môn). */
-const departmentMetricWidths: RankMetricWidths = {
-  sectionCount: '6%',
-  classSize: '7%',
-  responseCount: '9%',
-  validResponseCount: '9%',
-  invalidResponseCount: '10%',
-  responseRate: '14%',
-  averageScore: '9%',
-};
+  Bề rộng mỗi bảng cộng đúng 100%.
+*/
 
-/** Bảng Học phần: bốn cột định danh (Khoa / Viện, Bộ môn, Học phần, Mã học phần). */
-const courseMetricWidths: RankMetricWidths = {
-  sectionCount: '5%',
-  classSize: '6%',
-  responseCount: '8%',
-  validResponseCount: '8%',
-  invalidResponseCount: '8%',
-  responseRate: '11%',
-  averageScore: '7%',
-};
-
-/**
- * Sáu cột số dùng chung cho cả ba bảng xếp hạng ở cấp tổng hợp.
- *
- * Bảng Học phần trước đây tự khai lại sáu cột này theo cách riêng nên thiếu hẳn
- * hai cột phiếu, còn cột Hoàn thành chỉ là con số trần không có thanh tiến độ —
- * cùng nằm một cấp bậc mà nhìn như hai trang khác nhau. Gom về một chỗ thì ba
- * bảng không còn lệch nhau được nữa.
- */
-const rankMetricColumns = <T extends RankedUnit>(widths: RankMetricWidths): Column<T>[] => [
+/** Bảng Theo Khoa/Viện: 1 cột định danh + 8 cột số + Thao tác. */
+const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedUnit>[] => [
+  {
+    key: 'name',
+    header: 'Khoa / Viện',
+    width: '25%',
+    sortValue: (item) => item.name,
+    filterValue: (item) => item.name,
+    render: (item) => <span className="catalog-cell-primary">{item.name}</span>,
+  },
   {
     key: 'sectionCount',
     header: 'Số lớp',
-    width: widths.sectionCount,
+    width: '6%',
     numeric: true,
     sortValue: (item) => item.sectionCount,
     filterValue: (item) => String(item.sectionCount),
@@ -368,7 +338,7 @@ const rankMetricColumns = <T extends RankedUnit>(widths: RankMetricWidths): Colu
   {
     key: 'classSize',
     header: 'Sĩ số',
-    width: widths.classSize,
+    width: '6%',
     numeric: true,
     sortValue: (item) => item.classSize,
     filterValue: (item) => String(item.classSize),
@@ -376,8 +346,8 @@ const rankMetricColumns = <T extends RankedUnit>(widths: RankMetricWidths): Colu
   },
   {
     key: 'responseCount',
-    header: 'Số phiếu thu được',
-    width: widths.responseCount,
+    header: 'Số phiếu đã thu',
+    width: '9%',
     numeric: true,
     sortValue: (item) => item.responseCount,
     filterValue: (item) => String(item.responseCount),
@@ -386,7 +356,7 @@ const rankMetricColumns = <T extends RankedUnit>(widths: RankMetricWidths): Colu
   {
     key: 'validResponseCount',
     header: 'Số phiếu hợp lệ',
-    width: widths.validResponseCount,
+    width: '9%',
     numeric: true,
     sortValue: (item) => item.validResponseCount,
     filterValue: (item) => String(item.validResponseCount),
@@ -395,7 +365,7 @@ const rankMetricColumns = <T extends RankedUnit>(widths: RankMetricWidths): Colu
   {
     key: 'invalidResponseCount',
     header: 'Số phiếu không hợp lệ',
-    width: widths.invalidResponseCount,
+    width: '10%',
     numeric: true,
     sortValue: (item) => item.invalidResponseCount,
     filterValue: (item) => String(item.invalidResponseCount),
@@ -410,29 +380,34 @@ const rankMetricColumns = <T extends RankedUnit>(widths: RankMetricWidths): Colu
     ),
   },
   {
-    // Tỷ lệ phản hồi = số phiếu thu được ÷ sĩ số, cùng cách tính với cột cùng tên ở
-    // bảng tra cứu chi tiết. Số phiếu hợp lệ đã có cột riêng nên bỏ dòng phụ bên dưới.
     key: 'responseRate',
     header: 'Tỷ lệ phản hồi',
-    width: widths.responseRate,
+    width: '10%',
     numeric: true,
     sortValue: (item) => item.responseRate,
-    filterValue: (item) => String(Math.round(item.responseRate)),
+    filterValue: (item) => `${item.responseRate.toFixed(1)}%`,
     render: (item) => (
-      <span className="reports-progress-cell">
-        <span className="reports-progress">
-          <span style={{ width: `${Math.min(100, item.responseRate)}%`, background: completionColor(item.responseRate) }} />
-        </span>
-        <span style={{ color: completionColor(item.responseRate), fontWeight: 700, fontSize: 12 }}>
-          {item.responseRate.toFixed(0)}%
-        </span>
+      <span
+        className="catalog-cell-number"
+        style={{ color: completionColor(item.responseRate), fontWeight: 700 }}
+      >
+        {item.responseRate.toFixed(1)}%
       </span>
     ),
   },
   {
+    key: 'validRate',
+    header: 'Tỷ lệ phiếu hợp lệ',
+    width: '10%',
+    numeric: true,
+    sortValue: (item) => item.validRate,
+    filterValue: (item) => `${item.validRate.toFixed(1)}%`,
+    render: (item) => <span className="catalog-cell-number">{item.validRate.toFixed(1)}%</span>,
+  },
+  {
     key: 'averageScore',
     header: 'Điểm trung bình',
-    width: widths.averageScore,
+    width: '8%',
     numeric: true,
     sortValue: (item) => item.averageScore,
     filterValue: (item) => item.averageScore.toFixed(2),
@@ -442,51 +417,212 @@ const rankMetricColumns = <T extends RankedUnit>(widths: RankMetricWidths): Colu
       </span>
     ),
   },
+  ...(onOpenDetail ? [{
+    key: 'actions',
+    header: 'Thao tác',
+    width: '7%',
+    render: (item: RankedUnit) => (
+      <button
+        type="button"
+        className="btn btn-secondary btn-sm reports-row-action"
+        onClick={() => onOpenDetail(item.id)}
+      >
+        <ClipboardList className="operation-icon" aria-hidden="true" />
+        Xem KQ
+      </button>
+    ),
+  }] : []),
 ];
 
-/** Cột "Xem KQ". Bảng nào không mở được chi tiết thì không có cột này. */
-const rankActionColumn = <T extends RankedUnit>(
-  onOpenDetail: ((id: number) => void) | undefined,
-): Column<T>[] => (onOpenDetail ? [{
-  key: 'actions',
-  header: 'Thao tác',
-  width: '112px',
-  render: (item) => (
-    <button
-      type="button"
-      className="btn btn-secondary btn-sm reports-row-action"
-      onClick={() => onOpenDetail(item.id)}
-    >
-      <ClipboardList className="operation-icon" aria-hidden="true" />
-      Xem KQ
-    </button>
-  ),
-}] : []);
-
-/**
- * Cột số của tệp xuất, cũng dùng chung cho cả ba bảng — cùng lý do với
- * `rankMetricColumns`: bảng nào cũng phải ra đúng một bộ cột như nhau.
- */
-const rankMetricExportColumns = <T extends RankedUnit>(): ExportColumn<T>[] => [
-  { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number' as const, align: 'right' as const },
-  { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
-  { key: 'responseCount', header: 'Số phiếu thu được', width: 16, type: 'number' as const, align: 'right' as const },
-  { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
-  { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number' as const, align: 'right' as const },
+const facultyRankExportColumns: ExportColumn<RankedUnit>[] = [
+  { key: 'name', header: 'Khoa / Viện', width: 28 },
+  { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number', align: 'right' },
+  { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number', align: 'right' },
+  { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number', align: 'right' },
+  { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
+  { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number', align: 'right' },
   {
     key: 'responseRate',
     header: 'Tỷ lệ phản hồi',
     width: 14,
-    type: 'string' as const,
-    align: 'right' as const,
-    format: (val: any) => `${Number(val).toFixed(0)}%`,
+    type: 'string',
+    align: 'right',
+    format: (val: any) => `${Number(val).toFixed(1)}%`,
+  },
+  {
+    key: 'validRate',
+    header: 'Tỷ lệ phiếu hợp lệ',
+    width: 16,
+    type: 'string',
+    align: 'right',
+    format: (val: any) => `${Number(val).toFixed(1)}%`,
   },
   {
     key: 'averageScore',
     header: 'Điểm trung bình',
     width: 14,
-    type: 'number' as const,
-    align: 'right' as const,
+    type: 'number',
+    align: 'right',
+    format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+  },
+];
+
+/** Bảng Theo Bộ môn: 2 cột định danh + 8 cột số + Thao tác. */
+const departmentRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedUnit>[] => [
+  {
+    key: 'facultyName',
+    header: 'Khoa / Viện',
+    width: '16%',
+    sortValue: (item) => item.facultyName,
+    filterValue: (item) => item.facultyName,
+    render: (item) => <span className="catalog-cell-primary">{item.facultyName}</span>,
+  },
+  {
+    key: 'name',
+    header: 'Bộ môn',
+    width: '18%',
+    sortValue: (item) => item.name,
+    filterValue: (item) => item.name,
+    render: (item) => <span className="catalog-cell-primary">{item.name}</span>,
+  },
+  {
+    key: 'sectionCount',
+    header: 'Số lớp',
+    width: '5%',
+    numeric: true,
+    sortValue: (item) => item.sectionCount,
+    filterValue: (item) => String(item.sectionCount),
+    render: (item) => <span className="catalog-cell-number">{item.sectionCount}</span>,
+  },
+  {
+    key: 'classSize',
+    header: 'Sĩ số',
+    width: '6%',
+    numeric: true,
+    sortValue: (item) => item.classSize,
+    filterValue: (item) => String(item.classSize),
+    render: (item) => <span className="catalog-cell-number">{item.classSize}</span>,
+  },
+  {
+    key: 'responseCount',
+    header: 'Số phiếu đã thu',
+    width: '8%',
+    numeric: true,
+    sortValue: (item) => item.responseCount,
+    filterValue: (item) => String(item.responseCount),
+    render: (item) => <span className="catalog-cell-number">{item.responseCount}</span>,
+  },
+  {
+    key: 'validResponseCount',
+    header: 'Số phiếu hợp lệ',
+    width: '8%',
+    numeric: true,
+    sortValue: (item) => item.validResponseCount,
+    filterValue: (item) => String(item.validResponseCount),
+    render: (item) => <span className="catalog-cell-number">{item.validResponseCount}</span>,
+  },
+  {
+    key: 'invalidResponseCount',
+    header: 'Số phiếu không hợp lệ',
+    width: '8%',
+    numeric: true,
+    sortValue: (item) => item.invalidResponseCount,
+    filterValue: (item) => String(item.invalidResponseCount),
+    render: (item) => (
+      <span
+        className={item.invalidResponseCount > 0
+          ? 'catalog-cell-number reports-invalid-count'
+          : 'catalog-cell-number'}
+      >
+        {item.invalidResponseCount}
+      </span>
+    ),
+  },
+  {
+    key: 'responseRate',
+    header: 'Tỷ lệ phản hồi',
+    width: '8%',
+    numeric: true,
+    sortValue: (item) => item.responseRate,
+    filterValue: (item) => `${item.responseRate.toFixed(1)}%`,
+    render: (item) => (
+      <span
+        className="catalog-cell-number"
+        style={{ color: completionColor(item.responseRate), fontWeight: 700 }}
+      >
+        {item.responseRate.toFixed(1)}%
+      </span>
+    ),
+  },
+  {
+    key: 'validRate',
+    header: 'Tỷ lệ phiếu hợp lệ',
+    width: '8%',
+    numeric: true,
+    sortValue: (item) => item.validRate,
+    filterValue: (item) => `${item.validRate.toFixed(1)}%`,
+    render: (item) => <span className="catalog-cell-number">{item.validRate.toFixed(1)}%</span>,
+  },
+  {
+    key: 'averageScore',
+    header: 'Điểm trung bình',
+    width: '8%',
+    numeric: true,
+    sortValue: (item) => item.averageScore,
+    filterValue: (item) => item.averageScore.toFixed(2),
+    render: (item) => (
+      <span className="reports-rank-score" style={{ color: scoreColor(item.averageScore) }}>
+        {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'}
+      </span>
+    ),
+  },
+  ...(onOpenDetail ? [{
+    key: 'actions',
+    header: 'Thao tác',
+    width: '7%',
+    render: (item: RankedUnit) => (
+      <button
+        type="button"
+        className="btn btn-secondary btn-sm reports-row-action"
+        onClick={() => onOpenDetail(item.id)}
+      >
+        <ClipboardList className="operation-icon" aria-hidden="true" />
+        Xem KQ
+      </button>
+    ),
+  }] : []),
+];
+
+const departmentRankExportColumns: ExportColumn<RankedUnit>[] = [
+  { key: 'facultyName', header: 'Khoa / Viện', width: 26 },
+  { key: 'name', header: 'Bộ môn', width: 28 },
+  { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number', align: 'right' },
+  { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number', align: 'right' },
+  { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number', align: 'right' },
+  { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
+  { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number', align: 'right' },
+  {
+    key: 'responseRate',
+    header: 'Tỷ lệ phản hồi',
+    width: 14,
+    type: 'string',
+    align: 'right',
+    format: (val: any) => `${Number(val).toFixed(1)}%`,
+  },
+  {
+    key: 'validRate',
+    header: 'Tỷ lệ phiếu hợp lệ',
+    width: 16,
+    type: 'string',
+    align: 'right',
+    format: (val: any) => `${Number(val).toFixed(1)}%`,
+  },
+  {
+    key: 'averageScore',
+    header: 'Điểm trung bình',
+    width: 14,
+    type: 'number',
+    align: 'right',
     format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
   },
 ];
@@ -494,65 +630,38 @@ const rankMetricExportColumns = <T extends RankedUnit>(): ExportColumn<T>[] => [
 interface RankedUnitTableProps {
   title: string;
   data: RankedUnit[];
-  /** Tên cột đơn vị: "Khoa / Viện" hay "Bộ môn" tuỳ bảng. */
-  unitHeader: string;
   /** Danh từ đếm trong tiêu đề, ví dụ "khoa/viện". */
   itemLabel: string;
-  /** Bảng Bộ môn thêm cột Khoa / Viện đứng trước cột Bộ môn. */
-  showFacultyColumn?: boolean;
+  columns: Column<RankedUnit>[];
+  exportColumns: ExportColumn<RankedUnit>[];
+  exportTitle: string;
+  exportFileName: string;
   onVisibleDataChange?: (rows: RankedUnit[]) => void;
-  onOpenDetail?: (id: number) => void;
 }
 
+/** Khung chung của hai bảng xếp hạng đơn vị; cột do trang truyền vào. */
 const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
   title,
   data,
-  unitHeader,
   itemLabel,
-  showFacultyColumn = false,
+  columns,
+  exportColumns,
+  exportTitle,
+  exportFileName,
   onVisibleDataChange,
-  onOpenDetail,
 }) => {
-  // Cùng bộ cột và cùng cách tính với bảng tra cứu chi tiết, chỉ khác là gộp
-  // theo đơn vị. Lọc và sắp xếp đều nằm trong menu trên tiêu đề cột.
-  const columns: Column<RankedUnit>[] = [
-    ...(showFacultyColumn
-      ? [{
-        key: 'facultyName',
-        header: 'Khoa / Viện',
-        width: '15%',
-        sortValue: (item: RankedUnit) => item.facultyName,
-        filterValue: (item: RankedUnit) => item.facultyName,
-        render: (item: RankedUnit) => <span className="catalog-cell-primary">{item.facultyName}</span>,
-      }]
-      : []),
-    {
-      key: 'name',
-      header: unitHeader,
-      width: showFacultyColumn ? '17%' : '24%',
-      sortValue: (item) => item.name,
-      filterValue: (item) => item.name,
-      render: (item) => <span className="catalog-cell-primary">{item.name}</span>,
-    },
-    ...rankMetricColumns<RankedUnit>(showFacultyColumn ? departmentMetricWidths : facultyMetricWidths),
-    ...rankActionColumn<RankedUnit>(onOpenDetail),
-  ];
-
   const exportConfig = useMemo(() => ({
-    title: `BÁO CÁO XẾP HẠNG ${title.toUpperCase()}`,
-    fileName: `xep-hang-${foldVietnamese(title).includes('khoa') ? 'khoa-vien' : 'bo-mon'}`,
+    title: exportTitle,
+    fileName: exportFileName,
     subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
     summaryNotes: [
-      'Tỷ lệ phản hồi = Số phiếu thu được ÷ Sĩ số.',
+      'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Sĩ số.',
+      'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
       'Số phiếu không hợp lệ là phiếu bị bộ lọc nhiễu loại, không tham gia tính điểm.',
       'Chỉ gộp các lớp học phần đủ điều kiện tính điểm.',
     ],
-    columns: [
-      ...(showFacultyColumn ? [{ key: 'facultyName', header: 'Khoa / Viện', width: 26 }] : []),
-      { key: 'name', header: unitHeader, width: 28 },
-      ...rankMetricExportColumns<RankedUnit>(),
-    ],
-  }), [title, unitHeader, showFacultyColumn]);
+    columns: exportColumns,
+  }), [exportTitle, exportFileName, exportColumns]);
 
   return (
     <section className="reports-rank" aria-label={title}>
@@ -575,34 +684,150 @@ const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
   );
 };
 
+/** Bảng Theo Học phần: 4 cột định danh + 8 cột số + Thao tác. */
 const RankedCourseTable: React.FC<{
   data: RankedCourse[];
   onOpenDetail: (id: number) => void;
 }> = ({ data, onOpenDetail }) => {
-  // Bốn cột định danh theo thứ tự Khoa / Viện, Bộ môn, Học phần, Mã học phần; bảy cột
-  // số dùng chung với bảng Khoa/Viện và bảng Bộ môn — cùng cấp bậc thì cùng bộ cột.
   const columns: Column<RankedCourse>[] = [
     {
-      key: 'facultyName', header: 'Khoa / Viện', width: '12%',
-      sortValue: (item) => item.facultyName, filterValue: (item) => item.facultyName,
+      key: 'facultyName',
+      header: 'Khoa / Viện',
+      width: '14%',
+      sortValue: (item) => item.facultyName,
+      filterValue: (item) => item.facultyName,
       render: (item) => <span className="catalog-cell-primary">{item.facultyName}</span>,
     },
     {
-      key: 'departmentName', header: 'Bộ môn', width: '12%',
-      sortValue: (item) => item.departmentName, filterValue: (item) => item.departmentName,
+      key: 'departmentName',
+      header: 'Bộ môn',
+      width: '15%',
+      sortValue: (item) => item.departmentName,
+      filterValue: (item) => item.departmentName,
+      render: (item) => <span className="catalog-cell-primary">{item.departmentName}</span>,
     },
     {
-      key: 'name', header: 'Học phần', width: '16%',
-      sortValue: (item) => item.name, filterValue: (item) => item.name,
+      key: 'name',
+      header: 'Học phần',
+      width: '15%',
+      sortValue: (item) => item.name,
+      filterValue: (item) => item.name,
       render: (item) => <span className="catalog-cell-primary">{item.name}</span>,
     },
     {
-      key: 'code', header: 'Mã học phần', width: '8%',
-      sortValue: (item) => item.code, filterValue: (item) => item.code,
+      key: 'code',
+      header: 'Mã học phần',
+      width: '5%',
+      sortValue: (item) => item.code,
+      filterValue: (item) => item.code,
       render: (item) => <span className="catalog-cell-primary">{item.code}</span>,
     },
-    ...rankMetricColumns<RankedCourse>(courseMetricWidths),
-    ...rankActionColumn<RankedCourse>(onOpenDetail),
+    {
+      key: 'sectionCount',
+      header: 'Số lớp',
+      width: '4%',
+      numeric: true,
+      sortValue: (item) => item.sectionCount,
+      filterValue: (item) => String(item.sectionCount),
+      render: (item) => <span className="catalog-cell-number">{item.sectionCount}</span>,
+    },
+    {
+      key: 'classSize',
+      header: 'Sĩ số',
+      width: '4%',
+      numeric: true,
+      sortValue: (item) => item.classSize,
+      filterValue: (item) => String(item.classSize),
+      render: (item) => <span className="catalog-cell-number">{item.classSize}</span>,
+    },
+    {
+      key: 'responseCount',
+      header: 'Số phiếu đã thu',
+      width: '6%',
+      numeric: true,
+      sortValue: (item) => item.responseCount,
+      filterValue: (item) => String(item.responseCount),
+      render: (item) => <span className="catalog-cell-number">{item.responseCount}</span>,
+    },
+    {
+      key: 'validResponseCount',
+      header: 'Số phiếu hợp lệ',
+      width: '6%',
+      numeric: true,
+      sortValue: (item) => item.validResponseCount,
+      filterValue: (item) => String(item.validResponseCount),
+      render: (item) => <span className="catalog-cell-number">{item.validResponseCount}</span>,
+    },
+    {
+      key: 'invalidResponseCount',
+      header: 'Số phiếu không hợp lệ',
+      width: '6%',
+      numeric: true,
+      sortValue: (item) => item.invalidResponseCount,
+      filterValue: (item) => String(item.invalidResponseCount),
+      render: (item) => (
+        <span
+          className={item.invalidResponseCount > 0
+            ? 'catalog-cell-number reports-invalid-count'
+            : 'catalog-cell-number'}
+        >
+          {item.invalidResponseCount}
+        </span>
+      ),
+    },
+    {
+      key: 'responseRate',
+      header: 'Tỷ lệ phản hồi',
+      width: '6%',
+      numeric: true,
+      sortValue: (item) => item.responseRate,
+      filterValue: (item) => `${item.responseRate.toFixed(1)}%`,
+      render: (item) => (
+        <span
+          className="catalog-cell-number"
+          style={{ color: completionColor(item.responseRate), fontWeight: 700 }}
+        >
+          {item.responseRate.toFixed(1)}%
+        </span>
+      ),
+    },
+    {
+      key: 'validRate',
+      header: 'Tỷ lệ phiếu hợp lệ',
+      width: '6%',
+      numeric: true,
+      sortValue: (item) => item.validRate,
+      filterValue: (item) => `${item.validRate.toFixed(1)}%`,
+      render: (item) => <span className="catalog-cell-number">{item.validRate.toFixed(1)}%</span>,
+    },
+    {
+      key: 'averageScore',
+      header: 'Điểm trung bình',
+      width: '6%',
+      numeric: true,
+      sortValue: (item) => item.averageScore,
+      filterValue: (item) => item.averageScore.toFixed(2),
+      render: (item) => (
+        <span className="reports-rank-score" style={{ color: scoreColor(item.averageScore) }}>
+          {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Thao tác',
+      width: '7 %',
+      render: (item) => (
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm reports-row-action"
+          onClick={() => onOpenDetail(item.id)}
+        >
+          <ClipboardList className="operation-icon" aria-hidden="true" />
+          Xem KQ
+        </button>
+      ),
+    },
   ];
 
   const exportConfig = useMemo(() => ({
@@ -610,7 +835,8 @@ const RankedCourseTable: React.FC<{
     fileName: 'xep-hang-hoc-phan',
     subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
     summaryNotes: [
-      'Tỷ lệ phản hồi = Số phiếu thu được ÷ Sĩ số.',
+      'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Sĩ số.',
+      'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
       'Số phiếu không hợp lệ là phiếu bị bộ lọc nhiễu loại, không tham gia tính điểm.',
       'Chỉ gộp các lớp học phần đủ điều kiện tính điểm.',
     ],
@@ -619,7 +845,35 @@ const RankedCourseTable: React.FC<{
       { key: 'departmentName', header: 'Bộ môn', width: 24 },
       { key: 'name', header: 'Học phần', width: 32 },
       { key: 'code', header: 'Mã học phần', width: 14 },
-      ...rankMetricExportColumns<RankedCourse>(),
+      { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number' as const, align: 'right' as const },
+      { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
+      { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number' as const, align: 'right' as const },
+      { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
+      { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number' as const, align: 'right' as const },
+      {
+        key: 'responseRate',
+        header: 'Tỷ lệ phản hồi',
+        width: 14,
+        type: 'string' as const,
+        align: 'right' as const,
+        format: (val: any) => `${Number(val).toFixed(1)}%`,
+      },
+      {
+        key: 'validRate',
+        header: 'Tỷ lệ phiếu hợp lệ',
+        width: 16,
+        type: 'string' as const,
+        align: 'right' as const,
+        format: (val: any) => `${Number(val).toFixed(1)}%`,
+      },
+      {
+        key: 'averageScore',
+        header: 'Điểm trung bình',
+        width: 14,
+        type: 'number' as const,
+        align: 'right' as const,
+        format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+      },
     ],
   }), []);
 
@@ -640,7 +894,6 @@ const RankedCourseTable: React.FC<{
     </section>
   );
 };
-
 export const ReportsOverviewPage: React.FC = () => {
   const initialRoute = useMemo(() => parseReportRoute(), []);
   const thresholds = useScoringThresholds();
@@ -1238,6 +1491,7 @@ export const ReportsOverviewPage: React.FC = () => {
     () => results.map((item) => ({
       ...item,
       responseRate: responseRateOf(item.responseCount, item.classSize),
+      validRate: validRateOf(item.validResponseCount, item.responseCount),
     })),
     [results],
   );
@@ -1284,6 +1538,7 @@ export const ReportsOverviewPage: React.FC = () => {
             validResponseCount: item.validResponseCount,
             invalidResponseCount: item.invalidResponseCount,
             responseRate: 0,
+            validRate: 0,
             averageScore: 0,
             sectionCount: 1,
           });
@@ -1311,6 +1566,7 @@ export const ReportsOverviewPage: React.FC = () => {
           ? (scoreSums.get(group.id) ?? 0) / scoredResponses
           : 0;
         group.responseRate = responseRateOf(group.responseCount, group.classSize);
+        group.validRate = validRateOf(group.validResponseCount, group.responseCount);
         ranked.push(group);
       }
       return ranked.sort((left, right) => left.name.localeCompare(right.name, 'vi'));
@@ -1350,6 +1606,7 @@ export const ReportsOverviewPage: React.FC = () => {
           validResponseCount: item.validResponseCount,
           invalidResponseCount: item.invalidResponseCount,
           responseRate: 0,
+          validRate: 0,
           averageScore: 0,
           sectionCount: 1,
         });
@@ -1372,6 +1629,7 @@ export const ReportsOverviewPage: React.FC = () => {
       const scoreCount = scoreCounts.get(group.id) ?? 0;
       group.averageScore = scoreCount > 0 ? (scoreSums.get(group.id) ?? 0) / scoreCount : 0;
       group.responseRate = responseRateOf(group.responseCount, group.classSize);
+      group.validRate = validRateOf(group.validResponseCount, group.responseCount);
       return group;
     }).sort((left, right) => left.code.localeCompare(right.code, 'vi'));
   }, [catalogCourses, results, thresholds]);
@@ -1484,7 +1742,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'departmentName',
       header: 'Bộ môn',
-      width: '11%',
+      width: '12%',
       sortValue: (item) => item.departmentName,
       filterValue: (item) => item.departmentName,
       render: (item) => <span className="catalog-cell-primary">{item.departmentName}</span>,
@@ -1507,7 +1765,7 @@ export const ReportsOverviewPage: React.FC = () => {
     },
     {
       key: 'sectionName',
-      header: 'Nhóm lớp',
+      header: 'Lớp học phần',
       width: '4%',
       sortValue: (item) => item.sectionName,
       filterValue: (item) => item.sectionName,
@@ -1560,7 +1818,7 @@ export const ReportsOverviewPage: React.FC = () => {
       sortValue: (item) => item.responseCount,
       filterValue: (item) => String(item.responseCount),
       numeric: true,
-      width: '6%',
+      width: '5%',
       render: (item) => <span className="catalog-cell-number">{item.responseCount}</span>,
     },
     {
@@ -1569,7 +1827,7 @@ export const ReportsOverviewPage: React.FC = () => {
       sortValue: (item) => item.validResponseCount,
       filterValue: (item) => String(item.validResponseCount),
       numeric: true,
-      width: '6%',
+      width: '5%',
       render: (item) => <span className="catalog-cell-number">{item.validResponseCount}</span>,
     },
     {
@@ -1578,7 +1836,7 @@ export const ReportsOverviewPage: React.FC = () => {
       sortValue: (item) => item.invalidResponseCount,
       filterValue: (item) => String(item.invalidResponseCount),
       numeric: true,
-      width: '6%',
+      width: '5%',
       render: (item) => (
         <span
           className={item.invalidResponseCount > 0
@@ -1601,20 +1859,31 @@ export const ReportsOverviewPage: React.FC = () => {
       sortValue: (item) => responseRateOf(item.responseCount, item.classSize),
       filterValue: (item) => String(Math.round(responseRateOf(item.responseCount, item.classSize))),
       numeric: true,
-      width: '8%',
+      width: '5%',
       render: (item) => {
         const rate = responseRateOf(item.responseCount, item.classSize);
         return (
-          <span className="reports-progress-cell">
-            <span className="reports-progress">
-              <span style={{ width: `${Math.min(100, rate)}%`, background: completionColor(rate) }} />
-            </span>
-            <span style={{ color: completionColor(rate), fontWeight: 700, fontSize: 12 }}>
-              {rate.toFixed(0)}%
-            </span>
+          <span
+            className="catalog-cell-number"
+            style={{ color: completionColor(rate), fontWeight: 700 }}
+          >
+            {rate.toFixed(1)}%
           </span>
         );
       },
+    },
+    {
+      key: 'validRate',
+      header: 'Tỷ lệ phiếu hợp lệ',
+      sortValue: (item) => validRateOf(item.validResponseCount, item.responseCount),
+      filterValue: (item) => `${validRateOf(item.validResponseCount, item.responseCount).toFixed(1)}%`,
+      numeric: true,
+      width: '5%',
+      render: (item) => (
+        <span className="catalog-cell-number">
+          {validRateOf(item.validResponseCount, item.responseCount).toFixed(1)}%
+        </span>
+      ),
     },
     {
       key: 'averageScore',
@@ -1657,7 +1926,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'courseCode',
       header: 'Mã Học phần',
-      width: '100px',
+      width: '10%',
       sortValue: (item) => item.courseCode,
       filterValue: (item) => item.courseCode,
       render: (item) => <span className="catalog-cell-primary">{item.courseCode}</span>,
@@ -1665,6 +1934,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'courseName',
       header: 'Tên học phần',
+      width: '22%',
       sortValue: (item) => item.courseName,
       filterValue: (item) => item.courseName,
       render: (item) => <span className="catalog-cell-primary">{item.courseName}</span>,
@@ -1672,7 +1942,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'sectionName',
       header: 'Nhóm lớp',
-      width: '90px',
+      width: '9%',
       sortValue: (item) => item.sectionName,
       filterValue: (item) => item.sectionName,
       render: (item) => <span className="operations-code">{item.sectionName}</span>,
@@ -1680,7 +1950,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'classSize',
       header: 'Sĩ số',
-      width: '64px',
+      width: '6%',
       numeric: true,
       sortValue: (item) => item.classSize,
       filterValue: (item) => String(item.classSize),
@@ -1689,7 +1959,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'responseCount',
       header: 'Phiếu thu',
-      width: '92px',
+      width: '9%',
       numeric: true,
       sortValue: (item) => item.responseCount,
       filterValue: (item) => String(item.responseCount),
@@ -1698,7 +1968,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'invalidResponseCount',
       header: 'Phiếu lỗi',
-      width: '84px',
+      width: '9%',
       numeric: true,
       sortValue: (item) => item.invalidResponseCount,
       filterValue: (item) => String(item.invalidResponseCount),
@@ -1715,7 +1985,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'completionRate',
       header: 'Hoàn thành',
-      width: '140px',
+      width: '15%',
       numeric: true,
       sortValue: (item) => item.completionRate,
       filterValue: (item) => String(Math.round(item.completionRate)),
@@ -1738,7 +2008,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'averageScore',
       header: 'Điểm TB',
-      width: '96px',
+      width: '9%',
       numeric: true,
       sortValue: (item) => item.averageScore,
       filterValue: (item) => item.averageScore.toFixed(2),
@@ -1751,7 +2021,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'actions',
       header: 'Thao tác',
-      width: '96px',
+      width: '11%',
       render: (item) => (
         <button
           type="button"
@@ -2063,9 +2333,11 @@ export const ReportsOverviewPage: React.FC = () => {
               <RankedUnitTable
                 title="Kết quả theo Khoa/Viện"
                 data={facultyRankings}
-                unitHeader="Khoa / Viện"
                 itemLabel="khoa/viện"
-                onOpenDetail={(id) => openAnalysisDetail('faculty', id)}
+                columns={facultyRankColumns((id) => openAnalysisDetail('faculty', id))}
+                exportColumns={facultyRankExportColumns}
+                exportTitle="BÁO CÁO XẾP HẠNG KẾT QUẢ THEO KHOA/VIỆN"
+                exportFileName="xep-hang-khoa-vien"
               />
             </div>
           )}
@@ -2075,10 +2347,11 @@ export const ReportsOverviewPage: React.FC = () => {
               <RankedUnitTable
                 title="Kết quả theo Bộ môn"
                 data={departmentRankings}
-                unitHeader="Bộ môn"
                 itemLabel="bộ môn"
-                showFacultyColumn
-                onOpenDetail={(id) => openAnalysisDetail('department', id)}
+                columns={departmentRankColumns((id) => openAnalysisDetail('department', id))}
+                exportColumns={departmentRankExportColumns}
+                exportTitle="BÁO CÁO XẾP HẠNG KẾT QUẢ THEO BỘ MÔN"
+                exportFileName="xep-hang-bo-mon"
               />
             </div>
           )}
@@ -2180,7 +2453,15 @@ export const ReportsOverviewPage: React.FC = () => {
                         width: 14,
                         type: 'string' as const,
                         align: 'right' as const,
-                        format: (val: any) => `${Number(val).toFixed(0)}%`,
+                        format: (val: any) => `${Number(val).toFixed(1)}%`,
+                      },
+                      {
+                        key: 'validRate',
+                        header: 'Tỷ lệ phiếu hợp lệ',
+                        width: 16,
+                        type: 'string' as const,
+                        align: 'right' as const,
+                        format: (val: any) => `${Number(val).toFixed(1)}%`,
                       },
                       {
                         key: 'averageScore',

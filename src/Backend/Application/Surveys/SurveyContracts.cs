@@ -1090,6 +1090,15 @@ public static class SurveyErrorCodes
 
     /// <summary>Đợt không có lớp nào trong phạm vi người dùng, không có gì để xuất.</summary>
     public const string SemesterSurveyHasNoSections = "SURVEY_SEMESTER_SURVEY_HAS_NO_SECTIONS";
+
+    /// <summary>Chưa hết thời gian thu phiếu nên chưa phát hành kết quả được.</summary>
+    public const string SurveyNotEnded = "SURVEY_NOT_ENDED";
+
+    /// <summary>
+    /// Kết quả của đợt chưa được quản trị phát hành. Trưởng bộ môn và giảng viên nhận
+    /// mã này thay vì số liệu; endpoint trả 403.
+    /// </summary>
+    public const string ResultsNotPublished = "SURVEY_RESULTS_NOT_PUBLISHED";
     /// <summary>Tên đợt để trống hoặc chỉ có khoảng trắng.</summary>
     public const string SemesterSurveyNameRequired = "SURVEY_SEMESTER_SURVEY_NAME_REQUIRED";
     /// <summary>Kiểu phạm vi không nằm trong <see cref="SurveyScopeTypes"/>.</summary>

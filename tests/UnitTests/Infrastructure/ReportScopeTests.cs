@@ -57,7 +57,7 @@ public class ReportScopeTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
 
-        await body(db, userScope => new EfSurveyService(db, cache, new FixedScopeResolver(userScope), new FixedScoringThresholdProvider(), new SchoolOverviewCacheVersion()));
+        await body(db, userScope => new EfSurveyService(db, cache, new FixedScopeResolver(userScope), new FixedScoringThresholdProvider(), new PublishedSurveyPublicationService(), new SchoolOverviewCacheVersion()));
     }
 
     private static UserScope Admin => UserScope.Unrestricted(RoleCodes.Admin);

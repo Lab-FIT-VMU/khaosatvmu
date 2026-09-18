@@ -62,7 +62,7 @@ public class SurveySectionScopeTests
         await using var transaction = await db.Database.BeginTransactionAsync();
         try
         {
-            await body(db, userScope => new EfSurveyService(db, cache, new FixedScopeResolver(userScope), new FixedScoringThresholdProvider(), new SchoolOverviewCacheVersion()));
+            await body(db, userScope => new EfSurveyService(db, cache, new FixedScopeResolver(userScope), new FixedScoringThresholdProvider(), new PublishedSurveyPublicationService(), new SchoolOverviewCacheVersion()));
         }
         finally
         {

@@ -276,12 +276,16 @@
 }
 
 /*
-  Bảng tra cứu chi tiết có 13 cột và khai báo bề rộng theo phần trăm, nên phải khoá
+  Bảng tra cứu chi tiết có 14 cột và khai báo bề rộng theo phần trăm, nên phải khoá
   bố cục lại. Để `auto` thì tên học phần và tên giảng viên tự kéo cột rộng ra, phần
   trăm không còn nghĩa gì và mấy cột số bị bóp lại.
+
+  Sàn bề rộng để thấp: trước đây 1360px nên màn hình thường hoặc khi phóng to chữ là
+  bảng thò ra ngoài, phải kéo ngang mới thấy cột cuối. Chữ trong ô đã tự xuống dòng
+  nên hẹp lại vẫn đọc được.
 */
 .reports-table-section .catalog-table {
-  min-width: 1360px;
+  min-width: 980px;
   table-layout: fixed;
 }
 

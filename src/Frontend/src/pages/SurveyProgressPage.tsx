@@ -243,11 +243,11 @@ interface ProgressItem {
 }
 
 const progressColumns = [
-  { key: 'code', header: 'Mã lớp HP', width: 14, align: 'center' as const },
-  { key: 'name', header: 'Tên lớp học phần', width: 28 },
-  { key: 'lecturerName', header: 'Giảng viên', width: 24 },
-  { key: 'departmentName', header: 'Bộ môn', width: 20 },
   { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
+  { key: 'departmentName', header: 'Bộ môn', width: 20 },
+  { key: 'name', header: 'Học phần', width: 28 },
+  { key: 'code', header: 'Nhóm lớp', width: 14, align: 'center' as const },
+  { key: 'lecturerName', header: 'Giảng viên', width: 24 },
   { key: 'targetCount', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
   { key: 'actualCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
   {
@@ -414,46 +414,46 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
   // Bề rộng theo phần trăm để tỷ lệ cột giữ nguyên trên mọi cỡ màn hình.
   const columns: Column<ProgressItem>[] = [
     {
-      key: 'code',
-      header: 'Nhóm lớp',
-      width: '7%',
-      filterValue: (item) => item.code,
-      render: (item) => <span className="operations-code">{item.code}</span>,
+      key: 'facultyName',
+      header: 'Khoa / Viện',
+      width: '16%',
+      filterValue: (item) => item.facultyName,
+      render: (item) => <span className="operations-primary-text">{item.facultyName}</span>,
+    },
+    {
+      key: 'departmentName',
+      header: 'Bộ môn',
+      width: '14%',
+      filterValue: (item) => item.departmentName,
+      render: (item) => <span className="operations-primary-text">{item.departmentName}</span>,
     },
     {
       key: 'name',
-      header: 'Tên lớp học phần',
+      header: 'Học phần',
       width: '18%',
       filterValue: (item) => item.name,
       render: (item) => <strong className="operations-primary-text">{item.name}</strong>,
     },
     {
+      key: 'code',
+      header: 'Lớp học phần',
+      width: '5%',
+      filterValue: (item) => item.code,
+      render: (item) => <span className="operations-code">{item.code}</span>,
+    },
+    {
       key: 'lecturerName',
       header: 'Giảng viên',
-      width: '14%',
+      width: '15%',
       filterValue: (item) => item.lecturerName,
       render: (item) => (
         <span className="operations-primary-text">{item.lecturerName}</span>
       ),
     },
     {
-      key: 'departmentName',
-      header: 'Bộ Môn',
-      width: '12%',
-      filterValue: (item) => item.departmentName,
-      render: (item) => <span className="operations-primary-text">{item.departmentName}</span>,
-    },
-    {
-      key: 'facultyName',
-      header: 'Khoa / Viện',
-      width: '12%',
-      filterValue: (item) => item.facultyName,
-      render: (item) => <span className="operations-primary-text">{item.facultyName}</span>,
-    },
-    {
       key: 'targetCount',
       header: 'Sĩ số',
-      width: '6%',
+      width: '5%',
       filterValue: (item) => String(item.targetCount),
       numeric: true,
       render: (item) => <span className="operations-primary-text">{item.targetCount}</span>,
@@ -461,15 +461,15 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
     {
       key: 'actualCount',
       header: 'Số phiếu đã thu',
-      width: '9%',
+      width: '7%',
       filterValue: (item) => String(item.actualCount),
       numeric: true,
-      render: (item) => <span className="operations-primary-text">{item.actualCount} phiếu</span>,
+      render: (item) => <span className="operations-primary-text">{item.actualCount}</span>,
     },
     {
       key: 'progress',
       header: 'Tỷ lệ phản hồi',
-      width: '12%',
+      width: '10%',
       filterValue: (item) => String(item.rate),
       numeric: true,
       quickFilters: [
@@ -590,15 +590,15 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
           <section className="operations-metrics" aria-label="Tổng quan tiến độ">
             <div className="operation-metric">
               <span className="operation-metric-icon"><Target className="operation-icon" aria-hidden="true" /></span>
-              <span className="operation-metric-label">Tổng sĩ số</span>
+              <span className="operation-metric-label">Số phiếu dự kiến thu về</span>
               <strong className="operation-metric-value">{totalTarget.toLocaleString()}</strong>
-              <span className="operation-metric-note">Theo sĩ số tất cả nhóm lớp</span>
+              <span className="operation-metric-note">Theo tổng sĩ số tất cả nhóm lớp</span>
             </div>
             <div className="operation-metric operation-metric--success">
               <span className="operation-metric-icon"><ClipboardCheck className="operation-icon" aria-hidden="true" /></span>
               <span className="operation-metric-label">Phiếu đã thu</span>
               <strong className="operation-metric-value">{totalActual.toLocaleString()}</strong>
-              <span className="operation-metric-note">Tỷ lệ phản hồi {overallRate}% tổng sĩ số</span>
+              <span className="operation-metric-note">Tỷ lệ phản hồi đạt {overallRate}% theo số phiếu dự kiến thu về  </span>
             </div>
             <div className="operation-metric operation-metric--warning">
               <span className="operation-metric-icon"><CheckCircle2 className="operation-icon" aria-hidden="true" /></span>
@@ -624,6 +624,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
             exportConfig={exportConfig}
             emptyMessage="Chưa có lớp học phần nào được phát phiếu khảo sát."
             keyExtractor={(item) => item.id}
+            showIndex={false}
           />
         </>
       )}

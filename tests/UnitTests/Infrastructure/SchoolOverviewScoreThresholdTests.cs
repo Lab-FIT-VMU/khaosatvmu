@@ -54,7 +54,8 @@ public class SchoolOverviewScoreThresholdTests
                 db,
                 cache,
                 new SchoolOverviewCacheVersion(),
-                new FixedScoringThresholdProvider())));
+                new FixedScoringThresholdProvider(),
+                new PublishedSurveyPublicationService())));
     }
 
     /// <summary>

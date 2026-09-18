@@ -174,6 +174,7 @@ builder.Services.AddScoped<ICatalogService, EfCatalogService>();
 builder.Services.AddScoped<ISurveyService, EfSurveyService>();
 builder.Services.AddScoped<ICourseSurveyQrExporter, ClosedXmlCourseSurveyQrExporter>();
 builder.Services.AddScoped<IScoringThresholdProvider, EfScoringThresholdProvider>();
+builder.Services.AddScoped<ISurveyPublicationService, EfSurveyPublicationService>();
 // Vé bắt đầu làm bài. Khóa ký khác nhau giữa máy dev và máy chạy thật, lấy từ
 // cấu hình chứ không viết trong mã. Đổi khóa thì mọi vé đang phát mất hiệu lực.
 builder.Services.AddSingleton(_ =>

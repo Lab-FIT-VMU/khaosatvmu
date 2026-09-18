@@ -71,6 +71,7 @@ public class ClearSectionResponsesTests
                     cache,
                     new FixedScopeResolver(userScope),
                     new FixedScoringThresholdProvider(),
+                    new PublishedSurveyPublicationService(),
                     new SchoolOverviewCacheVersion()));
         }
         finally

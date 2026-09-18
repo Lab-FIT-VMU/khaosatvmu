@@ -310,7 +310,7 @@ const tabs: { id: TabId; label: string; hint: string; minimumRole: 'unrestricted
   {
     id: 'normalization',
     label: 'Phân tích theo khoa/viện',
-    hint: 'Điểm trung bình từng khoa/viện. Cột Z-Score so điểm TB khoa với trung bình toàn trường theo sai số chuẩn σ/√n, chia bậc 1σ · 2σ · 3σ.',
+    hint: 'Điểm trung bình từng khoa/viện. Cột Z-Score so điểm trung bình khoa với trung bình toàn trường theo sai số chuẩn σ/√n, chia bậc 1σ · 2σ · 3σ.',
     minimumRole: 'unrestricted',
   },
   {
@@ -390,35 +390,34 @@ const FormulaNotes: React.FC<{ notes: string[] }> = ({ notes }) => (
  */
 const tabFormulaNotes: Partial<Record<TabId, string[]>> = {
   normalization: [
-    'Độ lệch chuẩn = √( Tổng bình phương (Điểm từng lớp − Điểm TB khoa) ÷ (Số lớp − 1) )',
-    'Z-Score = (Điểm TB khoa − Trung bình toàn trường)'
+    'Độ lệch chuẩn = √( Tổng bình phương (Điểm từng lớp − Điểm trung bình khoa) ÷ (Số lớp − 1) )',
+    'Z-Score = (Điểm trung bình khoa − Trung bình toàn trường)'
       + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp)',
   ],
   normalizationSections: [
-    'Z-Score toàn trường = (Điểm lớp − Trung bình toàn trường) ÷ Độ lệch chuẩn toàn trường',
-    'Z-Score trong khoa = (Điểm lớp − Điểm TB khoa) ÷ Độ lệch chuẩn khoa',
-    'Chênh lệch Z-Score = Z-Score trong khoa − Z-Score toàn trường',
+    'Z-Score so với toàn trường = (Điểm lớp − Trung bình toàn trường) ÷ Độ lệch chuẩn toàn trường',
+    'Z-Score so với khoa = (Điểm lớp − Điểm trung bình khoa) ÷ Độ lệch chuẩn khoa',
   ],
   departments: [
     'Mỗi dòng gộp toàn bộ lớp của một bộ môn trong đợt khảo sát.',
     'Độ lệch chuẩn = độ lệch chuẩn điểm các lớp của bộ môn.',
-    'Z-Score so toàn trường = (Điểm TB bộ môn − Trung bình toàn trường)'
+    'Z-Score so với toàn trường = (Điểm trung bình bộ môn − Trung bình toàn trường)'
       + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp)',
-    'Z-Score so với khoa = (Điểm TB bộ môn − Điểm TB khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
+    'Z-Score so với khoa = (Điểm trung bình bộ môn − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
       + ' Để trống khi khoa có dưới 2 lớp.',
   ],
   courses: [
     'Bảng này so các lớp TRONG CÙNG một học phần với nhau.',
     'Chênh lệch giữa các lớp = Điểm lớp cao nhất − Điểm lớp thấp nhất.',
-    'Z-Score so toàn trường = (Điểm TB học phần − Trung bình toàn trường)'
+    'Z-Score so với toàn trường = (Điểm trung bình học phần − Trung bình toàn trường)'
       + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp)',
-    'Z-Score so với khoa = (Điểm TB học phần − Điểm TB khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
+    'Z-Score so với khoa = (Điểm trung bình học phần − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
       + ' Để trống khi khoa có dưới 2 lớp.',
   ],
   lecturer: [
     'Z-Score = (Điểm lớp − Trung bình nhóm so) ÷ Độ lệch chuẩn nhóm so.'
       + ' Ba cột Z dùng ba nhóm: toàn trường, các lớp cùng khoa, các lớp cùng bộ môn.',
-    'Chênh so học phần = Điểm lớp − Điểm TB học phần.'
+    'Chênh so học phần = Điểm lớp − Điểm trung bình học phần.'
       + ' Để trống khi học phần chỉ có đúng lớp này, không có ai để so.',
     'Lớp cảnh báo = số lớp có điểm thấp hơn trung bình từ 1 độ lệch chuẩn trở lên (Z-Score ≤ −1).',
   ],
@@ -756,7 +755,7 @@ export const SurveyAnalysisPage: React.FC = () => {
 
   // Nút chú thích của tab được truyền xuống để mỗi tab đặt nó vào cuối dòng tóm
   // tắt số liệu của mình — hai thứ nằm chung một hàng thay vì ăn hai dòng.
-  const tabNote = (
+  const noteButton = (
     <NoteModalButton title={`Chú thích · ${activeTab.label}`}>
       <div className="z-legend">
         <p className="z-legend__note">{activeTab.hint}</p>
@@ -770,10 +769,10 @@ export const SurveyAnalysisPage: React.FC = () => {
           nút Cập nhật điểm.
         </p>
         <p className="z-legend__note">
-          <strong>Tỷ lệ phản hồi</strong> = Số phiếu thu về ÷ Tổng sĩ số.
+          <strong>Tỷ lệ phản hồi</strong> = Số phiếu đã thu ÷ Tổng sĩ số.
         </p>
         <p className="z-legend__note">
-          <strong>Tỷ lệ phiếu hợp lệ</strong> = Số phiếu hợp lệ ÷ Số phiếu thu về.
+          <strong>Tỷ lệ phiếu hợp lệ</strong> = Số phiếu hợp lệ ÷ Số phiếu đã thu.
         </p>
         <p className="z-legend__note">
           Số liệu trang này lấy theo lần bấm Cập nhật điểm gần nhất: đổi ngưỡng xong cần
@@ -834,8 +833,8 @@ export const SurveyAnalysisPage: React.FC = () => {
       ...extra,
       `Số liệu chỉ gộp lớp qua cả hai tiêu chí: tỷ lệ phản hồi ≥ ${thresholds.minimumResponseRate}%`
         + ` và tỷ lệ phiếu hợp lệ ≥ ${thresholds.minimumValidRate}%.`,
-      'Tỷ lệ phản hồi = Số phiếu thu về ÷ Tổng sĩ số.',
-      'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu thu về.',
+      'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng sĩ số.',
+      'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
       'Số liệu lấy theo lần bấm Cập nhật điểm gần nhất.',
       ...(shown < total
         ? [`Tệp chỉ chứa ${shown}/${total} dòng đang hiển thị theo bộ lọc cột trên màn hình.`]
@@ -867,7 +866,7 @@ export const SurveyAnalysisPage: React.FC = () => {
             'Số khoa/viện': data.groups.length,
           },
           notesFor('normalization', rows.length, data.groups.length, [
-            'Dòng TOÀN TRƯỜNG cộng từ tất cả các khoa/viện; Số GV để trống vì giảng viên dạy lớp của nhiều khoa sẽ bị đếm trùng.',
+            'Dòng TOÀN TRƯỜNG cộng từ tất cả các khoa/viện; Số giảng viên để trống vì giảng viên dạy lớp của nhiều khoa sẽ bị đếm trùng.',
           ]),
         ),
         sheets: [
@@ -877,15 +876,15 @@ export const SurveyAnalysisPage: React.FC = () => {
             columns: [
               textColumn('facultyName', 'Khoa / Viện', 32),
               countColumn('sectionCount', 'Số lớp', 8),
-              countColumn('lecturerCount', 'Số GV', 8),
+              countColumn('lecturerCount', 'Số giảng viên', 8),
               countColumn('totalClassSize', 'Tổng sĩ số'),
-              countColumn('responseCount', 'Số phiếu thu về', 12),
+              countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm TB khoa', 3),
+              scoreColumn('averageScore', 'Điểm trung bình khoa', 3),
               scoreColumn('standardDeviation', 'Độ lệch chuẩn', 3),
-              zColumn('meanZScore', 'Z-Score so toàn trường'),
+              zColumn('meanZScore', 'Z-Score so với toàn trường'),
             ],
             data: [
               ...rows,
@@ -943,21 +942,20 @@ export const SurveyAnalysisPage: React.FC = () => {
             sheetName: 'Theo lop hoc phan',
             title: `PHÂN TÍCH THEO LỚP HỌC PHẦN (${rows.length} LỚP)`,
             columns: [
-              textColumn('courseCode', 'Mã HP', 12),
-              textColumn('sectionName', 'Lớp', 12),
-              textColumn('courseName', 'Học phần', 30),
-              textColumn('lecturerName', 'Giảng viên', 24),
-              textColumn('departmentName', 'Bộ môn', 22),
               textColumn('facultyName', 'Khoa / Viện', 22),
+              textColumn('departmentName', 'Bộ môn', 22),
+              textColumn('courseName', 'Học phần', 30),
+              textColumn('courseCode', 'Mã học phần', 14),
+              textColumn('sectionName', 'Lớp học phần', 12),
+              textColumn('lecturerName', 'Giảng viên', 24),
               countColumn('classSize', 'Sĩ số', 8),
-              countColumn('responseCount', 'Số phiếu thu về', 12),
+              countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
               scoreColumn('averageScore', 'Điểm', 2, 8),
-              zColumn('zSchool', 'Z-Score toàn trường'),
-              zColumn('zFaculty', 'Z-Score trong khoa'),
-              zColumn('zDifference', 'Chênh lệch Z-Score'),
+              zColumn('zSchool', 'Z-Score so với toàn trường'),
+              zColumn('zFaculty', 'Z-Score so với khoa'),
             ],
             data: rows,
           },
@@ -992,7 +990,7 @@ export const SurveyAnalysisPage: React.FC = () => {
             rows.length,
             data.rows.length,
             isScoped
-              ? ['Dòng Toàn trường: Số lớp, Số phiếu thu về và Điểm trung bình tính trên toàn trường; Tổng sĩ số, Số phiếu hợp lệ và hai tỷ lệ cộng từ các bộ môn trong bảng.']
+              ? ['Dòng Toàn trường: Số lớp, Số phiếu đã thu và Điểm trung bình tính trên toàn trường; Tổng sĩ số, Số phiếu hợp lệ và hai tỷ lệ cộng từ các bộ môn trong bảng.']
               : [],
           ),
         ),
@@ -1004,15 +1002,15 @@ export const SurveyAnalysisPage: React.FC = () => {
               textColumn('facultyName', 'Khoa / Viện', 26),
               textColumn('departmentName', 'Bộ môn', 26),
               countColumn('sectionCount', 'Số lớp', 8),
-              countColumn('lecturerCount', 'Số GV', 8),
+              countColumn('lecturerCount', 'Số giảng viên', 8),
               countColumn('totalClassSize', 'Tổng sĩ số'),
-              countColumn('responseCount', 'Số phiếu thu về', 12),
+              countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
               scoreColumn('averageScore', 'Điểm trung bình'),
               scoreColumn('standardDeviation', 'Độ lệch chuẩn', 3),
-              zColumn('meanZScore', 'Z-Score so toàn trường'),
+              zColumn('meanZScore', 'Z-Score so với toàn trường'),
               zColumn('facultyMeanZScore', 'Z-Score so với khoa'),
             ],
             data: [
@@ -1053,22 +1051,22 @@ export const SurveyAnalysisPage: React.FC = () => {
             sheetName: 'Theo hoc phan',
             title: `PHÂN TÍCH THEO HỌC PHẦN (${rows.length} HỌC PHẦN)`,
             columns: [
-              textColumn('courseCode', 'Mã HP', 12),
-              textColumn('courseName', 'Học phần', 30),
-              textColumn('departmentName', 'Bộ môn', 22),
               textColumn('facultyName', 'Khoa / Viện', 22),
+              textColumn('departmentName', 'Bộ môn', 22),
+              textColumn('courseName', 'Học phần', 30),
+              textColumn('courseCode', 'Mã học phần', 14),
               countColumn('sectionCount', 'Số lớp', 8),
-              countColumn('lecturerCount', 'Số GV', 8),
+              countColumn('lecturerCount', 'Số giảng viên', 8),
               countColumn('totalClassSize', 'Tổng sĩ số'),
-              countColumn('responseCount', 'Số phiếu thu về', 12),
+              countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm TB', 2, 8),
+              scoreColumn('averageScore', 'Điểm trung bình', 2, 8),
               scoreColumn('minScore', 'Lớp thấp nhất'),
               scoreColumn('maxScore', 'Lớp cao nhất'),
               scoreColumn('spread', 'Chênh lệch giữa các lớp', 2, 14),
-              zColumn('meanZScore', 'Z-Score so toàn trường'),
+              zColumn('meanZScore', 'Z-Score so với toàn trường'),
               zColumn('facultyMeanZScore', 'Z-Score so với khoa'),
             ],
             data: rows,
@@ -1098,7 +1096,7 @@ export const SurveyAnalysisPage: React.FC = () => {
             'Phiếu thu': `${report.totalResponseCount.toLocaleString('vi-VN')} phiếu (${responseRate.toFixed(1)}%)`,
           },
           notesFor('lecturer', rows.length, report.sections.length, [
-            'Điểm TB học phần = trung bình mọi lớp cùng học phần, kể cả lớp người khác dạy.',
+            'Điểm trung bình học phần = trung bình mọi lớp cùng học phần, kể cả lớp người khác dạy.',
           ]),
         ),
         sheets: [
@@ -1110,16 +1108,16 @@ export const SurveyAnalysisPage: React.FC = () => {
               textColumn('courseName', 'Học phần', 30),
               textColumn('sectionName', 'Lớp', 12),
               countColumn('classSize', 'Sĩ số', 8),
-              countColumn('responseCount', 'Số phiếu thu về', 12),
+              countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
               scoreColumn('averageScore', 'Điểm', 2, 8),
-              scoreColumn('courseAverageScore', 'Điểm TB học phần', 2, 14),
+              scoreColumn('courseAverageScore', 'Điểm trung bình học phần', 2, 14),
               zColumn('differenceFromCourse', 'Chênh so học phần'),
-              zColumn('zSchool', 'Z-Score toàn trường'),
-              zColumn('zFaculty', 'Z-Score trong khoa'),
-              zColumn('zDepartment', 'Z-Score trong bộ môn'),
+              zColumn('zSchool', 'Z-Score so với toàn trường'),
+              zColumn('zFaculty', 'Z-Score so với khoa'),
+              zColumn('zDepartment', 'Z-Score so với bộ môn'),
             ],
             data: rows,
           },
@@ -1167,25 +1165,24 @@ export const SurveyAnalysisPage: React.FC = () => {
             sheetName: 'Giang vien',
             title: `TỔNG HỢP KẾT QUẢ THEO GIẢNG VIÊN (${rows.length} GIẢNG VIÊN)`,
             columns: [
-              textColumn('fullName', 'Giảng viên', 26),
-              textColumn('departmentName', 'Bộ môn', 22),
               textColumn('facultyName', 'Khoa / Viện', 22),
+              textColumn('departmentName', 'Bộ môn', 22),
+              textColumn('fullName', 'Giảng viên', 26),
               countColumn('sectionCount', 'Số lớp', 8),
               countColumn('totalClassSize', 'Tổng sĩ số'),
               countColumn('responseCount', 'Số phiếu thu', 10),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ hợp lệ'),
-              scoreColumn('averageScore', 'Điểm TB', 2, 8),
+              scoreColumn('averageScore', 'Điểm trung bình', 2, 8),
               scoreColumn('minScore', 'Lớp thấp nhất'),
               scoreColumn('maxScore', 'Lớp cao nhất'),
-              countColumn('warningSectionCount', 'Lớp cảnh báo'),
             ],
             data: [
               ...rows,
               {
-                fullName: 'Toàn trường',
-                departmentName: `${lecturers.length} giảng viên`,
+                facultyName: 'Toàn trường',
+                fullName: `${lecturers.length} giảng viên`,
                 sectionCount: totalSections,
                 totalClassSize: classSize,
                 responseCount: responses,
@@ -1193,7 +1190,6 @@ export const SurveyAnalysisPage: React.FC = () => {
                 responseRate,
                 validResponseRate: validRate,
                 averageScore: overallScore,
-                warningSectionCount: totalWarnings,
               },
             ],
           },
@@ -1216,6 +1212,21 @@ export const SurveyAnalysisPage: React.FC = () => {
     semesterSurveyId,
     thresholds,
   ]);
+
+  // Nút Chú thích và nút xuất đi cùng nhau xuống dòng tóm tắt của tab: tệp xuất là
+  // của đúng tab đang mở nên nút đứng cạnh bảng, không đứng trên thanh chọn đợt.
+  const tabNote = (
+    <>
+      {noteButton}
+      {exportAnalysisOptions && (
+        <ExportDropdown
+          options={exportAnalysisOptions}
+          buttonLabel="Xuất báo cáo phân tích"
+          size="sm"
+        />
+      )}
+    </>
+  );
 
   return (
     <div className="survey-operations-page survey-statistics-page survey-analysis-page">
@@ -1272,9 +1283,6 @@ export const SurveyAnalysisPage: React.FC = () => {
         </div>
 
         <div className="statistics-toolbar-actions">
-          {exportAnalysisOptions && (
-            <ExportDropdown options={exportAnalysisOptions} buttonLabel="Xuất báo cáo phân tích" size="sm" />
-          )}
           <button
             type="button"
             className="btn btn-secondary"
@@ -1476,7 +1484,7 @@ const NormalizationGroupTab: React.FC<{
   }, [groupFilters.visibleRows, onVisibleRowsChange]);
 
   // Dòng TOÀN TRƯỜNG cộng từ tất cả các khoa chứ không phải từ trang đang xem.
-  // Riêng Số GV để trống: một giảng viên dạy lớp của hai khoa sẽ bị đếm hai lần.
+  // Riêng Số giảng viên để trống: một giảng viên dạy lớp của hai khoa sẽ bị đếm hai lần.
   const schoolClassSize = groups.reduce((sum, row) => sum + row.totalClassSize, 0);
   const schoolResponses = groups.reduce((sum, row) => sum + row.responseCount, 0);
   const schoolValidResponses = groups.reduce((sum, row) => sum + row.validResponseCount, 0);
@@ -1490,46 +1498,46 @@ const NormalizationGroupTab: React.FC<{
       <NormalizationSummary data={data} note={note} />
 
       <div className="analysis-group-table">
-        <table className="statistics-table">
+        <table className="statistics-table statistics-table--fixed">
           <thead>
             {/* Bảng này không có cột ghim nên bề rộng để theo phần trăm được. */}
             <tr>
-              <th scope="col" style={{ width: '26%' }}>
+              <th scope="col" style={{ width: '20%' }}>
                 {groupFilters.filterHeader('facultyName', 'Khoa / Viện')}
               </th>
-              <th scope="col" style={{ width: '5%' }}>
+              <th scope="col" style={{ width: '6%' }}>
                 {groupFilters.filterHeader('sectionCount', 'Số lớp')}
               </th>
-              <th scope="col" style={{ width: '5%' }}>
-                {groupFilters.filterHeader('lecturerCount', 'Số GV')}
+              <th scope="col" style={{ width: '6%' }}>
+                {groupFilters.filterHeader('lecturerCount', 'Số giảng viên')}
               </th>
               <th scope="col" style={{ width: '7%' }}>
                 {groupFilters.filterHeader('totalClassSize', 'Tổng sĩ số')}
               </th>
               <th scope="col" style={{ width: '8%' }}>
-                {groupFilters.filterHeader('responseCount', 'Số phiếu thu về')}
+                {groupFilters.filterHeader('responseCount', 'Số phiếu đã thu')}
               </th>
               <th scope="col" style={{ width: '8%' }}>
                 {groupFilters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '8%' }} title="Số phiếu thu về chia tổng sĩ số">
+              <th scope="col" style={{ width: '9%' }} title="Số phiếu đã thu chia tổng sĩ số">
                 {groupFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
-              <th scope="col" style={{ width: '8%' }} title="Số phiếu hợp lệ chia số phiếu thu về">
+              <th scope="col" style={{ width: '9%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
                 {groupFilters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '8%' }}>
-                {groupFilters.filterHeader('averageScore', 'Điểm TB khoa')}
+              <th scope="col" style={{ width: '9%' }}>
+                {groupFilters.filterHeader('averageScore', 'Điểm trung bình khoa')}
               </th>
-              <th scope="col" style={{ width: '8%' }}>
+              <th scope="col" style={{ width: '9%' }}>
                 {groupFilters.filterHeader('standardDeviation', 'Độ lệch chuẩn')}
               </th>
               <th
                 scope="col"
                 style={{ width: '9%' }}
-                title="Điểm TB khoa lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
+                title="Điểm trung bình khoa lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
               >
-                {groupFilters.filterHeader('meanZScore', 'Z-Score so toàn trường')}
+                {groupFilters.filterHeader('meanZScore', 'Z-Score so với toàn trường')}
               </th>
             </tr>
           </thead>
@@ -1544,7 +1552,7 @@ const NormalizationGroupTab: React.FC<{
                     id: group.facultyId!,
                   })}
                 >
-                  <td>
+                  <td title={group.facultyName}>
                     {group.facultyId === null ? group.facultyName : (
                       <button
                         type="button"
@@ -1585,7 +1593,7 @@ const NormalizationGroupTab: React.FC<{
             <tr>
               <th scope="row">TOÀN TRƯỜNG</th>
               <td className="num is-sum">{data.schoolSectionCount}</td>
-              {/* Số GV để trống: cộng số của từng khoa sẽ đếm trùng người dạy liên khoa. */}
+              {/* Số giảng viên để trống: cộng số của từng khoa sẽ đếm trùng người dạy liên khoa. */}
               <td />
               <td className="num is-sum">{schoolClassSize}</td>
               <td className="num is-sum">{schoolResponses}</td>
@@ -1716,11 +1724,6 @@ const NormalizationSectionTab: React.FC<{
       value: (row) => (row.zFaculty === null ? '—' : row.zFaculty.toFixed(2)),
       sortValue: (row) => row.zFaculty,
     },
-    {
-      key: 'zDifference',
-      value: (row) => (row.zDifference === null ? '—' : row.zDifference.toFixed(2)),
-      sortValue: (row) => row.zDifference,
-    },
   ], []);
   const sectionFilters = useColumnFilters(sections, sectionColumns);
   const sectionPagination = usePaginatedItems(sectionFilters.visibleRows, analysisPageSize);
@@ -1757,55 +1760,50 @@ const NormalizationSectionTab: React.FC<{
       <NormalizationSummary data={data} showStandardDeviation note={note} />
 
       <div className="statistics-table-scroll" tabIndex={0} aria-label="Chi tiết chuẩn hoá từng lớp">
-        <table className="statistics-table">
+        <table className="statistics-table statistics-table--fixed">
           <thead>
             <tr>
-              <th className="col-left col-left-1" scope="col">
-                {sectionFilters.filterHeader('courseCode', 'Mã HP')}
-              </th>
-              <th className="col-left col-left-2" scope="col">
-                {sectionFilters.filterHeader('sectionName', 'Lớp')}
-              </th>
-              <th className="col-left col-left-3" scope="col">
-                {sectionFilters.filterHeader('courseName', 'Học phần')}
-              </th>
-              {/* Ba cột đầu bị ghim nên bề rộng phải giữ pixel — giá trị `left` của
-                  cột sau cộng dồn từ chúng. Các cột còn lại để theo phần trăm. */}
-              <th scope="col" style={{ width: '11%' }}>
-                {sectionFilters.filterHeader('lecturerName', 'Giảng viên')}
-              </th>
-              <th scope="col" style={{ width: '10%' }}>
-                {sectionFilters.filterHeader('departmentName', 'Bộ môn')}
-              </th>
-              <th scope="col" style={{ width: '10%' }}>
+              <th scope="col" style={{ width: '12%' }}>
                 {sectionFilters.filterHeader('facultyName', 'Khoa / Viện')}
               </th>
+              <th scope="col" style={{ width: '12%' }}>
+                {sectionFilters.filterHeader('departmentName', 'Bộ môn')}
+              </th>
+              <th scope="col" style={{ width: '14%' }}>
+                {sectionFilters.filterHeader('courseName', 'Học phần')}
+              </th>
               <th scope="col" style={{ width: '5%' }}>
+                {sectionFilters.filterHeader('courseCode', 'Mã học phần')}
+              </th>
+              <th scope="col" style={{ width: '4%' }}>
+                {sectionFilters.filterHeader('sectionName', 'Lớp học phần')}
+              </th>
+              <th scope="col" style={{ width: '14%' }}>
+                {sectionFilters.filterHeader('lecturerName', 'Giảng viên')}
+              </th>
+              <th scope="col" style={{ width: '3%' }}>
                 {sectionFilters.filterHeader('classSize', 'Sĩ số')}
               </th>
-              <th scope="col" style={{ width: '7%' }}>
-                {sectionFilters.filterHeader('responseCount', 'Số phiếu thu về')}
+              <th scope="col" style={{ width: '5%' }}>
+                {sectionFilters.filterHeader('responseCount', 'Số phiếu đã thu')}
               </th>
-              <th scope="col" style={{ width: '7%' }}>
+              <th scope="col" style={{ width: '5%' }}>
                 {sectionFilters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '7%' }} title="Số phiếu thu về chia sĩ số lớp">
+              <th scope="col" style={{ width: '5%' }} title="Số phiếu đã thu chia sĩ số lớp">
                 {sectionFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
-              <th scope="col" style={{ width: '7%' }} title="Số phiếu hợp lệ chia số phiếu thu về">
+              <th scope="col" style={{ width: '5%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
                 {sectionFilters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '7%' }}>
+              <th scope="col" style={{ width: '4%' }}>
                 {sectionFilters.filterHeader('averageScore', 'Điểm')}
               </th>
-              <th scope="col" style={{ width: '10%' }}>
-                {sectionFilters.filterHeader('zSchool', 'Z-Score toàn trường')}
+              <th scope="col" style={{ width: '6%' }}>
+                {sectionFilters.filterHeader('zSchool', 'Z-Score so với toàn trường')}
               </th>
-              <th scope="col" style={{ width: '10%' }}>
-                {sectionFilters.filterHeader('zFaculty', 'Z-Score trong khoa')}
-              </th>
-              <th scope="col" style={{ width: '9%' }}>
-                {sectionFilters.filterHeader('zDifference', 'Chênh lệch Z-Score')}
+              <th scope="col" style={{ width: '6%' }}>
+                {sectionFilters.filterHeader('zFaculty', 'Z-Score so với khoa')}
               </th>
             </tr>
           </thead>
@@ -1816,7 +1814,10 @@ const NormalizationSectionTab: React.FC<{
                 className="analysis-drill-row"
                 onClick={() => onOpenSurvey(section.courseSectionSurveyId)}
               >
-                <td className="col-left col-left-1">
+                <td title={section.facultyName}>{section.facultyName}</td>
+                <td title={section.departmentName}>{section.departmentName}</td>
+                <td title={section.courseName}>{section.courseName}</td>
+                <td>
                   <button
                     type="button"
                     className="analysis-drill-link operations-code"
@@ -1829,13 +1830,8 @@ const NormalizationSectionTab: React.FC<{
                     {section.courseCode}
                   </button>
                 </td>
-                <td className="col-left col-left-2">{section.sectionName}</td>
-                <td className="col-left col-left-3" title={section.courseName}>
-                  {section.courseName}
-                </td>
-                <td>{section.lecturerName}</td>
-                <td>{section.departmentName}</td>
-                <td>{section.facultyName}</td>
+                <td>{section.sectionName}</td>
+                <td title={section.lecturerName}>{section.lecturerName}</td>
                 <td className="num">{section.classSize}</td>
                 <td className="num">{section.responseCount}</td>
                 <td className="num">{section.validResponseCount}</td>
@@ -1853,11 +1849,6 @@ const NormalizationSectionTab: React.FC<{
                   {section.zFaculty === null
                     ? '—'
                     : `${section.zFaculty > 0 ? '+' : ''}${section.zFaculty.toFixed(2)}`}
-                </td>
-                <td className="num">
-                  {section.zDifference === null
-                    ? '—'
-                    : `${section.zDifference > 0 ? '+' : ''}${section.zDifference.toFixed(2)}`}
                 </td>
               </tr>
             ))}
@@ -1969,37 +1960,53 @@ const DepartmentTab: React.FC<{
       </section>
 
       <div className="statistics-table-scroll" tabIndex={0} aria-label="Phân tích theo bộ môn">
-        <table className="statistics-table statistics-table--fill">
+        <table className="statistics-table statistics-table--fixed statistics-table--fill">
           <thead>
             <tr>
-              <th className="col-left col-dept-1" scope="col">
+              <th scope="col" style={{ width: '19%' }}>
                 {filters.filterHeader('facultyName', 'Khoa / Viện')}
               </th>
-              <th className="col-left col-dept-2" scope="col">
+              <th scope="col" style={{ width: '18%' }}>
                 {filters.filterHeader('departmentName', 'Bộ môn')}
               </th>
-              <th scope="col">{filters.filterHeader('sectionCount', 'Số lớp')}</th>
-              <th scope="col">{filters.filterHeader('lecturerCount', 'Số GV')}</th>
-              <th scope="col">{filters.filterHeader('totalClassSize', 'Tổng sĩ số')}</th>
-              <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu thu về')}</th>
-              <th scope="col">{filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}</th>
-              <th scope="col" title="Số phiếu thu về chia tổng sĩ số">
+              <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('sectionCount', 'Số lớp')}
+              </th>
+              <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('lecturerCount', 'Số giảng viên')}
+              </th>
+              <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('totalClassSize', 'Tổng sĩ số')}
+              </th>
+              <th scope="col" style={{ width: '6%' }}>
+                {filters.filterHeader('responseCount', 'Số phiếu đã thu')}
+              </th>
+              <th scope="col" style={{ width: '6%' }}>
+                {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
+              </th>
+              <th scope="col" style={{ width: '6%' }} title="Số phiếu đã thu chia tổng sĩ số">
                 {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
-              <th scope="col" title="Số phiếu hợp lệ chia số phiếu thu về">
+              <th scope="col" style={{ width: '6%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
                 {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
               </th>
-              <th scope="col">{filters.filterHeader('averageScore', 'Điểm trung bình')}</th>
-              <th scope="col">{filters.filterHeader('standardDeviation', 'Độ lệch chuẩn')}</th>
-              <th
-                scope="col"
-                title="Điểm TB bộ môn lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
-              >
-                {filters.filterHeader('meanZScore', 'Z-Score so toàn trường')}
+              <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('averageScore', 'Điểm trung bình')}
+              </th>
+              <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('standardDeviation', 'Độ lệch chuẩn')}
               </th>
               <th
                 scope="col"
-                title="Điểm TB bộ môn lệch trung bình khoa bao nhiêu lần sai số chuẩn σ/√n"
+                style={{ width: '7%' }}
+                title="Điểm trung bình bộ môn lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
+              >
+                {filters.filterHeader('meanZScore', 'Z-Score so với toàn trường')}
+              </th>
+              <th
+                scope="col"
+                style={{ width: '7%' }}
+                title="Điểm trung bình bộ môn lệch trung bình khoa bao nhiêu lần sai số chuẩn σ/√n"
               >
                 {filters.filterHeader('facultyMeanZScore', 'Z-Score so với khoa')}
               </th>
@@ -2015,10 +2022,8 @@ const DepartmentTab: React.FC<{
                   id: row.departmentId!,
                 })}
               >
-                <td className="col-left col-dept-1" title={row.facultyName}>
-                  {row.facultyName}
-                </td>
-                <td className="col-left col-dept-2" title={row.departmentName}>
+                <td title={row.facultyName}>{row.facultyName}</td>
+                <td title={row.departmentName}>
                   {row.departmentId === null ? row.departmentName : (
                     <button
                       type="button"
@@ -2068,8 +2073,8 @@ const DepartmentTab: React.FC<{
 
           <tfoot>
             <tr>
-              <th className="col-left col-dept-1" scope="row">Toàn trường</th>
-              <td className="col-left col-dept-2">{data.schoolDepartmentCount} bộ môn</td>
+              <th scope="row">Toàn trường</th>
+              <td>{data.schoolDepartmentCount} bộ môn</td>
               <td className="num is-sum">{totalSections}</td>
               <td />
               <td className="num is-sum">{totalClassSize}</td>
@@ -2179,66 +2184,65 @@ const CourseDiagnosisTab: React.FC<{
       </section>
 
       <div className="statistics-table-scroll" tabIndex={0} aria-label="Phân tích theo học phần">
-        <table className="statistics-table">
+        <table className="statistics-table statistics-table--fixed">
           <thead>
             <tr>
-              <th className="col-left col-course-1" scope="col">
-                {filters.filterHeader('courseCode', 'Mã HP')}
-              </th>
-              <th className="col-left col-course-2" scope="col">
-                {filters.filterHeader('courseName', 'Học phần')}
-              </th>
-              {/* Hai cột đầu bị ghim nên giữ pixel; phần còn lại theo phần trăm. */}
-              <th scope="col" style={{ width: '11%' }}>
-                {filters.filterHeader('departmentName', 'Bộ môn')}
-              </th>
               <th scope="col" style={{ width: '11%' }}>
                 {filters.filterHeader('facultyName', 'Khoa / Viện')}
               </th>
+              <th scope="col" style={{ width: '10%' }}>
+                {filters.filterHeader('departmentName', 'Bộ môn')}
+              </th>
+              <th scope="col" style={{ width: '17%' }}>
+                {filters.filterHeader('courseName', 'Học phần')}
+              </th>
               <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('courseCode', 'Mã học phần')}
+              </th>
+              <th scope="col" style={{ width: '3%' }}>
                 {filters.filterHeader('sectionCount', 'Số lớp')}
               </th>
-              <th scope="col" style={{ width: '5%' }}>
-                {filters.filterHeader('lecturerCount', 'Số GV')}
+              <th scope="col" style={{ width: '4%' }}>
+                {filters.filterHeader('lecturerCount', 'Số giảng viên')}
               </th>
-              <th scope="col" style={{ width: '6%' }}>
+              <th scope="col" style={{ width: '4%' }}>
                 {filters.filterHeader('totalClassSize', 'Tổng sĩ số')}
               </th>
-              <th scope="col" style={{ width: '7%' }}>
-                {filters.filterHeader('responseCount', 'Số phiếu thu về')}
+              <th scope="col" style={{ width: '4%' }}>
+                {filters.filterHeader('responseCount', 'Số phiếu đã thu')}
               </th>
-              <th scope="col" style={{ width: '7%' }}>
+              <th scope="col" style={{ width: '4%' }}>
                 {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '7%' }} title="Số phiếu thu về chia tổng sĩ số">
+              <th scope="col" style={{ width: '5%' }} title="Số phiếu đã thu chia tổng sĩ số">
                 {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
-              <th scope="col" style={{ width: '7%' }} title="Số phiếu hợp lệ chia số phiếu thu về">
+              <th scope="col" style={{ width: '5%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
                 {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '7%' }}>
-                {filters.filterHeader('averageScore', 'Điểm TB')}
+              <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('averageScore', 'Điểm trung bình')}
               </th>
-              <th scope="col" style={{ width: '7%' }}>
+              <th scope="col" style={{ width: '4%' }}>
                 {filters.filterHeader('minScore', 'Lớp thấp nhất')}
               </th>
-              <th scope="col" style={{ width: '7%' }}>
+              <th scope="col" style={{ width: '4%' }}>
                 {filters.filterHeader('maxScore', 'Lớp cao nhất')}
               </th>
-              <th scope="col" style={{ width: '8%' }} title="Điểm lớp cao nhất trừ điểm lớp thấp nhất">
+              <th scope="col" style={{ width: '5%' }} title="Điểm lớp cao nhất trừ điểm lớp thấp nhất">
                 {filters.filterHeader('spread', 'Chênh lệch giữa các lớp')}
               </th>
               <th
                 scope="col"
-                style={{ width: '7%' }}
-                title="Điểm TB học phần lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
+                style={{ width: '5%' }}
+                title="Điểm trung bình học phần lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
               >
-                {filters.filterHeader('meanZScore', 'Z-Score so toàn trường')}
+                {filters.filterHeader('meanZScore', 'Z-Score so với toàn trường')}
               </th>
               <th
                 scope="col"
-                style={{ width: '7%' }}
-                title="Điểm TB học phần lệch trung bình khoa bao nhiêu lần sai số chuẩn σ/√n"
+                style={{ width: '5%' }}
+                title="Điểm trung bình học phần lệch trung bình khoa bao nhiêu lần sai số chuẩn σ/√n"
               >
                 {filters.filterHeader('facultyMeanZScore', 'Z-Score so với khoa')}
               </th>
@@ -2254,10 +2258,9 @@ const CourseDiagnosisTab: React.FC<{
                   id: row.courseId,
                 })}
               >
-                <td className="col-left col-course-1">
-                  <span className="operations-code">{row.courseCode}</span>
-                </td>
-                <td className="col-left col-course-2" title={row.courseName}>
+                <td title={row.facultyName}>{row.facultyName}</td>
+                <td title={row.departmentName}>{row.departmentName}</td>
+                <td title={row.courseName}>
                   <button
                     type="button"
                     className="analysis-drill-link"
@@ -2272,8 +2275,9 @@ const CourseDiagnosisTab: React.FC<{
                     {row.courseName}
                   </button>
                 </td>
-                <td>{row.departmentName}</td>
-                <td>{row.facultyName}</td>
+                <td>
+                  <span className="operations-code">{row.courseCode}</span>
+                </td>
                 <td className="num">{row.sectionCount}</td>
                 <td className="num">{row.lecturerCount}</td>
                 <td className="num">{row.totalClassSize}</td>
@@ -2406,7 +2410,6 @@ const LecturerTab: React.FC<{
       value: (row) => (typeof row.maxScore === 'number' ? row.maxScore.toFixed(2) : '—'),
       sortValue: (row) => row.maxScore,
     },
-    { key: 'warningSectionCount', value: (row) => String(row.warningSectionCount), numeric: true },
   ], []);
 
   const filters = useColumnFilters(lecturers, columns);
@@ -2470,15 +2473,11 @@ const LecturerTab: React.FC<{
   return (
     <>
       <section className="statistics-summary">
+        {/* Dòng này chỉ giữ vài số đầu bảng: sĩ số, phiếu thu và phiếu hợp lệ đã có ở
+            dòng tổng cuối bảng, để cả ra đây thì nút Chú thích và nút xuất bị đẩy
+            xuống dòng thứ hai. */}
         <span>
-          <strong>{lecturers.length}</strong> giảng viên thu được phiếu · <strong>{totalSections}</strong> lớp giảng dạy
-        </span>
-        <span>
-          Tổng sĩ số: <strong>{totalClassSize.toLocaleString('vi-VN')}</strong> ·{' '}
-          Phiếu thu về: <strong>{totalResponses.toLocaleString('vi-VN')}</strong> (
-          {totalClassSize === 0 ? 0 : ((totalResponses / totalClassSize) * 100).toFixed(1)}%) ·{' '}
-          Phiếu hợp lệ: <strong>{totalValidResponses.toLocaleString('vi-VN')}</strong> (
-          {totalResponses === 0 ? 0 : ((totalValidResponses / totalResponses) * 100).toFixed(1)}%)
+          <strong>{lecturers.length}</strong> giảng viên · <strong>{totalSections}</strong> lớp giảng dạy
         </span>
         <span>
           Điểm trung bình chung:{' '}
@@ -2486,39 +2485,51 @@ const LecturerTab: React.FC<{
         </span>
         {lecturersWithWarning > 0 && (
           <span className="statistics-trap-note">
-            <strong>{lecturersWithWarning} giảng viên</strong> có lớp thuộc diện cảnh báo ({totalWarnings} lớp Z-Score ≤ −1)
+            <strong>{lecturersWithWarning} giảng viên</strong> có lớp cảnh báo ({totalWarnings} lớp)
           </span>
         )}
         {note}
       </section>
 
       <div className="statistics-table-scroll" tabIndex={0} aria-label="Tổng hợp kết quả đánh giá theo giảng viên">
-        <table className="statistics-table statistics-table--fill">
+        <table className="statistics-table statistics-table--fixed statistics-table--fill">
           <thead>
             <tr>
-              <th className="col-left col-dept-1" scope="col">
+              <th scope="col" style={{ width: '14%' }}>
+                {filters.filterHeader('facultyName', 'Khoa / Viện')}
+              </th>
+              <th scope="col" style={{ width: '14%' }}>
+                {filters.filterHeader('departmentName', 'Bộ môn')}
+              </th>
+              <th scope="col" style={{ width: '16%' }}>
                 {filters.filterHeader('fullName', 'Giảng viên')}
               </th>
-              <th scope="col">{filters.filterHeader('departmentName', 'Bộ môn')}</th>
-              <th scope="col">{filters.filterHeader('facultyName', 'Khoa / Viện')}</th>
-              <th scope="col">{filters.filterHeader('sectionCount', 'Số lớp')}</th>
-              <th scope="col">{filters.filterHeader('totalClassSize', 'Tổng sĩ số')}</th>
-              <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu thu')}</th>
-              <th scope="col">{filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}</th>
-              <th scope="col" title="Số phiếu thu về chia tổng sĩ số">
+              <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('sectionCount', 'Số lớp')}
+              </th>
+              <th scope="col" style={{ width: '6%' }}>
+                {filters.filterHeader('totalClassSize', 'Tổng sĩ số')}
+              </th>
+              <th scope="col" style={{ width: '7%' }}>
+                {filters.filterHeader('responseCount', 'Số phiếu thu')}
+              </th>
+              <th scope="col" style={{ width: '7%' }}>
+                {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
+              </th>
+              <th scope="col" style={{ width: '7%' }} title="Số phiếu đã thu chia tổng sĩ số">
                 {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
-              <th scope="col" title="Số phiếu hợp lệ chia số phiếu thu về">
+              <th scope="col" style={{ width: '7%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
                 {filters.filterHeader('validResponseRate', 'Tỷ lệ hợp lệ')}
               </th>
-              <th scope="col">{filters.filterHeader('averageScore', 'Điểm TB')}</th>
-              <th scope="col">{filters.filterHeader('minScore', 'Lớp thấp nhất')}</th>
-              <th scope="col">{filters.filterHeader('maxScore', 'Lớp cao nhất')}</th>
-              <th
-                scope="col"
-                title="Số lớp có điểm thấp hơn trung bình từ 1 độ lệch chuẩn trở lên (Z-Score ≤ -1)"
-              >
-                {filters.filterHeader('warningSectionCount', 'Lớp cảnh báo')}
+              <th scope="col" style={{ width: '7%' }}>
+                {filters.filterHeader('averageScore', 'Điểm trung bình')}
+              </th>
+              <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('minScore', 'Lớp thấp nhất')}
+              </th>
+              <th scope="col" style={{ width: '5%' }}>
+                {filters.filterHeader('maxScore', 'Lớp cao nhất')}
               </th>
             </tr>
           </thead>
@@ -2529,7 +2540,9 @@ const LecturerTab: React.FC<{
                 className="analysis-drill-row"
                 onClick={() => onSelectLecturer(row.lecturerId)}
               >
-                <td className="col-left col-dept-1" title={row.fullName}>
+                <td title={row.facultyName}>{row.facultyName}</td>
+                <td title={row.departmentName}>{row.departmentName}</td>
+                <td title={row.fullName}>
                   <button
                     type="button"
                     className="analysis-drill-link"
@@ -2541,8 +2554,6 @@ const LecturerTab: React.FC<{
                     {row.fullName}
                   </button>
                 </td>
-                <td title={row.departmentName}>{row.departmentName}</td>
-                <td title={row.facultyName}>{row.facultyName}</td>
                 <td className="num">{row.sectionCount}</td>
                 <td className="num">{row.totalClassSize}</td>
                 <td className="num">{row.responseCount}</td>
@@ -2558,20 +2569,18 @@ const LecturerTab: React.FC<{
                 <td className={scoreClass(row.maxScore)}>
                   {typeof row.maxScore === 'number' ? row.maxScore.toFixed(2) : '—'}
                 </td>
-                <td className={row.warningSectionCount > 0 ? 'num is-flagged' : 'num'}>
-                  {row.warningSectionCount}
-                </td>
               </tr>
             ))}
             <tr className="table-spacer" aria-hidden="true">
-              <td colSpan={13} />
+              <td colSpan={12} />
             </tr>
           </tbody>
 
           <tfoot>
             <tr>
-              <th className="col-left col-dept-1" scope="row">Toàn trường</th>
-              <td colSpan={2}>{lecturers.length} giảng viên</td>
+              <th scope="row">Toàn trường</th>
+              <td />
+              <td>{lecturers.length} giảng viên</td>
               <td className="num is-sum">{totalSections}</td>
               <td className="num is-sum">{totalClassSize}</td>
               <td className="num is-sum">{totalResponses}</td>
@@ -2591,7 +2600,6 @@ const LecturerTab: React.FC<{
               </td>
               <td />
               <td />
-              <td className="num is-sum">{totalWarnings}</td>
             </tr>
           </tfoot>
         </table>
@@ -2709,22 +2717,22 @@ const LecturerReportView: React.FC<{
                 <th scope="col">{filters.filterHeader('courseName', 'Học phần')}</th>
                 <th scope="col">{filters.filterHeader('sectionName', 'Lớp')}</th>
                 <th scope="col">{filters.filterHeader('classSize', 'Sĩ số')}</th>
-                <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu thu về')}</th>
+                <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu đã thu')}</th>
                 <th scope="col">{filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}</th>
-                <th scope="col" title="Số phiếu thu về chia sĩ số">
+                <th scope="col" title="Số phiếu đã thu chia sĩ số">
                   {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
                 </th>
-                <th scope="col" title="Số phiếu hợp lệ chia số phiếu thu về">
+                <th scope="col" title="Số phiếu hợp lệ chia số phiếu đã thu">
                   {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
                 </th>
                 <th scope="col">{filters.filterHeader('averageScore', 'Điểm')}</th>
                 <th scope="col" title="Trung bình mọi lớp cùng học phần, kể cả lớp người khác dạy">
-                  {filters.filterHeader('courseAverageScore', 'Điểm TB học phần')}
+                  {filters.filterHeader('courseAverageScore', 'Điểm trung bình học phần')}
                 </th>
                 <th scope="col">{filters.filterHeader('differenceFromCourse', 'Chênh so học phần')}</th>
-                <th scope="col">{filters.filterHeader('zSchool', 'Z-Score toàn trường')}</th>
-                <th scope="col">{filters.filterHeader('zFaculty', 'Z-Score trong khoa')}</th>
-                <th scope="col">{filters.filterHeader('zDepartment', 'Z-Score trong bộ môn')}</th>
+                <th scope="col">{filters.filterHeader('zSchool', 'Z-Score so với toàn trường')}</th>
+                <th scope="col">{filters.filterHeader('zFaculty', 'Z-Score so với khoa')}</th>
+                <th scope="col">{filters.filterHeader('zDepartment', 'Z-Score so với bộ môn')}</th>
               </tr>
             </thead>
             <tbody>

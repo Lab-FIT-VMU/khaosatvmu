@@ -479,6 +479,14 @@
   border-radius: 50%;
 }
 
+/* Trang tiến độ: cột Trạng thái chỉ cần chấm màu và chữ. Mỗi ô một khung viền
+   thì cả cột thành một dãy hộp, rối hơn là rõ. Các trang khác giữ nguyên khung. */
+.survey-progress-page .operations-status {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+}
+
 .operations-status--success {
   color: #137b3b;
 }
