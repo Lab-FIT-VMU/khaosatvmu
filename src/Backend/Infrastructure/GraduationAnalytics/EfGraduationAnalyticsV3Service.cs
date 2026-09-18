@@ -218,16 +218,50 @@ public sealed class EfGraduationAnalyticsV3Service(
         {
             throw new GraduationAnalyticsException(
                 GraduationAnalyticsV3ErrorCodes.PeriodNotFound,
-                "Không tìm thấy đợt cutoff hoặc đợt chưa có dữ liệu.");
+                "Không tìm thấy đợt kết thúc hoặc đợt chưa có dữ liệu.");
+        }
+
+        GraduationPeriod? start = null;
+        if (mode == GraduationExploreModes.CohortCumulative && query.StartPeriodId.HasValue)
+        {
+            start = await db.GraduationPeriods.AsNoTracking()
+                .SingleOrDefaultAsync(
+                    x => x.PeriodId == query.StartPeriodId.Value && x.ActiveRevisionId.HasValue,
+                    cancellationToken);
+            if (start is null)
+            {
+                throw new GraduationAnalyticsException(
+                    GraduationAnalyticsV3ErrorCodes.PeriodNotFound,
+                    "Không tìm thấy đợt bắt đầu hoặc đợt chưa có dữ liệu.");
+            }
+            if (start.AcademicYearStart > cutoff.AcademicYearStart
+                || (start.AcademicYearStart == cutoff.AcademicYearStart
+                    && start.RoundNumber > cutoff.RoundNumber))
+            {
+                throw new GraduationAnalyticsException(
+                    GraduationAnalyticsErrorCodes.InvalidQuery,
+                    "Đợt bắt đầu không được nằm sau đợt kết thúc.");
+            }
         }
 
         var periodQuery = db.GraduationPeriods.AsNoTracking()
             .Where(x => x.ActiveRevisionId.HasValue);
-        periodQuery = mode == GraduationExploreModes.Period
-            ? periodQuery.Where(x => x.PeriodId == cutoff.PeriodId)
-            : periodQuery.Where(x =>
+        if (mode == GraduationExploreModes.Period)
+        {
+            periodQuery = periodQuery.Where(x => x.PeriodId == cutoff.PeriodId);
+        }
+        else
+        {
+            periodQuery = periodQuery.Where(x =>
                 x.AcademicYearStart < cutoff.AcademicYearStart ||
                 (x.AcademicYearStart == cutoff.AcademicYearStart && x.RoundNumber <= cutoff.RoundNumber));
+            if (start is not null)
+            {
+                periodQuery = periodQuery.Where(x =>
+                    x.AcademicYearStart > start.AcademicYearStart ||
+                    (x.AcademicYearStart == start.AcademicYearStart && x.RoundNumber >= start.RoundNumber));
+            }
+        }
         var periodRows = await periodQuery
             .OrderBy(x => x.AcademicYearStart)
             .ThenBy(x => x.RoundNumber)

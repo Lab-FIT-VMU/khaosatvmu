@@ -218,6 +218,7 @@ export function GraduationAnalyticsPage() {
   const [periods, setPeriods] = useState<GraduationManagedPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [startPeriodId, setStartPeriodId] = useState<number | null>(null);
   const [cutoffPeriodId, setCutoffPeriodId] = useState<number | null>(null);
   const [mode, setMode] = useState<GraduationExploreModeV3>('period');
   const [chartMetric, setChartMetric] = useState<ExploreChartMetric>('graduated');
@@ -252,8 +253,13 @@ export function GraduationAnalyticsPage() {
     try {
       const next = await graduationAnalyticsApi.managedPeriods();
       setPeriods(next);
+      const earliest = [...next].sort((a, b) =>
+        a.academicYearStart - b.academicYearStart || a.roundNumber - b.roundNumber)[0];
       const latest = [...next].sort((a, b) =>
         b.academicYearStart - a.academicYearStart || b.roundNumber - a.roundNumber)[0];
+      setStartPeriodId((current) => current && next.some((period) => period.periodId === current)
+        ? current
+        : earliest?.periodId ?? null);
       setCutoffPeriodId((current) => preferredPeriodId
         ?? (current && next.some((period) => period.periodId === current) ? current : latest?.periodId ?? null));
     } catch {
@@ -277,7 +283,7 @@ export function GraduationAnalyticsPage() {
   }, []);
 
   useEffect(() => {
-    if (!cutoffPeriodId) {
+    if (!cutoffPeriodId || (mode === 'cohortCumulative' && !startPeriodId)) {
       dispatchExploreRequest({ type: 'reset' });
       return;
     }
@@ -291,6 +297,7 @@ export function GraduationAnalyticsPage() {
     };
     graduationAnalyticsApi.exploreV3({
       mode,
+      startPeriodId: mode === 'cohortCumulative' ? startPeriodId : null,
       cutoffPeriodId,
       cohort: cohort || null,
       facultyKey: facultyKey || null,
@@ -310,12 +317,14 @@ export function GraduationAnalyticsPage() {
       }
     });
     return () => { cancelled = true; };
-  }, [chartGroupBy, chartMetric, chartSeriesBy, cohort, cutoffPeriodId, facultyKey, mode, programKey]);
+  }, [chartGroupBy, chartMetric, chartSeriesBy, cohort, cutoffPeriodId, facultyKey, mode, programKey, startPeriodId]);
 
   const academicYears = useMemo(() => {
     const current = currentAcademicYearStart();
     return Array.from({ length: 21 }, (_, index) => current + 10 - index);
   }, []);
+  const chronologicalPeriods = useMemo(() => [...periods].sort((a, b) =>
+    a.academicYearStart - b.academicYearStart || a.roundNumber - b.roundNumber), [periods]);
   const managedPeriods = useMemo(() => periods
     .filter((period) => period.academicYearStart === academicYearStart)
     .sort((a, b) => a.roundNumber - b.roundNumber), [academicYearStart, periods]);
@@ -451,12 +460,27 @@ export function GraduationAnalyticsPage() {
   const handleModeChange = (next: GraduationExploreModeV3) => {
     setMode(next);
     if (next === 'cohortCumulative') {
-      const latestPeriod = [...periods].sort((a, b) =>
-        b.academicYearStart - a.academicYearStart || b.roundNumber - a.roundNumber)[0];
+      const earliestPeriod = chronologicalPeriods[0];
+      const latestPeriod = chronologicalPeriods.at(-1);
+      if (earliestPeriod) setStartPeriodId(earliestPeriod.periodId);
       if (latestPeriod) setCutoffPeriodId(latestPeriod.periodId);
     }
     setChartGroupBy(recommendedChartGroup(next, cohort, facultyKey, programKey));
     setChartSeriesBy(next === 'cohortCumulative' && !cohort ? 'cohort' : '');
+  };
+
+  const handleStartPeriodChange = (nextPeriodId: number) => {
+    setStartPeriodId(nextPeriodId);
+    const nextIndex = chronologicalPeriods.findIndex((period) => period.periodId === nextPeriodId);
+    const cutoffIndex = chronologicalPeriods.findIndex((period) => period.periodId === cutoffPeriodId);
+    if (cutoffIndex >= 0 && nextIndex > cutoffIndex) setCutoffPeriodId(nextPeriodId);
+  };
+
+  const handleCutoffPeriodChange = (nextPeriodId: number) => {
+    setCutoffPeriodId(nextPeriodId);
+    const startIndex = chronologicalPeriods.findIndex((period) => period.periodId === startPeriodId);
+    const nextIndex = chronologicalPeriods.findIndex((period) => period.periodId === nextPeriodId);
+    if (startIndex >= 0 && nextIndex < startIndex) setStartPeriodId(nextPeriodId);
   };
 
   const handleCohortChange = (next: string) => {
@@ -538,9 +562,12 @@ export function GraduationAnalyticsPage() {
     }
   };
 
-  const renderExploreControls = () => <div className="graduation-v3-controls">
+  const renderExploreControls = () => <div className={`graduation-v3-controls${mode === 'cohortCumulative' ? ' is-range' : ''}`}>
     <label>Phạm vi<select value={mode} onChange={(event) => handleModeChange(event.target.value as GraduationExploreModeV3)}><option value="period">Riêng một đợt</option><option value="cohortCumulative">Tích lũy qua các đợt</option></select></label>
-    <label className={mode === 'cohortCumulative' ? 'is-disabled' : ''}>Mốc dữ liệu<select disabled={mode === 'cohortCumulative'} value={cutoffPeriodId ?? ''} onChange={(event) => { setCutoffPeriodId(Number(event.target.value)); setFacultyKey(''); setProgramKey(''); setCohort(''); setChartGroupBy(recommendedChartGroup(mode, '', '', '')); setChartSeriesBy(mode === 'cohortCumulative' ? 'cohort' : ''); }}>{periods.map((period) => <option key={period.periodId} value={period.periodId}>{periodLabel(period)}</option>)}</select></label>
+    {mode === 'cohortCumulative' ? <>
+      <label>Từ đợt<select value={startPeriodId ?? ''} onChange={(event) => handleStartPeriodChange(Number(event.target.value))}>{chronologicalPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodLabel(period)}</option>)}</select></label>
+      <label>Đến đợt<select value={cutoffPeriodId ?? ''} onChange={(event) => handleCutoffPeriodChange(Number(event.target.value))}>{chronologicalPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodLabel(period)}</option>)}</select></label>
+    </> : <label>Mốc dữ liệu<select value={cutoffPeriodId ?? ''} onChange={(event) => { setCutoffPeriodId(Number(event.target.value)); setFacultyKey(''); setProgramKey(''); setCohort(''); setChartGroupBy(recommendedChartGroup(mode, '', '', '')); setChartSeriesBy(''); }}>{chronologicalPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodLabel(period)}</option>)}</select></label>}
     <label>Khóa<select value={cohort} onChange={(event) => handleCohortChange(event.target.value)}><option value="">Tất cả khóa</option>{facets?.cohorts.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
     <label>Khoa<select value={facultyKey} onChange={(event) => handleFacultyChange(event.target.value)}><option value="">Tất cả khoa</option>{facets?.faculties.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
     <label>Chuyên ngành<select value={programKey} onChange={(event) => handleProgramChange(event.target.value)}><option value="">Tất cả chuyên ngành</option>{availablePrograms.map((item) => <option key={`${item.parentValue}-${item.value}`} value={item.value}>{item.label}</option>)}</select></label>
@@ -576,6 +603,7 @@ export function GraduationAnalyticsPage() {
                     <strong>Cách cấu hình biểu đồ</strong>
                     <ul>
                       <li>Bộ lọc phía trên giới hạn tập sinh viên được thống kê.</li>
+                      <li>Trong phạm vi tích lũy, <b>Từ đợt</b> và <b>Đến đợt</b> xác định khoảng tính; số tích lũy bắt đầu lại từ đợt đầu khoảng.</li>
                       <li><b>Tiêu chí</b> là số liệu cần xem.</li>
                       <li><b>So sánh theo</b> tạo các nhóm trên biểu đồ.</li>
                       <li><b>Phân chuỗi</b> tách mỗi nhóm theo một chiều khác.</li>
@@ -606,7 +634,9 @@ export function GraduationAnalyticsPage() {
           <GraduationSummaryTable
             rows={explore.breakdown}
             fileName={`thong-ke-tot-nghiep-${cohort || 'theo-dot'}`}
-            subtitle={explore.scope.cutoffPeriodLabel}
+            subtitle={explore.scope.startPeriodId === explore.scope.cutoffPeriodId
+              ? explore.scope.cutoffPeriodLabel
+              : `${explore.scope.startPeriodLabel} → ${explore.scope.cutoffPeriodLabel}`}
           />
         </>}
       </>}

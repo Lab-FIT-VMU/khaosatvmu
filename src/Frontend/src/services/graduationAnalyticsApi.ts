@@ -90,6 +90,7 @@ export const graduationAnalyticsApi = {
   },
   exploreV3: (payload: {
     mode: GraduationExploreModeV3;
+    startPeriodId?: number | null;
     cutoffPeriodId: number;
     cohort?: string | null;
     facultyKey?: string | null;

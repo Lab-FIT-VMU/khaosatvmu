@@ -371,6 +371,7 @@
   border: 1px solid #dfe4e8;
   background: #fff;
 }
+.graduation-v3-controls.is-range { grid-template-columns: minmax(130px, .8fr) repeat(2, minmax(170px, 1.1fr)) minmax(100px, .65fr) minmax(140px, 1fr) minmax(150px, 1fr) auto; }
 .graduation-v3-controls label, .graduation-year-picker label { display: grid; gap: 5px; color: #59636c; font-size: 11px; font-weight: 700; }
 .graduation-v3-controls select, .graduation-year-picker select { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid #cfd7dc; background: #fff; color: #20262c; font: inherit; }
 .graduation-v3-controls label.is-disabled { color: #99a3aa; }
@@ -543,7 +544,7 @@
   .graduation-import__metadata { grid-template-columns: 1fr 1fr auto; }
   .graduation-import__reason { grid-column: 1 / -1; }
   .graduation-import__submit { grid-column: 3; }
-  .graduation-v3-controls { grid-template-columns: 1fr 1fr; }
+  .graduation-v3-controls, .graduation-v3-controls.is-range { grid-template-columns: 1fr 1fr; }
   .graduation-v3-controls .btn { width: 100%; }
   .graduation-scope-note { align-items: flex-start; flex-direction: column; }
   .graduation-import-heading { align-items: flex-start; flex-direction: column; }
@@ -561,7 +562,7 @@
   .graduation-overview-chart, .graduation-overview-chart--wide { height: 330px; }
   .catalog-modal-card--import.modal-card { width: 100%; max-height: 100dvh; border: 0; }
   .catalog-modal-card--import .catalog-modal-body.modal-body { padding: 14px; }
-  .graduation-import__metadata, .graduation-v3-controls { grid-template-columns: 1fr; }
+  .graduation-import__metadata, .graduation-v3-controls, .graduation-v3-controls.is-range { grid-template-columns: 1fr; }
   .graduation-import__metadata input, .graduation-import__metadata select, .graduation-import__submit { min-height: 44px; }
   .graduation-import__reason { grid-column: auto; }
   .graduation-import__submit { grid-column: auto; grid-row: auto; width: 100%; }

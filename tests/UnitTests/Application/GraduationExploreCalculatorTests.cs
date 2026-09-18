@@ -167,6 +167,39 @@ public sealed class GraduationExploreCalculatorTests
             .Should().Equal(4, 4);
     }
 
+    [Fact]
+    public void Calculate_CumulativeRangeRestartsTotalsAtTheSelectedStartPeriod()
+    {
+        var selectedPeriods = new[]
+        {
+            Period(2, 2024, 10, 2024, 2),
+            Period(3, 2024, 1, 2025, 3),
+        };
+        var selectedCells = new[]
+        {
+            Cell(2, GraduationRank.Excellent, false, 4, cohort: "K61"),
+            Cell(3, GraduationRank.Good, true, 3, cohort: "K61"),
+        };
+
+        var result = GraduationExploreCalculator.Calculate(
+            GraduationExploreModes.CohortCumulative,
+            "K61",
+            selectedPeriods,
+            selectedCells,
+            EmptyFacets(),
+            "graduated",
+            "period",
+            null);
+
+        result.Scope.StartPeriodId.Should().Be(2);
+        result.Scope.CutoffPeriodId.Should().Be(3);
+        result.Scope.IncludedPeriodCount.Should().Be(2);
+        result.Kpis.Single(x => x.Id == "graduated").Count.Should().Be(7);
+        result.Timeline.Select(x => x.Graduated).Should().Equal(4, 3);
+        result.Timeline.Select(x => x.CumulativeGraduated).Should().Equal(4, 7);
+        result.ChartPoints.Select(x => x.Value).Should().Equal(4, 7);
+    }
+
     private static GraduationExplorePeriod Period(
         long id,
         int academicYearStart,

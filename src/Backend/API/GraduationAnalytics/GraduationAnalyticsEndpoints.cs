@@ -90,6 +90,7 @@ public static class GraduationAnalyticsEndpoints
             {
                 return Results.Ok(await service.ExploreAsync(new GraduationExploreQuery(
                     request.Mode ?? string.Empty,
+                    request.StartPeriodId,
                     request.CutoffPeriodId,
                     request.Cohort,
                     request.FacultyKey,
@@ -254,6 +255,7 @@ public static class GraduationAnalyticsEndpoints
 
     public sealed record GraduationExploreV3Request(
         string? Mode,
+        long? StartPeriodId,
         long CutoffPeriodId,
         string? Cohort,
         string? FacultyKey,

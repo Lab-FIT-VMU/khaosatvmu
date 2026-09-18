@@ -61,6 +61,7 @@ public static class GraduationExploreModes
 
 public sealed record GraduationExploreQuery(
     string Mode,
+    long? StartPeriodId,
     long CutoffPeriodId,
     string? Cohort,
     string? FacultyKey,
