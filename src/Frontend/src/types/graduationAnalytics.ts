@@ -61,6 +61,7 @@ export interface GraduationMetric {
 export type GraduationChartType =
   | 'bar'
   | 'column'
+  | 'combo'
   | 'stacked-bar'
   | 'stacked-column'
   | 'line'
@@ -288,9 +289,17 @@ export interface GraduationExploreResultV3 {
     graduated: number;
     onTime: number;
     workStudy: number;
+    excellent: number;
+    veryGood: number;
+    good: number;
+    average: number;
     cumulativeGraduated: number;
     cumulativeOnTime: number;
     cumulativeWorkStudy: number;
+    cumulativeExcellent: number;
+    cumulativeVeryGood: number;
+    cumulativeGood: number;
+    cumulativeAverage: number;
   }>;
   breakdown: Array<{
     facultyName: string;
@@ -305,6 +314,13 @@ export interface GraduationExploreResultV3 {
     veryGood: number;
     good: number;
     average: number;
+  }>;
+  chartPoints: Array<{
+    groupKey: string;
+    groupLabel: string;
+    seriesKey: string | null;
+    seriesLabel: string | null;
+    value: number;
   }>;
   facets: {
     faculties: GraduationFacetOptionV3[];

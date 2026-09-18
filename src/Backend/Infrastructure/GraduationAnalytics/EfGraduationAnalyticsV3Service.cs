@@ -209,12 +209,6 @@ public sealed class EfGraduationAnalyticsV3Service(
         }
 
         var cohort = NormalizeFilter(query.Cohort);
-        if (mode == GraduationExploreModes.CohortCumulative && cohort is null)
-        {
-            throw new GraduationAnalyticsException(
-                GraduationAnalyticsErrorCodes.InvalidQuery,
-                "Phải chọn một khóa khi xem số liệu tích lũy.");
-        }
 
         var cutoff = await db.GraduationPeriods.AsNoTracking()
             .SingleOrDefaultAsync(
@@ -326,7 +320,15 @@ public sealed class EfGraduationAnalyticsV3Service(
             x.ReviewMonth,
             x.ReviewYear)).ToList();
 
-        return GraduationExploreCalculator.Calculate(mode, cohort, periods, cells, facets);
+        return GraduationExploreCalculator.Calculate(
+            mode,
+            cohort,
+            periods,
+            cells,
+            facets,
+            query.MetricId,
+            query.GroupBy,
+            query.SeriesBy);
     }
 
     private static void ValidateMetadata(ImportGraduationRevisionCommand command)

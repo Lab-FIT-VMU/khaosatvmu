@@ -93,7 +93,10 @@ public static class GraduationAnalyticsEndpoints
                     request.CutoffPeriodId,
                     request.Cohort,
                     request.FacultyKey,
-                    request.ProgramKey), ct));
+                    request.ProgramKey,
+                    request.MetricId ?? "graduated",
+                    request.GroupBy ?? "period",
+                    request.SeriesBy), ct));
             }
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
         }).AddEndpointFilter<RequireAntiforgeryFilter>();
@@ -254,7 +257,10 @@ public static class GraduationAnalyticsEndpoints
         long CutoffPeriodId,
         string? Cohort,
         string? FacultyKey,
-        string? ProgramKey);
+        string? ProgramKey,
+        string? MetricId,
+        string? GroupBy,
+        string? SeriesBy);
 
     public sealed record GraduationImportRowRequest(
         int SourceRowNumber,

@@ -64,7 +64,10 @@ public sealed record GraduationExploreQuery(
     long CutoffPeriodId,
     string? Cohort,
     string? FacultyKey,
-    string? ProgramKey);
+    string? ProgramKey,
+    string MetricId,
+    string GroupBy,
+    string? SeriesBy);
 
 public sealed record GraduationExplorePeriod(
     long PeriodId,
@@ -102,9 +105,17 @@ public sealed record GraduationTimelinePointV3Dto(
     int Graduated,
     int OnTime,
     int WorkStudy,
+    int Excellent,
+    int VeryGood,
+    int Good,
+    int Average,
     int CumulativeGraduated,
     int CumulativeOnTime,
-    int CumulativeWorkStudy);
+    int CumulativeWorkStudy,
+    int CumulativeExcellent,
+    int CumulativeVeryGood,
+    int CumulativeGood,
+    int CumulativeAverage);
 
 public sealed record GraduationBreakdownV3Dto(
     string FacultyName,
@@ -119,6 +130,13 @@ public sealed record GraduationBreakdownV3Dto(
     int VeryGood,
     int Good,
     int Average);
+
+public sealed record GraduationChartPointV3Dto(
+    string GroupKey,
+    string GroupLabel,
+    string? SeriesKey,
+    string? SeriesLabel,
+    int Value);
 
 public sealed record GraduationFacetOptionDto(string Value, string Label, string? ParentValue = null);
 
@@ -142,6 +160,7 @@ public sealed record GraduationExploreResultV3Dto(
     IReadOnlyList<GraduationRankSummaryV3Dto> Ranks,
     IReadOnlyList<GraduationTimelinePointV3Dto> Timeline,
     IReadOnlyList<GraduationBreakdownV3Dto> Breakdown,
+    IReadOnlyList<GraduationChartPointV3Dto> ChartPoints,
     GraduationExploreFacetsV3Dto Facets);
 
 public interface IGraduationAnalyticsV3Service

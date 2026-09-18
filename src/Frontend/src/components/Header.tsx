@@ -23,6 +23,7 @@ const tabContexts: Record<string, TabContext> = {
   overview: { section: 'Tổng quan', title: 'Bảng điều khiển' },
   progress: { section: 'Tổng quan', title: 'Tiến độ thu phiếu' },
   'survey-analysis': { section: 'Tổng quan', title: 'Thống kê chi tiết' },
+  'graduation-analytics': { section: 'Tổng quan', title: 'Thống kê kết quả tốt nghiệp' },
   faculties: { section: 'Danh mục đào tạo', title: 'Khoa / Viện' },
   departments: { section: 'Danh mục đào tạo', title: 'Bộ môn' },
   lecturers: { section: 'Danh mục đào tạo', title: 'Giảng viên' },

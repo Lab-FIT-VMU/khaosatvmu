@@ -52,6 +52,11 @@ const defaultReview = (academicYearStart: number) => {
     : { month: 4, year: academicYearStart + 1 };
 };
 
+const monthLabel = (month: number) => `Tháng ${String(month).padStart(2, '0')}`;
+const reviewMonthsFor = (year: number, academicYearStart: number) => year === academicYearStart
+  ? [8, 9, 10, 11, 12]
+  : [1, 2, 3, 4, 5, 6, 7];
+
 export function GraduationImportDialog({
   isOpen,
   target,
@@ -135,18 +140,30 @@ export function GraduationImportDialog({
 
   if (!target) return null;
   const isReplace = Boolean(target.period);
+  const reviewYears = [target.academicYearStart, target.academicYearStart + 1];
+  const reviewMonths = reviewMonthsFor(reviewYear, target.academicYearStart);
+
+  const changeReviewYear = (year: number) => {
+    setReviewYear(year);
+    const nextMonths = reviewMonthsFor(year, target.academicYearStart);
+    if (!nextMonths.includes(reviewMonth)) setReviewMonth(nextMonths[0]);
+  };
 
   return <Modal
     isOpen={isOpen}
     onClose={close}
-    title={`${isReplace ? 'Import lại' : 'Import'} đợt ${target.roundNumber} · ${target.academicYearStart}–${target.academicYearStart + 1}`}
+    title={`${isReplace ? 'Tải lên lại' : 'Tải lên'} đợt ${target.roundNumber} · ${target.academicYearStart}–${target.academicYearStart + 1}`}
     size={preview ? 'data-preview' : 'import'}
   >
     <div className="graduation-import" aria-busy={busy}>
       <div className="graduation-import__metadata">
-        <label>Tháng xét<input type="number" min={1} max={12} value={reviewMonth} onChange={(event) => setReviewMonth(Number(event.target.value))} disabled={busy} /></label>
-        <label>Năm xét<input type="number" min={target.academicYearStart} max={target.academicYearStart + 1} value={reviewYear} onChange={(event) => setReviewYear(Number(event.target.value))} disabled={busy} /></label>
+        <label>Năm xét<select value={reviewYear} onChange={(event) => changeReviewYear(Number(event.target.value))} disabled={busy}>{reviewYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
+        <label>Tháng xét<select value={reviewMonth} onChange={(event) => setReviewMonth(Number(event.target.value))} disabled={busy}>{reviewMonths.map((month) => <option key={month} value={month}>{monthLabel(month)}</option>)}</select></label>
         {isReplace && <label className="graduation-import__reason">Lý do import lại<input value={replaceReason} maxLength={1000} onChange={(event) => setReplaceReason(event.target.value)} placeholder="Ví dụ: sửa danh sách bị thiếu sinh viên" disabled={busy} /></label>}
+        <button type="button" className="btn btn-primary graduation-import__submit" onClick={() => void commit()} disabled={!preview || busy}>
+          {busy ? <LoaderCircle className="spin" size={17} /> : <Upload size={17} />}
+          {busy ? 'Đang lưu...' : isReplace ? 'Tải lên lại đợt' : 'Tải lên đợt'}
+        </button>
       </div>
 
       <div className={`graduation-import__picker${file ? ' has-file' : ''}`}>
@@ -173,13 +190,6 @@ export function GraduationImportDialog({
         {preview.aggregates.length > 150 && <p className="graduation-note">Hiển thị 150/{preview.aggregates.length} tổ hợp tổng hợp.</p>}
       </>}
 
-      <div className="graduation-import__actions">
-        <button type="button" className="btn btn-secondary" onClick={close} disabled={busy}>Hủy</button>
-        <button type="button" className="btn btn-primary" onClick={() => void commit()} disabled={!preview || busy}>
-          {busy ? <LoaderCircle className="spin" size={17} /> : <Upload size={17} />}
-          {busy ? 'Đang lưu...' : isReplace ? 'Thay thế dữ liệu đợt' : 'Import đợt'}
-        </button>
-      </div>
     </div>
   </Modal>;
 }

@@ -94,6 +94,9 @@ export const graduationAnalyticsApi = {
     cohort?: string | null;
     facultyKey?: string | null;
     programKey?: string | null;
+    metricId: string;
+    groupBy: string;
+    seriesBy?: string | null;
   }) => csrfRequest<GraduationExploreResultV3>(`${basePath}/explore/summary`, 'POST', payload),
 };
 

@@ -40,8 +40,16 @@ public sealed class GraduationExploreCalculatorTests
         result.Ranks.Single(x => x.Rank == GraduationRank.Average).Count.Should().Be(3);
 
         result.Timeline.Select(x => x.Graduated).Should().Equal(3, 3, 0);
+        result.Timeline.Select(x => x.PeriodLabel).Should().Equal("04/2025", "05/2025", "09/2025");
         result.Timeline.Select(x => x.CumulativeGraduated).Should().Equal(3, 6, 6);
         result.Timeline.Select(x => x.CumulativeWorkStudy).Should().Equal(1, 1, 1);
+        result.Timeline.Select(x => x.Excellent).Should().Equal(2, 0, 0);
+        result.Timeline.Select(x => x.Good).Should().Equal(1, 0, 0);
+        result.Timeline.Select(x => x.Average).Should().Equal(0, 3, 0);
+        result.Timeline.Select(x => x.CumulativeExcellent).Should().Equal(2, 2, 2);
+        result.Timeline.Select(x => x.CumulativeGood).Should().Equal(1, 1, 1);
+        result.Timeline.Select(x => x.CumulativeAverage).Should().Equal(0, 3, 3);
+        result.ChartPoints.Select(x => x.Value).Should().Equal(3, 6, 6);
         result.Scope.StartPeriodId.Should().Be(1);
         result.Scope.CutoffPeriodId.Should().Be(3);
         result.Scope.IncludedPeriodCount.Should().Be(3);
@@ -85,6 +93,78 @@ public sealed class GraduationExploreCalculatorTests
         result.Ranks.Should().OnlyContain(x => x.Count == 0 && x.Rate == 0);
         result.Breakdown.Should().BeEmpty();
         result.Timeline.Should().ContainSingle(x => x.Graduated == 0 && x.CumulativeGraduated == 0);
+        result.ChartPoints.Should().ContainSingle(x => x.Value == 0);
+    }
+
+    [Fact]
+    public void Calculate_BuildsSelectedRankByGroupAndSeries()
+    {
+        var result = GraduationExploreCalculator.Calculate(
+            GraduationExploreModes.Period,
+            null,
+            [Period(1, 2025, 9, 2025, 1)],
+            [
+                Cell(1, GraduationRank.Excellent, false, 2),
+                Cell(1, GraduationRank.Good, false, 3),
+            ],
+            EmptyFacets(),
+            "excellent",
+            "cohort",
+            "faculty");
+
+        var point = result.ChartPoints.Should().ContainSingle().Subject;
+        point.GroupLabel.Should().Be("K62");
+        point.SeriesLabel.Should().Be("Khoa CNTT");
+        point.Value.Should().Be(2);
+    }
+
+    [Fact]
+    public void Calculate_CumulativeModeSupportsAnOverviewAcrossAllCohorts()
+    {
+        var periods = new[]
+        {
+            Period(1, 2024, 4, 2025, 1),
+            Period(2, 2024, 5, 2025, 2),
+        };
+        var cells = new[]
+        {
+            Cell(1, GraduationRank.Excellent, false, 2, cohort: "K61"),
+            Cell(2, GraduationRank.Good, false, 3, cohort: "K61"),
+            Cell(1, GraduationRank.VeryGood, false, 4, cohort: "K62"),
+        };
+
+        var byCohort = GraduationExploreCalculator.Calculate(
+            GraduationExploreModes.CohortCumulative,
+            null,
+            periods,
+            cells,
+            EmptyFacets(),
+            "graduated",
+            "cohort",
+            null);
+
+        byCohort.Scope.Cohort.Should().BeNull();
+        byCohort.ChartPoints.Should().ContainSingle(x => x.GroupLabel == "K61" && x.Value == 5);
+        byCohort.ChartPoints.Should().ContainSingle(x => x.GroupLabel == "K62" && x.Value == 4);
+
+        var timelineByCohort = GraduationExploreCalculator.Calculate(
+            GraduationExploreModes.CohortCumulative,
+            null,
+            periods,
+            cells,
+            EmptyFacets(),
+            "graduated",
+            "period",
+            "cohort");
+
+        timelineByCohort.ChartPoints
+            .Where(x => x.SeriesLabel == "K61")
+            .Select(x => x.Value)
+            .Should().Equal(2, 5);
+        timelineByCohort.ChartPoints
+            .Where(x => x.SeriesLabel == "K62")
+            .Select(x => x.Value)
+            .Should().Equal(4, 4);
     }
 
     private static GraduationExplorePeriod Period(
@@ -100,13 +180,14 @@ public sealed class GraduationExploreCalculatorTests
         bool workStudy,
         int count,
         string facultyName = "Khoa CNTT",
-        string facultyKey = "KHOA CNTT") => new(
+        string facultyKey = "KHOA CNTT",
+        string cohort = "K62") => new(
             periodId,
             facultyName,
             facultyKey,
             "Kỹ thuật phần mềm",
             "KY THUAT PHAN MEM",
-            "K62",
+            cohort,
             rank,
             workStudy,
             count);

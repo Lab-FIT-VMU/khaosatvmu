@@ -17,7 +17,7 @@ Mỗi đợt phải build/test độc lập trước khi chuyển tiếp; schema
 | 3 | Query riêng đợt/tích lũy theo khóa, ba KPI và bốn xếp loại | **Hoàn thành** |
 | 4 | Giao diện quản lý năm học–đợt–tháng–file, preview và import lại | **Hoàn thành** |
 | 5 | Chuyển Khám phá chi tiết, chart/table/export sang dữ liệu v3 | **Hoàn thành** |
-| 6 | UAT 11 file, feature flag, cutover và cleanup schema cũ sau nghiệm thu | **Đã xong parser 11 file, PostgreSQL migration smoke, build và unit test; còn E2E/UAT trên môi trường đích và cutover** |
+| 6 | UAT 11 file, feature flag, cutover và cleanup schema cũ sau nghiệm thu | **Đã xong parser 11 file, PostgreSQL migration smoke, HTTP E2E, build và unit test; còn UAT giao diện, chốt feature flag, backup/deploy/cutover trên môi trường đích và cleanup schema cũ sau nghiệm thu** |
 
 ## 1. Mục tiêu
 
@@ -110,7 +110,7 @@ Kế hoạch đề xuất chốt các quy tắc sau. Đây là điều kiện tr
 - Một đợt được định danh duy nhất bằng `(AcademicYearStart, RoundNumber)`.
 - Ví dụ: `AcademicYearStart = 2024`, `RoundNumber = 1` hiển thị là `Năm học 2024–2025 · Đợt 1`.
 - Không dùng `(tháng, năm)` làm khóa duy nhất vì đợt 3, 4 và 5 có thể cùng nằm trong tháng 5 như ảnh minh họa.
-- Mặc định có đợt 1–5; nếu nghiệp vụ có thể phát sinh nhiều hơn 5 đợt thì chỉ cần nới validation, không đổi schema.
+- Không giới hạn cố định số đợt. Màn hình bắt đầu với một dòng đợt và người dùng bấm `Thêm đợt` để sinh đợt kế tiếp; schema chỉ yêu cầu `RoundNumber > 0`.
 
 ### 3.2. Năm học và tháng xét
 
@@ -305,7 +305,7 @@ Không đưa 11 file thật chứa dữ liệu cá nhân vào Git. Tạo workboo
 
 Thay modal 16 cột hiện tại bằng màn hình quản lý theo mẫu trong ảnh:
 
-1. Chọn năm học, mặc định năm học hiện tại theo quy tắc tháng 8–7.
+1. Khi mở module, hiển thị màn hình import trước. Chọn năm học bằng combobox, mặc định năm học hiện tại theo quy tắc tháng 8–7; danh sách gồm 10 năm trước đến 10 năm sau năm học hiện tại.
 2. Hiển thị bảng các đợt của năm học:
 
 | Đợt | Tháng/năm xét | File hiện tại | Số SV | Phiên bản | Thao tác |
@@ -313,8 +313,8 @@ Thay modal 16 cột hiện tại bằng màn hình quản lý theo mẫu trong �
 | 1 | 04/2025 | tên file | 134 | 2 | Xem / Import lại |
 | 2 | 05/2025 | Chưa có | — | — | Chọn file |
 
-3. Cho phép thêm đợt nếu sau này vượt quá số đợt mặc định.
-4. Tên file được parser dùng để gợi ý năm học/đợt, nhưng người dùng vẫn phải xác nhận.
+3. Không sinh sẵn 5 đợt và không đặt giới hạn tối đa; nút `Thêm đợt` tạo tuần tự Đợt 2, Đợt 3, ... khi người dùng cần.
+4. Tháng và năm xét dùng combobox, chỉ cho chọn tổ hợp thuộc năm học đang quản lý. Tên file không được coi là nguồn metadata đợt.
 
 ### 6.2. Luồng import lần đầu
 
@@ -561,6 +561,8 @@ Metadata tháng/năm không có trong file và được người dùng chọn kh
 - UAT bằng các phép tính tay theo khóa/đợt trong ảnh.
 - Backup, feature flag, deploy, giám sát rồi mới cleanup legacy.
 
+Kết quả tự động ngày 18/09/2026: script `scripts/test-graduation-analytics-e2e.ps1` đã chạy toàn bộ luồng HTTP trên PostgreSQL tạm, gồm đăng nhập/phân quyền/CSRF, preview và commit 11 file, import không đổi, hai lần thay revision, lịch sử revision, truy vấn riêng đợt và tích lũy theo khóa. Kết quả đạt 6.698 dòng nguồn, 6.697 dòng active, bỏ đúng 1 dòng; tổng xếp loại 676 / 1.509 / 3.632 / 880 và VLVH 451. Tháng/năm dùng trong test là metadata giả lập theo thứ tự đợt; khi triển khai thật vẫn phải nhập tháng/năm đã được đơn vị nghiệp vụ duyệt.
+
 ## 14. Ma trận kiểm thử bắt buộc
 
 ### 14.1. Parser
@@ -610,7 +612,8 @@ Metadata tháng/năm không có trong file và được người dùng chọn kh
 
 ### 14.5. UI/E2E
 
-- Quản lý được năm học và 5 đợt.
+- Mở module vào thẳng màn hình import; combobox năm học có đủ khoảng ±10 năm quanh năm học hiện tại.
+- Có thể thêm tuần tự số đợt không giới hạn cố định; tháng/năm xét chỉ chọn được trong năm học tương ứng.
 - Preview/diff rõ trên desktop và màn hình nhỏ.
 - Sau replace, card/chart/table/export cùng cập nhật một revision.
 - URL giữ được năm học, cutoff, mode và filter hợp lệ.
