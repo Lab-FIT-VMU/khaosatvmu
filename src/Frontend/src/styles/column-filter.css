@@ -46,8 +46,10 @@
   /* Panel được portal ra body để luôn nằm trên các cột sticky và vùng cuộn của bảng. */
   z-index: 1200;
   display: flex;
+  box-sizing: border-box;
   flex-direction: column;
   max-height: min(440px, calc(100vh - 96px));
+  overflow: hidden;
   padding: 4px 0 0;
   border: 1px solid #b9c2c9;
   border-radius: 3px;
@@ -59,6 +61,7 @@
 
 .column-filter-item {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -108,6 +111,7 @@
 
 .column-filter-search {
   position: relative;
+  flex: 0 0 auto;
   padding: 4px 8px 6px;
 }
 
@@ -140,8 +144,8 @@
 }
 
 .column-filter-values {
-  flex: 1;
-  min-height: 90px;
+  flex: 1 1 auto;
+  min-height: 0;
   margin: 0 8px;
   padding: 4px 0;
   border: 1px solid #d7dee2;
@@ -178,9 +182,12 @@
 
 .column-filter-actions {
   display: flex;
+  flex: 0 0 auto;
   justify-content: flex-end;
   gap: 8px;
   padding: 9px 8px;
+  border-top: 1px solid #e5eaee;
+  background: #ffffff;
 }
 
 .column-filter-actions button {

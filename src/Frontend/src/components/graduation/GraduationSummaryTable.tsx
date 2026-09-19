@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ColumnFilterMenu } from '../ColumnFilterMenu';
 import { ExportDropdown } from '../ExportDropdown';
 import type { GraduationExploreResultV3 } from '../../types/graduationAnalytics';
 
@@ -41,11 +42,19 @@ const columns: Array<{ key: SortKey; label: string }> = [
 export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationSummaryTableProps) {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [columnFilters, setColumnFilters] = useState<Partial<Record<SortKey, string[]>>>({});
+
+  const valueOf = (row: SummaryRow, key: SortKey) => String(row[key]);
+
+  const filteredRows = useMemo(() => rows.filter((row) => columns.every((column) => {
+    const selected = columnFilters[column.key];
+    return !selected || selected.includes(valueOf(row, column.key));
+  })), [columnFilters, rows]);
 
   const sortedRows = useMemo(() => {
-    if (!sortKey) return rows;
+    if (!sortKey) return filteredRows;
     const direction = sortDirection === 'asc' ? 1 : -1;
-    return rows
+    return filteredRows
       .map((row, index) => ({ row, index }))
       .sort((leftItem, rightItem) => {
         const left = leftItem.row[sortKey];
@@ -56,32 +65,41 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
         return result === 0 ? leftItem.index - rightItem.index : result * direction;
       })
       .map((item) => item.row);
-  }, [rows, sortDirection, sortKey]);
+  }, [filteredRows, sortDirection, sortKey]);
 
-  const changeSort = (nextKey: SortKey) => {
-    if (sortKey !== nextKey) {
-      setSortKey(nextKey);
-      setSortDirection('asc');
-      return;
-    }
-    if (sortDirection === 'asc') {
-      setSortDirection('desc');
-      return;
-    }
-    setSortKey(null);
-    setSortDirection('asc');
+  const changeSort = (nextKey: SortKey, direction: SortDirection) => {
+    setSortKey(nextKey);
+    setSortDirection(direction);
   };
 
-  const sortIcon = (key: SortKey) => {
-    if (sortKey !== key) return <ArrowUpDown aria-hidden="true" />;
+  const activeSortIcon = (key: SortKey) => {
+    if (sortKey !== key) return null;
     return sortDirection === 'asc'
       ? <ArrowUp aria-hidden="true" />
       : <ArrowDown aria-hidden="true" />;
   };
 
-  const nextSortLabel = (key: SortKey) => {
-    if (sortKey !== key) return 'tăng dần';
-    return sortDirection === 'asc' ? 'giảm dần' : 'bỏ sắp xếp';
+  const valuesFor = (key: SortKey) => {
+    const numeric = typeof rows[0]?.[key] === 'number';
+    return [...new Set(rows
+      .filter((row) => columns.every((column) => {
+        if (column.key === key) return true;
+        const selected = columnFilters[column.key];
+        return !selected || selected.includes(valueOf(row, column.key));
+      }))
+      .map((row) => valueOf(row, key)))]
+      .sort((left, right) => numeric
+        ? Number(left) - Number(right)
+        : left.localeCompare(right, 'vi', { numeric: true, sensitivity: 'base' }));
+  };
+
+  const applyColumnFilter = (key: SortKey, selected: string[] | null) => {
+    setColumnFilters((current) => {
+      const next = { ...current };
+      if (selected === null) delete next[key];
+      else next[key] = selected;
+      return next;
+    });
   };
 
   return (
@@ -129,21 +147,26 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
                     ? (sortDirection === 'asc' ? 'ascending' : 'descending')
                     : 'none'}
                 >
-                  <button
-                    type="button"
-                    className="graduation-sort-button"
-                    onClick={() => changeSort(column.key)}
-                    aria-label={`Sắp xếp ${column.label}: ${nextSortLabel(column.key)}`}
-                  >
-                    {column.label}
-                    {sortIcon(column.key)}
-                  </button>
+                  <span className="graduation-column-filterable">
+                    <span className="graduation-column-label">
+                      {column.label}
+                      {activeSortIcon(column.key)}
+                    </span>
+                    <ColumnFilterMenu
+                      label={column.label}
+                      values={valuesFor(column.key)}
+                      selected={columnFilters[column.key] ?? null}
+                      sortDirection={sortKey === column.key ? sortDirection : null}
+                      onSort={(direction) => changeSort(column.key, direction)}
+                      onApply={(selected) => applyColumnFilter(column.key, selected)}
+                    />
+                  </span>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map((row) => (
+            {sortedRows.length === 0 ? <tr><td className="graduation-table-empty" colSpan={columns.length}>Không có dữ liệu phù hợp với bộ lọc.</td></tr> : sortedRows.map((row) => (
               <tr key={`${row.facultyKey}-${row.programKey}-${row.cohortCode}`}>
                 <td>{row.facultyName}</td>
                 <td>{row.programName}</td>
