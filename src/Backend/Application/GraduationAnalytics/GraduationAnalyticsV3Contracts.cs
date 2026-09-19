@@ -6,7 +6,6 @@ public static class GraduationAnalyticsV3ErrorCodes
 {
     public const string PeriodNotFound = "GRADUATION_V3_PERIOD_NOT_FOUND";
     public const string ConcurrentReplace = "GRADUATION_V3_CONCURRENT_REPLACE";
-    public const string DuplicateSourceFile = "GRADUATION_V3_DUPLICATE_SOURCE_FILE";
     public const string ReplaceReasonRequired = "GRADUATION_V3_REPLACE_REASON_REQUIRED";
 }
 
@@ -64,9 +63,9 @@ public sealed record GraduationExploreQuery(
     string Mode,
     long? StartPeriodId,
     long CutoffPeriodId,
-    string? Cohort,
-    string? FacultyKey,
-    string? ProgramKey,
+    IReadOnlyList<string> Cohorts,
+    IReadOnlyList<string> FacultyKeys,
+    IReadOnlyList<string> ProgramKeys,
     string MetricId,
     string GroupBy,
     string? SeriesBy);
@@ -150,6 +149,7 @@ public sealed record GraduationExploreFacetsV3Dto(
 public sealed record GraduationExploreScopeDto(
     string Mode,
     string? Cohort,
+    IReadOnlyList<string> Cohorts,
     long StartPeriodId,
     string StartPeriodLabel,
     long CutoffPeriodId,
@@ -181,6 +181,11 @@ public interface IGraduationAnalyticsV3Service
 
     Task<ParsedGraduationImport> GetActivePreviewAsync(
         long periodId,
+        CancellationToken cancellationToken);
+
+    Task DeletePeriodAsync(
+        long periodId,
+        string reason,
         CancellationToken cancellationToken);
 
     Task<GraduationExploreResultV3Dto> ExploreAsync(

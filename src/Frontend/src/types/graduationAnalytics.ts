@@ -276,6 +276,7 @@ export interface GraduationExploreResultV3 {
   scope: {
     mode: GraduationExploreModeV3;
     cohort: string | null;
+    cohorts: string[];
     startPeriodId: number;
     startPeriodLabel: string;
     cutoffPeriodId: number;

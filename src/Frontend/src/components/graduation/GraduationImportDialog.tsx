@@ -36,7 +36,6 @@ const errorMessage = (error: unknown) => {
     GRADUATION_IMPORT_INVALID: 'File hoặc metadata import không hợp lệ.',
     GRADUATION_IMPORT_TOO_LARGE: 'File có quá nhiều dòng dữ liệu.',
     GRADUATION_V3_CONCURRENT_REPLACE: 'Đợt đã được người khác cập nhật. Hãy đóng cửa sổ và tải lại.',
-    GRADUATION_V3_DUPLICATE_SOURCE_FILE: 'File này đã được dùng cho một đợt khác.',
     GRADUATION_V3_REPLACE_REASON_REQUIRED: 'Phải nhập lý do khi import lại.',
   };
   return messages[error.errorCode] ?? 'Không thể xử lý file. Vui lòng kiểm tra lại dữ liệu.';
@@ -70,6 +69,8 @@ export function GraduationImportDialog({
   const [reviewMonth, setReviewMonth] = useState(4);
   const [reviewYear, setReviewYear] = useState(new Date().getFullYear());
   const [replaceReason, setReplaceReason] = useState('');
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [academicYearConfirmed, setAcademicYearConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,17 +82,34 @@ export function GraduationImportDialog({
     setFile(null);
     setPreview(null);
     setReplaceReason('');
+    setConfirmationVisible(false);
+    setAcademicYearConfirmed(false);
     setError(null);
     if (inputRef.current) inputRef.current.value = '';
   }, [isOpen, target]);
 
   const close = () => {
-    if (!busy) onClose();
+    if (busy) return;
+    if (confirmationVisible) {
+      setConfirmationVisible(false);
+      setAcademicYearConfirmed(false);
+      return;
+    }
+    onClose();
+  };
+
+  const closeConfirmation = () => {
+    if (busy) return;
+    setConfirmationVisible(false);
+    setAcademicYearConfirmed(false);
+    setError(null);
   };
 
   const chooseFile = async (next?: File) => {
     setFile(next ?? null);
     setPreview(null);
+    setConfirmationVisible(false);
+    setAcademicYearConfirmed(false);
     setError(null);
     if (!next) return;
     setBusy(true);
@@ -106,6 +124,10 @@ export function GraduationImportDialog({
 
   const commit = async () => {
     if (!target || !file || !preview) return;
+    if (!academicYearConfirmed) {
+      setError(`Bạn cần xác nhận file thuộc năm học ${target.academicYearStart}–${target.academicYearStart + 1}.`);
+      return;
+    }
     const expectedStart = reviewMonth >= 8 ? reviewYear : reviewYear - 1;
     if (expectedStart !== target.academicYearStart) {
       setError(`Tháng ${reviewMonth}/${reviewYear} không thuộc năm học ${target.academicYearStart}–${target.academicYearStart + 1}.`);
@@ -138,6 +160,23 @@ export function GraduationImportDialog({
     }
   };
 
+  const requestConfirmation = () => {
+    if (!target || !file || !preview) return;
+    const expectedStart = reviewMonth >= 8 ? reviewYear : reviewYear - 1;
+    if (expectedStart !== target.academicYearStart) {
+      setError(`Tháng ${reviewMonth}/${reviewYear} không thuộc năm học ${target.academicYearStart}–${target.academicYearStart + 1}.`);
+      return;
+    }
+    if (target.period && !replaceReason.trim()) {
+      setError('Phải nhập lý do khi import lại một đợt đã có dữ liệu.');
+      return;
+    }
+
+    setError(null);
+    setAcademicYearConfirmed(false);
+    setConfirmationVisible(true);
+  };
+
   if (!target) return null;
   const isReplace = Boolean(target.period);
   const reviewYears = [target.academicYearStart, target.academicYearStart + 1];
@@ -145,25 +184,34 @@ export function GraduationImportDialog({
 
   const changeReviewYear = (year: number) => {
     setReviewYear(year);
+    setConfirmationVisible(false);
+    setAcademicYearConfirmed(false);
     const nextMonths = reviewMonthsFor(year, target.academicYearStart);
     if (!nextMonths.includes(reviewMonth)) setReviewMonth(nextMonths[0]);
   };
 
-  return <Modal
-    isOpen={isOpen}
-    onClose={close}
-    title={`${isReplace ? 'Tải lên lại' : 'Tải lên'} đợt ${target.roundNumber} · ${target.academicYearStart}–${target.academicYearStart + 1}`}
-    size={preview ? 'data-preview' : 'import'}
-  >
-    <div className="graduation-import" aria-busy={busy}>
+  const changeReviewMonth = (month: number) => {
+    setReviewMonth(month);
+    setConfirmationVisible(false);
+    setAcademicYearConfirmed(false);
+  };
+
+  return <>
+    <Modal
+      isOpen={isOpen && !confirmationVisible}
+      onClose={close}
+      title={`${isReplace ? 'Tải lên lại' : 'Tải lên'} đợt ${target.roundNumber} · ${target.academicYearStart}–${target.academicYearStart + 1}`}
+      size={preview ? 'data-preview' : 'import'}
+    >
+      <div className="graduation-import" aria-busy={busy}>
       <div className="graduation-import__metadata">
         <label>Năm xét<select value={reviewYear} onChange={(event) => changeReviewYear(Number(event.target.value))} disabled={busy}>{reviewYears.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
-        <label>Tháng xét<select value={reviewMonth} onChange={(event) => setReviewMonth(Number(event.target.value))} disabled={busy}>{reviewMonths.map((month) => <option key={month} value={month}>{monthLabel(month)}</option>)}</select></label>
+        <label>Tháng xét<select value={reviewMonth} onChange={(event) => changeReviewMonth(Number(event.target.value))} disabled={busy}>{reviewMonths.map((month) => <option key={month} value={month}>{monthLabel(month)}</option>)}</select></label>
         {isReplace && <label className="graduation-import__reason">Lý do import lại<input value={replaceReason} maxLength={1000} onChange={(event) => setReplaceReason(event.target.value)} placeholder="Ví dụ: sửa danh sách bị thiếu sinh viên" disabled={busy} /></label>}
-        <button type="button" className="btn btn-primary graduation-import__submit" onClick={() => void commit()} disabled={!preview || busy}>
-          {busy ? <LoaderCircle className="spin" size={17} /> : <Upload size={17} />}
-          {busy ? 'Đang lưu...' : isReplace ? 'Tải lên lại đợt' : 'Tải lên đợt'}
-        </button>
+        {!confirmationVisible && <button type="button" className="btn btn-primary graduation-import__submit" onClick={requestConfirmation} disabled={!preview || busy}>
+          <Upload size={17} />
+          {isReplace ? 'Tải lên lại đợt' : 'Tải lên đợt'}
+        </button>}
       </div>
 
       <div className={`graduation-import__picker${file ? ' has-file' : ''}`}>
@@ -190,6 +238,43 @@ export function GraduationImportDialog({
         {preview.aggregates.length > 150 && <p className="graduation-note">Hiển thị 150/{preview.aggregates.length} tổ hợp tổng hợp.</p>}
       </>}
 
-    </div>
-  </Modal>;
+      </div>
+    </Modal>
+
+    <Modal
+      isOpen={isOpen && confirmationVisible}
+      onClose={closeConfirmation}
+      title="Xác nhận tải lên dữ liệu"
+      size="compact"
+    >
+      <div className="graduation-import-confirmation" aria-busy={busy}>
+        <div className="graduation-import-confirmation__summary">
+          <AlertTriangle aria-hidden="true" size={20} />
+          <div>
+            <strong>{target.academicYearStart}–{target.academicYearStart + 1} · Đợt {target.roundNumber}</strong>
+            <span>{file?.name}</span>
+            <small>Tháng xét {String(reviewMonth).padStart(2, '0')}/{reviewYear}</small>
+          </div>
+        </div>
+        <label className="graduation-import__year-confirmation">
+          <input
+            type="checkbox"
+            checked={academicYearConfirmed}
+            onChange={(event) => setAcademicYearConfirmed(event.target.checked)}
+            disabled={busy}
+            autoFocus
+          />
+          <span>Tôi xác nhận file này thuộc năm học <strong>{target.academicYearStart}–{target.academicYearStart + 1}</strong>.</span>
+        </label>
+        {error && <div className="graduation-alert" role="alert">{error}</div>}
+        <div className="graduation-import-confirmation__actions">
+          <button type="button" className="btn btn-secondary" onClick={closeConfirmation} disabled={busy}>Quay lại</button>
+          <button type="button" className="btn btn-primary" onClick={() => void commit()} disabled={!academicYearConfirmed || busy}>
+            {busy ? <LoaderCircle className="spin" size={17} /> : <Upload size={17} />}
+            {busy ? 'Đang lưu...' : 'Xác nhận tải lên'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  </>;
 }

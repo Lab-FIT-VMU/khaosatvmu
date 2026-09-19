@@ -41,15 +41,17 @@ public sealed class EfGraduationAnalyticsV3Service(
         ValidateParsedImport(command.ParsedImport);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var period = await db.GraduationPeriods
+        var period = await db.GraduationPeriods.IgnoreQueryFilters()
             .SingleOrDefaultAsync(
                 x => x.AcademicYearStart == command.AcademicYearStart &&
                      x.RoundNumber == command.RoundNumber,
                 cancellationToken);
 
         GraduationImportRevision? activeRevision = null;
+        var isRestoring = period?.IsDeleted == true;
+        var previousRevisionId = isRestoring ? period?.ActiveRevisionId : null;
         var aggregateHash = ComputeAggregateHash(command);
-        if (period is not null && period.ActiveRevisionId.HasValue)
+        if (period is not null && !isRestoring && period.ActiveRevisionId.HasValue)
         {
             activeRevision = await db.GraduationImportRevisions
                 .SingleAsync(x => x.RevisionId == period.ActiveRevisionId.Value, cancellationToken);
@@ -81,19 +83,6 @@ public sealed class EfGraduationAnalyticsV3Service(
                 "Đợt chưa tồn tại hoặc đã thay đổi. Hãy tải lại trước khi import.");
         }
 
-        var duplicateFile = await db.GraduationImportRevisions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.FileHash == command.ParsedImport.FileHash &&
-                     (period == null || x.PeriodId != period.PeriodId),
-                cancellationToken);
-        if (duplicateFile is not null)
-        {
-            throw new GraduationAnalyticsException(
-                GraduationAnalyticsV3ErrorCodes.DuplicateSourceFile,
-                "File này đã được dùng cho một đợt khác.");
-        }
-
         var orderValue = command.ReviewYear * 12 + command.ReviewMonth;
         var violatesRoundOrder = await db.GraduationPeriods.AsNoTracking().AnyAsync(
             x => x.AcademicYearStart == command.AcademicYearStart &&
@@ -109,18 +98,7 @@ public sealed class EfGraduationAnalyticsV3Service(
         }
 
         var now = DateTime.UtcNow;
-        var actorId = currentUser.UserId ?? Guid.Empty;
-        var actor = currentUser.UserId is null
-            ? null
-            : await db.Users.AsNoTracking()
-                .Where(x => x.Id == currentUser.UserId.Value)
-                .Select(x => new { x.DisplayName, x.Email })
-                .FirstOrDefaultAsync(cancellationToken);
-        var actorName = !string.IsNullOrWhiteSpace(actor?.Email)
-            ? actor!.Email
-            : !string.IsNullOrWhiteSpace(currentUser.UserEmail)
-                ? currentUser.UserEmail.Trim()
-                : actor?.DisplayName ?? "Không xác định";
+        var (actorId, actorName) = await GetActorAsync(cancellationToken);
         if (period is null)
         {
             period = new GraduationPeriod
@@ -135,8 +113,18 @@ public sealed class EfGraduationAnalyticsV3Service(
             db.GraduationPeriods.Add(period);
             await db.SaveChangesAsync(cancellationToken);
         }
+        else if (isRestoring)
+        {
+            period.IsDeleted = false;
+            period.DeletedAt = null;
+            period.DeletedByUserId = null;
+            period.DeletedByName = null;
+            period.DeleteReason = null;
+        }
 
-        var revisionNumber = activeRevision is null ? 1 : activeRevision.RevisionNumber + 1;
+        var revisionNumber = (await db.GraduationImportRevisions
+            .Where(x => x.PeriodId == period.PeriodId)
+            .MaxAsync(x => (int?)x.RevisionNumber, cancellationToken) ?? 0) + 1;
         var revision = new GraduationImportRevision
         {
             PeriodId = period.PeriodId,
@@ -154,8 +142,9 @@ public sealed class EfGraduationAnalyticsV3Service(
             ImportedAtUtc = now,
             ImportedByUserId = actorId,
             ImportedByName = actorName,
-            ReplaceReason = NormalizeOptional(command.ReplaceReason),
-            ReplacedRevisionId = activeRevision?.RevisionId,
+            ReplaceReason = NormalizeOptional(command.ReplaceReason) ??
+                (isRestoring ? "Tải lên lại sau khi xóa dữ liệu đợt" : null),
+            ReplacedRevisionId = activeRevision?.RevisionId ?? previousRevisionId,
         };
         db.GraduationImportRevisions.Add(revision);
         await db.SaveChangesAsync(cancellationToken);
@@ -184,6 +173,37 @@ public sealed class EfGraduationAnalyticsV3Service(
             ToPeriodDto(period, revision),
             ToRevisionDto(revision),
             false);
+    }
+
+    public async Task DeletePeriodAsync(
+        long periodId,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var normalizedReason = reason.Trim();
+        if (normalizedReason.Length is < 3 or > 1000)
+        {
+            throw new GraduationAnalyticsException(
+                GraduationAnalyticsErrorCodes.InvalidQuery,
+                "Lý do xóa phải có từ 3 đến 1000 ký tự.");
+        }
+
+        var period = await db.GraduationPeriods
+            .SingleOrDefaultAsync(x => x.PeriodId == periodId, cancellationToken);
+        if (period is null)
+        {
+            throw new GraduationAnalyticsException(
+                GraduationAnalyticsV3ErrorCodes.PeriodNotFound,
+                "Không tìm thấy đợt tốt nghiệp.");
+        }
+
+        var (actorId, actorName) = await GetActorAsync(cancellationToken);
+        period.IsDeleted = true;
+        period.DeletedAt = DateTime.UtcNow;
+        period.DeletedByUserId = actorId;
+        period.DeletedByName = actorName;
+        period.DeleteReason = normalizedReason;
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<GraduationRevisionDto>> GetRevisionsAsync(
@@ -266,7 +286,28 @@ public sealed class EfGraduationAnalyticsV3Service(
                 "Chế độ phân tích phải là period hoặc cohortCumulative.");
         }
 
-        var cohort = NormalizeFilter(query.Cohort);
+        var selectedCohorts = query.Cohorts
+            .Select(NormalizeFilter)
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var selectedFacultyKeys = query.FacultyKeys
+            .Select(NormalizeFilter)
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var selectedProgramSelections = query.ProgramKeys
+            .Select(NormalizeFilter)
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        const string programSelectionSeparator = "\u001f";
+        var selectedProgramPairs = selectedProgramSelections
+            .Where(x => x.Contains(programSelectionSeparator, StringComparison.Ordinal))
+            .ToList();
+        var selectedLegacyProgramKeys = selectedProgramSelections
+            .Where(x => !x.Contains(programSelectionSeparator, StringComparison.Ordinal))
+            .ToList();
 
         var cutoff = await db.GraduationPeriods.AsNoTracking()
             .SingleOrDefaultAsync(
@@ -366,19 +407,19 @@ public sealed class EfGraduationAnalyticsV3Service(
                 .ToList(),
             cohorts);
 
-        var facultyKey = NormalizeFilter(query.FacultyKey);
-        var programKey = NormalizeFilter(query.ProgramKey);
-        if (cohort is not null)
+        if (selectedCohorts.Count > 0)
         {
-            aggregateQuery = aggregateQuery.Where(x => x.CohortCode == cohort);
+            aggregateQuery = aggregateQuery.Where(x => selectedCohorts.Contains(x.CohortCode));
         }
-        if (facultyKey is not null)
+        if (selectedFacultyKeys.Count > 0)
         {
-            aggregateQuery = aggregateQuery.Where(x => x.FacultyKey == facultyKey);
+            aggregateQuery = aggregateQuery.Where(x => selectedFacultyKeys.Contains(x.FacultyKey));
         }
-        if (programKey is not null)
+        if (selectedProgramPairs.Count > 0 || selectedLegacyProgramKeys.Count > 0)
         {
-            aggregateQuery = aggregateQuery.Where(x => x.ProgramKey == programKey);
+            aggregateQuery = aggregateQuery.Where(x =>
+                selectedProgramPairs.Contains(x.FacultyKey + programSelectionSeparator + x.ProgramKey)
+                || selectedLegacyProgramKeys.Contains(x.ProgramKey));
         }
         var filtered = await aggregateQuery
             .Select(x => new
@@ -414,13 +455,14 @@ public sealed class EfGraduationAnalyticsV3Service(
 
         return GraduationExploreCalculator.Calculate(
             mode,
-            cohort,
+            selectedCohorts.Count == 0 ? null : string.Join(", ", selectedCohorts),
             periods,
             cells,
             facets,
             query.MetricId,
             query.GroupBy,
-            query.SeriesBy);
+            query.SeriesBy,
+            selectedCohorts);
     }
 
     private static void ValidateMetadata(ImportGraduationRevisionCommand command)
@@ -535,6 +577,24 @@ public sealed class EfGraduationAnalyticsV3Service(
         {
             return [];
         }
+    }
+
+    private async Task<(Guid Id, string Name)> GetActorAsync(CancellationToken cancellationToken)
+    {
+        var actorId = currentUser.UserId ?? Guid.Empty;
+        var actor = currentUser.UserId is null
+            ? null
+            : await db.Users.AsNoTracking()
+                .Where(x => x.Id == currentUser.UserId.Value)
+                .Select(x => new { x.DisplayName, x.Email })
+                .FirstOrDefaultAsync(cancellationToken);
+        var actorName = !string.IsNullOrWhiteSpace(actor?.Email)
+            ? actor!.Email
+            : !string.IsNullOrWhiteSpace(currentUser.UserEmail)
+                ? currentUser.UserEmail.Trim()
+                : actor?.DisplayName ?? "Không xác định";
+
+        return (actorId, actorName);
     }
 
     private static string? NormalizeOptional(string? value) =>

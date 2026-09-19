@@ -69,6 +69,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         // — điểm lớp, Z-score, tổng quan toàn trường — tự bỏ qua, không phải sửa
         // hai chục chỗ truy vấn.
         modelBuilder.Entity<SurveyResponse>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<GraduationPeriod>().HasQueryFilter(e => !e.IsDeleted);
         // Câu trả lời không có cột IsDeleted riêng mà bám theo phiếu cha. Bắt buộc
         // phải khai bộ lọc khớp: answer là đầu BẮT BUỘC của quan hệ, thiếu bộ lọc
         // thì EF cảnh báo đọc ra answer mà navigation phiếu cha lại null.
@@ -575,6 +576,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 table.HasCheckConstraint("CK_GraduationPeriods_ReviewYear", "\"ReviewYear\" BETWEEN 1900 AND 2200");
             });
             entity.HasKey(x => x.PeriodId);
+            entity.Property(x => x.DeletedByName).HasMaxLength(320);
+            entity.Property(x => x.DeleteReason).HasMaxLength(1000);
             entity.HasIndex(x => new { x.AcademicYearStart, x.RoundNumber }).IsUnique();
             entity.HasIndex(x => new { x.AcademicYearStart, x.ReviewYear, x.ReviewMonth });
         });

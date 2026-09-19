@@ -9,7 +9,7 @@ public enum GraduationRank
 }
 
 /// <summary>Một đợt xét tốt nghiệp ổn định, được định danh bằng năm học và số đợt.</summary>
-public sealed class GraduationPeriod
+public sealed class GraduationPeriod : ISoftDeletable
 {
     public long PeriodId { get; set; }
     public int AcademicYearStart { get; set; }
@@ -19,6 +19,11 @@ public sealed class GraduationPeriod
     public long? ActiveRevisionId { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public Guid CreatedByUserId { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+    public string? DeletedByName { get; set; }
+    public string? DeleteReason { get; set; }
 }
 
 /// <summary>Snapshot bất biến của một lần import hoặc import lại.</summary>

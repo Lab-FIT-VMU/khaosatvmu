@@ -38,6 +38,20 @@ public static class GraduationAnalyticsEndpoints
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
         });
 
+        group.MapDelete("/managed-periods/{periodId:long}", async (
+            long periodId,
+            [FromBody] DeleteGraduationPeriodRequest request,
+            [FromServices] IGraduationAnalyticsV3Service service,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                await service.DeletePeriodAsync(periodId, request.Reason ?? string.Empty, ct);
+                return Results.NoContent();
+            }
+            catch (GraduationAnalyticsException exception) { return ToError(exception); }
+        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+
         group.MapPost("/imports/preview", async (
             HttpRequest request,
             [FromServices] IGraduationImportParser parser,
@@ -101,9 +115,9 @@ public static class GraduationAnalyticsEndpoints
                     request.Mode ?? string.Empty,
                     request.StartPeriodId,
                     request.CutoffPeriodId,
-                    request.Cohort,
-                    request.FacultyKey,
-                    request.ProgramKey,
+                    request.Cohorts ?? (string.IsNullOrWhiteSpace(request.Cohort) ? [] : [request.Cohort]),
+                    request.FacultyKeys ?? (string.IsNullOrWhiteSpace(request.FacultyKey) ? [] : [request.FacultyKey]),
+                    request.ProgramKeys ?? (string.IsNullOrWhiteSpace(request.ProgramKey) ? [] : [request.ProgramKey]),
                     request.MetricId ?? "graduated",
                     request.GroupBy ?? "period",
                     request.SeriesBy), ct));
@@ -189,7 +203,6 @@ public static class GraduationAnalyticsEndpoints
             GraduationAnalyticsErrorCodes.PeriodNotFound => StatusCodes.Status404NotFound,
             GraduationAnalyticsV3ErrorCodes.PeriodNotFound => StatusCodes.Status404NotFound,
             GraduationAnalyticsV3ErrorCodes.ConcurrentReplace => StatusCodes.Status409Conflict,
-            GraduationAnalyticsV3ErrorCodes.DuplicateSourceFile => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest,
         };
         return Results.Json(new { errorCode = exception.ErrorCode, message = exception.Message }, statusCode: statusCode);
@@ -271,7 +284,12 @@ public static class GraduationAnalyticsEndpoints
         string? ProgramKey,
         string? MetricId,
         string? GroupBy,
-        string? SeriesBy);
+        string? SeriesBy,
+        IReadOnlyList<string>? Cohorts = null,
+        IReadOnlyList<string>? FacultyKeys = null,
+        IReadOnlyList<string>? ProgramKeys = null);
+
+    public sealed record DeleteGraduationPeriodRequest(string? Reason);
 
     public sealed record GraduationImportRowRequest(
         int SourceRowNumber,

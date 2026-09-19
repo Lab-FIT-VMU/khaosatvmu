@@ -357,6 +357,44 @@
 .graduation-import__metadata input, .graduation-import__metadata select { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid #cfd7dc; border-radius: 3px; background: #fff; color: #000000; font: inherit; }
 .graduation-import__reason { grid-column: 1 / 4; }
 .graduation-import__submit { grid-column: 4; grid-row: 1; min-height: 36px; padding: 6px 14px; font-size: 13px; white-space: nowrap; }
+.graduation-import__year-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid #d9c27e;
+  border-radius: 3px;
+  background: #fffaf0;
+  color: #4b3c16;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.graduation-import__year-confirmation input { width: 16px; height: 16px; flex: 0 0 auto; margin: 1px 0 0; accent-color: #0788b8; }
+.graduation-import__year-confirmation input:focus-visible { outline: 2px solid #0788b8; outline-offset: 2px; }
+.graduation-import__year-confirmation:has(input:checked) { border-color: #9fc5d4; background: #f3fafc; color: #064f69; }
+.graduation-import-confirmation { display: grid; gap: 14px; }
+.graduation-import-confirmation__summary { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #e3cf98; border-radius: 3px; background: #fffaf0; color: #614a13; }
+.graduation-import-confirmation__summary > svg { flex: 0 0 auto; margin-top: 1px; }
+.graduation-import-confirmation__summary > div { display: grid; min-width: 0; gap: 3px; }
+.graduation-import-confirmation__summary strong { font-size: 14px; }
+.graduation-import-confirmation__summary span { overflow: hidden; color: #20262c; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.graduation-import-confirmation__summary small { color: #665c45; font-size: 12px; }
+.graduation-import-confirmation__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid #e4e8eb; }
+.graduation-import-confirmation__actions .btn { min-height: 36px; }
+.graduation-delete-dialog { display: grid; gap: 16px; }
+.graduation-delete-dialog__warning { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #e3b7b7; border-radius: 3px; background: #fff6f6; color: #772323; }
+.graduation-delete-dialog__warning > svg { flex: 0 0 auto; margin-top: 1px; }
+.graduation-delete-dialog__warning strong { font-size: 14px; }
+.graduation-delete-dialog__warning p { margin: 4px 0 0; color: #633838; font-size: 13px; line-height: 1.45; }
+.graduation-delete-dialog > label { display: grid; gap: 6px; color: #20262c; font-size: 13px; font-weight: 700; }
+.graduation-delete-dialog > label > span { color: #b52d2d; }
+.graduation-delete-dialog textarea { box-sizing: border-box; width: 100%; min-height: 82px; resize: vertical; padding: 9px 10px; border: 1px solid #cfd7dc; border-radius: 3px; background: #fff; color: #20262c; font: inherit; font-weight: 400; line-height: 1.4; }
+.graduation-delete-dialog textarea:focus { border-color: #0788b8; outline: 2px solid rgb(7 136 184 / 14%); }
+.graduation-delete-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid #e4e8eb; }
+.graduation-delete-dialog__submit { border: 1px solid #a92727; background: #b52d2d; color: #fff; }
+.graduation-delete-dialog__submit:hover:not(:disabled) { border-color: #8e2020; background: #9d2424; }
+.graduation-delete-dialog__submit svg { width: 16px; height: 16px; }
 .graduation-warning { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border: 1px solid #e7cc8d; background: #fff9e8; color: #775715; font-size: 13px; }
 .graduation-warning svg { flex: 0 0 auto; margin-top: 1px; }
 .graduation-warning > div { display: grid; gap: 3px; }
@@ -374,8 +412,57 @@
   background: #fff;
 }
 .graduation-v3-controls.is-range { grid-template-columns: minmax(130px, .8fr) repeat(2, minmax(170px, 1.1fr)) minmax(100px, .65fr) minmax(140px, 1fr) minmax(150px, 1fr) auto; }
-.graduation-v3-controls label, .graduation-year-picker label { display: grid; gap: 5px; color: #000000; font-size: 13px; font-weight: 700; }
+.graduation-v3-controls label, .graduation-filter-field, .graduation-year-picker label { display: grid; gap: 5px; color: #000000; font-size: 13px; font-weight: 700; }
 .graduation-v3-controls select, .graduation-year-picker select { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid #cfd7dc; background: #fff; color: #000000; font: inherit; }
+.graduation-cohort-select { min-width: 0; }
+.graduation-cohort-select__trigger {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 9px;
+  border: 1px solid #cfd7dc;
+  background: #fff;
+  color: #20262c;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.graduation-cohort-select__trigger:hover, .graduation-cohort-select__trigger.is-open { border-color: #0788b8; }
+.graduation-cohort-select__trigger:focus-visible { outline: 2px solid #0788b8; outline-offset: 2px; }
+.graduation-cohort-select__trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.graduation-cohort-select__trigger svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.graduation-cohort-select__popover {
+  position: fixed;
+  z-index: 1200;
+  box-sizing: border-box;
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #bfcbd2;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgb(20 32 40 / 16%);
+}
+.graduation-cohort-select__search { position: relative; padding: 9px; border-bottom: 1px solid #e4e8eb; }
+.graduation-cohort-select__search svg { position: absolute; top: 19px; left: 18px; width: 15px; height: 15px; color: #64717a; pointer-events: none; }
+.graduation-cohort-select__search input { box-sizing: border-box; width: 100%; height: 34px; padding: 0 9px 0 31px; border: 1px solid #cfd7dc; border-radius: 3px; color: #20262c; font: inherit; }
+.graduation-cohort-select__search input:focus { border-color: #0788b8; outline: 2px solid rgb(7 136 184 / 12%); }
+.graduation-cohort-select__toolbar { display: flex; justify-content: space-between; padding: 7px 9px; border-bottom: 1px solid #e8ecef; }
+.graduation-cohort-select__toolbar button { padding: 0; border: 0; background: transparent; color: #076d91; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.graduation-cohort-select__toolbar button:disabled { color: #9aa4aa; cursor: default; }
+.graduation-cohort-select__options { min-height: 0; flex: 1 1 auto; overflow-y: auto; padding: 4px; }
+.graduation-cohort-select__options label { display: flex; min-height: 34px; align-items: center; gap: 9px; padding: 4px 8px; color: #20262c; font-size: 13px; font-weight: 400; cursor: pointer; }
+.graduation-cohort-select__options label:hover, .graduation-cohort-select__options label.is-selected { background: #eef8fb; }
+.graduation-cohort-select__options input { width: 15px; height: 15px; margin: 0; accent-color: #0788b8; }
+.graduation-cohort-select__options label span { flex: 1 1 auto; }
+.graduation-cohort-select__options label svg { width: 15px; height: 15px; color: #0788b8; }
+.graduation-cohort-select__options p { margin: 16px 8px; color: #68737d; font-size: 12px; text-align: center; }
+.graduation-cohort-select__popover footer { padding: 7px 10px; border-top: 1px solid #e4e8eb; background: #f7f9fa; color: #52616b; font-size: 12px; }
 .graduation-v3-controls label.is-disabled { color: #99a3aa; }
 .graduation-v3-controls select:disabled {
   border-color: #dce2e6;
@@ -469,7 +556,7 @@
 .graduation-period-manager th:nth-child(6) { width: 104px; }
 .graduation-period-manager th:nth-child(7) { width: 112px; }
 .graduation-period-manager th:nth-child(8) { width: 86px; }
-.graduation-period-manager th:nth-child(9) { width: 130px; }
+.graduation-period-manager th:nth-child(9) { width: 164px; }
 .graduation-period-manager td { height: 48px; vertical-align: middle; font-variant-numeric: tabular-nums; }
 .graduation-period-manager td:nth-child(4) { min-width: 0; }
 .graduation-period-manager th:nth-child(9), .graduation-period-manager td:nth-child(9) { text-align: center; }
