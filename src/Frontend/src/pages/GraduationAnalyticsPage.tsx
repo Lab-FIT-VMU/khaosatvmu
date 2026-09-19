@@ -589,8 +589,38 @@ export function GraduationAnalyticsPage() {
         {exploreError && <div className="graduation-alert" role="alert">{exploreError}</div>}
         {!explore && <>{renderExploreControls()}{exploreLoading && <div className="graduation-overview-status"><LoaderCircle className="spin" /> Đang tính số liệu...</div>}</>}
         {explore && <>
-          <div className="graduation-kpis graduation-kpis--three">{explore.kpis.map((kpi) => <div key={kpi.id}><span>{kpi.label}</span><strong>{formatNumber(kpi.count)}</strong><small>{formatRate(kpi.rate)}</small></div>)}</div>
-          <article className="graduation-v3-card"><header><div><span>XẾP LOẠI TỐT NGHIỆP</span><h2>Cơ cấu trong cùng phạm vi</h2></div></header><div className="graduation-rank-grid">{explore.ranks.map((rank) => <div key={rank.rank}><span>{rank.label}</span><strong>{formatNumber(rank.count)}</strong><small>{formatRate(rank.rate)}</small></div>)}</div></article>
+          <article className="graduation-result-summary">
+            <header>
+              <div>
+                <span>TỔNG QUAN KẾT QUẢ</span>
+                <h2>Kết quả tốt nghiệp và cơ cấu xếp loại</h2>
+              </div>
+              <p>{explore.scope.cohort ? `Khóa ${explore.scope.cohort}` : 'Tất cả khóa'}</p>
+            </header>
+            <section className="graduation-result-summary__kpis" aria-label="Các chỉ số tốt nghiệp chính">
+              {explore.kpis.map((kpi) => <div key={kpi.id} data-kpi={kpi.id}>
+                <span>{kpi.label}</span>
+                <strong>{formatNumber(kpi.count)}</strong>
+                <small>{formatRate(kpi.rate)} tổng số sinh viên</small>
+              </div>)}
+            </section>
+            <section className="graduation-result-summary__ranks" aria-labelledby="graduation-rank-heading">
+              <div className="graduation-result-summary__section-heading">
+                <h3 id="graduation-rank-heading">Xếp loại tốt nghiệp</h3>
+                <span>Tỷ trọng trên tổng số sinh viên</span>
+              </div>
+              <div className="graduation-result-summary__distribution" role="img" aria-label="Tỷ trọng các mức xếp loại tốt nghiệp">
+                {explore.ranks.map((rank) => <span key={rank.rank} style={{ width: `${rank.rate}%` }} title={`${rank.label}: ${formatRate(rank.rate)}`} />)}
+              </div>
+              <div className="graduation-result-summary__rank-grid">
+                {explore.ranks.map((rank) => <div key={rank.rank}>
+                  <span><i aria-hidden="true" />{rank.label}</span>
+                  <strong>{formatNumber(rank.count)}</strong>
+                  <small>{formatRate(rank.rate)}</small>
+                </div>)}
+              </div>
+            </section>
+          </article>
           {renderExploreControls()}
           <div className="graduation-scope-note"><strong>{explore.scope.mode === 'cohortCumulative' ? (explore.scope.cohort ? `Tích lũy ${explore.scope.cohort}` : 'Tích lũy tất cả khóa') : 'Riêng đợt được chọn'}</strong><span>{explore.scope.startPeriodLabel}{explore.scope.startPeriodId !== explore.scope.cutoffPeriodId ? ` → ${explore.scope.cutoffPeriodLabel}` : ''} · {explore.scope.includedPeriodCount} đợt</span></div>
           <div className="graduation-workspace graduation-explore-chart-workspace">

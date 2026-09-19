@@ -400,18 +400,43 @@
 .graduation-scope-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 9px 12px; border: 1px solid #c8dce4; background: #f3fafc; font-size: 13px; }
 .graduation-scope-note span { color: #000000; }
 
-.graduation-kpis--three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 8px; }
-.graduation-kpis--three > div:last-child { border-right: 0; }
-.graduation-kpis small, .graduation-rank-grid small { color: #000000; font-size: 13px; }
+.graduation-result-summary { margin-top: 8px; border: 1px solid #dfe4e8; background: #fff; }
+.graduation-result-summary > header { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 14px; border-bottom: 1px solid #dfe4e8; }
+.graduation-result-summary > header span { color: #52616b; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.graduation-result-summary > header h2 { margin: 3px 0 0; color: #20262c; font-size: 15px; }
+.graduation-result-summary > header p { margin: 0; color: #68737d; font-size: 12px; white-space: nowrap; }
+.graduation-result-summary__kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #f7f9fa; }
+.graduation-result-summary__kpis > div { position: relative; display: grid; min-height: 92px; align-content: center; gap: 3px; padding: 12px 16px 12px 19px; border-right: 1px solid #dfe4e8; }
+.graduation-result-summary__kpis > div::before { position: absolute; top: 15px; bottom: 15px; left: 0; width: 3px; background: #0788b8; content: ''; }
+.graduation-result-summary__kpis > div:nth-child(2)::before { background: #21884a; }
+.graduation-result-summary__kpis > div:nth-child(3)::before { background: #b86216; }
+.graduation-result-summary__kpis > div:last-child { border-right: 0; }
+.graduation-result-summary__kpis span { color: #4d5962; font-size: 12px; }
+.graduation-result-summary__kpis strong { color: #075d79; font-size: 25px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.graduation-result-summary__kpis > div:nth-child(2) strong { color: #137b3b; }
+.graduation-result-summary__kpis > div:nth-child(3) strong { color: #9a5511; }
+.graduation-result-summary__kpis small { color: #68737d; font-size: 11px; }
+.graduation-result-summary__ranks { padding: 12px 14px 0; border-top: 1px solid #dfe4e8; }
+.graduation-result-summary__section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.graduation-result-summary__section-heading h3 { margin: 0; color: #20262c; font-size: 13px; }
+.graduation-result-summary__section-heading span { color: #68737d; font-size: 11px; }
+.graduation-result-summary__distribution { display: flex; height: 7px; margin-top: 10px; overflow: hidden; background: #edf0f2; }
+.graduation-result-summary__distribution > span { min-width: 0; }
+.graduation-result-summary__distribution > span:nth-child(1), .graduation-result-summary__rank-grid > div:nth-child(1) i { background: #0788b8; }
+.graduation-result-summary__distribution > span:nth-child(2), .graduation-result-summary__rank-grid > div:nth-child(2) i { background: #36a07a; }
+.graduation-result-summary__distribution > span:nth-child(3), .graduation-result-summary__rank-grid > div:nth-child(3) i { background: #d49b28; }
+.graduation-result-summary__distribution > span:nth-child(4), .graduation-result-summary__rank-grid > div:nth-child(4) i { background: #7c8790; }
+.graduation-result-summary__rank-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 10px; }
+.graduation-result-summary__rank-grid > div { display: grid; gap: 3px; padding: 10px 12px 13px; border-right: 1px solid #edf0f2; }
+.graduation-result-summary__rank-grid > div:last-child { border-right: 0; }
+.graduation-result-summary__rank-grid span { display: inline-flex; align-items: center; gap: 7px; color: #4d5962; font-size: 12px; }
+.graduation-result-summary__rank-grid i { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 2px; }
+.graduation-result-summary__rank-grid strong { color: #20262c; font-size: 20px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.graduation-result-summary__rank-grid small { color: #68737d; font-size: 11px; }
 .graduation-v3-card { margin-top: 10px; border: 1px solid #dfe4e8; background: #fff; }
 .graduation-v3-card > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 13px; border-bottom: 1px solid #e6eaed; }
 .graduation-v3-card > header span { color: #000000; font-size: 13px; font-weight: 700; letter-spacing: .05em; }
 .graduation-v3-card h2 { margin: 3px 0 0; font-size: 15px; }
-.graduation-rank-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.graduation-rank-grid > div { display: grid; gap: 4px; padding: 14px; border-right: 1px solid #edf0f2; }
-.graduation-rank-grid > div:last-child { border-right: 0; }
-.graduation-rank-grid span { color: #000000; font-size: 13px; }
-.graduation-rank-grid strong { font-size: 23px; }
 .graduation-v3-chart { height: 360px; padding: 8px 10px; }
 .graduation-v3-table > div, .graduation-period-manager, .graduation-history { overflow: auto; }
 .graduation-v3-table > div { max-height: 420px; scrollbar-gutter: stable; }
@@ -566,8 +591,14 @@
   .graduation-import__metadata input, .graduation-import__metadata select, .graduation-import__submit { min-height: 44px; }
   .graduation-import__reason { grid-column: auto; }
   .graduation-import__submit { grid-column: auto; grid-row: auto; width: 100%; }
-  .graduation-kpis--three, .graduation-rank-grid { grid-template-columns: 1fr; }
-  .graduation-kpis--three > div, .graduation-rank-grid > div { border-right: 0; border-bottom: 1px solid #edf0f2; }
+  .graduation-result-summary > header { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .graduation-result-summary__kpis { grid-template-columns: 1fr; }
+  .graduation-result-summary__kpis > div { min-height: 80px; border-right: 0; border-bottom: 1px solid #dfe4e8; }
+  .graduation-result-summary__kpis > div:last-child { border-bottom: 0; }
+  .graduation-result-summary__section-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .graduation-result-summary__rank-grid { grid-template-columns: 1fr 1fr; }
+  .graduation-result-summary__rank-grid > div:nth-child(2) { border-right: 0; }
+  .graduation-result-summary__rank-grid > div:nth-child(-n+2) { border-bottom: 1px solid #edf0f2; }
   .graduation-row-actions { align-items: stretch; flex-direction: column; }
   .graduation-import-heading__summary { justify-content: space-between; gap: 8px; }
   .graduation-import-heading__summary span { flex: 1 1 0; }
