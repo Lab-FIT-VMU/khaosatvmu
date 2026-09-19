@@ -5,7 +5,6 @@ import {
   ChevronDown,
   CircleAlert,
   LoaderCircle,
-  RefreshCw,
   Search,
   TriangleAlert,
 } from 'lucide-react';
@@ -642,15 +641,6 @@ export const SurveyStatisticsPage: React.FC = () => {
               options={exportOptions}
             />
           )}
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => void loadStatistics()}
-            disabled={!semesterSurveyId || loading}
-          >
-            <RefreshCw aria-hidden="true" size={16} />
-            Tải lại
-          </button>
           <UpdateScoresButton semesterSurveyId={semesterSurveyId} onUpdated={loadStatistics} />
           {/* Phát hành nằm ở đúng trang này vì đây là chỗ quản trị chốt số liệu cuối
               đợt: xem bảng, bấm Cập nhật điểm, rồi mới mở cho đơn vị xem. */}

@@ -41,6 +41,10 @@ lưu ý và cảnh báo.
   cập nhật dữ liệu nào.
 - Tuỳ biến gắn theo **đợt khảo sát** (`SemesterSurveys`), không gắn theo bộ câu hỏi — cùng một
   bộ câu hỏi dùng cho nhiều đợt với hình thức khác nhau.
+- **Chỉ cấu hình được LÚC TẠO ĐỢT.** Đợt đã tạo thì cấu hình phiếu đóng lại, không sửa nữa.
+  Muốn hình thức khác thì tạo đợt mới. Ràng buộc này xoá luôn hai rủi ro nặng nhất: phiếu đổi
+  hình thức giữa chừng trong lúc sinh viên đang làm, và chuyện phải xoá cache phiếu công khai
+  của vài nghìn lớp mỗi lần lưu cấu hình.
 - Không đụng tới phiếu sinh viên đã nộp và điểm đã chốt.
 
 ---
@@ -85,10 +89,12 @@ phải lọc hay gộp theo nó.
 
 **Việc phải làm:**
 
-- Backend: endpoint đọc/ghi cấu hình; `PublicSurveyDto` trả kèm cấu hình; endpoint tải ảnh lên
-  và phục vụ tệp tĩnh (giới hạn định dạng, dung lượng, xoá ảnh khi xoá đợt).
-- Frontend: tab "Tuỳ biến phiếu" trong màn tạo/sửa đợt, **xem trước bằng chính component phiếu
-  thật** chứ không vẽ lại — vẽ lại thì xem trước một đằng, sinh viên thấy một nẻo.
+- Backend: nhận cấu hình trong lệnh **tạo đợt** và ghi một lần; `PublicSurveyDto` trả kèm cấu
+  hình; endpoint tải ảnh lên và phục vụ tệp tĩnh (giới hạn định dạng, dung lượng, xoá ảnh khi
+  xoá đợt). Lệnh sửa đợt **không** nhận cấu hình phiếu — sửa đợt chỉ còn đổi tên và lịch.
+- Frontend: bước "Tuỳ biến phiếu" trong hộp thoại **tạo đợt**, **xem trước bằng chính component
+  phiếu thật** chứ không vẽ lại — vẽ lại thì xem trước một đằng, sinh viên thấy một nẻo. Màn
+  sửa đợt chỉ hiện lại cấu hình ở dạng chỉ đọc.
 
 ---
 
@@ -148,9 +154,19 @@ mới cần quy tắc riêng — đơn giản nhất là chỉ quản trị xem,
 
 ## 8. Rủi ro đã thấy
 
+Xét trong tình trạng **đang thu phiếu thật**.
+
 - **Xem trước lệch thực tế** nếu dựng lại giao diện riêng cho phần xem trước.
 - **Ảnh tải lên**: dung lượng, dọn rác khi xoá đợt, sao lưu, và đường dẫn tĩnh khi deploy.
-- **Đợt đang mở mà đổi cấu hình**: sinh viên đang làm dở có thể thấy phiếu đổi hình thức giữa
-  chừng. Cần quyết định: khoá tuỳ biến khi đợt đã mở, hay cho đổi tự do.
+- **Bản nháp trong máy sinh viên**: bài làm dở nằm ở `localStorage`, khoá `survey_draft_<linkToken>`,
+  gồm đáp án theo `questionId` và vé bắt đầu (`PublicSurveyPage.tsx`). Đổi hình thức phiếu thì
+  nháp vẫn đọc được, nhưng **tuyệt đối không đổi hay bỏ `questionId` của đợt đang mở** — nháp cũ
+  sẽ trỏ vào câu không còn tồn tại.
+- **Lệch phiên bản khi deploy**: tab đang mở của sinh viên chạy bundle cũ, nhận DTO có thêm
+  trường thì không sao; ngược lại bundle mới gặp backend cũ phải có giá trị mặc định cho cấu
+  hình, đừng để thiếu trường làm trắng trang.
 - **Hai đường dữ liệu** ở cách A: mọi báo cáo tổng phải nhớ gộp cả hai nguồn, quên một chỗ là số
   thiếu mà nhìn vẫn như đúng.
+
+Hai rủi ro đã được ràng buộc "chỉ cấu hình lúc tạo đợt" loại bỏ: phiếu đổi hình thức giữa chừng,
+và việc phải xoá cache `survey:public:{token}` (TTL 15 phút) của từng lớp mỗi lần lưu cấu hình.

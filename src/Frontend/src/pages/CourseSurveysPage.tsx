@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ChevronUp,
   CircleAlert,
-  ClipboardList,
   Copy,
   LoaderCircle,
   Pencil,
@@ -69,6 +68,16 @@ function toIso(localValue: string): string {
 
 function formatRange(startTime: string, endTime: string): string {
   const formatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+  return `${formatter.format(new Date(startTime))} → ${formatter.format(new Date(endTime))}`;
+}
+
+/**
+ * Chỉ ngày, không giờ. Dùng cho cột Thời gian mở của bảng lớp: mọi lớp trong đợt
+ * dùng chung một lịch nên giờ giấc lặp lại y hệt ở hàng trăm dòng, chỉ tổ chiếm
+ * chỗ. Giờ cụ thể vẫn xem được ở dòng mô tả của đợt và trong mã QR.
+ */
+function formatDateRange(startTime: string, endTime: string): string {
+  const formatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short' });
   return `${formatter.format(new Date(startTime))} → ${formatter.format(new Date(endTime))}`;
 }
 
@@ -165,11 +174,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     closingEarlierCount: number;
   } | null>(null);
 
-  const [editingSection, setEditingSection] = useState<CourseSectionSurvey | null>(null);
-  const [editSchedule, setEditSchedule] = useState<ScheduleForm>(defaultSchedule);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [savingSchedule, setSavingSchedule] = useState(false);
-
   const [deleting, setDeleting] = useState<SemesterSurvey | null>(null);
   const [qrTarget, setQrTarget] = useState<CourseSectionSurvey | null>(null);
 
@@ -206,11 +210,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   const [addSchedule, setAddSchedule] = useState<ScheduleForm>(defaultSchedule);
   const [addError, setAddError] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<number | null>(null);
-  const editingSectionParent = editingSection
-    ? semesterSurveys.find(
-        (survey) => survey.semesterSurveyId === editingSection.semesterSurveyId
-      ) ?? null
-    : null;
 
   // Nạp danh sách template khảo sát. Bộ câu hỏi thuộc quyền
   // COURSE_QUESTION_SETS_ACCESS mà vai trò chỉ đọc không có, nên gọi vào là 403 và
@@ -361,43 +360,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
       setCreateError(messageFrom(error));
     } finally {
       setCreating(false);
-    }
-  };
-
-  const handleSaveSchedule = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!editingSection) return;
-    if (new Date(editSchedule.endTime) <= new Date(editSchedule.startTime)) {
-      setEditError('Thời gian đóng phải sau thời gian mở.');
-      return;
-    }
-    const parent = semesterSurveys.find(
-      (survey) => survey.semesterSurveyId === editingSection.semesterSurveyId
-    );
-    if (parent && (
-      new Date(editSchedule.startTime) < new Date(parent.startTime)
-      || new Date(editSchedule.endTime) > new Date(parent.endTime)
-    )) {
-      setEditError('Thời gian của lớp phải nằm trọn trong thời gian mở và đóng của đợt khảo sát.');
-      return;
-    }
-
-    setSavingSchedule(true);
-    try {
-      await surveyApi.updateSectionSurveySchedule(editingSection.courseSectionSurveyId, {
-        startTime: toIso(editSchedule.startTime),
-        endTime: toIso(editSchedule.endTime),
-      });
-      await loadSections(editingSection.semesterSurveyId);
-      await loadSemesterSurveys(semesterId);
-      onSurveysChanged?.();
-      toast.success('Đã cập nhật thời gian mở khảo sát');
-      setEditingSection(null);
-      setEditError(null);
-    } catch (error) {
-      setEditError(messageFrom(error));
-    } finally {
-      setSavingSchedule(false);
     }
   };
 
@@ -821,13 +783,13 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                     <tr>
                       <th style={{ width: '12%' }}>Khoa / Viện</th>
                       <th style={{ width: '11%' }}>Bộ môn</th>
-                      <th style={{ width: '18%' }}>Lớp học phần</th>
-                      <th style={{ width: '14%' }}>Giảng viên</th>
+                      <th style={{ width: '20%' }}>Lớp học phần</th>
+                      <th style={{ width: '15%' }}>Giảng viên</th>
                       <th style={{ width: '4%' }}>Sĩ số</th>
                       <th style={{ width: '16%' }}>Đường dẫn riêng</th>
-                      <th style={{ width: '12%' }}>Thời gian mở</th>
-                      <th style={{ width: '5%' }}>Lượt trả lời</th>
-                      <th style={{ width: '8%' }}>Thao tác</th>
+                      <th style={{ width: '10%' }}>Thời gian mở</th>
+                      <th style={{ width: '6%' }}>Lượt trả lời</th>
+                      <th style={{ width: '6%' }}>Ảnh QR</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -875,7 +837,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                         <td className="campaign-schedule-cell">
                           <div className="campaign-date">
                             <CalendarDays className="operation-icon" aria-hidden="true" />
-                            <span>{formatRange(section.startTime, section.endTime)}</span>
+                            <span>{formatDateRange(section.startTime, section.endTime)}</span>
                           </div>
                         </td>
                         <td className="campaign-number-cell">
@@ -895,18 +857,8 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                             </button>
                           )}
                         </td>
-                        <td>
+                        <td className="campaign-qr-cell">
                           <div className="campaign-row-actions">
-                            {canViewReports && (
-                              <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => openSurveyReport(section.courseSectionSurveyId)}
-                              >
-                                <ClipboardList className="operation-icon" aria-hidden="true" />
-                                Kết quả
-                              </button>
-                            )}
                             {/* Mã QR và đường dẫn thì giữ cho mọi vai trò: giảng viên
                                 chính là người đưa cho sinh viên, câu H-d. */}
                             <button
@@ -917,23 +869,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                               <QrCode className="operation-icon" aria-hidden="true" />
                               QR
                             </button>
-                            {canManageCampaign && (
-                              <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => {
-                                  setEditingSection(section);
-                                  setEditError(null);
-                                  setEditSchedule({
-                                    startTime: toLocalInput(section.startTime),
-                                    endTime: toLocalInput(section.endTime),
-                                  });
-                                }}
-                              >
-                                <Pencil className="operation-icon" aria-hidden="true" />
-                                Sửa lịch
-                              </button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -1188,83 +1123,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                 <Save aria-hidden="true" size={16} />
               )}
               {scheduleConfirm ? 'Xác nhận lưu lịch mới' : 'Lưu thay đổi'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        isOpen={editingSection !== null}
-        onClose={() => {
-          if (savingSchedule) return;
-          setEditingSection(null);
-          setEditError(null);
-        }}
-        title={
-          editingSection
-            ? `Thời gian mở khảo sát lớp ${editingSection.sectionName}`
-            : 'Thời gian mở khảo sát'
-        }
-      >
-        <form className="catalog-form" onSubmit={(event) => void handleSaveSchedule(event)}>
-          {editError && <div className="catalog-validation-error" role="alert">{editError}</div>}
-
-          {editingSectionParent && (
-            <div className="catalog-context-band">
-              Lịch tổng của đợt: <strong>{formatRange(
-                editingSectionParent.startTime,
-                editingSectionParent.endTime
-              )}</strong>. Lịch lớp phải nằm trọn trong khoảng này.
-            </div>
-          )}
-
-          <div className="catalog-form-grid catalog-form-grid--2">
-            <div className="form-group">
-              <label htmlFor="edit-survey-start">Thời gian mở</label>
-              <input
-                id="edit-survey-start"
-                type="datetime-local"
-                value={editSchedule.startTime}
-                min={editingSectionParent ? toLocalInput(editingSectionParent.startTime) : undefined}
-                max={editingSectionParent ? toLocalInput(editingSectionParent.endTime) : undefined}
-                onChange={(event) =>
-                  setEditSchedule((prev) => ({ ...prev, startTime: event.target.value }))
-                }
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="edit-survey-end">Thời gian đóng</label>
-              <input
-                id="edit-survey-end"
-                type="datetime-local"
-                value={editSchedule.endTime}
-                min={editingSectionParent ? toLocalInput(editingSectionParent.startTime) : undefined}
-                max={editingSectionParent ? toLocalInput(editingSectionParent.endTime) : undefined}
-                onChange={(event) =>
-                  setEditSchedule((prev) => ({ ...prev, endTime: event.target.value }))
-                }
-                required
-              />
-            </div>
-          </div>
-
-          <div className="modal-footer catalog-form-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setEditingSection(null)}
-              disabled={savingSchedule}
-            >
-              Hủy
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={savingSchedule}>
-              {savingSchedule ? (
-                <LoaderCircle className="auth-spin" aria-hidden="true" size={16} />
-              ) : (
-                <Save aria-hidden="true" size={16} />
-              )}
-              Lưu lịch
             </button>
           </div>
         </form>

@@ -40,7 +40,7 @@ export const WeakestQuestionsPanel: React.FC<WeakestQuestionsPanelProps> = ({
   return (
     <div className="reports-weakest">
       <p className="reports-weakest-hint">
-        Gộp từ <strong>{formatNumber(validResponseCount)}</strong> phiếu hợp lệ của các lớp
+        Gộp từ {formatNumber(validResponseCount)} phiếu hợp lệ của các lớp
         đủ điều kiện tính điểm ·{' '}
         {lowestFirst
           ? 'xếp từ tiêu chí bị chấm thấp nhất'

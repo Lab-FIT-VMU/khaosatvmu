@@ -1419,67 +1419,6 @@ public sealed class EfSurveyService(
                 .ToList()));
     }
 
-    public async Task<SurveyOperationResult<CourseSectionSurveyDto>> UpdateCourseSectionSurveyScheduleAsync(
-        int courseSectionSurveyId,
-        SaveSurveyScheduleCommand command,
-        CancellationToken cancellationToken = default)
-    {
-        // Lịch từng lớp là cấu hình của đợt khảo sát, chỉ quản trị được thay đổi.
-        var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.CanManageSurveyCampaigns)
-        {
-            return Failed<CourseSectionSurveyDto>(SurveyErrorCodes.OutOfScope);
-        }
-
-        var sectionSurvey = await db.CourseSectionSurveys
-            .FirstOrDefaultAsync(x => x.CourseSectionSurveyId == courseSectionSurveyId, cancellationToken);
-        if (sectionSurvey is null)
-        {
-            return Failed<CourseSectionSurveyDto>(SurveyErrorCodes.SectionSurveyNotFound);
-        }
-
-        var startTime = ToUtc(command.StartTime);
-        var endTime = ToUtc(command.EndTime);
-        if (endTime <= startTime)
-        {
-            return Failed<CourseSectionSurveyDto>(SurveyErrorCodes.ScheduleInvalid);
-        }
-
-        await using var transaction = db.Database.CurrentTransaction is null
-            ? await db.Database.BeginTransactionAsync(
-                System.Data.IsolationLevel.Serializable,
-                cancellationToken)
-            : null;
-
-        var semesterSurvey = await FindSemesterSurveyForUpdateAsync(
-            sectionSurvey.SemesterSurveyId,
-            cancellationToken);
-        if (semesterSurvey is null)
-        {
-            return Failed<CourseSectionSurveyDto>(SurveyErrorCodes.SemesterSurveyNotFound);
-        }
-        if (startTime < semesterSurvey.StartTime || endTime > semesterSurvey.EndTime)
-        {
-            return Failed<CourseSectionSurveyDto>(
-                SurveyErrorCodes.SectionScheduleOutsideSemesterSurvey);
-        }
-
-        sectionSurvey.StartTime = startTime;
-        sectionSurvey.EndTime = endTime;
-        await db.SaveChangesAsync(cancellationToken);
-        if (transaction is not null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-        }
-        cache.Remove($"survey:public:{sectionSurvey.LinkToken}");
-
-        var updated = (await GetCourseSectionSurveysAsync(sectionSurvey.SemesterSurveyId, cancellationToken))
-            .FirstOrDefault(x => x.CourseSectionSurveyId == courseSectionSurveyId);
-        return updated is null
-            ? Failed<CourseSectionSurveyDto>(SurveyErrorCodes.SectionSurveyNotFound)
-            : Succeeded(updated);
-    }
-
     /// <summary>
     /// Khóa dòng đợt trong transaction để thao tác sửa lịch tổng, sửa lịch lớp và thêm lớp không
     /// thể chạy xuyên qua nhau rồi cùng vượt qua bước kiểm tra bằng dữ liệu cũ.

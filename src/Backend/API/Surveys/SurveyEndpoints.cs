@@ -252,17 +252,6 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSurveyResponseAsync(responseId, cancellationToken)));
 
-        campaignGroup.MapPut("/course-section-surveys/{courseSectionSurveyId:int}/schedule", async (
-            int courseSectionSurveyId,
-            SaveSurveyScheduleRequest request,
-            ISurveyService service,
-            CancellationToken cancellationToken) =>
-            ToResult(await service.UpdateCourseSectionSurveyScheduleAsync(
-                courseSectionSurveyId,
-                new SaveSurveyScheduleCommand(request.StartTime, request.EndTime),
-                cancellationToken)))
-            .AddEndpointFilter<RequireAntiforgeryFilter>();
-
         // ------------------------------------------------------- Thống kê điểm
 
         surveyStatisticsGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/statistics", async (

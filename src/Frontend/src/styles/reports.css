@@ -1510,7 +1510,7 @@
   gap: 7px;
   min-width: 0;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: #000000;
   white-space: nowrap;
 }
@@ -1526,8 +1526,10 @@
   flex: 0 0 16px;
 }
 
+/* Con số lấy đúng cỡ chữ của nhãn và phần đuôi trong cùng một ô — ba mảnh chữ đứng
+   liền nhau mà ba cỡ khác nhau thì dòng số liệu nhấp nhô. Phân cấp bằng nét đậm. */
 .reports-exec-stat strong {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 700;
   color: #000000;
   line-height: 1.2;
@@ -1535,7 +1537,7 @@
 
 .reports-exec-stat small {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: #000000;
 }
 

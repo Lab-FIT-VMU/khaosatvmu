@@ -995,12 +995,7 @@ public interface ISurveyService
         int responseId,
         CancellationToken cancellationToken = default);
 
-    Task<SurveyOperationResult<CourseSectionSurveyDto>> UpdateCourseSectionSurveyScheduleAsync(
-        int courseSectionSurveyId,
-        SaveSurveyScheduleCommand command,
-        CancellationToken cancellationToken = default);
 
-    /// <summary>Đọc phiếu khảo sát theo LinkToken, không cần đăng nhập.</summary>
     Task<SurveyOperationResult<PublicSurveyDto>> GetPublicSurveyAsync(
         string linkToken,
         CancellationToken cancellationToken = default);

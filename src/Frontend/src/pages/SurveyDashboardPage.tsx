@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, CircleAlert, LoaderCircle, RefreshCw } from 'lucide-react';
+import { Check, ChevronDown, CircleAlert, LoaderCircle } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -388,15 +388,6 @@ export const SurveyDashboardPage: React.FC = () => {
               }}
             />
           )}
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => void loadData()}
-            disabled={!semesterSurveyId || loading}
-          >
-            <RefreshCw aria-hidden="true" size={16} />
-            Tải lại
-          </button>
         </div>
       </section>
 

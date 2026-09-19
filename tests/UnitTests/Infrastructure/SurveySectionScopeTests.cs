@@ -520,50 +520,6 @@ public class SurveySectionScopeTests
     }
 
     [Fact]
-    public async Task UpdateSectionSchedule_WhenOutsideSemesterSurvey_ShouldBeRejected()
-    {
-        await RunInRollbackAsync(async (db, serviceFor) =>
-        {
-            var seeded = await SeedDepartmentScopedSurveyAsync(db, 1);
-            if (seeded is null) return;
-
-            var survey = await db.SemesterSurveys.SingleAsync(
-                x => x.SemesterSurveyId == seeded.Value.SemesterSurveyId);
-            var section = await db.CourseSectionSurveys.FirstAsync(
-                x => x.SemesterSurveyId == survey.SemesterSurveyId);
-            var result = await serviceFor(Admin).UpdateCourseSectionSurveyScheduleAsync(
-                section.CourseSectionSurveyId,
-                new SaveSurveyScheduleCommand(
-                    survey.StartTime.AddMinutes(-1),
-                    survey.EndTime));
-
-            result.Succeeded.Should().BeFalse();
-            result.ErrorCode.Should().Be(
-                SurveyErrorCodes.SectionScheduleOutsideSemesterSurvey);
-        });
-    }
-
-    [Fact]
-    public async Task UpdateSectionSchedule_ByDepartmentManager_ShouldBeRejected()
-    {
-        await RunInRollbackAsync(async (db, serviceFor) =>
-        {
-            var seeded = await SeedDepartmentScopedSurveyAsync(db, 1);
-            if (seeded is null) return;
-            var section = await db.CourseSectionSurveys.FirstAsync(
-                x => x.SemesterSurveyId == seeded.Value.SemesterSurveyId);
-
-            var result = await serviceFor(ManagerOf(seeded.Value.Slice.DepartmentId))
-                .UpdateCourseSectionSurveyScheduleAsync(
-                    section.CourseSectionSurveyId,
-                    new SaveSurveyScheduleCommand(section.StartTime, section.EndTime));
-
-            result.Succeeded.Should().BeFalse();
-            result.ErrorCode.Should().Be(SurveyErrorCodes.OutOfScope);
-        });
-    }
-
-    [Fact]
     public async Task AddSections_WhenScheduleIsOutsideSemesterSurvey_ShouldBeRejected()
     {
         await RunInRollbackAsync(async (db, serviceFor) =>

@@ -769,16 +769,6 @@ export const surveyApi = {
       `/api/surveys/course-section-surveys/${courseSectionSurveyId}/clear-responses`,
       'POST',
     ),
-
-  updateSectionSurveySchedule: (
-    courseSectionSurveyId: number,
-    schedule: { startTime: string; endTime: string },
-  ) =>
-    csrfRequest<CourseSectionSurvey>(
-      `/api/surveys/course-section-surveys/${courseSectionSurveyId}/schedule`,
-      'PUT',
-      schedule,
-    ),
 };
 
 /** Phiếu của sinh viên: mở bằng link hoặc QR nên không cần đăng nhập. */

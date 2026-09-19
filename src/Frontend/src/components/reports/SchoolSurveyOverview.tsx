@@ -332,7 +332,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
               className="reports-exec-stat"
               title="Phiếu hợp lệ của những lớp không qua vòng lọc, không góp vào điểm"
             >
-              Phiếu bị loại khỏi điểm
+              Phiếu bị loại khỏi tính điểm
               <strong>
                 {formatNumber(Math.max(0, data.totalResponses - data.scoredValidResponseCount))}
               </strong>
