@@ -1934,3 +1934,44 @@ textarea:focus-visible {
     flex: 1;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Chữ đậm toàn hệ thống.
+
+   Yêu cầu: mọi chữ của phần quản trị in đậm cho dễ đọc, trừ bảng dữ liệu và ô
+   người dùng gõ vào. Chỗ nào vốn đã đậm sẵn thì không đậm thêm được nữa, nên
+   phân biệt bằng màu nóng.
+
+   Đặt ở .app-container nên trang đăng nhập và trang làm phiếu khảo sát của sinh
+   viên (không nằm trong khung này) giữ nguyên như cũ.
+   --------------------------------------------------------------------------- */
+.app-container {
+  font-weight: 700;
+}
+
+/* Bảng dữ liệu giữ chữ thường: đậm cả bảng thì không còn chỗ nào nhấn được nữa. */
+.app-container table {
+  font-weight: 400;
+}
+
+/* Chữ trong ô nhập là chữ người dùng gõ, không phải nhãn giao diện. */
+.app-container input,
+.app-container textarea {
+  font-weight: 400;
+}
+
+/* Chỗ đã đậm sẵn: đổi màu để vẫn tách khỏi phần chữ đậm xung quanh. */
+.app-container strong,
+.app-container b {
+  color: #b45309;
+}
+
+/* Trừ trong bảng và trong nút — hai chỗ này đã có tông màu riêng của chúng. */
+.app-container table strong,
+.app-container table b,
+.app-container button strong,
+.app-container button b,
+.app-container .btn strong,
+.app-container .btn b {
+  color: inherit;
+}

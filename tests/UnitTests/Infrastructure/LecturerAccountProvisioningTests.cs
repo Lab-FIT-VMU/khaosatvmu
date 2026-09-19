@@ -11,9 +11,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 /// <summary>
-/// Kiểm chứng luật của nhóm G: thêm giảng viên thì sinh luôn một tài khoản đăng nhập
-/// gắn qua <c>Users.LecturerId</c>, nhưng KHÔNG sinh <c>UserProfiles</c> nên chưa ai
-/// vào được hệ thống cho tới khi admin cấp quyền.
+/// Kiểm chứng thêm giảng viên thì sinh luôn tài khoản và hồ sơ Giảng viên. Người có
+/// chức vụ Trưởng/Phó Trưởng bộ môn được sinh thêm hồ sơ Trưởng bộ môn.
 ///
 /// Các test này chạy trên cơ sở dữ liệu thật vì phần cần kiểm nằm ở tầng EF và ở
 /// interceptor xoá mềm — dùng provider giả thì không kiểm được gì. Mỗi test bọc trong
@@ -72,7 +71,7 @@ public class LecturerAccountProvisioningTests
         new($"Kiem Thu {Guid.NewGuid():N}"[..24], null, null, email, null, null);
 
     [Fact]
-    public async Task CreateLecturer_ShouldCreateLinkedAccount_WithoutAnyProfile()
+    public async Task CreateLecturer_ShouldCreateLinkedAccount_WithDefaultLecturerProfile()
     {
         await RunInRollbackAsync(async (db, service) =>
         {
@@ -89,8 +88,93 @@ public class LecturerAccountProvisioningTests
             user.IsActive.Should().BeTrue();
             user.GoogleSubject.Should().BeNull("tài khoản chưa đăng nhập lần nào");
 
-            var profileCount = await db.UserProfiles.CountAsync(x => x.UserId == user.Id);
-            profileCount.Should().Be(0, "cấp quyền là việc riêng của admin, xem G1-b");
+            var profile = await (
+                from item in db.UserProfiles
+                join role in db.Roles on item.RoleId equals role.Id
+                where item.UserId == user.Id
+                select new { item.ProfileName, item.ProfileCode, item.IsActive, item.IsDefault, role.Code })
+                .SingleAsync();
+            profile.Code.Should().Be(RoleCodes.Lecturer);
+            profile.ProfileName.Should().Be("Giảng viên");
+            profile.ProfileCode.Should().EndWith("GV");
+            profile.IsActive.Should().BeTrue();
+            profile.IsDefault.Should().BeTrue();
+        });
+    }
+
+    [Theory]
+    [InlineData("Trưởng Bộ môn")]
+    [InlineData("Phó Trưởng Bộ môn")]
+    public async Task CreateLecturer_WithDepartmentLeadershipPosition_ShouldCreateManagerProfile(
+        string positionName)
+    {
+        await RunInRollbackAsync(async (db, service) =>
+        {
+            var positionId = await db.Positions
+                .Where(x => x.PositionName == positionName)
+                .Select(x => x.PositionId)
+                .SingleAsync();
+            var command = NewLecturer($"quanly-{Guid.NewGuid():N}@vimaru.edu.vn") with
+            {
+                PositionId = positionId,
+            };
+
+            var result = await service.CreateLecturerAsync(command);
+
+            result.Succeeded.Should().BeTrue();
+            var userId = await db.Users
+                .Where(x => x.LecturerId == result.Value!.LecturerId)
+                .Select(x => x.Id)
+                .SingleAsync();
+            var profiles = await (
+                from profile in db.UserProfiles
+                join role in db.Roles on profile.RoleId equals role.Id
+                where profile.UserId == userId
+                select new { role.Code, profile.IsDefault, profile.ProfileCode })
+                .ToListAsync();
+
+            profiles.Select(x => x.Code).Should().BeEquivalentTo(
+                RoleCodes.Lecturer,
+                RoleCodes.DepartmentManager);
+            profiles.Single(x => x.Code == RoleCodes.Lecturer).IsDefault.Should().BeTrue();
+            profiles.Single(x => x.Code == RoleCodes.DepartmentManager).IsDefault.Should().BeFalse();
+            profiles.Single(x => x.Code == RoleCodes.DepartmentManager).ProfileCode.Should().EndWith("BM");
+        });
+    }
+
+    [Fact]
+    public async Task ImportLecturers_ShouldCreateProfilesForEveryImportedLecturer()
+    {
+        await RunInRollbackAsync(async (db, service) =>
+        {
+            var lecturerEmail = $"import-gv-{Guid.NewGuid():N}@vimaru.edu.vn";
+            var managerEmail = $"import-bm-{Guid.NewGuid():N}@vimaru.edu.vn";
+            var rows = new[]
+            {
+                new ImportLecturerRowCommand(2, "Giảng viên import", lecturerEmail, null, null, null, "Giảng viên"),
+                new ImportLecturerRowCommand(3, "Quản lý import", managerEmail, null, null, null, "Phó Trưởng Bộ môn"),
+            };
+
+            var result = await service.ImportLecturersAsync(rows);
+
+            result.Succeeded.Should().BeTrue();
+            result.Value!.CreatedCount.Should().Be(2);
+            var assignedRoles = await (
+                from user in db.Users
+                join profile in db.UserProfiles on user.Id equals profile.UserId
+                join role in db.Roles on profile.RoleId equals role.Id
+                where user.Email == lecturerEmail || user.Email == managerEmail
+                select new { user.Email, role.Code, profile.IsDefault })
+                .ToListAsync();
+
+            assignedRoles.Where(x => x.Email == lecturerEmail)
+                .Select(x => x.Code)
+                .Should().Equal(RoleCodes.Lecturer);
+            assignedRoles.Where(x => x.Email == managerEmail)
+                .Select(x => x.Code)
+                .Should().BeEquivalentTo(RoleCodes.Lecturer, RoleCodes.DepartmentManager);
+            assignedRoles.Single(x => x.Email == managerEmail && x.Code == RoleCodes.Lecturer)
+                .IsDefault.Should().BeTrue();
         });
     }
 

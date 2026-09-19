@@ -141,7 +141,21 @@ public sealed record NormalizationGroupDto(
     /// sẽ dồn mọi khoa về sát 0 và cột này thành vô dụng.
     /// Null khi độ lệch chuẩn toàn trường bằng 0 hoặc không xác định.
     /// </summary>
-    decimal? MeanZScore);
+    decimal? MeanZScore,
+    /// <summary>Số giảng viên khác nhau đứng lớp trong khoa.</summary>
+    int LecturerCount,
+    /// <summary>Tổng sĩ số các lớp của khoa — mẫu số của tỷ lệ phản hồi.</summary>
+    int TotalClassSize,
+    /// <summary>Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại.</summary>
+    int ResponseCount,
+    /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
+    int ValidResponseCount,
+    /// <summary>Phiếu thu về chia tổng sĩ số, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
+    decimal ValidResponseRate,
+    /// <summary>Số lớp của khoa ở mức cảnh báo: điểm ≤ mốc Z-Score −1 của toàn đợt.</summary>
+    int WarningSectionCount);
 
 /// <summary>Một lớp trong bảng chi tiết của sheet chuẩn hoá điểm.</summary>
 public sealed record NormalizedSectionDto(
@@ -161,7 +175,22 @@ public sealed record NormalizedSectionDto(
     /// <summary>Z trong khoa trừ Z toàn trường. Lệch nhiều nghĩa là chuẩn hoá đổi kết luận.</summary>
     decimal? ZDifference,
     /// <summary>Mã trong <see cref="NormalizationVerdicts"/>.</summary>
-    string Verdict);
+    string Verdict,
+    /// <summary>Tổng phiếu thu về của lớp, kể cả phiếu bị bộ lọc nhiễu loại.</summary>
+    int ResponseCount,
+    /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
+    int ValidResponseCount,
+    /// <summary>Phiếu thu về chia sĩ số lớp, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
+    decimal ValidResponseRate);
+
+/// <summary>Một mục của bộ câu hỏi trong ô chọn tính điểm theo mục.</summary>
+public sealed record NormalizationQuestionSectionDto(
+    int SectionId,
+    string SectionName,
+    /// <summary>Số câu được chấm điểm của mục: không đếm câu bẫy và câu tự nhập.</summary>
+    int QuestionCount);
 
 /// <summary>Toàn bộ sheet chuẩn hoá điểm của một đợt khảo sát.</summary>
 public sealed record SemesterSurveyNormalizationDto(
@@ -174,7 +203,14 @@ public sealed record SemesterSurveyNormalizationDto(
     decimal SchoolAverageScore,
     decimal? SchoolStandardDeviation,
     IReadOnlyList<NormalizationGroupDto> Groups,
-    IReadOnlyList<NormalizedSectionDto> Sections);
+    IReadOnlyList<NormalizedSectionDto> Sections,
+    /// <summary>Các mục của bộ câu hỏi của đợt, theo thứ tự trên phiếu — để giao diện dựng ô chọn.</summary>
+    IReadOnlyList<NormalizationQuestionSectionDto> QuestionSections,
+    /// <summary>
+    /// Mục đang dùng để tính điểm và Z-Score; null là toàn bộ bài khảo sát. Khi có
+    /// mục, điểm của mỗi lớp chỉ gộp các câu thuộc mục đó.
+    /// </summary>
+    int? QuestionSectionId);
 
 // --------------------------------------- Sheet 3: tổng hợp theo bộ môn
 
@@ -186,18 +222,32 @@ public sealed record DepartmentSummaryRowDto(
     string DepartmentName,
     int SectionCount,
     int LecturerCount,
-    /// <summary>Tổng sĩ số các lớp của bộ môn — mẫu số của tỷ lệ phiếu hợp lệ.</summary>
+    /// <summary>Tổng sĩ số các lớp của bộ môn — mẫu số của tỷ lệ phản hồi.</summary>
     int TotalClassSize,
     /// <summary>Tổng số phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại.</summary>
     int ResponseCount,
     /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
     int ValidResponseCount,
-    /// <summary>Phiếu hợp lệ chia tổng sĩ số, tính theo phần trăm.</summary>
+    /// <summary>Phiếu thu về chia tổng sĩ số, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
     decimal ValidResponseRate,
     /// <summary>Điểm tổng hợp, chỉ gộp phiếu hợp lệ. Null khi chưa có phiếu nào.</summary>
     decimal? AverageScore,
     /// <summary>Số lớp có điểm ở mức cảnh báo: Z-Score ≤ −1 so với mặt bằng toàn đợt.</summary>
-    int WarningSectionCount);
+    int WarningSectionCount,
+    /// <summary>Độ lệch chuẩn điểm các lớp trong bộ môn; null khi bộ môn có ít hơn hai lớp.</summary>
+    decimal? StandardDeviation,
+    /// <summary>
+    /// Mặt bằng bộ môn lệch mặt bằng toàn trường bao nhiêu lần sai số chuẩn σ/√n —
+    /// cùng công thức với MeanZScore của khoa, để hai tab đọc ngang được nhau.
+    /// </summary>
+    decimal? MeanZScore,
+    /// <summary>
+    /// Mặt bằng bộ môn lệch mặt bằng khoa của nó bao nhiêu lần sai số chuẩn σ/√n.
+    /// Null khi khoa quá ít lớp để chuẩn hoá hoặc mọi lớp của khoa cùng điểm.
+    /// </summary>
+    decimal? FacultyMeanZScore);
 
 public sealed record SemesterSurveyDepartmentSummaryDto(
     int SemesterSurveyId,
@@ -236,7 +286,28 @@ public sealed record CourseDiagnosisRowDto(
     decimal? WeakestQuestionScore,
     string? WeakestQuestionText,
     /// <summary>Mã trong <see cref="CourseDiagnosisVerdicts"/>.</summary>
-    string Verdict);
+    string Verdict,
+    /// <summary>Tổng sĩ số các lớp của học phần — mẫu số của tỷ lệ phản hồi.</summary>
+    int TotalClassSize,
+    /// <summary>Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại.</summary>
+    int ResponseCount,
+    /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
+    int ValidResponseCount,
+    /// <summary>Phiếu thu về chia tổng sĩ số, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
+    decimal ValidResponseRate,
+    /// <summary>
+    /// Mặt bằng học phần lệch mặt bằng toàn trường bao nhiêu lần sai số chuẩn σ/√n.
+    /// </summary>
+    decimal? MeanZScore,
+    /// <summary>Số lớp của học phần ở mức cảnh báo: điểm ≤ mốc Z-Score −1 của toàn đợt.</summary>
+    int WarningSectionCount,
+    /// <summary>
+    /// Mặt bằng học phần lệch mặt bằng khoa của nó bao nhiêu lần sai số chuẩn σ/√n.
+    /// Null khi khoa quá ít lớp để chuẩn hoá hoặc mọi lớp của khoa cùng điểm.
+    /// </summary>
+    decimal? FacultyMeanZScore);
 
 public sealed record SemesterSurveyCourseDiagnosisDto(
     int SemesterSurveyId,
@@ -251,6 +322,7 @@ public sealed record ScopeAnalysisOptionDto(
     int Count,
     decimal Percentage);
 
+/// <summary>Một câu hỏi trong bảng phân tích của một phạm vi.</summary>
 public sealed record ScopeAnalysisQuestionDto(
     int QuestionId,
     int QuestionOrder,
@@ -295,6 +367,9 @@ public sealed record LecturerOptionDto(
     int TotalClassSize,
     int ResponseCount,
     int ValidResponseCount,
+    /// <summary>Phiếu thu về chia tổng sĩ số, tính theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, tính theo phần trăm.</summary>
     decimal ValidResponseRate,
     decimal? AverageScore,
     decimal? MinScore,
@@ -312,7 +387,9 @@ public sealed record LecturerSectionDto(
     int ResponseCount,
     /// <summary>Số phiếu qua được bộ lọc nhiễu.</summary>
     int ValidResponseCount,
-    /// <summary>Phiếu hợp lệ chia sĩ số, theo phần trăm.</summary>
+    /// <summary>Phiếu thu về chia sĩ số, theo phần trăm.</summary>
+    decimal ResponseRate,
+    /// <summary>Phiếu hợp lệ chia phiếu thu về, theo phần trăm.</summary>
     decimal ValidResponseRate,
     decimal AverageScore,
     /// <summary>
@@ -464,7 +541,9 @@ public sealed record SectionStatisticsRowDto(
     /// Điểm từng câu, theo đúng thứ tự cột C của bảng. Cũng là ảnh chụp của lần
     /// bấm tính gần nhất: câu chưa được chốt có <c>AnswerCount = 0</c>.
     /// </summary>
-    IReadOnlyList<SectionQuestionScoreDto> QuestionScores);
+    IReadOnlyList<SectionQuestionScoreDto> QuestionScores,
+    /// <summary>Khoa/viện suy từ bộ môn của dòng; rỗng khi bộ môn chưa thuộc khoa nào.</summary>
+    string FacultyName = "");
 
 /// <summary>Một cột C của bảng thống kê, sinh theo bộ câu hỏi của đợt.</summary>
 public sealed record StatisticsQuestionColumnDto(int QuestionId, int Order, string QuestionText);
@@ -725,10 +804,10 @@ public sealed record SurveyOperationResult<T>(bool Succeeded, string? ErrorCode,
 public static class SurveyRules
 {
     /// <summary>
-    /// Số mục tối đa của một bộ câu hỏi. Số câu thì không giới hạn — bộ dài bao
-    /// nhiêu là việc của người soạn phiếu.
+    /// Số mục tối đa của một bộ câu hỏi; tên mục đặt tuỳ ý. Số câu thì không giới hạn
+    /// — bộ dài bao nhiêu là việc của người soạn phiếu.
     /// </summary>
-    public const int MaximumSectionsPerTemplate = 10;
+    public const int MaximumSectionsPerTemplate = 3;
 
     /// <summary>Số mức tối đa của một thang: "AnswerScaleOptions"."Value" CHECK 1..5.</summary>
     public const int MaximumAnswerScaleOptions = 5;
@@ -865,7 +944,8 @@ public interface ISurveyService
     /// </summary>
     Task<SurveyOperationResult<SemesterSurveyNormalizationDto>> GetSemesterSurveyNormalizationAsync(
         int semesterSurveyId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? questionSectionId = null);
 
     /// <summary>Tổng hợp theo bộ môn của một đợt khảo sát, phục vụ trưởng khoa.</summary>
     Task<SurveyOperationResult<SemesterSurveyDepartmentSummaryDto>> GetSemesterSurveyDepartmentSummaryAsync(
@@ -1010,6 +1090,15 @@ public static class SurveyErrorCodes
 
     /// <summary>Đợt không có lớp nào trong phạm vi người dùng, không có gì để xuất.</summary>
     public const string SemesterSurveyHasNoSections = "SURVEY_SEMESTER_SURVEY_HAS_NO_SECTIONS";
+
+    /// <summary>Chưa hết thời gian thu phiếu nên chưa phát hành kết quả được.</summary>
+    public const string SurveyNotEnded = "SURVEY_NOT_ENDED";
+
+    /// <summary>
+    /// Kết quả của đợt chưa được quản trị phát hành. Trưởng bộ môn và giảng viên nhận
+    /// mã này thay vì số liệu; endpoint trả 403.
+    /// </summary>
+    public const string ResultsNotPublished = "SURVEY_RESULTS_NOT_PUBLISHED";
     /// <summary>Tên đợt để trống hoặc chỉ có khoảng trắng.</summary>
     public const string SemesterSurveyNameRequired = "SURVEY_SEMESTER_SURVEY_NAME_REQUIRED";
     /// <summary>Kiểu phạm vi không nằm trong <see cref="SurveyScopeTypes"/>.</summary>

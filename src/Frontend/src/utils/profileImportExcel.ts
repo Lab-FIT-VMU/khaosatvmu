@@ -13,7 +13,7 @@ const maximumFileSize = 5 * 1024 * 1024;
  * này ở cả bảng tra trong tệp mẫu lẫn phần kiểm tra khi đọc tệp.
  */
 export const profileRoleOptions: { roleCode: string; label: string }[] = [
-  { roleCode: 'ADMIN', label: 'Admin hệ thống' },
+  { roleCode: 'ADMIN', label: 'Quản trị hệ thống' },
   { roleCode: 'DEPARTMENT_MANAGER', label: 'Trưởng bộ môn' },
   { roleCode: 'LECTURER', label: 'Giảng viên' },
   { roleCode: 'SURVEY_ADMIN', label: 'Quản trị khảo sát' },

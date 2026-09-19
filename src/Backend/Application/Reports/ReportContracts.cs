@@ -1,3 +1,5 @@
+using Application.Surveys;
+
 namespace Application.Reports;
 
 /// <summary>Chi tiết tiến độ thu phiếu của một lớp học phần.</summary>
@@ -163,7 +165,13 @@ public sealed record SurveyResultDetailDto(
     int InvalidResponseCount,
     /// <summary>Tính trên phiếu hợp lệ so với sĩ số.</summary>
     decimal CompletionRate,
-    decimal AverageScore);
+    decimal AverageScore,
+    /// <summary>
+    /// Tên đọc từ tệp import khi lớp chưa gắn được mã giảng viên (<paramref name="LecturerId"/>
+    /// bằng 0). Có tên thì giao diện mở được trang giảng viên theo tên; null là lớp chưa
+    /// có người dạy hoặc đã gắn mã.
+    /// </summary>
+    string? UnidentifiedLecturerName = null);
 
 /// <summary>Một nhóm điểm trong phân bố điểm toàn trường (theo điểm TB từng phiếu).</summary>
 public sealed record ScoreBandDto(
@@ -285,6 +293,17 @@ public interface IReportService
     /// <summary>Lấy báo cáo đánh giá chi tiết cho 1 giảng viên.</summary>
     Task<LecturerPerformanceReportDto?> GetLecturerPerformanceReportAsync(
         int lecturerId,
+        int? semesterId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Trang giảng viên của người chưa gắn được mã: tra theo tên đọc từ tệp import, chỉ
+    /// lấy lớp thuộc khoa/viện <paramref name="facultyId"/> (null hoặc 0 là lớp chưa thuộc
+    /// khoa nào). Null khi không có lớp nào khớp.
+    /// </summary>
+    Task<LecturerPerformanceReportDto?> GetUnidentifiedLecturerReportAsync(
+        string lecturerName,
+        int? facultyId,
         int? semesterId,
         CancellationToken cancellationToken = default);
 

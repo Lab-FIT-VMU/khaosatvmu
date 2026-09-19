@@ -73,6 +73,17 @@ export interface NormalizationGroup {
    * Không phải bao nhiêu lần σ — đây là trung bình của n lớp, không phải một lớp.
    */
   meanZScore: number | null;
+  lecturerCount: number;
+  /** Tổng sĩ số các lớp của khoa — mẫu số của tỷ lệ phản hồi. */
+  totalClassSize: number;
+  /** Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại. */
+  responseCount: number;
+  validResponseCount: number;
+  /** Phiếu thu về chia tổng sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
+  validResponseRate: number;
+  warningSectionCount: number;
 }
 
 export interface NormalizedSection {
@@ -90,6 +101,21 @@ export interface NormalizedSection {
   zDifference: number | null;
   /** Mã diễn giải, xem normalizationVerdictLabels. */
   verdict: string;
+  /** Tổng phiếu thu về của lớp, kể cả phiếu bị bộ lọc nhiễu loại. */
+  responseCount: number;
+  validResponseCount: number;
+  /** Phiếu thu về chia sĩ số lớp, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
+  validResponseRate: number;
+}
+
+/** Một mục của bộ câu hỏi trong ô chọn tính điểm theo mục. */
+export interface NormalizationQuestionSection {
+  sectionId: number;
+  sectionName: string;
+  /** Số câu được chấm điểm của mục: không đếm câu bẫy và câu tự nhập. */
+  questionCount: number;
 }
 
 export interface SemesterSurveyNormalization {
@@ -102,6 +128,10 @@ export interface SemesterSurveyNormalization {
   schoolStandardDeviation: number | null;
   groups: NormalizationGroup[];
   sections: NormalizedSection[];
+  /** Các mục của bộ câu hỏi của đợt, theo thứ tự trên phiếu. */
+  questionSections: NormalizationQuestionSection[];
+  /** Mục đang dùng để tính điểm và Z-Score; null là toàn bộ bài khảo sát. */
+  questionSectionId: number | null;
 }
 
 /** Nhãn tiếng Việt cho mã diễn giải, để không phơi mã ra màn hình. */
@@ -121,15 +151,23 @@ export interface DepartmentSummaryRow {
   departmentName: string;
   sectionCount: number;
   lecturerCount: number;
-  /** Tổng sĩ số các lớp của bộ môn — mẫu số của tỷ lệ phiếu hợp lệ. */
+  /** Tổng sĩ số các lớp của bộ môn — mẫu số của tỷ lệ phản hồi. */
   totalClassSize: number;
   /** Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại. */
   responseCount: number;
   validResponseCount: number;
-  /** Phiếu hợp lệ chia tổng sĩ số, theo phần trăm. */
+  /** Phiếu thu về chia tổng sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
   validResponseRate: number;
   averageScore: number | null;
   warningSectionCount: number;
+  /** Null khi bộ môn có ít hơn hai lớp. */
+  standardDeviation: number | null;
+  /** Mặt bằng bộ môn lệch mặt bằng toàn trường bao nhiêu lần sai số chuẩn σ/√n. */
+  meanZScore: number | null;
+  /** Mặt bằng bộ môn lệch mặt bằng khoa bao nhiêu lần sai số chuẩn σ/√n; null khi khoa quá ít lớp. */
+  facultyMeanZScore: number | null;
 }
 
 export interface SemesterSurveyDepartmentSummary {
@@ -166,6 +204,20 @@ export interface CourseDiagnosisRow {
   weakestQuestionText: string | null;
   /** Mã kết luận, xem courseDiagnosisLabels. */
   verdict: string;
+  /** Tổng sĩ số các lớp của học phần — mẫu số của tỷ lệ phản hồi. */
+  totalClassSize: number;
+  /** Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại. */
+  responseCount: number;
+  validResponseCount: number;
+  /** Phiếu thu về chia tổng sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
+  validResponseRate: number;
+  /** Mặt bằng học phần lệch mặt bằng toàn trường bao nhiêu lần sai số chuẩn σ/√n. */
+  meanZScore: number | null;
+  warningSectionCount: number;
+  /** Mặt bằng học phần lệch mặt bằng khoa bao nhiêu lần sai số chuẩn σ/√n; null khi khoa quá ít lớp. */
+  facultyMeanZScore: number | null;
 }
 
 export interface SemesterSurveyCourseDiagnosis {
@@ -252,6 +304,9 @@ export interface LecturerOption {
   totalClassSize: number;
   responseCount: number;
   validResponseCount: number;
+  /** Phiếu thu về chia tổng sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
   validResponseRate: number;
   averageScore: number | null;
   minScore: number | null;
@@ -268,7 +323,9 @@ export interface LecturerSection {
   /** Tổng phiếu thu về, kể cả phiếu bị bộ lọc nhiễu loại. */
   responseCount: number;
   validResponseCount: number;
-  /** Phiếu hợp lệ chia sĩ số, theo phần trăm. */
+  /** Phiếu thu về chia sĩ số, theo phần trăm. */
+  responseRate: number;
+  /** Phiếu hợp lệ chia phiếu thu về, theo phần trăm. */
   validResponseRate: number;
   averageScore: number;
   /** Trung bình mọi lớp cùng học phần, kể cả lớp người khác dạy. Null khi chỉ có một lớp. */
@@ -307,6 +364,40 @@ export interface DashboardFacultyScore {
   facultyName: string;
   sectionCount: number;
   averageScore: number;
+}
+
+/**
+ * Trạng thái phát hành kết quả của một đợt. Chưa phát hành thì trưởng bộ môn và
+ * giảng viên không xem được số liệu của đợt, kể cả khi đã mở quyền vào module.
+ */
+export interface SurveyPublication {
+  semesterSurveyId: number;
+  isPublished: boolean;
+  /** Lần phát hành / thu hồi gần nhất; null khi chưa từng bấm. */
+  changedAt: string | null;
+  changedByName: string;
+  /** Đã qua thời gian thu phiếu — điều kiện để bấm phát hành. */
+  hasEnded: boolean;
+}
+
+/** Một lần đổi cấu hình tính điểm hoặc cập nhật điểm, kèm nguyên bộ cấu hình lúc đó. */
+export interface ScoringChange {
+  id: number;
+  /** CONFIG_UPDATED hoặc SCORES_RECALCULATED. */
+  kind: string;
+  semesterSurveyId: number | null;
+  semesterSurveyName: string | null;
+  minimumResponseRate: number;
+  minimumValidRate: number;
+  changedByName: string;
+  changedAt: string;
+}
+
+export interface ScoringChangeFeed {
+  /** Mốc mới nhất, kể cả sự kiện của chính người đang xem. */
+  latestId: number;
+  /** Cũ trước mới sau; không gồm sự kiện của chính người đang xem. */
+  items: ScoringChange[];
 }
 
 export interface SemesterSurveyDashboard {
@@ -424,6 +515,8 @@ export interface SectionStatisticsRow {
   weakestQuestionId: number | null;
   weakestQuestionScore: number | null;
   questionScores: SectionQuestionScore[];
+  /** Khoa/viện suy từ bộ môn; rỗng khi bộ môn chưa thuộc khoa nào. */
+  facultyName: string;
 }
 
 export interface SemesterSurveyStatistics {
@@ -467,9 +560,15 @@ export const surveyApi = {
       `/api/surveys/semester-surveys/${semesterSurveyId}/statistics`,
     ),
   /** Chuẩn hoá điểm bằng Z-score, so toàn đợt và so trong khoa/viện. */
-  semesterSurveyNormalization: (semesterSurveyId: number) =>
+  /**
+   * Chuẩn hoá điểm (Z-Score) của đợt. Truyền `questionSectionId` thì điểm của mỗi lớp
+   * chỉ gộp các câu thuộc mục đó; bỏ trống là toàn bộ bài khảo sát.
+   */
+  semesterSurveyNormalization: (semesterSurveyId: number, questionSectionId?: number | null) =>
     apiRequest<SemesterSurveyNormalization>(
-      `/api/surveys/semester-surveys/${semesterSurveyId}/normalization`,
+      questionSectionId
+        ? `/api/surveys/semester-surveys/${semesterSurveyId}/normalization?questionSectionId=${questionSectionId}`
+        : `/api/surveys/semester-surveys/${semesterSurveyId}/normalization`,
     ),
   /** Tổng hợp theo bộ môn, phục vụ trưởng khoa. */
   semesterSurveyDepartmentSummary: (semesterSurveyId: number) =>
@@ -501,16 +600,22 @@ export const surveyApi = {
     apiRequest<LecturerOption[]>(`/api/surveys/semester-surveys/${semesterSurveyId}/lecturers`)
       .then((rows) => rows.map((row) => {
         const totalClassSize = Number.isFinite(row.totalClassSize) ? row.totalClassSize : 0;
+        const responseCount = Number.isFinite(row.responseCount) ? row.responseCount : 0;
         const validResponseCount = Number.isFinite(row.validResponseCount) ? row.validResponseCount : 0;
         return {
           ...row,
           totalClassSize,
-          responseCount: Number.isFinite(row.responseCount) ? row.responseCount : 0,
+          responseCount,
           validResponseCount,
+          responseRate: Number.isFinite(row.responseRate)
+            ? row.responseRate
+            : totalClassSize > 0
+              ? (responseCount / totalClassSize) * 100
+              : 0,
           validResponseRate: Number.isFinite(row.validResponseRate)
             ? row.validResponseRate
-            : totalClassSize > 0
-              ? (validResponseCount / totalClassSize) * 100
+            : responseCount > 0
+              ? (validResponseCount / responseCount) * 100
               : 0,
           averageScore: typeof row.averageScore === 'number' && Number.isFinite(row.averageScore)
             ? row.averageScore
@@ -565,12 +670,36 @@ export const surveyApi = {
     ),
   deleteSemesterSurvey: (semesterSurveyId: number) =>
     csrfRequest<boolean>(`/api/surveys/semester-surveys/${semesterSurveyId}`, 'DELETE'),
+  /**
+   * Trạng thái phát hành kết quả của một đợt. Ai cũng đọc được để giao diện nói rõ
+   * vì sao chưa có số liệu; chỉ quản trị mới đổi được.
+   */
+  surveyPublication: (semesterSurveyId: number) =>
+    apiRequest<SurveyPublication>(
+      `/api/surveys/semester-surveys/${semesterSurveyId}/publication`,
+    ),
+  setSurveyPublication: (semesterSurveyId: number, publish: boolean) =>
+    csrfRequest<SurveyPublication>(
+      `/api/surveys/semester-surveys/${semesterSurveyId}/publication`,
+      'PUT',
+      { publish },
+    ),
   /** Hai vòng lọc lớp được tính điểm, dùng chung cho mọi trang báo cáo. */
   scoringThresholds: () =>
     apiRequest<ScoringThresholds>('/api/surveys/scoring-thresholds'),
   /** Chỉ quản trị mới đổi được; server tự chặn các vai trò khác. */
   updateScoringThresholds: (thresholds: ScoringThresholds) =>
     csrfRequest<ScoringThresholds>('/api/surveys/scoring-thresholds', 'PUT', thresholds),
+  /**
+   * Các lần đổi cấu hình / cập nhật điểm do NGƯỜI KHÁC làm sau mốc `afterId`.
+   * Không truyền `afterId` thì chỉ nhận mốc mới nhất để bắt đầu theo dõi.
+   */
+  scoringChanges: (afterId?: number) =>
+    apiRequest<ScoringChangeFeed>(
+      afterId === undefined
+        ? '/api/surveys/scoring-changes'
+        : `/api/surveys/scoring-changes?afterId=${afterId}`,
+    ),
   /** Đếm trước số lớp của một phạm vi, tính ở server để khớp đúng lúc tạo thật. */
   previewSectionScope: (params: {
     semesterId: number;
@@ -783,6 +912,10 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_SECTION_SCHEDULE_OUTSIDE_SEMESTER_SURVEY:
     'Thời gian của lớp học phần phải nằm trọn trong thời gian mở và đóng của đợt khảo sát.',
   SURVEY_SEMESTER_SURVEY_NOT_FOUND: 'Không tìm thấy đợt khảo sát.',
+  SURVEY_RESULTS_NOT_PUBLISHED:
+    'Kết quả của đợt khảo sát này chưa được phát hành. Quản trị sẽ phát hành sau khi đợt kết thúc.',
+  SURVEY_NOT_ENDED:
+    'Đợt khảo sát chưa kết thúc nên chưa phát hành kết quả được.',
   SURVEY_SEMESTER_SURVEY_NAME_REQUIRED: 'Vui lòng đặt tên cho bài khảo sát.',
   SURVEY_SEMESTER_SURVEY_HAS_RESPONSES: 'Đợt khảo sát đã có phiếu trả lời nên không xóa được.',
   SURVEY_SCOPE_TYPE_UNSUPPORTED: 'Kiểu phạm vi không hợp lệ.',

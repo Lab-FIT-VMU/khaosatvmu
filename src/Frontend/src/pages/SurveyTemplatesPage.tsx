@@ -756,6 +756,7 @@ export const SurveyTemplatesPage: React.FC = () => {
                         <ChevronDown aria-hidden="true" size={15} />
                       )}
                     </button>
+                    {/* Tên mục đặt tuỳ ý, tối đa maximumSectionsPerTemplate mục. */}
                     <input
                       type="text"
                       className="survey-section-name"

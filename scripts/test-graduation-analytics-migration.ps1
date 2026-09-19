@@ -75,6 +75,18 @@ DECLARE
     row_distribution text;
     legacy_eligible_total integer;
 BEGIN
+    IF to_regclass('"GraduationPeriods"') IS NULL
+       OR to_regclass('"GraduationImportRevisions"') IS NULL
+       OR to_regclass('"GraduationAggregateRows"') IS NULL THEN
+        RAISE EXCEPTION 'Graduation analytics v3 tables were not created';
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM "GraduationPeriods")
+       OR EXISTS (SELECT 1 FROM "GraduationImportRevisions")
+       OR EXISTS (SELECT 1 FROM "GraduationAggregateRows") THEN
+        RAISE EXCEPTION 'V3 tables must start empty; legacy data cannot be backfilled safely';
+    END IF;
+
     SELECT count(*) INTO period_count FROM "GraduationAnalyticsDatasets";
     IF period_count <> 2 THEN
         RAISE EXCEPTION 'Expected 2 period datasets, got %', period_count;
@@ -112,7 +124,7 @@ END $migration_test$;
 '@
     $gaAssertionSql | docker exec -i $PostgresContainer psql -v ON_ERROR_STOP=1 -U $PostgresUser -d $gaDatabaseName
     Assert-LastExitCode 'Legacy migration assertions failed.'
-    Write-Output 'Graduation analytics legacy migration test: PASS'
+    Write-Output 'Graduation analytics legacy + v3 migration test: PASS'
 }
 finally {
     $env:ConnectionStrings__DefaultConnection = $gaPreviousConnectionString

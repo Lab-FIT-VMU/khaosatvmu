@@ -123,8 +123,11 @@ export interface Criterion {
   status: 'Kích hoạt' | 'Tạm ẩn';
 }
 
-/** Số mục tối đa của một bộ câu hỏi. Số câu thì không giới hạn. */
-export const maximumSectionsPerTemplate = 10;
+/**
+ * Số mục tối đa của một bộ câu hỏi, tên mục đặt tuỳ ý. Số câu thì không giới hạn.
+ * Phải trùng `SurveyRules.MaximumSectionsPerTemplate` bên backend.
+ */
+export const maximumSectionsPerTemplate = 3;
 
 /** Số mức tối đa của một thang trả lời ("AnswerScaleOptions"."Value" CHECK 1..5). */
 export const maximumAnswerScaleOptions = 5;
@@ -669,6 +672,11 @@ export interface SurveyResultDetail {
   templateName: string;
   lecturerId: number;
   lecturerName: string;
+  /**
+   * Tên đọc từ tệp import khi lớp chưa gắn được mã giảng viên (`lecturerId` bằng 0).
+   * Có tên thì mở được trang giảng viên theo tên; null là lớp chưa có người dạy.
+   */
+  unidentifiedLecturerName?: string | null;
   departmentId: number;
   departmentName: string;
   facultyId: number;

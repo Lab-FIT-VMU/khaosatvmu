@@ -50,7 +50,12 @@ public class SchoolOverviewScoreThresholdTests
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var cache = scope.ServiceProvider.GetRequiredService<IMemoryCache>();
         return Task.FromResult<(AppDbContext, EfReportService)?>(
-            (db, new EfReportService(db, cache, new SchoolOverviewCacheVersion())));
+            (db, new EfReportService(
+                db,
+                cache,
+                new SchoolOverviewCacheVersion(),
+                new FixedScoringThresholdProvider(),
+                new PublishedSurveyPublicationService())));
     }
 
     /// <summary>

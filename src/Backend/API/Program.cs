@@ -174,6 +174,7 @@ builder.Services.AddScoped<ICatalogService, EfCatalogService>();
 builder.Services.AddScoped<ISurveyService, EfSurveyService>();
 builder.Services.AddScoped<ICourseSurveyQrExporter, ClosedXmlCourseSurveyQrExporter>();
 builder.Services.AddScoped<IScoringThresholdProvider, EfScoringThresholdProvider>();
+builder.Services.AddScoped<ISurveyPublicationService, EfSurveyPublicationService>();
 // Vé bắt đầu làm bài. Khóa ký khác nhau giữa máy dev và máy chạy thật, lấy từ
 // cấu hình chứ không viết trong mã. Đổi khóa thì mọi vé đang phát mất hiệu lực.
 builder.Services.AddSingleton(_ =>
@@ -191,6 +192,8 @@ builder.Services.AddSingleton(_ =>
 builder.Services.AddSingleton<SchoolOverviewCacheVersion>();
 builder.Services.AddScoped<IReportService, EfReportService>();
 builder.Services.AddScoped<IGraduationAnalyticsService, EfGraduationAnalyticsService>();
+builder.Services.AddScoped<IGraduationImportParser, ClosedXmlGraduationImportParser>();
+builder.Services.AddScoped<IGraduationAnalyticsV3Service, EfGraduationAnalyticsV3Service>();
 builder.Services.AddScoped<ApplicationCookieEvents>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();

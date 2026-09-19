@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   BarChart3,
@@ -27,7 +27,9 @@ import type {
 } from '../types';
 import '../styles/survey-operations.css';
 import '../styles/reports.css';
-import { foldVietnamese } from '../utils/vietnamese';
+import { foldVietnamese, toVietnameseFileSlug } from '../utils/vietnamese';
+import { hasEnoughResponsesToScore } from '../utils/reportThresholds';
+import type { QuestionAnalysisExportMetadata } from '../services/exportQuestionAnalysisService';
 
 interface SectionSurveyResponsesPageProps {
   courseSectionSurveyId: number;
@@ -226,21 +228,21 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     {
       key: 'isValid',
       header: 'Trạng thái',
-      width: '104px',
-      filterValue: (item) => (item.isValid ? 'Hợp lệ' : 'Bị lọc'),
+      width: '136px',
+      filterValue: (item) => (item.isValid ? 'Hợp lệ' : 'Không hợp lệ'),
       render: (item) =>
         item.isValid ? (
           <span className="response-validity">Hợp lệ</span>
         ) : (
           <span className="response-validity is-rejected">
             <TriangleAlert aria-hidden="true" size={13} />
-            Bị lọc
+            Không hợp lệ
           </span>
         ),
     },
     {
       key: 'rejectionReasons',
-      header: 'Lý do bị lọc',
+      header: 'Mô tả',
       width: '220px',
       // Dịch mã sang tiếng Việt, không phơi TOO_FAST ra màn hình.
       filterValue: (item) => rejectionReasonTexts(item.rejectionReasons).join(' · ') || '—',
@@ -299,6 +301,23 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
       ),
     },
   ];
+
+  const surveyExportMetadata = useMemo<QuestionAnalysisExportMetadata>(() => ({
+    title: `BÁO CÁO PHÂN TÍCH KẾT QUẢ CÂU HỎI KHẢO SÁT · LỚP ${sectionSurvey?.sectionName || ''}`.trim(),
+    subtitle: sectionSurvey
+      ? `${sectionSurvey.courseCode} - ${sectionSurvey.courseName} · GV: ${sectionSurvey.lecturerName || 'Chưa gắn GV'}`
+      : undefined,
+    fileName: `bao-cao-cau-hoi-lop-${toVietnameseFileSlug(sectionSurvey?.sectionName || String(courseSectionSurveyId))}`,
+    info: {
+      'Học phần': sectionSurvey ? `${sectionSurvey.courseCode} - ${sectionSurvey.courseName}` : undefined,
+      'Lớp học phần': sectionSurvey?.sectionName,
+      'Giảng viên': sectionSurvey?.lecturerName || 'Chưa gắn GV',
+      'Đơn vị': sectionSurvey ? `${sectionSurvey.departmentName || ''} · ${sectionSurvey.facultyName || ''}` : undefined,
+      'Sĩ số': sectionSurvey?.classSize,
+      'Phiếu hợp lệ': analysis?.responseCount ?? sectionSurvey?.validResponseCount,
+      'Điểm trung bình': analysis?.averageScore ? `${analysis.averageScore.toFixed(2)} / 5.0` : undefined,
+    },
+  }), [sectionSurvey, analysis, courseSectionSurveyId]);
 
   return (
     <div className="survey-operations-page section-responses-page">
@@ -417,12 +436,24 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
       {showAnalysis && !analysisLoading && analysis && !analysis.isScored && (
         <div className="operations-empty" role="status">
           <BarChart3 className="operation-icon" aria-hidden="true" />
-          <strong>Lớp chưa đủ điều kiện tính điểm</strong>
-          <span>
-            Lớp phải qua cả ngưỡng tỷ lệ phản hồi và ngưỡng tỷ lệ phiếu hợp lệ, sau đó
-            được chốt bằng nút "Tính lại điểm" ở trang Bảng dữ liệu khảo sát thì mới có
-            số liệu phân tích.
-          </span>
+          {hasEnoughResponsesToScore(sectionSurvey?.classSize || 0, responses.length, validResponses.length) ? (
+            <>
+              <strong>Lớp đã thu đủ phiếu (Đang chờ chốt điểm)</strong>
+              <span>
+                Lớp đã đạt đủ số lượng phiếu theo quy định. Vui lòng bấm &quot;Cập nhật điểm&quot; ở
+                các trang thống kê để tạo báo cáo phân tích theo câu hỏi.
+              </span>
+            </>
+          ) : (
+            <>
+              <strong>Lớp chưa đủ điều kiện tính điểm</strong>
+              <span>
+                Lớp phải qua cả ngưỡng tỷ lệ phản hồi và ngưỡng tỷ lệ phiếu hợp lệ, sau đó
+                được chốt bằng nút &quot;Cập nhật điểm&quot; ở các trang thống kê thì mới có
+                số liệu phân tích.
+              </span>
+            </>
+          )}
         </div>
       )}
 
@@ -433,6 +464,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
           responseCount={analysis.responseCount}
           title="Phân tích kết quả theo câu hỏi"
           showDistributionTable={true}
+          exportMetadata={surveyExportMetadata}
         />
       )}
 
@@ -468,8 +500,8 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
             { key: 'responseId', header: 'Mã phiếu', width: 12, align: 'center' as const },
             { key: 'submittedAt', header: 'Thời gian nộp', width: 18, format: (val: any) => formatDateTime(val) },
             { key: 'score', header: 'Điểm', width: 10, type: 'number' as const, align: 'right' as const, format: (val: any) => Number(val).toFixed(2) },
-            { key: 'isValid', header: 'Trạng thái', width: 12, align: 'center' as const, format: (val: any) => (val ? 'Hợp lệ' : 'Bị lọc') },
-            { key: 'rejectionReasons', header: 'Lý do bị lọc', width: 20, format: (_: any, item: any) => rejectionReasonTexts(item.rejectionReasons).join('; ') || '—' },
+            { key: 'isValid', header: 'Trạng thái', width: 12, align: 'center' as const, format: (val: any) => (val ? 'Hợp lệ' : 'Không hợp lệ') },
+            { key: 'rejectionReasons', header: 'Mô tả', width: 20, format: (_: any, item: any) => rejectionReasonTexts(item.rejectionReasons).join('; ') || '—' },
             { key: 'additionalComments', header: 'Ý kiến đóng góp', width: 35, format: (val: any) => val || '—' },
           ],
         }}

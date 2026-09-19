@@ -2,6 +2,7 @@ using Application.Reports;
 using Application.Surveys;
 using Domain;
 using Infrastructure.Persistence;
+using Infrastructure.Surveys;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -10,7 +11,9 @@ namespace Infrastructure.Reports;
 public sealed class EfReportService(
     AppDbContext db,
     IMemoryCache cache,
-    SchoolOverviewCacheVersion cacheVersion) : IReportService
+    SchoolOverviewCacheVersion cacheVersion,
+    IScoringThresholdProvider scoringThresholds,
+    ISurveyPublicationService publication) : IReportService
 {
     /// <summary>Prefix key cache cho báo cáo tổng quan toàn trường (theo học kỳ).</summary>
     private const string SchoolOverviewCachePrefix = "school-overview:";
@@ -31,6 +34,23 @@ public sealed class EfReportService(
     private const int MaxTextAnswersPerQuestion = 200;
 
     /// <summary>
+    /// Bảng lớp đã lọc theo trạng thái phát hành. MỌI truy vấn số liệu của service này
+    /// phải đi qua đây chứ không đọc thẳng <c>db.CourseSectionSurveys</c>: quản trị thấy
+    /// tất cả, còn trưởng bộ môn và giảng viên chỉ thấy lớp thuộc đợt đã phát hành, nên
+    /// đợt chưa phát hành không lọt vào bất kỳ con số gộp nào.
+    /// </summary>
+    private async Task<IQueryable<CourseSectionSurvey>> VisibleSectionSurveysAsync(
+        CancellationToken cancellationToken)
+    {
+        var query = db.CourseSectionSurveys.AsNoTracking();
+        var visible = await publication.VisibleSurveyIdsAsync(cancellationToken);
+        if (visible is null) return query;
+
+        var ids = visible.ToList();
+        return query.Where(x => ids.Contains(x.SemesterSurveyId));
+    }
+
+    /// <summary>
     /// Số phiếu của một lớp, tách làm hai nhóm theo quyết định C-e:
     /// <see cref="TotalCount"/> đếm hết mọi phiếu, dùng cho số liệu tiến độ thu
     /// phiếu (tỷ lệ hoàn thành so với sĩ số) — nộp ẩu thì vẫn là đã tham gia.
@@ -49,17 +69,19 @@ public sealed class EfReportService(
     private sealed record ResponseTally(
         int TotalCount,
         int ValidCount,
+        int SnapshotValidCount,
         decimal ValidTotalScore,
         bool IsScored)
     {
-        public static readonly ResponseTally Empty = new(0, 0, 0m, false);
+        public static readonly ResponseTally Empty = new(0, 0, 0, 0m, false);
 
         public decimal AverageScore =>
-            ValidCount > 0 ? Math.Round(ValidTotalScore / ValidCount, 2) : 0m;
+            SnapshotValidCount > 0 ? Math.Round(ValidTotalScore / SnapshotValidCount, 2) : 0m;
     }
 
     /// <summary>
     /// Gộp số phiếu theo lớp trong một lượt truy vấn: cả tổng lẫn phần hợp lệ.
+    /// Số phiếu đếm sống để phản ánh tiến độ thực tế, điểm lấy từ ảnh chụp lúc chốt.
     /// </summary>
     private async Task<Dictionary<int, ResponseTally>> ResponseTalliesAsync(
         IReadOnlyCollection<int> courseSectionSurveyIds,
@@ -67,15 +89,36 @@ public sealed class EfReportService(
     {
         if (courseSectionSurveyIds.Count == 0) return [];
 
-        // Đọc ảnh chụp trên "CourseSectionSurveys" chứ không gộp lại từ
-        // "SurveyResponses": mọi trang báo cáo phải nói cùng một lần chốt với bảng
-        // dữ liệu khảo sát. Riêng trang Tiến độ thu phiếu vẫn đếm sống — tiến độ
-        // phải đúng ngay cả khi đợt chưa bấm tính lần nào.
-        //
-        // Tổng điểm dựng lại bằng AverageScore × ValidResponseCount. AverageScore
-        // đã làm tròn 2 chữ số nên tổng chỉ xấp xỉ, nhưng khi chia lại cho đúng số
-        // phiếu ấy thì ra lại chính con số đã chốt — đó mới là thứ cần khớp.
-        return await db.CourseSectionSurveys.AsNoTracking()
+        // Luật nào của bộ lọc nhiễu đang được áp là do quản trị bật tắt, nên phải
+        // đọc lại "RejectionReasons" chứ không dùng cột "IsValid" đã chốt lúc nộp.
+        // Viết thẳng ra đây thay vì gọi ResponseInclusion.CountsTowardScore() vì
+        // EF không dịch được một Expression lồng trong Count(...) của GroupBy.
+        var thresholds = await scoringThresholds.GetAsync(cancellationToken);
+        var rejectTooFast = thresholds.RejectTooFast;
+        var rejectSingleAnswer = thresholds.RejectSingleAnswer;
+        var rejectAttentionCheck = thresholds.RejectAttentionCheckFailed;
+
+        // Đếm sống số phiếu thực tế từ bảng SurveyResponses để phản ánh đúng tiến độ
+        var liveCounts = await db.SurveyResponses.AsNoTracking()
+            .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId) && !x.IsDeleted)
+            .GroupBy(x => x.CourseSectionSurveyId)
+            .Select(g => new
+            {
+                Id = g.Key,
+                Total = g.Count(),
+                Valid = g.Count(r =>
+                    r.RejectionReasons == null
+                    || ((!rejectTooFast
+                            || !r.RejectionReasons.Contains(RejectionReasonCodes.TooFast))
+                        && (!rejectSingleAnswer
+                            || !r.RejectionReasons.Contains(RejectionReasonCodes.SingleAnswer))
+                        && (!rejectAttentionCheck
+                            || !r.RejectionReasons.Contains(RejectionReasonCodes.AttentionCheckFailed))))
+            })
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        // Đọc ảnh chụp điểm chốt trên CourseSectionSurveys
+        var snapshots = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId))
             .Select(x => new
             {
@@ -84,14 +127,22 @@ public sealed class EfReportService(
                 x.ValidResponseCount,
                 x.AverageScore,
             })
-            .ToDictionaryAsync(
-                x => x.CourseSectionSurveyId,
-                x => new ResponseTally(
-                    x.TotalResponseCount,
+            .ToListAsync(cancellationToken);
+
+        return snapshots.ToDictionary(
+            x => x.CourseSectionSurveyId,
+            x =>
+            {
+                var live = liveCounts.GetValueOrDefault(x.CourseSectionSurveyId);
+                int total = live != null ? live.Total : x.TotalResponseCount;
+                int valid = live != null ? live.Valid : x.ValidResponseCount;
+                return new ResponseTally(
+                    total,
+                    valid,
                     x.ValidResponseCount,
                     (x.AverageScore ?? 0m) * x.ValidResponseCount,
-                    x.AverageScore is not null),
-                cancellationToken);
+                    x.AverageScore is not null);
+            });
     }
 
     /// <summary>
@@ -105,7 +156,7 @@ public sealed class EfReportService(
     {
         if (courseSectionSurveyIds.Count == 0) return [];
 
-        return await db.CourseSectionSurveys.AsNoTracking()
+        return await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId) && x.AverageScore != null)
             .Select(x => x.CourseSectionSurveyId)
             .ToListAsync(cancellationToken);
@@ -162,6 +213,19 @@ public sealed class EfReportService(
             : rating with { AverageScore = 0, TotalAnswers = 0, OptionDistribution = [] };
     }
 
+    /// <summary>
+    /// Tên người dạy của một lớp. Lớp chưa gắn được mã giảng viên vẫn có tên đọc từ tệp
+    /// import ở "UnidentifiedLecturerName" — bỏ qua nó thì một lớp thật ra có người dạy
+    /// lại hiện "Chưa phân công". Cùng thứ tự với trang Thống kê chi tiết, để một lớp
+    /// không mang hai tên ở hai màn hình.
+    /// </summary>
+    private static string LecturerNameOf(Lecturer? lecturer, CourseSection? section)
+    {
+        if (lecturer is not null) return lecturer.FullName;
+        var unidentifiedName = section?.UnidentifiedLecturerName?.Trim();
+        return string.IsNullOrEmpty(unidentifiedName) ? "Chưa phân công" : unidentifiedName;
+    }
+
     public async Task<OperationalProgressReportDto?> GetOperationalProgressReportAsync(
         int semesterId,
         CancellationToken cancellationToken = default)
@@ -181,8 +245,7 @@ public sealed class EfReportService(
             .Select(x => x.SemesterSurveyId)
             .ToListAsync(cancellationToken);
 
-        var sectionSurveys = await db.CourseSectionSurveys
-            .AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => semesterSurveyIds.Contains(x.SemesterSurveyId))
             .ToListAsync(cancellationToken);
 
@@ -192,6 +255,11 @@ public sealed class EfReportService(
         // trường. Trước đây chỗ này cố ý đếm cả phiếu bị lọc với lý do "nộp ẩu vẫn
         // là đã tham gia"; lý do đó đã bị bỏ khi cả hệ thống chuyển sang đo bằng
         // phiếu hợp lệ, chỉ riêng đây bị sót vì không màn hình nào gọi tới.
+        var countThresholds = await scoringThresholds.GetAsync(cancellationToken);
+        var countRejectTooFast = countThresholds.RejectTooFast;
+        var countRejectSingleAnswer = countThresholds.RejectSingleAnswer;
+        var countRejectAttentionCheck = countThresholds.RejectAttentionCheckFailed;
+
         var responseCounts = await db.SurveyResponses
             .AsNoTracking()
             .Where(x => sectionSurveyIds.Contains(x.CourseSectionSurveyId))
@@ -199,7 +267,14 @@ public sealed class EfReportService(
             .Select(g => new
             {
                 CourseSectionSurveyId = g.Key,
-                Count = g.Count(x => x.IsValid),
+                Count = g.Count(x =>
+                    x.RejectionReasons == null
+                    || ((!countRejectTooFast
+                            || !x.RejectionReasons.Contains(RejectionReasonCodes.TooFast))
+                        && (!countRejectSingleAnswer
+                            || !x.RejectionReasons.Contains(RejectionReasonCodes.SingleAnswer))
+                        && (!countRejectAttentionCheck
+                            || !x.RejectionReasons.Contains(RejectionReasonCodes.AttentionCheckFailed)))),
             })
             .ToDictionaryAsync(x => x.CourseSectionSurveyId, x => x.Count, cancellationToken);
 
@@ -263,7 +338,7 @@ public sealed class EfReportService(
                 crs?.CourseCode ?? string.Empty,
                 crs?.CourseName ?? string.Empty,
                 sec?.SectionName ?? string.Empty,
-                lec?.FullName ?? "Chưa phân công",
+                LecturerNameOf(lec, sec),
                 classSize,
                 responseCount,
                 rate,
@@ -337,7 +412,7 @@ public sealed class EfReportService(
             .Where(x => courseIds.Contains(x.CourseId))
             .ToDictionaryAsync(x => x.CourseId, x => x, cancellationToken);
 
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => sectionIds.Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
 
@@ -355,75 +430,196 @@ public sealed class EfReportService(
         foreach (var lec in lecturers)
         {
             var lecSections = sectionsByLecturerId[lec.LecturerId].ToList();
-            var lecCss = lecSections
-                .SelectMany(section => sectionSurveysBySectionId[section.CourseSectionId])
-                .ToList();
-            var lecSectionById = lecSections.ToDictionary(x => x.CourseSectionId);
-
-            // Mọi con số hiển thị đều tính trên phiếu hợp lệ; phiếu bị bộ lọc nhiễu
-            // loại không dùng được vào kết quả nào nên cũng không tính là đã thu.
-            int totalResponses = 0;
-            int validResponses = 0;
-
-            // Điểm trung bình gộp riêng, chỉ từ lớp đã thu đủ phiếu. Số ĐẾM phiếu ở
-            // trên vẫn cộng mọi lớp — đó là tiến độ, lớp thiếu phiếu cũng phải hiện
-            // ra thì giảng viên mới biết lớp nào cần nhắc sinh viên làm.
-            int scoredValidResponses = 0;
-            decimal scoredScoreSum = 0;
-
-            var sectionSummaries = new List<LecturerSectionSummaryDto>();
-            foreach (var css in lecCss)
-            {
-                var sec = lecSectionById.GetValueOrDefault(css.CourseSectionId);
-                var crs = sec != null && courses.TryGetValue(sec.CourseId, out var c) ? c : null;
-
-                var tally = responseStats.GetValueOrDefault(css.CourseSectionSurveyId, ResponseTally.Empty);
-
-                totalResponses += tally.TotalCount;
-                validResponses += tally.ValidCount;
-
-                int classSize = sec?.ClassSize ?? 0;
-                if (tally.IsScored)
-                {
-                    scoredValidResponses += tally.ValidCount;
-                    scoredScoreSum += tally.ValidTotalScore;
-                }
-
-                sectionSummaries.Add(new LecturerSectionSummaryDto(
-                    css.CourseSectionSurveyId,
-                    crs?.CourseCode ?? string.Empty,
-                    crs?.CourseName ?? string.Empty,
-                    sec?.SectionName ?? string.Empty,
-                    classSize,
-                    tally.TotalCount,
-                    tally.ValidCount,
-                    tally.TotalCount - tally.ValidCount,
-                    classSize > 0 ? Math.Round((decimal)tally.ValidCount / classSize * 100, 1) : 0,
-                    tally.AverageScore
-                ));
-            }
-
-            decimal avgScore = scoredValidResponses > 0
-                ? Math.Round(scoredScoreSum / scoredValidResponses, 2)
-                : 0;
+            var summary = SummariseLecturerSections(lecSections, sectionSurveysBySectionId, courses, responseStats);
 
             reports.Add(new LecturerPerformanceReportDto(
                 lec.LecturerId,
                 lec.FullName,
                 lec.DepartmentId.HasValue && departments.TryGetValue(lec.DepartmentId.Value, out var dName) ? dName : "Chưa thuộc bộ môn",
                 lec.FacultyId.HasValue && faculties.TryGetValue(lec.FacultyId.Value, out var fName) ? fName : "Chưa thuộc khoa",
-                avgScore,
-                validResponses,
+                summary.AverageScore,
+                summary.ValidResponses,
                 lecSections.Count,
-                avgScore,
-                avgScore,
-                sectionSummaries,
+                summary.AverageScore,
+                summary.AverageScore,
+                summary.Sections,
                 [],
-                scoredValidResponses
+                summary.ScoredValidResponses
             ));
         }
 
         return reports.OrderByDescending(x => x.AverageScore).ToList();
+    }
+
+    private sealed record LecturerSectionsSummary(
+        IReadOnlyList<LecturerSectionSummaryDto> Sections,
+        int ValidResponses,
+        int ScoredValidResponses,
+        decimal AverageScore);
+
+    /// <summary>
+    /// Gộp số liệu các lớp của một giảng viên cho trang giảng viên. Dùng chung cho
+    /// giảng viên đã gắn mã và giảng viên chưa gắn mã tra theo tên, để hai trang tính
+    /// đúng một cách.
+    /// </summary>
+    private static LecturerSectionsSummary SummariseLecturerSections(
+        IReadOnlyCollection<CourseSection> lecturerSections,
+        ILookup<int, CourseSectionSurvey> sectionSurveysBySectionId,
+        IReadOnlyDictionary<int, Course> courses,
+        IReadOnlyDictionary<int, ResponseTally> responseStats)
+    {
+        var sectionById = lecturerSections.ToDictionary(x => x.CourseSectionId);
+        var sectionSurveys = lecturerSections
+            .SelectMany(section => sectionSurveysBySectionId[section.CourseSectionId])
+            .ToList();
+
+        // Mọi con số hiển thị đều tính trên phiếu hợp lệ; phiếu bị bộ lọc nhiễu
+        // loại không dùng được vào kết quả nào nên cũng không tính là đã thu.
+        int validResponses = 0;
+
+        // Điểm trung bình gộp riêng, chỉ từ lớp đã thu đủ phiếu. Số ĐẾM phiếu ở
+        // trên vẫn cộng mọi lớp — đó là tiến độ, lớp thiếu phiếu cũng phải hiện
+        // ra thì giảng viên mới biết lớp nào cần nhắc sinh viên làm.
+        int scoredValidResponses = 0;
+        decimal scoredScoreSum = 0;
+
+        var sectionSummaries = new List<LecturerSectionSummaryDto>();
+        foreach (var css in sectionSurveys)
+        {
+            var sec = sectionById.GetValueOrDefault(css.CourseSectionId);
+            var crs = sec != null && courses.TryGetValue(sec.CourseId, out var c) ? c : null;
+
+            var tally = responseStats.GetValueOrDefault(css.CourseSectionSurveyId, ResponseTally.Empty);
+
+            validResponses += tally.ValidCount;
+
+            int classSize = sec?.ClassSize ?? 0;
+            if (tally.IsScored)
+            {
+                scoredValidResponses += tally.ValidCount;
+                scoredScoreSum += tally.ValidTotalScore;
+            }
+
+            sectionSummaries.Add(new LecturerSectionSummaryDto(
+                css.CourseSectionSurveyId,
+                crs?.CourseCode ?? string.Empty,
+                crs?.CourseName ?? string.Empty,
+                sec?.SectionName ?? string.Empty,
+                classSize,
+                tally.TotalCount,
+                tally.ValidCount,
+                tally.TotalCount - tally.ValidCount,
+                classSize > 0 ? Math.Round((decimal)tally.ValidCount / classSize * 100, 1) : 0,
+                tally.AverageScore
+            ));
+        }
+
+        decimal avgScore = scoredValidResponses > 0
+            ? Math.Round(scoredScoreSum / scoredValidResponses, 2)
+            : 0;
+
+        return new LecturerSectionsSummary(sectionSummaries, validResponses, scoredValidResponses, avgScore);
+    }
+
+    public async Task<LecturerPerformanceReportDto?> GetUnidentifiedLecturerReportAsync(
+        string lecturerName,
+        int? facultyId,
+        int? semesterId,
+        CancellationToken cancellationToken = default)
+    {
+        var name = lecturerName?.Trim() ?? string.Empty;
+        if (name.Length == 0) return null;
+
+        // 0 hay null đều là lớp chưa thuộc khoa/viện nào, khớp FacultyId = 0 của bảng
+        // Tra cứu chi tiết.
+        int? targetFacultyId = facultyId is > 0 ? facultyId : null;
+
+        // Chỉ lớp CHƯA gắn mã giảng viên. Tên đọc từ tệp import không phải khoá duy nhất
+        // — hai người trùng tên ở hai khoa là chuyện thường — nên khoanh thêm theo
+        // khoa/viện. Không khoanh theo bộ môn: một người vẫn dạy học phần của nhiều bộ
+        // môn trong cùng một khoa.
+        var candidateQuery = db.CourseSections.AsNoTracking()
+            .Where(x => x.LecturerId == null && x.UnidentifiedLecturerName != null);
+        if (semesterId is { } semId)
+        {
+            candidateQuery = candidateQuery.Where(x => x.SemesterId == semId);
+        }
+        var namedSections = (await candidateQuery.ToListAsync(cancellationToken))
+            .Where(x => string.Equals(x.UnidentifiedLecturerName!.Trim(), name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (namedSections.Count == 0) return null;
+
+        var courseIds = namedSections.Select(x => x.CourseId).Distinct().ToList();
+        var courses = await db.Courses.AsNoTracking()
+            .Where(x => courseIds.Contains(x.CourseId))
+            .ToDictionaryAsync(x => x.CourseId, x => x, cancellationToken);
+        var departments = await db.Departments.AsNoTracking()
+            .ToDictionaryAsync(x => x.DepartmentId, x => x, cancellationToken);
+
+        // Đơn vị của lớp theo đúng thứ tự của bảng Tra cứu chi tiết: đơn vị sở hữu học
+        // phần, khoa suy từ bộ môn nếu học phần không ghi khoa. Lớp chưa gắn mã nên không
+        // có nhánh giảng viên để lùi về.
+        int? DepartmentOf(CourseSection section) =>
+            courses.TryGetValue(section.CourseId, out var course) ? course.DepartmentId : null;
+
+        int? FacultyOf(CourseSection section)
+        {
+            if (!courses.TryGetValue(section.CourseId, out var course)) return null;
+            if (course.FacultyId is { } courseFacultyId) return courseFacultyId;
+            return course.DepartmentId is { } departmentId
+                && departments.TryGetValue(departmentId, out var department)
+                    ? department.FacultyId
+                    : null;
+        }
+
+        var sections = namedSections.Where(x => FacultyOf(x) == targetFacultyId).ToList();
+        if (sections.Count == 0) return null;
+
+        var sectionIds = sections.Select(x => x.CourseSectionId).ToList();
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
+            .Where(x => sectionIds.Contains(x.CourseSectionId))
+            .ToListAsync(cancellationToken);
+        var responseStats = await ResponseTalliesAsync(
+            sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList(),
+            cancellationToken);
+        var summary = SummariseLecturerSections(
+            sections,
+            sectionSurveys.ToLookup(x => x.CourseSectionId),
+            courses,
+            responseStats);
+
+        // Một người có thể dạy học phần của nhiều bộ môn trong khoa: ghi đủ các bộ môn.
+        var departmentNames = sections
+            .Select(DepartmentOf)
+            .Distinct()
+            .Select(id => id is { } departmentId && departments.TryGetValue(departmentId, out var department)
+                ? department.DepartmentName
+                : "Chưa thuộc bộ môn")
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+        var facultyName = targetFacultyId is { } targetId
+            ? await db.Faculties.AsNoTracking()
+                .Where(x => x.FacultyId == targetId)
+                .Select(x => x.FacultyName)
+                .FirstOrDefaultAsync(cancellationToken) ?? "Chưa thuộc khoa"
+            : "Chưa thuộc khoa";
+
+        var report = new LecturerPerformanceReportDto(
+            0,
+            sections[0].UnidentifiedLecturerName!.Trim(),
+            string.Join(", ", departmentNames),
+            facultyName,
+            summary.AverageScore,
+            summary.ValidResponses,
+            sections.Count,
+            summary.AverageScore,
+            summary.AverageScore,
+            summary.Sections,
+            [],
+            summary.ScoredValidResponses);
+
+        return await WithQuestionRatingsAsync(report, sectionIds, cancellationToken);
     }
 
     public async Task<LecturerPerformanceReportDto?> GetLecturerPerformanceReportAsync(
@@ -441,10 +637,21 @@ public sealed class EfReportService(
         {
             sectionQuery = sectionQuery.Where(x => x.SemesterId == semId);
         }
-        var sections = await sectionQuery.ToListAsync(cancellationToken);
-        var sectionIds = sections.Select(x => x.CourseSectionId).ToList();
+        var sectionIds = await sectionQuery.Select(x => x.CourseSectionId).ToListAsync(cancellationToken);
 
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        return await WithQuestionRatingsAsync(report, sectionIds, cancellationToken);
+    }
+
+    /// <summary>
+    /// Bảng phân tích theo câu hỏi của trang giảng viên, dựng trên đúng tập lớp của trang.
+    /// Dùng chung cho giảng viên đã gắn mã và giảng viên chưa gắn mã tra theo tên.
+    /// </summary>
+    private async Task<LecturerPerformanceReportDto> WithQuestionRatingsAsync(
+        LecturerPerformanceReportDto report,
+        IReadOnlyCollection<int> sectionIds,
+        CancellationToken cancellationToken)
+    {
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => sectionIds.Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
@@ -459,9 +666,12 @@ public sealed class EfReportService(
 
         var questionSnapshots = await QuestionScoreSnapshotsAsync(scoredCssIds, cancellationToken);
 
-        // Điểm từng câu của giảng viên là số liệu chất lượng: chỉ gộp phiếu hợp lệ.
+        // Điểm từng câu của giảng viên là số liệu chất lượng: chỉ gộp phiếu qua được
+        // những luật lọc nhiễu đang bật.
+        var lecturerThresholds = await scoringThresholds.GetAsync(cancellationToken);
         var validResponseIds = db.SurveyResponses.AsNoTracking()
-            .Where(x => scoredCssIds.Contains(x.CourseSectionSurveyId) && x.IsValid)
+            .Where(x => scoredCssIds.Contains(x.CourseSectionSurveyId))
+            .Where(lecturerThresholds.CountsTowardScore())
             .Select(x => x.ResponseId);
 
         var validAnswersQuery = db.SurveyResponseAnswers.AsNoTracking()
@@ -539,7 +749,12 @@ public sealed class EfReportService(
                 questionSnapshots))
             .ToList();
 
-        return report with { QuestionRatings = questionRatings.OrderBy(x => x.QuestionOrder).ToList() };
+        return report with
+        {
+            QuestionRatings = questionRatings
+                .OrderBy(x => x.QuestionOrder)
+                .ToList(),
+        };
     }
 
     public async Task<IReadOnlyList<FacultyDepartmentReportDto>> GetFacultyDepartmentReportsAsync(
@@ -554,7 +769,7 @@ public sealed class EfReportService(
         if (semesterId is { } semId) sectionQuery = sectionQuery.Where(x => x.SemesterId == semId);
         var sections = await sectionQuery.ToListAsync(cancellationToken);
 
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => sections.Select(s => s.CourseSectionId).Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
 
@@ -684,14 +899,16 @@ public sealed class EfReportService(
             template.SurveyTemplateId,
             cancellationToken);
 
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => x.SemesterSurveyId == semesterSurveyId)
             .ToListAsync(cancellationToken);
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
 
-        // Báo cáo chất lượng nên chỉ gộp phiếu qua bộ lọc nhiễu.
+        // Báo cáo chất lượng nên chỉ gộp phiếu qua được những luật lọc nhiễu đang bật.
+        var summaryThresholds = await scoringThresholds.GetAsync(cancellationToken);
         var validResponsesQuery = db.SurveyResponses.AsNoTracking()
-            .Where(x => cssIds.Contains(x.CourseSectionSurveyId) && x.IsValid);
+            .Where(x => cssIds.Contains(x.CourseSectionSurveyId))
+            .Where(summaryThresholds.CountsTowardScore());
 
         var responsesCount = await validResponsesQuery.CountAsync(cancellationToken);
         if (responsesCount == 0)
@@ -790,7 +1007,7 @@ public sealed class EfReportService(
         int courseSectionSurveyId,
         CancellationToken cancellationToken = default)
     {
-        var sectionSurvey = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurvey = await (await VisibleSectionSurveysAsync(cancellationToken))
             .FirstOrDefaultAsync(x => x.CourseSectionSurveyId == courseSectionSurveyId, cancellationToken);
         if (sectionSurvey is null) return null;
 
@@ -821,9 +1038,12 @@ public sealed class EfReportService(
             : await db.Lecturers.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.LecturerId == section.LecturerId, cancellationToken);
 
-        // Phân tích theo câu hỏi là số liệu chất lượng nên chỉ gộp phiếu hợp lệ.
+        // Phân tích theo câu hỏi là số liệu chất lượng nên chỉ gộp phiếu qua được
+        // những luật lọc nhiễu đang bật.
+        var sectionThresholds = await scoringThresholds.GetAsync(cancellationToken);
         var responseIds = await db.SurveyResponses.AsNoTracking()
-            .Where(x => x.CourseSectionSurveyId == courseSectionSurveyId && x.IsValid)
+            .Where(x => x.CourseSectionSurveyId == courseSectionSurveyId)
+            .Where(sectionThresholds.CountsTowardScore())
             .Select(x => x.ResponseId)
             .ToListAsync(cancellationToken);
 
@@ -875,7 +1095,7 @@ public sealed class EfReportService(
                 course?.CourseCode ?? string.Empty,
                 course?.CourseName ?? string.Empty,
                 section?.SectionName ?? string.Empty,
-                lecturer?.FullName ?? "Chưa phân công",
+                LecturerNameOf(lecturer, section),
                 section?.ClassSize ?? 0,
                 0,
                 0m,
@@ -897,7 +1117,7 @@ public sealed class EfReportService(
             course?.CourseCode ?? string.Empty,
             course?.CourseName ?? string.Empty,
             section?.SectionName ?? string.Empty,
-            lecturer?.FullName ?? "Chưa phân công",
+            LecturerNameOf(lecturer, section),
             section?.ClassSize ?? 0,
             sectionSurvey.ValidResponseCount,
             sectionSurvey.AverageScore!.Value,
@@ -916,7 +1136,7 @@ public sealed class EfReportService(
         string? search,
         CancellationToken cancellationToken = default)
     {
-        var sectionSurveyQuery = db.CourseSectionSurveys.AsNoTracking().AsQueryable();
+        var sectionSurveyQuery = (await VisibleSectionSurveysAsync(cancellationToken)).AsQueryable();
 
         if (semesterSurveyId is { } ssId)
         {
@@ -1014,7 +1234,7 @@ public sealed class EfReportService(
             var courseCode = crs?.CourseCode ?? string.Empty;
             var courseName = crs?.CourseName ?? string.Empty;
             var sectionName = sec?.SectionName ?? string.Empty;
-            var lecturerName = lec?.FullName ?? "Chưa phân công";
+            var lecturerName = LecturerNameOf(lec, sec);
 
             if (!string.IsNullOrEmpty(term)
                 && !courseCode.ToLowerInvariant().Contains(term)
@@ -1060,7 +1280,11 @@ public sealed class EfReportService(
                 tally.ValidCount,
                 cnt - tally.ValidCount,
                 completionRate,
-                averageScore));
+                averageScore,
+                UnidentifiedLecturerName: lec is null
+                    && sec?.UnidentifiedLecturerName?.Trim() is { Length: > 0 } unidentifiedName
+                        ? unidentifiedName
+                        : null));
         }
 
         return results
@@ -1157,8 +1381,7 @@ public sealed class EfReportService(
                 0, 0, 0, 0m, 0, 0, 0, 0m, 0, 0, [], 0m, [], [], [], null);
         }
 
-        var sectionSurveys = await db.CourseSectionSurveys
-            .AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => semesterSurveyIds.Contains(x.SemesterSurveyId))
             .ToListAsync(cancellationToken);
 
@@ -1211,11 +1434,13 @@ public sealed class EfReportService(
         var responseStats = await ResponseTalliesAsync(cssIds, cancellationToken);
 
         // Phân bố điểm theo nhóm (band 2..5) gộp ngay trong SQL.
-        // Là số liệu chất lượng nên chỉ gộp phiếu hợp lệ.
+        // Là số liệu chất lượng nên chỉ gộp phiếu qua được những luật lọc nhiễu đang bật.
+        var bandThresholds = await scoringThresholds.GetAsync(cancellationToken);
         var bandCounts = cssIds.Count == 0
             ? new List<BandCount>()
             : (await db.SurveyResponses.AsNoTracking()
-                .Where(x => cssIds.Contains(x.CourseSectionSurveyId) && x.IsValid)
+                .Where(x => cssIds.Contains(x.CourseSectionSurveyId))
+                .Where(bandThresholds.CountsTowardScore())
                 .Select(x => new
                 {
                     Band = x.Score >= 4.5m ? 5 : x.Score >= 4.0m ? 4 : x.Score >= 3.0m ? 3 : 2
@@ -1277,7 +1502,7 @@ public sealed class EfReportService(
             if (scored)
             {
                 schoolScoredSectionCount++;
-                schoolScoredResponses += tally.ValidCount;
+                schoolScoredResponses += tally.SnapshotValidCount;
                 schoolScoredScoreSum += tally.ValidTotalScore;
             }
 
@@ -1289,7 +1514,7 @@ public sealed class EfReportService(
                 f.Responses += cnt;
                 if (scored)
                 {
-                    f.ScoredResponses += tally.ValidCount;
+                    f.ScoredResponses += tally.SnapshotValidCount;
                     f.ScoreSum += tally.ValidTotalScore;
                 }
                 facultyStats[fId] = f;
@@ -1303,7 +1528,7 @@ public sealed class EfReportService(
                 d.Responses += cnt;
                 if (scored)
                 {
-                    d.ScoredResponses += tally.ValidCount;
+                    d.ScoredResponses += tally.SnapshotValidCount;
                     d.ScoreSum += tally.ValidTotalScore;
                 }
                 deptStats[dId] = d;
@@ -1465,8 +1690,7 @@ public sealed class EfReportService(
         var semesterSurveyIds = await SemesterSurveyIdsAsync(semesterId, semesterSurveyId, cancellationToken);
         if (semesterSurveyIds.Count == 0) return [];
 
-        var cssIds = await db.CourseSectionSurveys
-            .AsNoTracking()
+        var cssIds = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => semesterSurveyIds.Contains(x.SemesterSurveyId))
             .Select(x => x.CourseSectionSurveyId)
             .ToListAsync(cancellationToken);
@@ -1489,7 +1713,7 @@ public sealed class EfReportService(
         // toàn trường: lớp đã chốt điểm ở lần bấm "Tính lại điểm" gần nhất. Trước đây
         // phần đếm phiếu bên dưới quét mọi lớp trong phạm vi, nên cột "Phiếu hợp lệ"
         // gộp cả lớp chưa đủ điều kiện và lệch hẳn so với dải chỉ số ngay phía trên.
-        var scoredIds = await db.CourseSectionSurveys.AsNoTracking()
+        var scoredIds = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => cssIds.Contains(x.CourseSectionSurveyId) && x.AverageScore != null)
             .Select(x => x.CourseSectionSurveyId)
             .ToListAsync(cancellationToken);
@@ -1521,12 +1745,18 @@ public sealed class EfReportService(
         var candidateQuestionIds = candidates.Select(x => x.QuestionId).ToList();
 
         // Phân bố lựa chọn vẫn cần dữ liệu gốc, nhưng chỉ cho tối đa WeakQuestionCount câu.
-        // Chỉ gộp phiếu hợp lệ vì đây là số liệu chất lượng.
+        // Chỉ gộp phiếu qua được những luật lọc nhiễu đang bật.
+        var weakThresholds = await scoringThresholds.GetAsync(cancellationToken);
+        var countedResponseIds = db.SurveyResponses.AsNoTracking()
+            .Where(r => scoredIds.Contains(r.CourseSectionSurveyId))
+            .Where(weakThresholds.CountsTowardScore())
+            .Select(r => r.ResponseId);
+
         var valueCounts = await (from r in db.SurveyResponses.AsNoTracking()
                                  join a in db.SurveyResponseAnswers.AsNoTracking()
                                      on r.ResponseId equals a.ResponseId
                                  where scoredIds.Contains(r.CourseSectionSurveyId)
-                                       && r.IsValid
+                                       && countedResponseIds.Contains(r.ResponseId)
                                        && candidateQuestionIds.Contains(a.QuestionId)
                                  group a by new { a.QuestionId, a.AnswerValue } into g
                                  select new { g.Key.QuestionId, g.Key.AnswerValue, Count = g.Count() })
@@ -1721,7 +1951,7 @@ public sealed class EfReportService(
             .ToListAsync(cancellationToken);
         if (ssIds.Count == 0) return (0, 0, 0, 0m);
 
-        var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
+        var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => ssIds.Contains(x.SemesterSurveyId))
             .Select(x => new { x.CourseSectionSurveyId, x.CourseSectionId })
             .ToListAsync(cancellationToken);

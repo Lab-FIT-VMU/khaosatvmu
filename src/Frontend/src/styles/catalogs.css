@@ -25,7 +25,7 @@
 
 .catalog-page-header h2 {
   margin: 0 0 2px;
-  color: #20262c;
+  color: #000000;
   font-size: 20px;
   font-weight: 650;
   line-height: 1.35;
@@ -34,8 +34,8 @@
 
 .catalog-page-header p {
   max-width: 760px;
-  color: #68737d;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -80,7 +80,7 @@
   border: 1px solid #cfd7dc;
   border-radius: 3px;
   background: #f7f9fa;
-  color: #68737d;
+  color: #000000;
 }
 
 .catalog-search:focus-within {
@@ -96,8 +96,8 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .catalog-search input::placeholder {
@@ -106,8 +106,8 @@
 
 .catalog-result-count {
   flex: 0 0 auto;
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -118,8 +118,8 @@
   border: 1px solid #cfd7dc;
   border-radius: 3px;
   background-color: #ffffff;
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .catalog-add-button.btn {
@@ -127,7 +127,7 @@
   padding: 0 11px;
   border-radius: 3px !important;
   box-shadow: none;
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -147,8 +147,8 @@
   min-width: 920px;
   border-collapse: collapse;
   table-layout: auto;
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   text-align: left;
 }
 
@@ -178,8 +178,8 @@
   border-right: 1px solid #e5e9ec;
   border-bottom: 1px solid #cfd7dc;
   background: #f7f9fa;
-  color: #404a52;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
   line-height: 1.2;
   letter-spacing: 0;
@@ -290,7 +290,7 @@
 
 .catalog-table__index {
   width: 48px;
-  color: #7b858e;
+  color: #000000;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -303,15 +303,15 @@
 }
 
 .catalog-cell-primary {
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
 }
 
 .catalog-cell-meta {
   margin-top: 2px;
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.4;
 }
 
@@ -374,7 +374,7 @@
 
 .unidentified-banner__text span {
   color: #7a271a;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .unidentified-banner__actions {
@@ -393,8 +393,8 @@
 
 .unidentified-dialog__hint {
   margin: 0 0 12px;
-  color: #40505a;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -404,15 +404,15 @@
   gap: 5px;
   margin-top: 6px;
   color: #b42318;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
 .catalog-field-hint {
   display: block;
   margin-top: 6px;
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -420,7 +420,7 @@
   display: inline-block;
   color: #075f80;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -437,19 +437,19 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .catalog-contact svg,
 .catalog-inline-meta svg {
   flex: 0 0 auto;
-  color: #7f8a93;
+  color: #000000;
 }
 
 .catalog-stat-line strong,
 .catalog-inline-meta strong {
-  color: #20262c;
+  color: #000000;
   font-variant-numeric: tabular-nums;
 }
 
@@ -457,8 +457,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #40505a;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -500,7 +500,7 @@
   border: 1px solid #d7dee2;
   border-radius: 3px;
   background: #ffffff;
-  color: #68737d;
+  color: #000000;
   cursor: pointer;
   transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
 }
@@ -562,19 +562,19 @@
 
 .catalog-empty svg {
   margin-bottom: 7px;
-  color: #8c969f;
+  color: #000000;
 }
 
 .catalog-empty strong {
-  color: #40505a;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
 }
 
 .catalog-empty span {
   margin-top: 3px;
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .catalog-pagination {
@@ -586,13 +586,13 @@
   padding: 6px 10px;
   border-top: 1px solid #dfe4e8;
   background: #ffffff;
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   margin-top: auto;
 }
 
 .catalog-pagination strong {
-  color: #20262c;
+  color: #000000;
   font-variant-numeric: tabular-nums;
 }
 
@@ -603,8 +603,8 @@
 }
 
 .catalog-page-total {
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -617,7 +617,7 @@
   border: 1px solid #d7dee2;
   border-radius: 3px;
   background: #ffffff;
-  color: #40505a;
+  color: #000000;
 }
 
 .catalog-page-button {
@@ -676,7 +676,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: #20262c;
+  color: #000000;
   font-size: 13px;
   font-weight: 650;
 }
@@ -706,14 +706,14 @@
   margin: 0;
   padding: 8px 12px;
   color: #b52d2d;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .term-tree__empty {
   margin: 0;
   padding: 14px 12px;
-  color: #8c969f;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   text-align: center;
 }
 
@@ -765,15 +765,15 @@
   padding: 7px 4px 7px 10px;
   border: 0;
   background: transparent;
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
 
 .term-tree__semester-button {
   padding-left: 26px;
-  color: #40505a;
+  color: #000000;
 }
 
 .term-tree__year-name {
@@ -789,8 +789,8 @@
   padding: 1px 6px;
   border-radius: 9px;
   background: #eef2f4;
-  color: #68737d;
-  font-size: 10px;
+  color: #000000;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -826,7 +826,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #20262c;
+  color: #000000;
   font-size: 13px;
   font-weight: 650;
 }
@@ -840,21 +840,21 @@
   border-radius: 9px;
   background: #eef6f9;
   color: #0b6f95;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .term-detail__context {
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 500;
 }
 
 .term-detail__hint {
   margin: 0;
   padding: 48px 16px;
-  color: #8c969f;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   text-align: center;
 }
 
@@ -873,8 +873,8 @@
   border: 1px solid #d7dee2;
   border-radius: 4px;
   background: #ffffff;
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -938,7 +938,7 @@
   padding: 12px 16px 12px 20px;
   border-bottom: 1px solid #dfe4e8;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
 }
 
 .catalog-modal-header.modal-header h3 {
@@ -960,14 +960,14 @@
   padding: 0;
   border: 1px solid transparent;
   border-radius: 3px;
-  color: #68737d;
+  color: #000000;
   cursor: pointer;
 }
 
 .catalog-modal-close.modal-close-btn:hover {
   border-color: #d7dee2;
   background: #f7f9fa;
-  color: #20262c;
+  color: #000000;
 }
 
 .catalog-modal-body.modal-body {
@@ -978,7 +978,7 @@
   padding: 24px 30px;
   overflow-y: auto;
   overflow-x: hidden;
-  color: #20262c;
+  color: #000000;
   font-size: 16px;
   line-height: 1.6;
 }
@@ -1020,7 +1020,7 @@
 .catalog-form .form-group label {
   display: block;
   margin-bottom: 4px;
-  color: #404a52;
+  color: #000000;
   font-size: 13px;
   font-weight: 650;
   line-height: 1.35;
@@ -1035,7 +1035,7 @@
   border: 1px solid #cfd7dc;
   border-radius: 3px;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
   font-size: 16px;
 }
 
@@ -1140,15 +1140,15 @@
   border-left: 3px solid #b52d2d;
   background: #fcebec;
   color: #8d2525;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .catalog-context-band {
   padding: 8px 10px;
   border: 1px solid #d7e7ed;
   background: #f2f8fa;
-  color: #40505a;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 /* ----- Chọn phạm vi phát phiếu khảo sát ----- */
@@ -1157,7 +1157,7 @@
 .catalog-form .form-group .form-label {
   display: block;
   margin-bottom: 4px;
-  color: #404a52;
+  color: #000000;
   font-size: 13px;
   font-weight: 650;
   line-height: 1.35;
@@ -1173,8 +1173,8 @@
   padding: 6px 12px;
   border: 1px solid #cbd8de;
   background: #fff;
-  color: #40505a;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -1203,8 +1203,8 @@
   padding: 7px 10px;
   border-left: 3px solid #0788b8;
   background: #f2f8fa;
-  color: #40505a;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .catalog-group-list {
@@ -1227,8 +1227,8 @@
 }
 
 .catalog-group-row__title {
-  color: #20262c;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -1242,14 +1242,14 @@
   border: 1px solid #d7dee2;
   border-radius: 3px;
   background: #ffffff;
-  color: #40505a;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .catalog-group-add:hover {
-  border-color: #94a7b1;
+  border-color: #000000;
   background: #f7f9fa;
 }
 
@@ -1262,8 +1262,8 @@
   border: 1px dashed #cfd7dc;
   border-radius: 3px;
   background: #f7f9fa;
-  color: #40505a;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .import-template-row .btn {
@@ -1282,8 +1282,8 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  color: #40505a;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .catalog-confirm svg {
@@ -1294,7 +1294,7 @@
 .catalog-confirm__warning {
   margin-top: 6px;
   color: #8d2525;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -1467,8 +1467,8 @@
 }
 
 .survey-question-editor-header strong {
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -1477,8 +1477,8 @@
   border: 1px solid #d7e7ed;
   border-radius: 999px;
   background: #ffffff;
-  color: #40505a;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -1498,7 +1498,7 @@
   border-left: 3px solid #c98a1e;
   background: #fdf6e8;
   color: #6c4a08;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -1542,8 +1542,8 @@
   border: 1px solid #d7e7ed;
   border-radius: 999px;
   background: #ffffff;
-  color: #40505a;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1560,7 +1560,7 @@
 /* Nhãn "Bẫy" thay cho số: câu bẫy không chiếm số thứ tự ở màn quản trị. */
 .survey-question-row-index--trap {
   color: #8d2525;
-  font-size: 10px;
+  font-size: 13px;
   text-transform: uppercase;
 }
 
@@ -1581,7 +1581,7 @@
 .survey-question-preview-order {
   display: inline-block;
   min-width: 24px;
-  color: #68737d;
+  color: #000000;
   font-weight: 650;
 }
 
@@ -1597,8 +1597,8 @@
 .survey-question-row-index {
   min-width: 22px;
   padding-top: 6px;
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
   text-align: center;
 }
@@ -1619,9 +1619,9 @@
   border: 1px solid #d7dee2;
   border-radius: 3px;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   resize: vertical;
 }
 
@@ -1631,9 +1631,9 @@
   border: 1px solid #d7dee2;
   border-radius: 3px;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .survey-question-row textarea:focus,
@@ -1645,8 +1645,8 @@
 
 .survey-question-preview-scale {
   margin: 0 0 8px;
-  color: #40505a;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .survey-question-preview ol {
@@ -1659,8 +1659,8 @@
 }
 
 .survey-question-preview li {
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 /* Tên thang trả lời của từng câu trong màn xem trước bộ câu hỏi. */
@@ -1670,8 +1670,8 @@
   padding: 1px 6px;
   border-radius: 10px;
   background: #eef4f7;
-  color: #40505a;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   white-space: nowrap;
 }
 
@@ -1689,8 +1689,8 @@
 
 .answer-scale-empty {
   margin: 0;
-  color: #68737d;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .answer-scale-row {
@@ -1710,14 +1710,14 @@
 }
 
 .answer-scale-row-body strong {
-  color: #20262c;
-  font-size: 12px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
 }
 
 .answer-scale-row-body span {
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
 }
 
 .answer-scale-confirm {
@@ -1725,7 +1725,7 @@
   align-items: center;
   gap: 6px;
   color: #8d2525;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -1747,9 +1747,9 @@
   border: 1px solid #d7dee2;
   border-radius: 3px;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
   text-align: center;
 }
@@ -1762,8 +1762,8 @@
 
 .answer-scale-hint {
   margin: 0;
-  color: #68737d;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -1772,8 +1772,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #52616b;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -1796,9 +1796,9 @@
   border: 1px solid #d7dee2;
   border-radius: 3px;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .answer-scale-option-row input:focus {
@@ -1837,7 +1837,7 @@
   border: 1px solid #cfd7dc;
   border-radius: 3px;
   background: #ffffff;
-  color: #20262c;
+  color: #000000;
   font-family: inherit;
   font-size: 16px;
   text-overflow: ellipsis;
@@ -1864,7 +1864,7 @@
   width: 16px;
   height: 16px;
   transform: translateY(-50%);
-  color: #68737d;
+  color: #000000;
   pointer-events: none;
 }
 
@@ -1899,7 +1899,7 @@
   justify-content: space-between;
   gap: 10px;
   padding: 9px 12px;
-  color: #20262c;
+  color: #000000;
   font-size: 15px;
   cursor: pointer;
 }
@@ -1927,8 +1927,8 @@
   border-radius: 4px;
   background: #ffffff;
   box-shadow: 0 6px 18px rgba(15, 30, 45, 0.18);
-  color: #20262c;
-  font-size: 11px;
+  color: #000000;
+  font-size: 13px;
   line-height: 1.45;
   white-space: normal;
   overflow-wrap: anywhere;
@@ -1937,7 +1937,7 @@
 
 .searchable-select__empty {
   padding: 12px;
-  color: #68737d;
+  color: #000000;
   font-size: 14px;
   text-align: center;
 }

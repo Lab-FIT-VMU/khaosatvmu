@@ -181,9 +181,10 @@ const surveyTemplateColumnWidths = [32, 70, 18, 30];
  * không kẹp bên phải sheet 1 nữa: để chung một sheet thì người soạn hay chèn hay
  * xoá dòng ở phần câu hỏi và làm xô lệch luôn bảng tra bên cạnh.
  *
- * Câu mẫu cố ý trải trên hai mục và có một câu bẫy nằm giữa mục, để người soạn
- * thấy ngay ba điều: tên mục phải LẶP LẠI ở mọi dòng (không gộp ô), câu bẫy cũng
- * phải có mục, và các câu cùng mục phải nằm liền nhau.
+ * Câu mẫu cố ý trải trên ba mục và có một câu bẫy nằm giữa mục, để người soạn thấy
+ * ngay ba điều: tên mục phải LẶP LẠI ở mọi dòng (không gộp ô), câu bẫy cũng phải có
+ * mục, và các câu cùng mục phải nằm liền nhau. Tên mục đặt tuỳ ý, tối đa
+ * `maximumSectionsPerTemplate` mục.
  */
 export async function downloadSurveyTemplateImportTemplate(
   answerScales: AnswerScale[]
@@ -194,8 +195,10 @@ export async function downloadSurveyTemplateImportTemplate(
   // Mức mẫu cho câu bẫy phải là một mức có thật của chính thang đó.
   const trapValue = defaultScale?.options?.[Math.floor((defaultScale.options.length - 1) / 2)]?.value;
 
+  // Tên mục chỉ là ví dụ, người soạn đặt tên nào cũng được.
   const courseSection = 'Nội dung đánh giá học phần';
   const lecturerSection = 'Nội dung đánh giá về giảng viên';
+  const facilitiesSection = 'Nội dung đánh giá về cơ sở vật chất, phục vụ học tập';
 
   const sampleRows: {
     sectionName: string;
@@ -235,15 +238,41 @@ export async function downloadSurveyTemplateImportTemplate(
       answerScaleId: defaultScaleId,
       trap: null,
     },
+    {
+      sectionName: facilitiesSection,
+      questionText: 'Phòng học, trang thiết bị đáp ứng yêu cầu học tập của học phần.',
+      answerScaleId: defaultScaleId,
+      trap: null,
+    },
   ];
 
+  // Lưu ý đặt ở cột F, cách bốn cột nhập một cột trống và gộp dọc suốt các dòng mẫu.
+  // Trình đọc tệp chỉ lấy đúng bốn cột có tiêu đề nên ô này không bị hiểu thành dữ liệu.
+  const sectionNote =
+    `LƯU Ý: Tên mục ở cột "Mục" đặt tuỳ ý, mỗi bộ câu hỏi tối đa ${maximumSectionsPerTemplate} mục. `
+    + 'Ghi lại tên mục ở từng dòng (không gộp ô) và để các câu cùng mục nằm liền nhau.';
+
   const data: SheetData = [
-    templateHeaderRow(surveyTemplateImportColumns),
+    [
+      ...templateHeaderRow(surveyTemplateImportColumns),
+      null,
+      {
+        value: sectionNote,
+        type: String,
+        fontWeight: 'bold',
+        textColor: '#B42318',
+        wrap: true,
+        alignVertical: 'top',
+        rowSpan: sampleRows.length + 1,
+      },
+    ],
     ...sampleRows.map((question) => [
       { value: question.sectionName, type: String },
       { value: question.questionText, type: String },
       { value: question.answerScaleId, type: Number },
       question.trap ? { value: question.trap, type: Number } : null,
+      null,
+      null,
     ]),
   ];
 
@@ -252,7 +281,8 @@ export async function downloadSurveyTemplateImportTemplate(
       {
         data,
         sheet: 'Bo cau hoi',
-        columns: surveyTemplateColumnWidths.map((width) => ({ width })),
+        // Cột E để trống làm khoảng cách, cột F rộng cho dòng lưu ý.
+        columns: [...surveyTemplateColumnWidths, 4, 60].map((width) => ({ width })),
       } as never,
       buildAnswerScaleLookupSheet(answerScales),
     ],
@@ -382,10 +412,10 @@ export async function parseSurveyTemplateImportFile(
     throw new SurveyTemplateImportFileError('NO_DATA_ROWS');
   }
 
-  // Đọc tuần tự từ trên xuống: gặp tên mục mới thì mở mục mới, tên đã gặp thì
-  // dùng lại đúng mục đó. Mục quay lại sau khi đã sang mục khác là bị cắt khúc,
-  // ghi vào danh sách lỗi chứ không tự gộp — tự gộp thì thứ tự câu khi lưu khác
-  // thứ tự trong tệp, người dùng không hiểu vì sao.
+  // Đọc tuần tự từ trên xuống: gặp mục mới thì mở mục mới, mục đã gặp thì dùng lại
+  // đúng mục đó. Mục quay lại sau khi đã sang mục khác là bị cắt khúc, ghi vào danh
+  // sách lỗi chứ không tự gộp — tự gộp thì thứ tự câu khi lưu khác thứ tự trong
+  // tệp, người dùng không hiểu vì sao.
   const invalidSectionRows: InvalidSectionRow[] = [];
   const sections: string[] = [];
   const sectionIndexByKey = new Map<string, number>();

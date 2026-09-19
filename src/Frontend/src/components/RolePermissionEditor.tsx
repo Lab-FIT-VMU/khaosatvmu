@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw, Save, Search, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
+import { roleDisplayName } from '../auth/roles';
 import { Modal } from './Modal';
 import { adminApi } from '../services/adminApi';
 import type { AdminRole, RolePermissionMatrix } from '../types';
@@ -99,7 +100,7 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
         [roleData.roleId]: roleData,
       };
       setDirtyMap({});
-      toast.success('Đã cập nhật phân quyền', { description: `Vai trò: ${roleData.roleName}` });
+      toast.success('Đã cập nhật phân quyền', { description: `Vai trò: ${roleDisplayName(roleData.roleCode, roleData.roleName)}` });
       return true;
     } catch (err: unknown) {
       setSaveError(messageFromError(err));
@@ -179,7 +180,7 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
         >
           {roles.map((role) => (
             <option key={role.id} value={role.id}>
-              {role.name}
+              {roleDisplayName(role.code, role.name)}
             </option>
           ))}
         </select>
@@ -193,7 +194,7 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
                 role="option"
                 aria-selected={role.id === selectedRoleId}
               >
-                <div className="perm-role-item__name">{role.name}</div>
+                <div className="perm-role-item__name">{roleDisplayName(role.code, role.name)}</div>
               </button>
             </li>
           ))}

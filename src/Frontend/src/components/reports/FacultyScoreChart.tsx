@@ -88,7 +88,7 @@ export const FacultyScoreChart: React.FC<FacultyScoreChartProps> = ({
             ticks={[0, 1, 2, 3, 4, 5]}
             tickLine={false}
             axisLine={{ stroke: '#cbd5e1' }}
-            tick={{ fontSize: 11, fill: '#68737d' }}
+            tick={{ fontSize: 13, fill: '#68737d' }}
           />
           <YAxis
             type="category"
@@ -110,7 +110,7 @@ export const FacultyScoreChart: React.FC<FacultyScoreChartProps> = ({
                 value: `Toàn trường ${schoolAverage.toFixed(2)}`,
                 position: 'top',
                 fill: '#1f2937',
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: 700,
               }}
             />

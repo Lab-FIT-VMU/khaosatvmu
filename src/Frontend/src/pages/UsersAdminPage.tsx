@@ -21,6 +21,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { roleDisplayName } from '../auth/roles';
 import { Modal } from '../components/Modal';
 import { ProfileImportDialog } from '../components/ProfileImportDialog';
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
@@ -53,7 +54,7 @@ type StatusConfirmation =
  * Mã hồ sơ do backend cấp số tự tăng khi tạo và không xuất hiện trong biểu mẫu.
  */
 const profileNamingByRole: Record<string, { name: string; suffix: string }> = {
-  ADMIN: { name: 'Admin hệ thống', suffix: 'AD' },
+  ADMIN: { name: 'Quản trị hệ thống', suffix: 'AD' },
   DEPARTMENT_MANAGER: { name: 'Trưởng bộ môn', suffix: 'BM' },
   LECTURER: { name: 'Giảng viên', suffix: 'GV' },
   SURVEY_ADMIN: { name: 'Quản trị khảo sát', suffix: 'QT' },
@@ -420,7 +421,7 @@ export function UsersAdminPage() {
    * sẽ bỏ sót mọi tài khoản kiêm thêm vai trò khác.
    */
   const rolesOf = (user: AdminUser) =>
-    [...new Set(user.profiles.map((profile) => profile.roleCode))].sort();
+    [...new Set(user.profiles.map((profile) => roleDisplayName(profile.roleCode, profile.roleName)))].sort();
 
   const roleLabelOf = (user: AdminUser) =>
     user.profiles.length === 0 ? 'Chưa có hồ sơ' : rolesOf(user).join(', ');
@@ -434,7 +435,7 @@ export function UsersAdminPage() {
       value: roleLabelOf,
       values: rolesOf,
       // Bốn vai trò cố định của hệ thống, cộng mục cho tài khoản chưa được cấp hồ sơ.
-      options: ['ADMIN', 'SURVEY_ADMIN', 'DEPARTMENT_MANAGER', 'LECTURER', 'Chưa có hồ sơ'],
+      options: ['Quản trị hệ thống', 'Quản trị khảo sát', 'Trưởng bộ môn', 'Giảng viên', 'Chưa có hồ sơ'],
     },
     { key: 'lastLogin', value: (user) => formatDate(user.lastLoginAt) },
   ], []);
@@ -709,7 +710,7 @@ export function UsersAdminPage() {
                               className={`admin-role-label ${profile.isActive ? '' : 'is-disabled'}`}
                               title={`${profile.name}${profile.isActive ? '' : ' - Đã vô hiệu'}`}
                             >
-                              {profile.roleCode}
+                              {roleDisplayName(profile.roleCode, profile.roleName)}
                             </span>
                           ))}
                       </div>
@@ -979,7 +980,7 @@ export function UsersAdminPage() {
               <label htmlFor="profile-role">Vai trò được cấp</label>
               <select id="profile-role" value={profileForm.roleId} onChange={(event) => setProfileForm({ ...profileForm, roleId: event.target.value })} required>
                 <option value="">Chọn vai trò</option>
-                {roles.map((role) => <option key={role.id} value={role.id}>{role.name} ({role.code})</option>)}
+                {roles.map((role) => <option key={role.id} value={role.id}>{roleDisplayName(role.code, role.name)}</option>)}
               </select>
             </div>
 
@@ -1058,7 +1059,7 @@ export function UsersAdminPage() {
                         {profile.isActive ? 'Hoạt động' : 'Vô hiệu'}
                       </span>
                     </div>
-                    <span>{profile.roleName} · {profile.code}</span>
+                    <span>{roleDisplayName(profile.roleCode, profile.roleName)} · {profile.code}</span>
                     <small>{profile.organizationUnitName || 'Toàn hệ thống'}{profile.organizationUnitCode ? ` (${profile.organizationUnitCode})` : ''}</small>
                   </div>
                   <div className="admin-row-actions">

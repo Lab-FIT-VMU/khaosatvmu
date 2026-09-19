@@ -1,3 +1,4 @@
+using Application.UserAdministration;
 using Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,10 +26,10 @@ public static class DatabaseSeeder
     {
         var definitions = new[]
         {
-            (Code: "ADMIN", Name: "Administrator", Description: "System administrator"),
-            (Code: "LECTURER", Name: "Lecturer", Description: "Lecturer profile"),
-            (Code: "DEPARTMENT_MANAGER", Name: "Department manager", Description: "Department manager profile"),
-            (Code: "SURVEY_ADMIN", Name: "Survey administrator", Description: "Survey administrator profile")
+            (Code: "ADMIN", Name: "Quản trị hệ thống", Description: "Hồ sơ quản trị toàn hệ thống"),
+            (Code: "LECTURER", Name: "Giảng viên", Description: "Hồ sơ giảng viên"),
+            (Code: "DEPARTMENT_MANAGER", Name: "Trưởng bộ môn", Description: "Hồ sơ quản lý bộ môn"),
+            (Code: "SURVEY_ADMIN", Name: "Quản trị khảo sát", Description: "Hồ sơ quản trị nghiệp vụ khảo sát")
         };
 
         var roles = new Dictionary<string, Role>(StringComparer.OrdinalIgnoreCase);
@@ -47,11 +48,34 @@ public static class DatabaseSeeder
                 };
                 db.Roles.Add(role);
             }
+            else
+            {
+                // Vai trò đã tồn tại từ các bản cài đặt cũ vẫn phải được Việt hoá;
+                // nếu chỉ đổi dữ liệu khởi tạo thì CSDL đang chạy vẫn trả về tên cũ.
+                role.Name = definition.Name;
+                role.Description = definition.Description;
+                role.IsSystem = true;
+            }
 
             roles[definition.Code] = role;
         }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Tên hồ sơ do vai trò quyết định và giao diện không cho sửa tự do. Đồng bộ
+        // cả dữ liệu cũ để không còn chỗ hiện "Admin hệ thống" trong chi tiết tài khoản.
+        foreach (var (roleCode, role) in roles)
+        {
+            var profileName = ProfileNaming.ByRoleCode[roleCode].Name;
+            await db.UserProfiles
+                .Where(x => x.RoleId == role.Id && x.ProfileName != profileName)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(x => x.ProfileName, profileName)
+                        .SetProperty(x => x.UpdatedAt, DateTime.UtcNow),
+                    cancellationToken);
+        }
+
         return roles;
     }
 
@@ -221,7 +245,7 @@ public static class DatabaseSeeder
             user,
             roles["LECTURER"],
             "LECTURER_MAIN",
-            "Giang vien",
+            ProfileNaming.ByRoleCode["LECTURER"].Name,
             "CNTT",
             "Khoa CNTT",
             isDefault: true,
@@ -232,7 +256,7 @@ public static class DatabaseSeeder
             user,
             roles["SURVEY_ADMIN"],
             "SURVEY_ADMIN",
-            "Quan tri khao sat",
+            ProfileNaming.ByRoleCode["SURVEY_ADMIN"].Name,
             "SURVEY",
             "Phong khao sat",
             isDefault: false,
@@ -243,7 +267,7 @@ public static class DatabaseSeeder
             user,
             roles["ADMIN"],
             "ADMIN_SYSTEM",
-            "Quan tri he thong",
+            ProfileNaming.ByRoleCode["ADMIN"].Name,
             null,
             null,
             isDefault: false,

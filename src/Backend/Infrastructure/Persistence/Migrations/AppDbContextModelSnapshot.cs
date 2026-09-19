@@ -481,6 +481,70 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("Faculties", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.GraduationAggregateRow", b =>
+                {
+                    b.Property<long>("AggregateRowId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("AggregateRowId"));
+
+                    b.Property<string>("CohortCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("DerivedProgramCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("FacultyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("FacultyNameRaw")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("GraduationRank")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("IsWorkStudy")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ProgramKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ProgramNameRaw")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<long>("RevisionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("StudentCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("AggregateRowId");
+
+                    b.HasIndex("RevisionId", "CohortCode");
+
+                    b.HasIndex("RevisionId", "FacultyKey", "ProgramKey", "CohortCode", "GraduationRank", "IsWorkStudy")
+                        .IsUnique();
+
+                    b.ToTable("GraduationAggregateRows", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_GraduationAggregateRows_StudentCount", "\"StudentCount\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("Domain.GraduationAnalyticsDataset", b =>
                 {
                     b.Property<long>("DatasetId")
@@ -660,6 +724,146 @@ namespace Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("GraduationAnalyticsRows", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.GraduationImportRevision", b =>
+                {
+                    b.Property<long>("RevisionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("RevisionId"));
+
+                    b.Property<string>("AggregateHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .IsFixedLength();
+
+                    b.Property<DateTime>("ImportedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImportedByName")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<Guid>("ImportedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ImportedRowCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<long>("PeriodId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ReplaceReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<long?>("ReplacedRevisionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ReviewMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ReviewYear")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SkippedRowCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SkippedSummaryJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("SourceRowCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceSheetName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("RevisionId");
+
+                    b.HasIndex("FileHash");
+
+                    b.HasIndex("ReplacedRevisionId");
+
+                    b.HasIndex("PeriodId", "RevisionNumber")
+                        .IsUnique();
+
+                    b.ToTable("GraduationImportRevisions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_GraduationImportRevisions_RevisionNumber", "\"RevisionNumber\" > 0");
+
+                            t.HasCheckConstraint("CK_GraduationImportRevisions_RowCounts", "\"SourceRowCount\" = \"ImportedRowCount\" + \"SkippedRowCount\" AND \"ImportedRowCount\" > 0 AND \"SkippedRowCount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.GraduationPeriod", b =>
+                {
+                    b.Property<long>("PeriodId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("PeriodId"));
+
+                    b.Property<int>("AcademicYearStart")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("ActiveRevisionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ReviewMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ReviewYear")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PeriodId");
+
+                    b.HasIndex("ActiveRevisionId");
+
+                    b.HasIndex("AcademicYearStart", "RoundNumber")
+                        .IsUnique();
+
+                    b.HasIndex("AcademicYearStart", "ReviewYear", "ReviewMonth");
+
+                    b.ToTable("GraduationPeriods", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_GraduationPeriods_AcademicYearStart", "\"AcademicYearStart\" BETWEEN 1900 AND 2200");
+
+                            t.HasCheckConstraint("CK_GraduationPeriods_ReviewMonth", "\"ReviewMonth\" BETWEEN 1 AND 12");
+
+                            t.HasCheckConstraint("CK_GraduationPeriods_ReviewYear", "\"ReviewYear\" BETWEEN 1900 AND 2200");
+
+                            t.HasCheckConstraint("CK_GraduationPeriods_RoundNumber", "\"RoundNumber\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Lecturer", b =>
@@ -1068,6 +1272,55 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("SurveyResponseAnswers", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.SurveyScoringChangeLog", b =>
+                {
+                    b.Property<long>("SurveyScoringChangeLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("SurveyScoringChangeLogId"));
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ChangedByName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("ChangedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<decimal>("MinimumResponseRate")
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal>("MinimumValidRate")
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<bool>("RejectAttentionCheckFailed")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RejectSingleAnswer")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RejectTooFast")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("SemesterSurveyId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("SurveyScoringChangeLogId");
+
+                    b.HasIndex("SemesterSurveyId");
+
+                    b.ToTable("SurveyScoringChangeLogs", (string)null);
+                });
+
             modelBuilder.Entity("Domain.SurveyScoringSetting", b =>
                 {
                     b.Property<int>("SurveyScoringSettingId")
@@ -1081,6 +1334,21 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Property<decimal>("MinimumValidRate")
                         .HasColumnType("numeric(5,2)");
+
+                    b.Property<bool>("RejectAttentionCheckFailed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("RejectSingleAnswer")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("RejectTooFast")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1357,6 +1625,15 @@ namespace Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
+            modelBuilder.Entity("Domain.GraduationAggregateRow", b =>
+                {
+                    b.HasOne("Domain.GraduationImportRevision", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.GraduationAnalyticsRow", b =>
                 {
                     b.HasOne("Domain.GraduationAnalyticsDataset", null)
@@ -1364,6 +1641,28 @@ namespace Infrastructure.Persistence.Migrations
                         .HasForeignKey("DatasetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.GraduationImportRevision", b =>
+                {
+                    b.HasOne("Domain.GraduationPeriod", null)
+                        .WithMany()
+                        .HasForeignKey("PeriodId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.GraduationImportRevision", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacedRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.GraduationPeriod", b =>
+                {
+                    b.HasOne("Domain.GraduationImportRevision", null)
+                        .WithMany()
+                        .HasForeignKey("ActiveRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Domain.Lecturer", b =>

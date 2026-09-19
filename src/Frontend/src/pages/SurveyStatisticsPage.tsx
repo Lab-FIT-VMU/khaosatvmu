@@ -1,16 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Calculator,
   Check,
   ChevronDown,
   CircleAlert,
   LoaderCircle,
   RefreshCw,
-  Settings,
+  Search,
   TriangleAlert,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { useSemester } from '../context/semesterContext';
 import { TablePagination } from '../components/TablePagination';
 import { ExportDropdown } from '../components/ExportDropdown';
@@ -19,19 +17,17 @@ import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import type { SemesterSurvey } from '../types';
 import type { SectionStatisticsRow, SemesterSurveyStatistics } from '../services/surveyApi';
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
-import { useAuth } from '../auth/authContext';
-import { isUnrestrictedRole } from '../auth/roles';
-import { Modal } from '../components/Modal';
-import {
-  publishScoringThresholds,
-  useScoringThresholds,
-} from '../hooks/useScoringThresholds';
+import { buildReportHash } from './reportRoute';
+import { UpdateScoresButton } from '../components/UpdateScoresButton';
+import { PublishResultsButton } from '../components/PublishResultsButton';
+import { ScoringConfigNote } from '../components/ScoringConfigNote';
+import { useScoringThresholds } from '../hooks/useScoringThresholds';
 import {
   hasEnoughResponsesToScore,
   responseRateOf,
   validRateOf,
-  type ScoringThresholds,
 } from '../utils/reportThresholds';
+import { foldVietnamese } from '../utils/vietnamese';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
@@ -49,13 +45,13 @@ const campaignSelectCss = `
 .campaign-select { position: relative; flex: 0 0 460px; min-width: 0; }
 .campaign-select__trigger {
   width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #20262c;
-  font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #000000;
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .campaign-select__trigger:disabled { background: #f4f6f8; color: #8c969f; cursor: not-allowed; }
 .campaign-select__trigger:focus-visible { outline: 2px solid rgba(7,136,184,.25); border-color: #0788b8; }
 .campaign-select__value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #68737d; }
+.campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #000000; }
 .campaign-select__list {
   position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none;
   overflow-y: auto; border: 1px solid #d7dee2; background: #fff;
@@ -64,7 +60,7 @@ const campaignSelectCss = `
 .campaign-select__option {
   position: relative; overflow: hidden; container-type: inline-size;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 8px 12px; font-size: 12px; color: #20262c; cursor: pointer;
+  padding: 8px 12px; font-size: 13px; color: #000000; cursor: pointer;
 }
 .campaign-select__option.is-active { background: #eef7fb; }
 .campaign-select__option > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -78,10 +74,10 @@ const campaignSelectCss = `
   0%, 12% { transform: translateX(0); }
   88%, 100% { transform: translateX(min(0px, calc(100cqw - 100% - 26px))); }
 }
-.campaign-select__empty { padding: 10px 12px; color: #68737d; font-size: 12px; text-align: center; }
+.campaign-select__empty { padding: 10px 12px; color: #000000; font-size: 13px; text-align: center; }
 .campaign-select__hint {
   position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid #d7dee2;
-  background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #20262c;
+  background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #000000;
   font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: none;
 }
 `;
@@ -256,14 +252,11 @@ export const SurveyStatisticsPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [recalculating, setRecalculating] = useState(false);
   const [page, setPage] = useState(1);
 
   // Hai vòng lọc lớp được tính điểm. Đọc từ cấu hình chung để bảng này và các
   // trang báo cáo luôn nói cùng một con số.
   const thresholds = useScoringThresholds();
-  const [isThresholdOpen, setIsThresholdOpen] = useState(false);
-  const [tab, setTab] = useState<'eligible' | 'ineligible'>('eligible');
 
   // Đổi học kỳ thì nạp lại danh sách đợt khảo sát của kỳ đó.
   useEffect(() => {
@@ -312,22 +305,6 @@ export const SurveyStatisticsPage: React.FC = () => {
     void loadStatistics();
   }, [loadStatistics]);
 
-  const handleRecalculate = async () => {
-    if (!semesterSurveyId || recalculating) return;
-    setRecalculating(true);
-    try {
-      const result = await surveyApi.recalculateScores(Number(semesterSurveyId));
-      toast.success(`Đã tính lại ${result.updatedSectionCount} lớp học phần`, {
-        description: `Thời điểm tính: ${formatDateTime(result.calculatedAt)}`,
-      });
-      await loadStatistics();
-    } catch (error) {
-      toast.error('Không tính lại được điểm', { description: messageFrom(error) });
-    } finally {
-      setRecalculating(false);
-    }
-  };
-
   const semesterOptions = useMemo(
     () =>
       academicYears.flatMap((year) =>
@@ -341,49 +318,62 @@ export const SurveyStatisticsPage: React.FC = () => {
 
   // Bám vào chính statistics chứ không vào mảng dẫn xuất, vì mảng dẫn xuất tạo
   // tham chiếu mới mỗi lần render nên useMemo sẽ chạy lại vô ích.
-  const { activeProfile } = useAuth();
-  const canRecalculate = isUnrestrictedRole(activeProfile?.roleCode);
-
   const columns = useMemo(() => statistics?.questionColumns ?? [], [statistics]);
   const rows = useMemo(() => statistics?.rows ?? [], [statistics]);
   const lastCalculatedAt = statistics?.lastCalculatedAt ?? null;
 
-  const questionTextById = useMemo(
-    () => new Map(columns.map((column) => [column.questionId, column])),
-    [columns]
-  );
-
   /**
-   * Hai nhóm của trang, chia theo ẢNH CHỤP của lần bấm "Tính lại điểm" gần nhất
-   * chứ không tính sống.
-   *
-   * Mốc phân nhóm là `averageScore`: câu UPDATE của nút tính chỉ chốt điểm cho
-   * lớp qua được hai vòng lọc, lớp rớt nhận NULL. Nên "có điểm đã chốt" đúng bằng
-   * "được tính vào điểm ở lần chốt gần nhất" — không cần thêm cột cờ nào.
-   *
-   * Hệ quả cố ý: có phiếu mới về, hay quản trị vừa sửa ngưỡng, thì hai tab vẫn
-   * đứng yên cho tới khi bấm tính lại. Đó là điều kiện để mọi con số trên trang
-   * cùng thuộc về một lần chốt.
+   * Lớp nào đủ điều kiện tính điểm. Một lớp đủ điều kiện khi đã có điểm chốt ở lần
+   * bấm Cập nhật điểm gần nhất (câu UPDATE chỉ chốt điểm cho lớp qua hai vòng lọc),
+   * hoặc số phiếu hiện tại đã qua hai vòng lọc nhưng chưa được chốt. Lớp không đủ
+   * điều kiện vẫn không có điểm như trước.
    */
-  const groupedRows = useMemo(() => {
-    const eligible: SectionStatisticsRow[] = [];
-    const ineligible: SectionStatisticsRow[] = [];
+  const eligibleIds = useMemo(() => {
+    const ids = new Set<number>();
     for (const row of rows) {
-      (row.averageScore === null ? ineligible : eligible).push(row);
+      const isEligibleNow = hasEnoughResponsesToScore(
+        row.classSize,
+        row.totalResponseCount,
+        row.validResponseCount,
+        thresholds
+      );
+      if (isEligibleNow || row.averageScore !== null) ids.add(row.courseSectionSurveyId);
     }
-    return { eligible, ineligible };
-  }, [rows]);
+    return ids;
+  }, [rows, thresholds]);
+  const eligibleCount = eligibleIds.size;
+  const ineligibleCount = rows.length - eligibleCount;
 
-  // Trong nhóm đủ điều kiện, lớp đã chốt điểm lên trên, lớp chưa có điểm xuống
-  // dưới — phần lớn việc cần làm nằm ở nhóm trên. Sort của JS ổn định nên vẫn
-  // giữ nguyên thứ tự mã học phần / tên lớp của backend.
+  // Ô tìm kiếm và ba ô chọn nhóm lớp phía trên bảng. Chỉ chọn được một nhóm.
+  const [searchText, setSearchText] = useState('');
+  const [eligibilityFilter, setEligibilityFilter] = useState<'all' | 'eligible' | 'ineligible'>('all');
+
+  // Một bảng chung: lớp đủ điều kiện lên trước (trong đó lớp đã chốt điểm lên trên
+  // lớp đang chờ chốt), lớp không đủ điều kiện xuống dưới. Sort của JS ổn định nên
+  // trong từng nhóm vẫn giữ thứ tự mã học phần / tên lớp của backend.
+  //
+  // Lọc theo nhóm và theo ô tìm kiếm TRƯỚC khi đưa vào bộ lọc cột, để số kết quả và
+  // phân trang tính trên đúng phần đang hiện. Tìm không phân biệt dấu, theo mã / tên
+  // học phần, giảng viên, bộ môn và khoa/viện.
   const orderedRows = useMemo(() => {
-    const source = tab === 'eligible' ? groupedRows.eligible : groupedRows.ineligible;
-    return [...source].sort(
-      (left, right) =>
-        Number(left.averageScore === null) - Number(right.averageScore === null)
-    );
-  }, [groupedRows, tab]);
+    const keyword = foldVietnamese(searchText).toLowerCase();
+    const rank = (row: SectionStatisticsRow) =>
+      !eligibleIds.has(row.courseSectionSurveyId) ? 2 : row.averageScore === null ? 1 : 0;
+    return rows
+      .filter((row) => {
+        const isEligible = eligibleIds.has(row.courseSectionSurveyId);
+        if (eligibilityFilter === 'eligible' && !isEligible) return false;
+        if (eligibilityFilter === 'ineligible' && isEligible) return false;
+        if (!keyword) return true;
+        return foldVietnamese(
+          [row.courseCode, row.courseName, row.lecturerName, row.departmentName, row.facultyName]
+            .join(' '),
+        )
+          .toLowerCase()
+          .includes(keyword);
+      })
+      .sort((left, right) => rank(left) - rank(right));
+  }, [rows, eligibleIds, eligibilityFilter, searchText]);
 
   /**
    * Cột lọc được. CỐ Ý bỏ qua 30 cột điểm từng câu: lọc theo một điểm lẻ như
@@ -395,6 +385,7 @@ export const SurveyStatisticsPage: React.FC = () => {
       { key: 'courseCode', value: (row) => row.courseCode },
       { key: 'sectionName', value: (row) => row.sectionName },
       { key: 'courseName', value: (row) => row.courseName },
+      { key: 'facultyName', value: (row) => row.facultyName },
       { key: 'departmentName', value: (row) => row.departmentName },
       { key: 'lecturerName', value: (row) => row.lecturerName },
       { key: 'classSize', value: (row) => String(row.classSize), numeric: true },
@@ -428,27 +419,6 @@ export const SurveyStatisticsPage: React.FC = () => {
         sortValue: (row) => row.averageScore,
       },
       {
-        key: 'weakestQuestion',
-        value: (row) => {
-          const weakest = row.weakestQuestionId === null
-            ? null
-            : questionTextById.get(row.weakestQuestionId);
-          return weakest ? `C${weakest.order}` : '—';
-        },
-        sortValue: (row) => {
-          const weakest = row.weakestQuestionId === null
-            ? null
-            : questionTextById.get(row.weakestQuestionId);
-          return weakest ? weakest.order : null;
-        },
-      },
-      {
-        key: 'weakestQuestionScore',
-        value: (row) =>
-          row.weakestQuestionScore === null ? '—' : row.weakestQuestionScore.toFixed(2),
-        sortValue: (row) => row.weakestQuestionScore,
-      },
-      {
         key: 'invalidResponseCount',
         value: (row) => String(row.invalidResponseCount),
         numeric: true,
@@ -458,8 +428,13 @@ export const SurveyStatisticsPage: React.FC = () => {
         value: (row) => String(row.openCommentCount),
         numeric: true,
       },
+      {
+        key: 'eligibility',
+        value: (row) =>
+          eligibleIds.has(row.courseSectionSurveyId) ? 'Đủ điều kiện' : 'Không đủ điều kiện',
+      },
     ],
-    [questionTextById]
+    [eligibleIds]
   );
 
   const filters = useColumnFilters(orderedRows, filterColumns);
@@ -472,38 +447,161 @@ export const SurveyStatisticsPage: React.FC = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [semesterSurveyId, tab]);
+  }, [semesterSurveyId, searchText, eligibilityFilter]);
 
   useEffect(() => {
     setPage((current) => Math.min(current, pageCount));
   }, [pageCount]);
   /**
-   * Số tổng cho FILE XUẤT. Dòng Tổng kết ghim đáy bảng đã bỏ, nhưng báo cáo xuất
-   * ra vẫn cần phần đầu trang, nên tính tại chỗ trên đúng tập dòng đang xuất —
-   * tức là theo tab đang mở và bộ lọc đang áp, không phải toàn đợt.
+   * Tệp xuất = đúng bảng đang hiển thị: cùng bộ cột, cùng thứ tự, cùng các dòng còn
+   * lại sau ô tìm kiếm, ô chọn nhóm lớp và bộ lọc cột, kèm phần mô tả cách đọc từng
+   * cột và danh sách nội dung câu hỏi của các cột C.
    */
-  const exportTotals = useMemo(() => {
-    const mean = (values: number[]) =>
-      values.length === 0 ? null : values.reduce((sum, x) => sum + x, 0) / values.length;
+  const exportOptions = useMemo(() => {
+    if (!statistics) return null;
 
-    const questionMeans = new Map<number, number | null>();
-    for (const column of columns) {
-      const scores = filteredRows
-        .map((row) => row.questionScores.find((score) => score.questionId === column.questionId))
-        .filter((score) => score !== undefined && score.answerCount > 0)
-        .map((score) => score!.averageScore);
-      questionMeans.set(column.questionId, mean(scores));
-    }
+    const surveyName = semesterSurveys
+      .find((item) => String(item.semesterSurveyId) === semesterSurveyId)?.surveyName ?? '';
+    const groupLabel = eligibilityFilter === 'eligible'
+      ? 'Các lớp học phần đủ điều kiện'
+      : eligibilityFilter === 'ineligible'
+        ? 'Các lớp học phần không đủ điều kiện'
+        : 'Toàn bộ';
+    const exportedEligible = filteredRows.filter((row) => eligibleIds.has(row.courseSectionSurveyId)).length;
+    const isNarrowed = eligibilityFilter !== 'all' || searchText.trim() !== '' || filters.isFiltered;
 
     return {
-      classSizeTotal: filteredRows.reduce((sum, row) => sum + row.classSize, 0),
-      responseTotal: filteredRows.reduce((sum, row) => sum + row.totalResponseCount, 0),
-      questionMeans,
-      averageScoreMean: mean(
-        filteredRows.filter((row) => row.averageScore !== null).map((row) => row.averageScore!)
-      ),
+      fileName: `bang-du-lieu-khao-sat-${surveyName || 'dot-khao-sat'}`,
+      metadata: {
+        title: 'BẢNG DỮ LIỆU KHẢO SÁT',
+        subtitle: surveyName
+          ? `${surveyName} · ${statistics.semesterName} năm học ${statistics.academicYearName}`
+          : `${statistics.semesterName} năm học ${statistics.academicYearName}`,
+        subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+        info: {
+          'Đợt khảo sát': surveyName || undefined,
+          'Học kỳ': `${statistics.semesterName} · ${statistics.academicYearName}`,
+          'Bộ câu hỏi': statistics.templateName,
+          'Tính điểm lần cuối': formatDateTime(statistics.lastCalculatedAt),
+          'Tiêu chí tính điểm':
+            `Tỷ lệ phản hồi ≥ ${thresholds.minimumResponseRate}% · `
+            + `Tỷ lệ phiếu hợp lệ ≥ ${thresholds.minimumValidRate}%`,
+          'Nhóm lớp': groupLabel,
+          'Từ khoá tìm kiếm': searchText.trim() || undefined,
+          'Số lớp trong tệp':
+            `${filteredRows.length} lớp (${exportedEligible} đủ điều kiện · `
+            + `${filteredRows.length - exportedEligible} không đủ điều kiện)`,
+        },
+        summaryNotes: [
+          'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Sĩ số.',
+          'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
+          'Số phiếu không hợp lệ là phiếu bị bộ lọc nhiễu loại, không tham gia tính điểm.',
+          'C1, C2… là điểm trung bình từng câu hỏi (thang 5.0) từ phiếu hợp lệ; nội dung câu ở sheet "Danh sach cau hoi". Câu bẫy không đánh số và không có trong bảng.',
+          'Điểm trung bình và điểm từng câu lấy theo lần bấm Cập nhật điểm gần nhất.',
+          'Mô tả: "Đủ điều kiện" là lớp qua cả hai tiêu chí tính điểm; lớp "Không đủ điều kiện" không được tính điểm. "Chờ chốt điểm" là lớp đã đủ điều kiện nhưng chưa được cập nhật điểm.',
+          ...(isNarrowed
+            ? ['Tệp chỉ chứa các lớp đang hiển thị theo tìm kiếm, nhóm lớp và bộ lọc đang áp trên màn hình.']
+            : []),
+        ],
+      },
+      sheets: [
+        {
+          sheetName: 'Bang du lieu',
+          title: `BẢNG DỮ LIỆU KHẢO SÁT (${filteredRows.length} LỚP)`,
+          columns: [
+            { key: 'courseName', header: 'Học phần', width: 28 },
+            { key: 'courseCode', header: 'Mã học phần', width: 12, align: 'center' as const },
+            { key: 'sectionName', header: 'Lớp học phần', width: 12, align: 'center' as const },
+            { key: 'facultyName', header: 'Khoa / Viện', width: 24 },
+            { key: 'departmentName', header: 'Bộ môn', width: 22 },
+            { key: 'lecturerName', header: 'Giảng viên', width: 26 },
+            { key: 'classSize', header: 'Sĩ số', width: 8, type: 'number' as const, align: 'right' as const },
+            { key: 'totalResponseCount', header: 'Số phiếu đã thu', width: 12, type: 'number' as const, align: 'right' as const },
+            { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 12, type: 'number' as const, align: 'right' as const },
+            { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
+            {
+              // Xuất SỐ kèm mã định dạng, không xuất chuỗi "18.2%": ô chữ thì Excel
+              // sắp theo bảng chữ cái, "100.0%" rơi xuống dưới "18.2%".
+              key: 'responseRate',
+              header: 'Tỷ lệ phản hồi',
+              width: 12,
+              type: 'number' as const,
+              align: 'right' as const,
+              numberFormat: '0.0"%"',
+              format: (_: unknown, row: SectionStatisticsRow) =>
+                Number(responseRateOf(row.totalResponseCount, row.classSize).toFixed(1)),
+            },
+            {
+              key: 'validRate',
+              header: 'Tỷ lệ phiếu hợp lệ',
+              width: 12,
+              type: 'number' as const,
+              align: 'right' as const,
+              numberFormat: '0.0"%"',
+              format: (_: unknown, row: SectionStatisticsRow) =>
+                Number(validRateOf(row.validResponseCount, row.totalResponseCount).toFixed(1)),
+            },
+            ...columns.map((column) => ({
+              key: `c_${column.questionId}`,
+              header: `C${column.order}`,
+              width: 7,
+              align: 'right' as const,
+              format: (_: unknown, row: SectionStatisticsRow) => {
+                const score = row.questionScores.find((item) => item.questionId === column.questionId);
+                return score?.answerCount ? score.averageScore.toFixed(2) : '—';
+              },
+            })),
+            {
+              key: 'averageScore',
+              header: 'Điểm trung bình',
+              width: 12,
+              align: 'right' as const,
+              format: (_: unknown, row: SectionStatisticsRow) => {
+                if (row.averageScore !== null) return row.averageScore.toFixed(2);
+                return hasEnoughResponsesToScore(
+                  row.classSize,
+                  row.totalResponseCount,
+                  row.validResponseCount,
+                  thresholds,
+                )
+                  ? 'Chờ chốt điểm'
+                  : '—';
+              },
+            },
+            { key: 'openCommentCount', header: 'Số ý kiến mở', width: 10, type: 'number' as const, align: 'right' as const },
+            {
+              key: 'eligibility',
+              header: 'Mô tả',
+              width: 18,
+              format: (_: unknown, row: SectionStatisticsRow) =>
+                eligibleIds.has(row.courseSectionSurveyId) ? 'Đủ điều kiện' : 'Không đủ điều kiện',
+            },
+          ],
+          data: filteredRows,
+        },
+        {
+          sheetName: 'Danh sach cau hoi',
+          title: 'DANH SÁCH CÂU HỎI ỨNG VỚI CÁC CỘT C',
+          columns: [
+            { key: 'order', header: 'Mã câu', width: 10, align: 'center' as const, format: (value: unknown) => `C${value}` },
+            { key: 'questionText', header: 'Nội dung câu hỏi', width: 90 },
+          ],
+          data: columns,
+        },
+      ],
     };
-  }, [columns, filteredRows]);
+  }, [
+    statistics,
+    semesterSurveys,
+    semesterSurveyId,
+    eligibilityFilter,
+    searchText,
+    filters.isFiltered,
+    filteredRows,
+    eligibleIds,
+    thresholds,
+    columns,
+  ]);
 
 
   return (
@@ -537,172 +635,11 @@ export const SurveyStatisticsPage: React.FC = () => {
         </div>
 
         <div className="statistics-toolbar-actions">
-          {statistics && rows.length > 0 && (
+          {exportOptions && rows.length > 0 && (
             <ExportDropdown
-              buttonLabel="Xuất bảng điểm"
+              buttonLabel="Xuất bảng dữ liệu"
               size="sm"
-              options={{
-                fileName: `bao-cao-thong-ke-diem-dot-khao-sat-${
-                  semesterSurveys.find((item) => String(item.semesterSurveyId) === semesterSurveyId)
-                    ?.surveyName || 'hoc-phan'
-                }`,
-                metadata: {
-                  title: 'BÁO CÁO THỐNG KÊ ĐIỂM SỐ ĐỢT KHẢO SÁT',
-                  subtitle: `Bộ câu hỏi: ${statistics.templateName}`,
-                  subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
-                  info: {
-                    'Bộ câu hỏi': statistics.templateName,
-                    'Số lượng lớp học phần': filteredRows.length,
-                    'Tổng sĩ số sinh viên': exportTotals.classSizeTotal,
-                    'Tổng phiếu khảo sát đã thu': exportTotals.responseTotal,
-                    'Điểm trung bình toàn đợt':
-                      exportTotals.averageScoreMean !== null ? exportTotals.averageScoreMean.toFixed(2) : '—',
-                  },
-                  summaryNotes: [
-                    'Điểm mỗi câu hỏi và điểm trung bình của lớp được tính trên thang điểm 5.0 từ phiếu hợp lệ.',
-                    'Dữ liệu được cập nhật tại thời điểm chốt tính điểm.',
-                    ...(filters.isFiltered
-                      ? ['Tệp này chỉ chứa các lớp còn lại sau bộ lọc đang áp trên màn hình.']
-                      : []),
-                  ],
-                },
-                sheets: [
-                  {
-                    sheetName: 'Bang diem chi tiet',
-                    title: filters.isFiltered
-                      ? `1. BẢNG ĐIỂM CHI TIẾT THEO BỘ LỌC ĐANG ÁP (${filteredRows.length} LỚP)`
-                      : `1. BẢNG ĐIỂM CHI TIẾT TẤT CẢ CÁC LỚP HỌC PHẦN (${filteredRows.length} LỚP)`,
-                    columns: [
-                      { key: 'courseCode', header: 'Mã học phần', width: 12, align: 'center' as const },
-                      { key: 'sectionName', header: 'Lớp học phần', width: 14, align: 'center' as const },
-                      { key: 'courseName', header: 'Tên học phần', width: 26 },
-                      { key: 'departmentName', header: 'Bộ môn', width: 20 },
-                      { key: 'lecturerName', header: 'Giảng viên', width: 34 },
-                      { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
-                      { key: 'totalResponseCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
-                      { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number' as const, align: 'right' as const },
-                      { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
-                      {
-                        // Xuất SỐ kèm mã định dạng, không xuất chuỗi "18.2%": ô chữ
-                        // thì Excel sắp theo bảng chữ cái, "100.0%" rơi xuống dưới
-                        // "18.2%" vì so ký tự thứ hai 0 < 8.
-                        key: 'responseRate',
-                        header: 'Tỷ lệ phản hồi',
-                        width: 14,
-                        type: 'number' as const,
-                        align: 'right' as const,
-                        numberFormat: '0.0"%"',
-                        format: (_: any, row: any) =>
-                          responseRateOf(row.totalResponseCount, row.classSize),
-                      },
-                      {
-                        key: 'validRate',
-                        header: 'Tỷ lệ phiếu hợp lệ',
-                        width: 16,
-                        type: 'number' as const,
-                        align: 'right' as const,
-                        numberFormat: '0.0"%"',
-                        format: (_: any, row: any) =>
-                          validRateOf(row.validResponseCount, row.totalResponseCount),
-                      },
-                      ...columns.map((c) => ({
-                        key: `c_${c.questionId}`,
-                        header: `C${c.order}`,
-                        width: 8,
-                        type: 'number' as const,
-                        align: 'right' as const,
-                        format: (_: any, row: any) => {
-                          const score = row.questionScores?.find((s: any) => s.questionId === c.questionId);
-                          return score?.answerCount ? score.averageScore.toFixed(2) : '—';
-                        },
-                      })),
-                      {
-                        key: 'averageScore',
-                        header: 'Điểm trung bình',
-                        width: 14,
-                        type: 'number' as const,
-                        align: 'right' as const,
-                        format: (val: any) => (val !== null ? Number(val).toFixed(2) : '—'),
-                      },
-                      { key: 'openCommentCount', header: 'Ý kiến mở', width: 10, type: 'number' as const, align: 'right' as const },
-                    ],
-                    data: filteredRows,
-                  },
-                  {
-                    sheetName: 'Lop diem thap & Luu y',
-                    title: '2. DANH SÁCH LỚP CÓ ĐIỂM THẤP HOẶC CÓ TIÊU CHÍ CẦN CẢI THIỆN',
-                    subtitle: 'Các lớp có Điểm trung bình < 3.50 hoặc có tiêu chí đơn lẻ bị đánh giá thấp',
-                    columns: [
-                      { key: 'courseCode', header: 'Mã HP', width: 12, align: 'center' as const },
-                      { key: 'sectionName', header: 'Lớp HP', width: 14, align: 'center' as const },
-                      { key: 'courseName', header: 'Tên học phần', width: 26 },
-                      { key: 'lecturerName', header: 'Giảng viên', width: 22 },
-                      { key: 'departmentName', header: 'Bộ môn', width: 20 },
-                      { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
-                      { key: 'totalResponseCount', header: 'Phiếu thu', width: 10, type: 'number' as const, align: 'right' as const },
-                      {
-                        key: 'averageScore',
-                        header: 'Điểm trung bình',
-                        width: 14,
-                        type: 'number' as const,
-                        align: 'right' as const,
-                        format: (v: any) => (v !== null ? Number(v).toFixed(2) : '—'),
-                      },
-                      {
-                        key: 'weakestQuestionOrder',
-                        header: 'Câu yếu nhất',
-                        width: 14,
-                        align: 'center' as const,
-                        format: (v: any, item: any) => v ? `C${v} (${item.weakestQuestionScore?.toFixed(2)})` : '—',
-                      },
-                      {
-                        key: 'weakestQuestionText',
-                        header: 'Nội dung câu hỏi yếu nhất',
-                        width: 36,
-                        format: (_: any, item: any) => {
-                          const q = item.weakestQuestionId ? questionTextById.get(item.weakestQuestionId) : null;
-                          return q?.questionText || item.weakestQuestionText || '—';
-                        },
-                      },
-                    ],
-                    data: filteredRows.filter((r) => (r.averageScore !== null && r.averageScore < 3.5) || (r.weakestQuestionScore !== null && r.weakestQuestionScore < 3.0)),
-                  },
-                  {
-                    sheetName: 'Thong ke theo Tieu chi',
-                    title: '3. THỐNG KÊ ĐIỂM TRUNG BÌNH THEO TỪNG TIÊU CHÍ CÂU HỎI',
-                    columns: [
-                      { key: 'order', header: 'Mã câu', width: 10, align: 'center' as const, format: (v: any) => `C${v}` },
-                      { key: 'questionText', header: 'Nội dung tiêu chí câu hỏi', width: 50 },
-                      {
-                        key: 'questionId',
-                        header: 'Điểm TB toàn trường',
-                        width: 18,
-                        type: 'number' as const,
-                        align: 'right' as const,
-                        format: (qid: any) => {
-                          const mean = exportTotals.questionMeans.get(Number(qid));
-                          return mean !== null && mean !== undefined ? mean.toFixed(2) : '—';
-                        },
-                      },
-                      {
-                        key: 'questionId',
-                        header: 'Số lớp < 3.5 điểm',
-                        width: 16,
-                        type: 'number' as const,
-                        align: 'right' as const,
-                        format: (qid: any) => {
-                          const id = Number(qid);
-                          return rows.filter((r) => {
-                            const sc = r.questionScores?.find((s) => s.questionId === id);
-                            return sc && sc.answerCount > 0 && sc.averageScore < 3.5;
-                          }).length;
-                        },
-                      },
-                    ],
-                    data: columns,
-                  },
-                ],
-              }}
+              options={exportOptions}
             />
           )}
           <button
@@ -714,26 +651,14 @@ export const SurveyStatisticsPage: React.FC = () => {
             <RefreshCw aria-hidden="true" size={16} />
             Tải lại
           </button>
-          {/* Tính lại điểm ghi đè điểm của MỌI lớp trong đợt, không cắt được theo
-              bộ môn — nên chỉ quản trị toàn hệ thống mới thấy nút. Backend cũng
-              chặn, đây chỉ là để người không có quyền khỏi bấm rồi ăn lỗi. */}
-          {canRecalculate && (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={() => void handleRecalculate()}
-              disabled={!semesterSurveyId || recalculating}
-            >
-              {recalculating ? (
-                <LoaderCircle className="auth-spin" aria-hidden="true" size={16} />
-              ) : (
-                <Calculator aria-hidden="true" size={16} />
-              )}
-              {recalculating ? 'Đang tính...' : 'Tính lại điểm'}
-            </button>
-          )}
+          <UpdateScoresButton semesterSurveyId={semesterSurveyId} onUpdated={loadStatistics} />
+          {/* Phát hành nằm ở đúng trang này vì đây là chỗ quản trị chốt số liệu cuối
+              đợt: xem bảng, bấm Cập nhật điểm, rồi mới mở cho đơn vị xem. */}
+          <PublishResultsButton semesterSurveyId={semesterSurveyId} onChanged={loadStatistics} />
         </div>
       </section>
+
+      <ScoringConfigNote />
 
       {loadError && (
         <div className="admin-alert" role="alert">
@@ -745,14 +670,11 @@ export const SurveyStatisticsPage: React.FC = () => {
       {statistics && (
         <section className="statistics-summary">
           <span>
-            Bộ câu hỏi: <strong>{statistics.templateName}</strong>
-          </span>
-          <span>
             {columns.length} câu chấm điểm · {rows.length} lớp ·{' '}
-            <strong>{groupedRows.eligible.length}</strong> đủ điều kiện ·{' '}
-            <strong>{groupedRows.ineligible.length}</strong> chưa đủ
-            {/* Đang lọc thì nói rõ còn bao nhiêu dòng TRONG TAB, không thì người
-                xem tưởng mất dữ liệu. */}
+            <strong className="statistics-count--eligible">{eligibleCount}</strong> đủ điều kiện ·{' '}
+            <strong className="statistics-count--ineligible">{ineligibleCount}</strong> không đủ điều kiện
+            {/* Đang lọc thì nói rõ còn bao nhiêu dòng, không thì người xem tưởng mất
+                dữ liệu. */}
             {filters.isFiltered && ` · đang lọc còn ${filteredRows.length} lớp`}
           </span>
           {/* Câu bẫy không được đánh số nên bảng không nhảy cóc số câu, nhưng bộ
@@ -767,20 +689,7 @@ export const SurveyStatisticsPage: React.FC = () => {
             Tính điểm lần cuối: <strong>{formatDateTime(statistics.lastCalculatedAt)}</strong>
           </span>
           {/* Hai vòng lọc đang áp, in ra ngay cạnh số liệu để không ai phải đoán
-              bảng đang bỏ lớp nào. Nút bánh răng nằm ngoài cùng bên phải. */}
-          <span className="statistics-threshold-note">
-            Tỷ lệ phản hồi ≥ <strong>{thresholds.minimumResponseRate}%</strong> · Tỷ lệ phiếu
-            hợp lệ ≥ <strong>{thresholds.minimumValidRate}%</strong>
-          </span>
-          <button
-            type="button"
-            className="statistics-threshold-button"
-            onClick={() => setIsThresholdOpen(true)}
-            title="Đặt lại ngưỡng lọc lớp được tính điểm"
-            aria-label="Đặt lại ngưỡng lọc lớp được tính điểm"
-          >
-            <Settings aria-hidden="true" />
-          </button>
+              bảng đang bỏ lớp nào. Đổi cấu hình ở nút Cập nhật điểm. */}
         </section>
       )}
 
@@ -790,7 +699,7 @@ export const SurveyStatisticsPage: React.FC = () => {
           <TriangleAlert aria-hidden="true" />
           <span>
             Có <strong>{statistics.responsesSinceLastCalculation} phiếu</strong> về sau lần tính gần
-            nhất. Bấm <strong>Tính lại điểm</strong> để cập nhật.
+            nhất. Bấm <strong>Cập nhật điểm</strong> để cập nhật.
           </span>
         </div>
       )}
@@ -801,8 +710,8 @@ export const SurveyStatisticsPage: React.FC = () => {
         <div className="admin-alert" role="status">
           <CircleAlert aria-hidden="true" />
           <span>
-            Đợt này chưa chốt điểm lần nào, nên các cột điểm (C1, C2…, Điểm trung bình, Câu yếu
-            nhất) đang để trống. Bấm <strong>Tính lại điểm</strong> để tính.
+            Đợt này chưa chốt điểm lần nào, nên các cột điểm (C1, C2…, Điểm trung bình) đang
+            để trống. Bấm <strong>Cập nhật điểm</strong> để tính.
           </span>
         </div>
       )}
@@ -818,52 +727,62 @@ export const SurveyStatisticsPage: React.FC = () => {
         </div>
       ) : (
         <>
-        {/* Hai nhóm chia theo đúng hai vòng lọc đang áp. Nút Tính lại điểm nằm
-            trên thanh công cụ phía trên, tức trên thanh tab này. */}
-        <nav className="statistics-tabs" aria-label="Nhóm lớp theo điều kiện tính điểm">
-          <button
-            type="button"
-            className={`statistics-tab${tab === 'eligible' ? ' is-active' : ''}`}
-            aria-pressed={tab === 'eligible'}
-            onClick={() => setTab('eligible')}
-          >
-            Lớp đủ điều kiện
-            <span className="statistics-tab-count">{groupedRows.eligible.length}</span>
-          </button>
-          <button
-            type="button"
-            className={`statistics-tab${tab === 'ineligible' ? ' is-active' : ''}`}
-            aria-pressed={tab === 'ineligible'}
-            onClick={() => setTab('ineligible')}
-          >
-            Lớp chưa đủ điều kiện
-            <span className="statistics-tab-count">{groupedRows.ineligible.length}</span>
-          </button>
-        </nav>
+        {/* Ô tìm kiếm bên trái, ba ô chọn nhóm lớp bên phải ô tìm kiếm. */}
+        <div className="statistics-filter-bar">
+          <label className="catalog-search">
+            <span className="catalog-sr-only">Tìm kiếm</span>
+            <Search aria-hidden="true" size={16} />
+            <input
+              type="search"
+              placeholder="Tìm học phần, giảng viên, bộ môn hoặc khoa/viện"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+            />
+          </label>
+          <span className="catalog-result-count" aria-live="polite">
+            {filteredRows.length} kết quả
+          </span>
+          <div className="statistics-filter-options" role="group" aria-label="Nhóm lớp học phần">
+            {([
+              ['all', 'Toàn bộ'],
+              ['eligible', 'Các lớp học phần đủ điều kiện'],
+              ['ineligible', 'Các lớp học phần không đủ điều kiện'],
+            ] as const).map(([value, label]) => (
+              <label key={value} className="statistics-filter-option">
+                <input
+                  type="checkbox"
+                  checked={eligibilityFilter === value}
+                  onChange={() => setEligibilityFilter(value)}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
 
         {orderedRows.length === 0 ? (
           <div className="operations-empty">
-            <strong>
-              {tab === 'eligible'
-                ? 'Lần chốt gần nhất chưa có lớp nào qua được hai vòng lọc.'
-                : 'Lần chốt gần nhất mọi lớp đều qua được hai vòng lọc.'}
-            </strong>
+            <strong>Không có lớp học phần nào khớp với tìm kiếm hoặc nhóm đang chọn.</strong>
           </div>
         ) : (
-        // Bảng rất rộng vì số cột C thay đổi theo bộ câu hỏi: cuộn ngang và ghim
-        // các cột đầu để không lạc dòng.
+        // Một bảng chung cho mọi lớp: lớp đủ điều kiện ở trên, không đủ ở dưới, cột Mô
+        // tả nói rõ từng lớp. Bảng rất rộng vì số cột C thay đổi theo bộ câu hỏi: cuộn
+        // ngang và ghim các cột đầu, cuối để không lạc dòng.
         <div className="statistics-table-scroll" tabIndex={0} aria-label="Bảng dữ liệu, cuộn ngang">
           <table className="statistics-table statistics-table--fill">
             <thead>
               <tr>
                 <th className="col-left col-left-1" scope="col">
-                  {filters.filterHeader('courseCode', 'Mã học phần')}
+                  {filters.filterHeader('courseName', 'Học phần')}
                 </th>
                 <th className="col-left col-left-2" scope="col">
-                  {filters.filterHeader('sectionName', 'Lớp học phần')}
+                  {filters.filterHeader('courseCode', 'Mã học phần')}
                 </th>
                 <th className="col-left col-left-3" scope="col">
-                  {filters.filterHeader('courseName', 'Tên học phần')}
+                  {filters.filterHeader('sectionName', 'Lớp học phần')}
+                </th>
+                <th className="col-meta" scope="col">
+                  {filters.filterHeader('facultyName', 'Khoa / Viện')}
                 </th>
                 <th className="col-meta" scope="col">
                   {filters.filterHeader('departmentName', 'Bộ môn')}
@@ -877,11 +796,11 @@ export const SurveyStatisticsPage: React.FC = () => {
                 <th className="col-metric" scope="col">
                   {filters.filterHeader('totalResponseCount', 'Số phiếu đã thu')}
                 </th>
-                <th className="col-metric" scope="col" title="Phiếu bị bộ lọc nhiễu loại">
-                  {filters.filterHeader('invalidResponseCount', 'Số phiếu không hợp lệ')}
-                </th>
                 <th className="col-metric" scope="col" title="Số phiếu qua được bộ lọc nhiễu">
                   {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
+                </th>
+                <th className="col-metric" scope="col" title="Phiếu bị bộ lọc nhiễu loại">
+                  {filters.filterHeader('invalidResponseCount', 'Số phiếu không hợp lệ')}
                 </th>
                 <th
                   className="col-metric"
@@ -907,25 +826,20 @@ export const SurveyStatisticsPage: React.FC = () => {
                     C{column.order}
                   </th>
                 ))}
-                <th className="col-right col-right-4" scope="col">
+                <th className="col-right col-right-3" scope="col">
                   {filters.filterHeader('averageScore', 'Điểm trung bình')}
                 </th>
-                <th className="col-right col-right-3" scope="col">
-                  {filters.filterHeader('weakestQuestion', 'Câu yếu nhất')}
-                </th>
                 <th className="col-right col-right-2" scope="col">
-                  {filters.filterHeader('weakestQuestionScore', 'Điểm câu yếu')}
+                  {filters.filterHeader('openCommentCount', 'Số ý kiến mở')}
                 </th>
                 <th className="col-right col-right-1" scope="col">
-                  {filters.filterHeader('openCommentCount', 'Số ý kiến mở')}
+                  {filters.filterHeader('eligibility', 'Mô tả')}
                 </th>
               </tr>
             </thead>
             <tbody>
               {visibleRows.map((row) => {
-                const weakest = row.weakestQuestionId === null
-                  ? null
-                  : questionTextById.get(row.weakestQuestionId);
+                const isEligible = eligibleIds.has(row.courseSectionSurveyId);
                 const scoreByQuestion = new Map(
                   row.questionScores.map((score) => [score.questionId, score])
                 );
@@ -938,8 +852,7 @@ export const SurveyStatisticsPage: React.FC = () => {
                   - cả đợt chưa ai bấm tính;
                   - lớp rớt vòng lọc ở lần chốt gần nhất;
                   - lớp rớt lúc đó nhưng SỐ HIỆN TẠI đã đủ, tức là số phiếu về thêm
-                    hoặc ngưỡng vừa đổi sau lần chốt — bấm tính lại là lớp sang tab
-                    bên kia.
+                    hoặc ngưỡng vừa đổi sau lần chốt — bấm Cập nhật điểm là lớp có điểm.
                 */
                 const enoughNow = hasEnoughResponsesToScore(
                   row.classSize,
@@ -951,24 +864,43 @@ export const SurveyStatisticsPage: React.FC = () => {
                   ? 'Đợt chưa được bấm tính điểm.'
                   : enoughNow
                     ? 'Số phiếu hiện tại đã đủ hai vòng lọc nhưng lần chốt gần nhất thì chưa.'
-                      + ' Bấm "Tính lại điểm" để cập nhật.'
+                      + ' Bấm "Cập nhật điểm" để cập nhật.'
                     : 'Lớp không qua vòng lọc: cần tỷ lệ phản hồi ≥ '
                       + `${thresholds.minimumResponseRate}% và tỷ lệ phiếu hợp lệ ≥ `
                       + `${thresholds.minimumValidRate}%.`;
 
                 return (
                   <tr key={row.courseSectionSurveyId}>
-                    <td className="col-left col-left-1">
-                      <span className="operations-code">{row.courseCode}</span>
-                    </td>
-                    <td className="col-left col-left-2">{row.sectionName}</td>
-                    <td className="col-left col-left-3" title={row.courseName}>
+                    <td className="col-left col-left-1" title={row.courseName}>
                       {row.courseName}
                     </td>
-                    <td className="col-meta">{row.departmentName}</td>
-                    <td className="col-meta col-meta--lecturer">{row.lecturerName}</td>
+                    <td className="col-left col-left-2">
+                      <span className="operations-code">{row.courseCode}</span>
+                    </td>
+                    <td className="col-left col-left-3">
+                      {/* Mở trang kết quả của lớp ở Thống kê & Báo cáo, kèm học kỳ và đợt
+                          đang xem. Liên kết thật nên Back và Ctrl + bấm vẫn dùng được. */}
+                      <a
+                        className="statistics-section-link"
+                        href={buildReportHash({
+                          screen: 'survey',
+                          surveyId: row.courseSectionSurveyId,
+                          semesterId: Number(semesterId) || undefined,
+                          semesterSurveyId: Number(semesterSurveyId) || undefined,
+                        })}
+                        title={`Xem kết quả ${row.courseCode} - ${row.courseName} (${row.sectionName})`}
+                      >
+                        {row.sectionName}
+                      </a>
+                    </td>
+                    <td className="col-meta" title={row.facultyName}>{row.facultyName}</td>
+                    <td className="col-meta" title={row.departmentName}>{row.departmentName}</td>
+                    <td className="col-meta col-meta--lecturer" title={row.lecturerName}>
+                      {row.lecturerName}
+                    </td>
                     <td className="num col-metric">{row.classSize}</td>
                     <td className="num col-metric">{row.totalResponseCount}</td>
+                    <td className="num col-metric">{row.validResponseCount}</td>
                     <td
                       className={
                         row.invalidResponseCount > 0
@@ -978,7 +910,6 @@ export const SurveyStatisticsPage: React.FC = () => {
                     >
                       {row.invalidResponseCount}
                     </td>
-                    <td className="num col-metric">{row.validResponseCount}</td>
                     <td className={`num col-metric${responseRate < thresholds.minimumResponseRate ? ' is-flagged' : ''}`}>
                       {responseRate.toFixed(1)}%
                     </td>
@@ -1002,24 +933,49 @@ export const SurveyStatisticsPage: React.FC = () => {
                       );
                     })}
                     <td
-                      className={
-                        row.averageScore === null && !enoughNow
-                          ? 'num is-total is-muted col-right col-right-4'
-                          : 'num is-total col-right col-right-4'
-                      }
+                      className="num is-total col-right col-right-3"
                       title={row.averageScore === null ? missingScoreReason : undefined}
                     >
-                      {row.averageScore === null ? '—' : row.averageScore.toFixed(2)}
+                      {row.averageScore === null ? (
+                        enoughNow ? (
+                          <span
+                            className="badge badge--warning"
+                            style={{
+                              display: 'inline-block',
+                              fontSize: '13px',
+                              lineHeight: 1.25,
+                              padding: '2px 4px',
+                              borderRadius: '4px',
+                              background: '#fef3c7',
+                              color: '#92400e',
+                              fontWeight: 600,
+                            }}
+                            title="Đã đủ số phiếu, bấm Cập nhật điểm để chốt điểm"
+                          >
+                            Chờ chốt điểm
+                          </span>
+                        ) : (
+                          '—'
+                        )
+                      ) : (
+                        row.averageScore.toFixed(2)
+                      )}
                     </td>
-                    <td className="col-right col-right-3" title={weakest?.questionText}>
-                      {weakest === null || weakest === undefined ? '—' : `C${weakest.order}`}
+                    <td className="num col-right col-right-2">{row.openCommentCount}</td>
+                    <td
+                      className="col-right col-right-1"
+                      title={isEligible ? 'Đủ điều kiện' : 'Không đủ điều kiện'}
+                    >
+                      <span
+                        className={
+                          isEligible
+                            ? 'statistics-eligibility statistics-eligibility--yes'
+                            : 'statistics-eligibility statistics-eligibility--no'
+                        }
+                      >
+                        {isEligible ? 'Đủ điều kiện' : 'Không đủ điều kiện'}
+                      </span>
                     </td>
-                    <td className="num col-right col-right-2">
-                      {row.weakestQuestionScore === null
-                        ? '—'
-                        : row.weakestQuestionScore.toFixed(2)}
-                    </td>
-                    <td className="num col-right col-right-1">{row.openCommentCount}</td>
                   </tr>
                 );
               })}
@@ -1046,139 +1002,7 @@ export const SurveyStatisticsPage: React.FC = () => {
           onPageChange={setPage}
         />
       )}
-
-      <ScoringThresholdDialog
-        isOpen={isThresholdOpen}
-        current={thresholds}
-        canEdit={canRecalculate}
-        onClose={() => setIsThresholdOpen(false)}
-      />
     </div>
   );
 };
 
-/**
- * Đặt lại hai vòng lọc. Ngưỡng là cấu hình chung của cả hệ thống nên chỉ quản trị
- * mới sửa được; vai trò khác vẫn mở xem được con số đang áp dụng.
- */
-const ScoringThresholdDialog: React.FC<{
-  isOpen: boolean;
-  current: ScoringThresholds;
-  canEdit: boolean;
-  onClose: () => void;
-}> = ({ isOpen, current, canEdit, onClose }) => {
-  const [responseRate, setResponseRate] = useState(String(current.minimumResponseRate));
-  const [validRate, setValidRate] = useState(String(current.minimumValidRate));
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  // Mở lại hộp thoại thì đọc lại giá trị đang áp, không giữ bản nháp lần trước.
-  useEffect(() => {
-    if (!isOpen) return;
-    setResponseRate(String(current.minimumResponseRate));
-    setValidRate(String(current.minimumValidRate));
-    setError(null);
-  }, [isOpen, current]);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const next = {
-      minimumResponseRate: Number(responseRate),
-      minimumValidRate: Number(validRate),
-    };
-    const outOfRange = [next.minimumResponseRate, next.minimumValidRate].some(
-      (value) => !Number.isFinite(value) || value < 0 || value > 100
-    );
-    if (outOfRange) {
-      setError('Cả hai ngưỡng phải là số trong khoảng 0 đến 100.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const saved = await surveyApi.updateScoringThresholds(next);
-      publishScoringThresholds(saved);
-      toast.success('Đã lưu ngưỡng tính điểm', {
-        description:
-          `Tỷ lệ phản hồi ≥ ${saved.minimumResponseRate}% · `
-          + `Tỷ lệ phiếu hợp lệ ≥ ${saved.minimumValidRate}%. `
-          + 'Bấm "Tính lại điểm" để chốt lại điểm theo ngưỡng mới.',
-      });
-      onClose();
-    } catch (caught) {
-      setError(messageFrom(caught));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Ngưỡng lọc lớp được tính điểm">
-      <form className="catalog-form" onSubmit={(event) => void handleSubmit(event)}>
-        {error && <div className="catalog-validation-error" role="alert">{error}</div>}
-
-        <div className="catalog-context-band">
-          Một lớp phải qua cả hai tiêu chí thì điểm của nó mới được gộp vào mọi bảng thống
-          kê và báo cáo. Đổi ngưỡng xong hãy bấm <strong>Tính lại điểm</strong> để chốt
-          lại điểm đã lưu theo ngưỡng mới.
-        </div>
-
-        <div className="catalog-form-grid catalog-form-grid--2">
-          <div className="form-group">
-            <label htmlFor="threshold-response-rate">
-              Tiêu chí 1 — Tỷ lệ phản hồi tối thiểu (%)
-            </label>
-            <input
-              id="threshold-response-rate"
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={responseRate}
-              disabled={!canEdit || saving}
-              onChange={(event) => setResponseRate(event.target.value)}
-              required
-            />
-            <p className="answer-scale-hint">Số phiếu đã thu ÷ Sĩ số. Mặc định 50%.</p>
-          </div>
-          <div className="form-group">
-            <label htmlFor="threshold-valid-rate">
-              Tiêu chí 2 — Tỷ lệ phiếu hợp lệ tối thiểu (%)
-            </label>
-            <input
-              id="threshold-valid-rate"
-              type="number"
-              min={0}
-              max={100}
-              step={1}
-              value={validRate}
-              disabled={!canEdit || saving}
-              onChange={(event) => setValidRate(event.target.value)}
-              required
-            />
-            <p className="answer-scale-hint">
-              Số phiếu hợp lệ ÷ Số phiếu đã thu. Mặc định 80%.
-            </p>
-          </div>
-        </div>
-
-        {!canEdit && (
-          <div className="catalog-context-band">
-            Chỉ quản trị mới đổi được ngưỡng. Bạn đang xem con số đang áp dụng.
-          </div>
-        )}
-
-        <div className="modal-footer catalog-form-actions">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
-            {canEdit ? 'Hủy' : 'Đóng'}
-          </button>
-          {canEdit && (
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Đang lưu...' : 'Lưu ngưỡng'}
-            </button>
-          )}
-        </div>
-      </form>
-    </Modal>
-  );
-};

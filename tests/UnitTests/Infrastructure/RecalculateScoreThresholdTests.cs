@@ -57,21 +57,34 @@ public class RecalculateScoreThresholdTests
         var thresholds = ScoringThresholds.Default;
         var minimumResponseRate = thresholds.MinimumResponseRate;
         var minimumValidRate = thresholds.MinimumValidRate;
+        var rejectTooFast = thresholds.RejectTooFast;
+        var rejectSingleAnswer = thresholds.RejectSingleAnswer;
+        var rejectAttentionCheck = thresholds.RejectAttentionCheckFailed;
         var rows = await db.Database
             .SqlQuery<SectionTally>($"""
                 SELECT c."CourseSectionSurveyId"                     AS "CourseSectionSurveyId",
                        s."ClassSize"                                 AS "ClassSize",
                        count(r.*)::int                               AS "TotalCount",
-                       count(r.*) FILTER (WHERE r."IsValid")::int    AS "ValidCount",
+                       count(r.*) FILTER (WHERE r.counted)::int      AS "ValidCount",
                        (s."ClassSize" > 0
                         AND count(r.*) > 0
                         AND count(r.*)::numeric / s."ClassSize" * 100 >= {minimumResponseRate}
-                        AND count(r.*) FILTER (WHERE r."IsValid")::numeric
+                        AND count(r.*) FILTER (WHERE r.counted)::numeric
                             / count(r.*) * 100 >= {minimumValidRate})  AS "SqlSaysEnough"
                 FROM "CourseSectionSurveys" c
                 JOIN "CourseSections" s ON s."CourseSectionId" = c."CourseSectionId"
-                LEFT JOIN "SurveyResponses" r
-                       ON r."CourseSectionSurveyId" = c."CourseSectionSurveyId"
+                LEFT JOIN (
+                    SELECT sr."CourseSectionSurveyId",
+                           (sr."RejectionReasons" IS NULL
+                            OR ((NOT {rejectTooFast}
+                                 OR position('TOO_FAST' in sr."RejectionReasons") = 0)
+                            AND (NOT {rejectSingleAnswer}
+                                 OR position('SINGLE_ANSWER' in sr."RejectionReasons") = 0)
+                            AND (NOT {rejectAttentionCheck}
+                                 OR position('ATTENTION_CHECK_FAILED' in sr."RejectionReasons") = 0)))
+                           AS counted
+                    FROM "SurveyResponses" sr
+                ) r ON r."CourseSectionSurveyId" = c."CourseSectionSurveyId"
                 WHERE NOT c."IsDeleted"
                 GROUP BY c."CourseSectionSurveyId", s."ClassSize"
                 """)

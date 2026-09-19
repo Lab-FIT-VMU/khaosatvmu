@@ -160,12 +160,26 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await provider.GetAsync(cancellationToken)));
 
+        // Các trang thống kê hỏi định kỳ để báo khi người khác đổi cấu hình hoặc tính
+        // lại điểm. Không truyền afterId thì chỉ nhận mốc mới nhất.
+        operationalReadGroup.MapGet("/scoring-changes", async (
+            long? afterId,
+            [FromServices] IScoringThresholdProvider provider,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await provider.GetChangesAsync(afterId, cancellationToken)));
+
         campaignGroup.MapPut("/scoring-thresholds", async (
             SaveScoringThresholdsRequest request,
             [FromServices] IScoringThresholdProvider provider,
             CancellationToken cancellationToken) =>
             ToResult(await provider.UpdateAsync(
-                new ScoringThresholds(request.MinimumResponseRate, request.MinimumValidRate),
+                // Không còn chọn bẫy lỗi: luôn áp cả ba luật của bộ lọc nhiễu.
+                new ScoringThresholds(
+                    request.MinimumResponseRate,
+                    request.MinimumValidRate,
+                    RejectTooFast: true,
+                    RejectSingleAnswer: true,
+                    RejectAttentionCheckFailed: true),
                 cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>();
 
@@ -257,11 +271,17 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSemesterSurveyStatisticsAsync(semesterSurveyId, cancellationToken)));
 
+        // questionSectionId: tính điểm và Z-Score chỉ trên các câu của một mục; bỏ trống
+        // là toàn bộ bài khảo sát.
         surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/normalization", async (
             int semesterSurveyId,
+            int? questionSectionId,
             ISurveyService service,
             CancellationToken cancellationToken) =>
-            ToResult(await service.GetSemesterSurveyNormalizationAsync(semesterSurveyId, cancellationToken)));
+            ToResult(await service.GetSemesterSurveyNormalizationAsync(
+                semesterSurveyId,
+                cancellationToken,
+                questionSectionId)));
 
         surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/department-summary", async (
             int semesterSurveyId,
@@ -289,7 +309,11 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSemesterSurveyCourseDiagnosisAsync(semesterSurveyId, cancellationToken)));
 
-        surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/scope-analysis", async (
+        // Trang chi tiết theo phạm vi giờ nằm trong module Thống kê & Báo cáo, nên
+        // endpoint phải mở cho mọi quyền của nhóm Báo cáo. Nhóm này là hợp của bốn
+        // quyền báo cáo (gồm cả SURVEY_ANALYSIS_ACCESS), nên ai đang xem được ở
+        // trang Thống kê chi tiết vẫn mở được y như trước.
+        reportingReadGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/scope-analysis", async (
             int semesterSurveyId,
             string scopeType,
             int scopeId,
@@ -320,6 +344,22 @@ public static class SurveyEndpoints
             ISurveyService service,
             CancellationToken cancellationToken) =>
             ToResult(await service.RecalculateSemesterSurveyScoresAsync(semesterSurveyId, cancellationToken)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
+        // Trạng thái phát hành kết quả của một đợt. Ai cũng đọc được để giao diện biết
+        // vì sao trống, nhưng chỉ quản trị mới đổi được (service tự chặn).
+        surveyStatisticsGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/publication", async (
+            int semesterSurveyId,
+            [FromServices] ISurveyPublicationService publication,
+            CancellationToken cancellationToken) =>
+            ToResult(await publication.GetAsync(semesterSurveyId, cancellationToken)));
+
+        surveyStatisticsGroup.MapPut("/semester-surveys/{semesterSurveyId:int}/publication", async (
+            int semesterSurveyId,
+            SetSurveyPublicationRequest request,
+            [FromServices] ISurveyPublicationService publication,
+            CancellationToken cancellationToken) =>
+            ToResult(await publication.SetAsync(semesterSurveyId, request.Publish, cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>();
 
         // Phiếu của sinh viên: mở bằng link hoặc mã QR nên không yêu cầu đăng nhập.
@@ -402,6 +442,8 @@ public static class SurveyEndpoints
         var statusCode = result.ErrorCode switch
         {
             SurveyErrorCodes.OutOfScope => StatusCodes.Status403Forbidden,
+            SurveyErrorCodes.ResultsNotPublished => StatusCodes.Status403Forbidden,
+            SurveyErrorCodes.SurveyNotEnded => StatusCodes.Status409Conflict,
             SurveyErrorCodes.AnswerScaleNotFound => StatusCodes.Status404NotFound,
             SurveyErrorCodes.TemplateNotFound => StatusCodes.Status404NotFound,
             SurveyErrorCodes.SemesterNotFound => StatusCodes.Status404NotFound,
@@ -426,6 +468,9 @@ public static class SurveyEndpoints
         };
         return Results.Json(new { errorCode = result.ErrorCode }, statusCode: statusCode);
     }
+
+    /// <summary>Phát hành hoặc thu hồi kết quả của một đợt.</summary>
+    public sealed record SetSurveyPublicationRequest(bool Publish);
 
     /// <summary>Hai vòng lọc lớp được tính điểm, đơn vị phần trăm.</summary>
     public sealed record SaveScoringThresholdsRequest(

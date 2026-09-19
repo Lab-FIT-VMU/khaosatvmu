@@ -86,7 +86,7 @@ export const AgentMemoryWidget: React.FC = () => {
               href="http://localhost:3113"
               target="_blank"
               rel="noreferrer"
-              style={{ color: '#38bdf8', textDecoration: 'underline', fontSize: '12px' }}
+              style={{ color: '#38bdf8', textDecoration: 'underline', fontSize: '13px' }}
             >
               Mở Viewer (3113) ↗
             </a>
@@ -122,8 +122,8 @@ export const AgentMemoryWidget: React.FC = () => {
             <div style={{ maxHeight: '120px', overflowY: 'auto', marginBottom: '12px', background: '#0f172a', padding: '6px', borderRadius: '4px' }}>
               {results.map((r, i) => (
                 <div key={r.id || i} style={{ marginBottom: '6px', borderBottom: '1px solid #334155', paddingBottom: '4px' }}>
-                  <div style={{ fontSize: '12px', color: '#cbd5e1' }}>{r.content}</div>
-                  <div style={{ fontSize: '10px', color: '#94a3b8' }}>Score: {r.score?.toFixed(2) || 'N/A'}</div>
+                  <div style={{ fontSize: '13px', color: '#cbd5e1' }}>{r.content}</div>
+                  <div style={{ fontSize: '13px', color: '#000000' }}>Score: {r.score?.toFixed(2) || 'N/A'}</div>
                 </div>
               ))}
             </div>
@@ -160,7 +160,7 @@ export const AgentMemoryWidget: React.FC = () => {
                 background: '#0f172a',
                 color: '#fff',
                 marginBottom: '6px',
-                fontSize: '11px',
+                fontSize: '13px',
               }}
             />
             <button type="submit" className="btn btn-secondary btn-sm" style={{ width: '100%' }}>
@@ -168,7 +168,7 @@ export const AgentMemoryWidget: React.FC = () => {
             </button>
           </form>
 
-          {message && <div style={{ marginTop: '8px', color: '#38bdf8', fontSize: '12px', textAlign: 'center' }}>{message}</div>}
+          {message && <div style={{ marginTop: '8px', color: '#38bdf8', fontSize: '13px', textAlign: 'center' }}>{message}</div>}
         </div>
       )}
     </div>

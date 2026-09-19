@@ -89,7 +89,7 @@ export const FacultyCompletionChart: React.FC<FacultyCompletionChartProps> = ({
             tickFormatter={(value: number) => `${value}%`}
             tickLine={false}
             axisLine={{ stroke: '#cbd5e1' }}
-            tick={{ fontSize: 11, fill: '#68737d' }}
+            tick={{ fontSize: 13, fill: '#68737d' }}
           />
           <YAxis
             type="category"
@@ -117,7 +117,7 @@ export const FacultyCompletionChart: React.FC<FacultyCompletionChartProps> = ({
               dataKey="completionRate"
               position="right"
               formatter={(label) => `${Math.round(Number(label) || 0)}%`}
-              style={{ fontSize: 11, fill: '#68737d', fontWeight: 600 }}
+              style={{ fontSize: 13, fill: '#68737d', fontWeight: 600 }}
             />
           </Bar>
         </BarChart>

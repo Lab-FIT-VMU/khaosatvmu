@@ -11,6 +11,7 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { useSemester } from '../context/semesterContext';
+import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import type { CourseSectionSurvey, SemesterSurvey } from '../types';
@@ -36,13 +37,13 @@ const campaignSelectCss = `
 .campaign-select { position: relative; flex: 0 0 460px; min-width: 0; }
 .campaign-select__trigger {
   width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #20262c;
-  font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #000000;
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .campaign-select__trigger:disabled { background: #f4f6f8; color: #8c969f; cursor: not-allowed; }
 .campaign-select__trigger:focus-visible { outline: 2px solid rgba(7,136,184,.25); border-color: #0788b8; }
 .campaign-select__value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #68737d; }
+.campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #000000; }
 .campaign-select__list {
   position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none;
   overflow-y: auto; border: 1px solid #d7dee2; background: #fff;
@@ -51,7 +52,7 @@ const campaignSelectCss = `
 .campaign-select__option {
   position: relative; overflow: hidden; container-type: inline-size;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 8px 12px; font-size: 12px; color: #20262c; cursor: pointer;
+  padding: 8px 12px; font-size: 13px; color: #000000; cursor: pointer;
 }
 .campaign-select__option.is-active { background: #eef7fb; }
 .campaign-select__option > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -65,10 +66,10 @@ const campaignSelectCss = `
   0%, 12% { transform: translateX(0); }
   88%, 100% { transform: translateX(min(0px, calc(100cqw - 100% - 26px))); }
 }
-.campaign-select__empty { padding: 10px 12px; color: #68737d; font-size: 12px; text-align: center; }
+.campaign-select__empty { padding: 10px 12px; color: #000000; font-size: 13px; text-align: center; }
 .campaign-select__hint {
   position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid #d7dee2;
-  background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #20262c;
+  background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #000000;
   font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: none;
 }
 `;
@@ -242,11 +243,11 @@ interface ProgressItem {
 }
 
 const progressColumns = [
-  { key: 'code', header: 'Mã lớp HP', width: 14, align: 'center' as const },
-  { key: 'name', header: 'Tên lớp học phần', width: 28 },
-  { key: 'lecturerName', header: 'Giảng viên', width: 24 },
-  { key: 'departmentName', header: 'Bộ môn', width: 20 },
   { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
+  { key: 'departmentName', header: 'Bộ môn', width: 20 },
+  { key: 'name', header: 'Học phần', width: 28 },
+  { key: 'code', header: 'Nhóm lớp', width: 14, align: 'center' as const },
+  { key: 'lecturerName', header: 'Giảng viên', width: 24 },
   { key: 'targetCount', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
   { key: 'actualCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
   {
@@ -413,46 +414,46 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
   // Bề rộng theo phần trăm để tỷ lệ cột giữ nguyên trên mọi cỡ màn hình.
   const columns: Column<ProgressItem>[] = [
     {
-      key: 'code',
-      header: 'Nhóm lớp',
-      width: '7%',
-      filterValue: (item) => item.code,
-      render: (item) => <span className="operations-code">{item.code}</span>,
+      key: 'facultyName',
+      header: 'Khoa / Viện',
+      width: '16%',
+      filterValue: (item) => item.facultyName,
+      render: (item) => <span className="operations-primary-text">{item.facultyName}</span>,
+    },
+    {
+      key: 'departmentName',
+      header: 'Bộ môn',
+      width: '14%',
+      filterValue: (item) => item.departmentName,
+      render: (item) => <span className="operations-primary-text">{item.departmentName}</span>,
     },
     {
       key: 'name',
-      header: 'Tên lớp học phần',
+      header: 'Học phần',
       width: '18%',
       filterValue: (item) => item.name,
       render: (item) => <strong className="operations-primary-text">{item.name}</strong>,
     },
     {
+      key: 'code',
+      header: 'Lớp học phần',
+      width: '5%',
+      filterValue: (item) => item.code,
+      render: (item) => <span className="operations-code">{item.code}</span>,
+    },
+    {
       key: 'lecturerName',
       header: 'Giảng viên',
-      width: '14%',
+      width: '15%',
       filterValue: (item) => item.lecturerName,
       render: (item) => (
         <span className="operations-primary-text">{item.lecturerName}</span>
       ),
     },
     {
-      key: 'departmentName',
-      header: 'Bộ Môn',
-      width: '12%',
-      filterValue: (item) => item.departmentName,
-      render: (item) => <span className="operations-primary-text">{item.departmentName}</span>,
-    },
-    {
-      key: 'facultyName',
-      header: 'Khoa / Viện',
-      width: '12%',
-      filterValue: (item) => item.facultyName,
-      render: (item) => <span className="operations-primary-text">{item.facultyName}</span>,
-    },
-    {
       key: 'targetCount',
       header: 'Sĩ số',
-      width: '6%',
+      width: '5%',
       filterValue: (item) => String(item.targetCount),
       numeric: true,
       render: (item) => <span className="operations-primary-text">{item.targetCount}</span>,
@@ -460,15 +461,15 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
     {
       key: 'actualCount',
       header: 'Số phiếu đã thu',
-      width: '9%',
+      width: '7%',
       filterValue: (item) => String(item.actualCount),
       numeric: true,
-      render: (item) => <span className="operations-primary-text">{item.actualCount} phiếu</span>,
+      render: (item) => <span className="operations-primary-text">{item.actualCount}</span>,
     },
     {
       key: 'progress',
       header: 'Tỷ lệ phản hồi',
-      width: '12%',
+      width: '10%',
       filterValue: (item) => String(item.rate),
       numeric: true,
       quickFilters: [
@@ -584,18 +585,20 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
             </div>
           </section>
 
+          <ScoringConfigNote />
+
           <section className="operations-metrics" aria-label="Tổng quan tiến độ">
             <div className="operation-metric">
               <span className="operation-metric-icon"><Target className="operation-icon" aria-hidden="true" /></span>
-              <span className="operation-metric-label">Tổng sĩ số</span>
+              <span className="operation-metric-label">Số phiếu dự kiến thu về</span>
               <strong className="operation-metric-value">{totalTarget.toLocaleString()}</strong>
-              <span className="operation-metric-note">Theo sĩ số tất cả nhóm lớp</span>
+              <span className="operation-metric-note">Theo tổng sĩ số tất cả nhóm lớp</span>
             </div>
             <div className="operation-metric operation-metric--success">
               <span className="operation-metric-icon"><ClipboardCheck className="operation-icon" aria-hidden="true" /></span>
               <span className="operation-metric-label">Phiếu đã thu</span>
               <strong className="operation-metric-value">{totalActual.toLocaleString()}</strong>
-              <span className="operation-metric-note">Tỷ lệ phản hồi {overallRate}% tổng sĩ số</span>
+              <span className="operation-metric-note">Tỷ lệ phản hồi đạt {overallRate}% theo số phiếu dự kiến thu về  </span>
             </div>
             <div className="operation-metric operation-metric--warning">
               <span className="operation-metric-icon"><CheckCircle2 className="operation-icon" aria-hidden="true" /></span>
@@ -621,6 +624,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
             exportConfig={exportConfig}
             emptyMessage="Chưa có lớp học phần nào được phát phiếu khảo sát."
             keyExtractor={(item) => item.id}
+            showIndex={false}
           />
         </>
       )}

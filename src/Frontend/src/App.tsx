@@ -9,6 +9,20 @@ import { getHashRoot } from './pages/reportRoute';
 // Shared Components
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { ScoringChangeNotifier } from './components/ScoringChangeNotifier';
+
+/**
+ * Các trang thống kê, báo cáo đọc điểm theo cấu hình tính điểm. Đang mở một trong
+ * các trang này thì nhận thông báo khi người khác đổi cấu hình hoặc cập nhật điểm.
+ */
+const scoringNotificationTabs = new Set([
+  'overview',
+  'survey-dashboard',
+  'progress',
+  'survey-statistics',
+  'reports',
+  'survey-analysis',
+]);
 import { QRCodeModal } from './components/QRCodeModal';
 
 // Lazy-loaded Pages (Code Splitting for Production Performance)
@@ -67,8 +81,32 @@ import type {
   SystemStats,
 } from './types';
 
+/** Link cũ mở thẳng trang chi tiết của module Thống kê chi tiết. */
+const legacyScopeHashPattern = /^#\/?survey-analysis\/(faculty|department|course)\/(\d+)/;
+
+/**
+ * Trang chi tiết theo phạm vi đã chuyển sang module Thống kê & Báo cáo. Link cũ
+ * được đổi trước khi chọn tab, không thì thanh điều hướng tô sáng mục Thống kê
+ * chi tiết rồi mới nhảy sang mục đúng.
+ */
+function redirectLegacyScopeHash() {
+  const match = legacyScopeHashPattern.exec(window.location.hash);
+  if (!match) return;
+  const [, scopeType, scopeId] = match;
+  // Bỏ `tab` của trang cũ: cấp chi tiết suy ra từ chính đường dẫn, không từ tab.
+  const query = new URLSearchParams(window.location.hash.slice(match[0].length).replace(/^\?/, ''));
+  query.delete('tab');
+  const queryString = query.toString();
+  window.history.replaceState(
+    null,
+    '',
+    `#/reports/scope/${scopeType}/${scopeId}${queryString ? `?${queryString}` : ''}`,
+  );
+}
+
 function getInitialTab(): string {
   if (typeof window === 'undefined') return 'overview';
+  redirectLegacyScopeHash();
   return getHashRoot();
 }
 
@@ -123,6 +161,7 @@ function DashboardApp() {
 
   useEffect(() => {
     const handleHashChange = () => {
+      redirectLegacyScopeHash();
       const tab = getHashRoot();
       if (tab !== currentTab) {
         setCurrentTabState(tab);
@@ -143,7 +182,9 @@ function DashboardApp() {
   useEffect(() => {
     const blocked =
       !canAccessModule(permissions, currentTab)
-      || (currentTab === 'overview' && !dashboardAllowed);
+      || (currentTab === 'overview' && !dashboardAllowed)
+      // Trang Thống kê theo mục đã bỏ khỏi menu; địa chỉ cũ còn lưu thì đưa về trang đầu.
+      || currentTab === 'survey-section-scores';
     if (blocked) {
       setCurrentTab(landingTab);
     }
@@ -568,6 +609,8 @@ function DashboardApp() {
         activeCampaignsCount={stats.activeCampaigns}
         permissions={permissions}
       />
+
+      <ScoringChangeNotifier active={scoringNotificationTabs.has(currentTab)} />
 
       {/* Main Content Area */}
       <div className="main-wrapper">
