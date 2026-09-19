@@ -54,6 +54,8 @@ jobs:
             git fetch origin master
             git reset --hard origin/master
             git clean -fd
-            docker compose build api frontend
+            docker compose stop api frontend
+            docker compose build api
+            docker compose build frontend
             docker compose up -d
             docker image prune -f
