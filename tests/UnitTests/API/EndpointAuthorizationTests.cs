@@ -90,6 +90,7 @@ public sealed class EndpointAuthorizationTests
     [InlineData("/api/v1/graduation-analytics/overview", "POST")]
     [InlineData("/api/v1/graduation-analytics/periods/{periodId:long}/rows", "GET")]
     [InlineData("/api/v1/graduation-analytics/managed-periods", "GET")]
+    [InlineData("/api/v1/graduation-analytics/managed-periods/{periodId:long}", "DELETE")]
     [InlineData("/api/v1/graduation-analytics/managed-periods/{periodId:long}/revisions", "GET")]
     [InlineData("/api/v1/graduation-analytics/imports/preview", "POST")]
     [InlineData("/api/v1/graduation-analytics/imports/commit", "POST")]

@@ -12,7 +12,8 @@ public static class GraduationExploreCalculator
         GraduationExploreFacetsV3Dto facets,
         string metricId = "graduated",
         string groupBy = "period",
-        string? seriesBy = null)
+        string? seriesBy = null,
+        IReadOnlyList<string>? selectedCohorts = null)
     {
         if (periods.Count == 0)
         {
@@ -128,6 +129,7 @@ public static class GraduationExploreCalculator
             new GraduationExploreScopeDto(
                 mode,
                 cohort,
+                selectedCohorts ?? (cohort is null ? [] : [cohort]),
                 first.PeriodId,
                 PeriodLabel(first),
                 last.PeriodId,

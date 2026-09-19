@@ -135,6 +135,19 @@ public sealed class GraduationAnalyticsServiceTests
     }
 
     [Fact]
+    public async Task DeletePeriod_RequiresAnExplicitReasonBeforeTouchingTheDatabase()
+    {
+        await using var db = CreateContext();
+        var service = new EfGraduationAnalyticsV3Service(db, Mock.Of<ICurrentUserAccessor>());
+
+        var action = () => service.DeletePeriodAsync(1, " ", CancellationToken.None);
+
+        var exception = await action.Should().ThrowAsync<GraduationAnalyticsException>();
+        exception.Which.ErrorCode.Should().Be(GraduationAnalyticsErrorCodes.InvalidQuery);
+        exception.Which.Message.Should().Contain("3 đến 1000 ký tự");
+    }
+
+    [Fact]
     public void ApiRequest_RejectsLegacyColumnsBeforeCreatingTheApplicationCommand()
     {
         var request = new GraduationAnalyticsEndpoints.GraduationImportRowRequest(

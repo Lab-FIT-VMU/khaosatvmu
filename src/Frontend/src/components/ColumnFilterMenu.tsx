@@ -42,7 +42,7 @@ export const ColumnFilterMenu: React.FC<ColumnFilterMenuProps> = ({
   const [search, setSearch] = useState('');
   /** Bản nháp: chỉ ghi vào bộ lọc thật khi bấm OK, bấm Cancel thì bỏ. */
   const [draft, setDraft] = useState<string[]>(values);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({ top: 0, left: 0 });
 
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -75,8 +75,21 @@ export const ColumnFilterMenu: React.FC<ColumnFilterMenuProps> = ({
   useLayoutEffect(() => {
     if (!isOpen || !buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - panelWidth - 8));
-    setPosition({ top: rect.bottom + panelGap, left });
+    const viewportPadding = 8;
+    const spaceBelow = window.innerHeight - rect.bottom - panelGap - viewportPadding;
+    const spaceAbove = rect.top - panelGap - viewportPadding;
+    const openAbove = spaceBelow < 300 && spaceAbove > spaceBelow;
+    const availableHeight = openAbove ? spaceAbove : spaceBelow;
+    const left = Math.max(
+      viewportPadding,
+      Math.min(rect.left, window.innerWidth - panelWidth - viewportPadding),
+    );
+    setPanelStyle({
+      top: openAbove ? rect.top - panelGap : rect.bottom + panelGap,
+      left,
+      maxHeight: Math.min(440, Math.max(0, availableHeight)),
+      transform: openAbove ? 'translateY(-100%)' : undefined,
+    });
   }, [isOpen]);
 
   useEffect(() => {
@@ -165,7 +178,7 @@ export const ColumnFilterMenu: React.FC<ColumnFilterMenuProps> = ({
           className="column-filter-panel"
           role="dialog"
           aria-label={`Bộ lọc cột ${label}`}
-          style={{ top: position.top, left: position.left, width: panelWidth }}
+          style={{ ...panelStyle, width: panelWidth }}
         >
           <button
             type="button"

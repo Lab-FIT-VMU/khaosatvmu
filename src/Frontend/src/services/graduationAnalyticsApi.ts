@@ -62,6 +62,8 @@ export const graduationAnalyticsApi = {
     apiRequest<GraduationRevisionV3[]>(`${basePath}/managed-periods/${periodId}/revisions`),
   activePreview: (periodId: number) =>
     apiRequest<GraduationImportPreviewV3>(`${basePath}/managed-periods/${periodId}/preview`),
+  deletePeriod: (periodId: number, reason: string) =>
+    csrfRequest<void>(`${basePath}/managed-periods/${periodId}`, 'DELETE', { reason }),
   previewImport: async (file: File) => {
     const form = new FormData();
     form.append('file', file);
@@ -94,9 +96,9 @@ export const graduationAnalyticsApi = {
     mode: GraduationExploreModeV3;
     startPeriodId?: number | null;
     cutoffPeriodId: number;
-    cohort?: string | null;
-    facultyKey?: string | null;
-    programKey?: string | null;
+    cohorts?: string[] | null;
+    facultyKeys?: string[] | null;
+    programKeys?: string[] | null;
     metricId: string;
     groupBy: string;
     seriesBy?: string | null;

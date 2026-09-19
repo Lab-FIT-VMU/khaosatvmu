@@ -24,6 +24,11 @@ import { toast } from 'sonner';
 import { GraduationEChart } from '../components/graduation/GraduationEChart';
 import { GraduationSummaryTable } from '../components/graduation/GraduationSummaryTable';
 import { GraduationSavedPreviewDialog } from '../components/graduation/GraduationSavedPreviewDialog';
+import { GraduationDeletePeriodDialog } from '../components/graduation/GraduationDeletePeriodDialog';
+import {
+  GraduationFilterMultiSelect,
+  type GraduationFilterOption,
+} from '../components/graduation/GraduationFilterMultiSelect';
 import {
   GraduationImportDialog,
   type GraduationImportTarget,
@@ -44,6 +49,9 @@ type ExploreChartMetric = 'graduated' | 'onTime' | 'workStudy' | 'excellent' | '
 type ExploreChartDimension = 'period' | 'faculty' | 'program' | 'cohort';
 type ExploreChartSeries = Exclude<ExploreChartDimension, 'period'> | '';
 type ExploreChartSort = 'name' | 'value-asc' | 'value-desc';
+const PROGRAM_SELECTION_SEPARATOR = '\u001f';
+const programSelectionValue = (facultyKey: string | null, programKey: string) =>
+  `${facultyKey ?? ''}${PROGRAM_SELECTION_SEPARATOR}${programKey}`;
 type ResolvedChartConfig = {
   metric: ExploreChartMetric;
   groupBy: ExploreChartDimension;
@@ -232,9 +240,9 @@ export function GraduationAnalyticsPage() {
   const [chartTopInput, setChartTopInput] = useState('');
   const [chartType, setChartType] = useState<GraduationChartType>('bar');
   const [showChartLabels, setShowChartLabels] = useState(true);
-  const [cohort, setCohort] = useState('');
-  const [facultyKey, setFacultyKey] = useState('');
-  const [programKey, setProgramKey] = useState('');
+  const [selectedCohorts, setSelectedCohorts] = useState<string[]>([]);
+  const [selectedFacultyKeys, setSelectedFacultyKeys] = useState<string[]>([]);
+  const [selectedProgramKeys, setSelectedProgramKeys] = useState<string[]>([]);
   const [exploreRequest, dispatchExploreRequest] = useReducer(
     exploreRequestReducer,
     initialExploreRequestState,
@@ -246,6 +254,7 @@ export function GraduationAnalyticsPage() {
   const [academicYearStart, setAcademicYearStart] = useState(currentAcademicYearStart());
   const [importTarget, setImportTarget] = useState<GraduationImportTarget | null>(null);
   const [previewPeriod, setPreviewPeriod] = useState<GraduationManagedPeriod | null>(null);
+  const [deletePeriod, setDeletePeriod] = useState<GraduationManagedPeriod | null>(null);
   const [historyPeriodId, setHistoryPeriodId] = useState<number | null>(null);
   const [revisions, setRevisions] = useState<GraduationRevisionV3[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -304,9 +313,9 @@ export function GraduationAnalyticsPage() {
       mode,
       startPeriodId: mode === 'cohortCumulative' ? startPeriodId : null,
       cutoffPeriodId,
-      cohort: cohort || null,
-      facultyKey: facultyKey || null,
-      programKey: programKey || null,
+      cohorts: selectedCohorts,
+      facultyKeys: selectedFacultyKeys,
+      programKeys: selectedProgramKeys,
       metricId: chartMetric,
       groupBy: chartGroupBy,
       seriesBy: chartSeriesBy || null,
@@ -322,7 +331,7 @@ export function GraduationAnalyticsPage() {
       }
     });
     return () => { cancelled = true; };
-  }, [chartGroupBy, chartMetric, chartSeriesBy, cohort, cutoffPeriodId, facultyKey, mode, programKey, startPeriodId]);
+  }, [chartGroupBy, chartMetric, chartSeriesBy, cutoffPeriodId, mode, selectedCohorts, selectedFacultyKeys, selectedProgramKeys, startPeriodId]);
 
   const academicYears = useMemo(() => {
     const current = currentAcademicYearStart();
@@ -356,13 +365,57 @@ export function GraduationAnalyticsPage() {
     (total, period) => total + period.studentCount,
     0,
   ), [managedPeriods]);
+  const facultyOptions = useMemo<GraduationFilterOption[]>(() =>
+    facets?.faculties.map((item) => ({ value: item.value, label: item.label })) ?? [],
+  [facets?.faculties]);
+  const facultyLabelByKey = useMemo(() => new Map(
+    facets?.faculties.map((item) => [item.value, item.label]) ?? [],
+  ), [facets?.faculties]);
   const availablePrograms = useMemo(() => facets?.programs.filter((program) =>
-    !facultyKey || program.parentValue === facultyKey) ?? [], [facets?.programs, facultyKey]);
+    selectedFacultyKeys.length === 0
+    || Boolean(program.parentValue && selectedFacultyKeys.includes(program.parentValue))) ?? [],
+  [facets?.programs, selectedFacultyKeys]);
+  const programOptions = useMemo<GraduationFilterOption[]>(() => availablePrograms.map((item) => ({
+    value: programSelectionValue(item.parentValue, item.value),
+    label: selectedFacultyKeys.length === 1
+      ? item.label
+      : `${item.label} · ${facultyLabelByKey.get(item.parentValue ?? '') ?? 'Chưa xác định khoa'}`,
+  })), [availablePrograms, facultyLabelByKey, selectedFacultyKeys.length]);
+  const singleSelectedCohort = selectedCohorts.length === 1 ? selectedCohorts[0] : '';
+  const singleSelectedFaculty = selectedFacultyKeys.length === 1 ? selectedFacultyKeys[0] : '';
+  const singleSelectedProgram = selectedProgramKeys.length === 1 ? selectedProgramKeys[0] : '';
+
+  useEffect(() => {
+    if (!facets) return;
+    const available = new Set(facets.cohorts);
+    setSelectedCohorts((current) => {
+      const next = current.filter((item) => available.has(item));
+      return next.length === current.length ? current : next;
+    });
+  }, [facets]);
+
+  useEffect(() => {
+    if (!facets) return;
+    const available = new Set(facets.faculties.map((item) => item.value));
+    setSelectedFacultyKeys((current) => {
+      const next = current.filter((item) => available.has(item));
+      return next.length === current.length ? current : next;
+    });
+  }, [facets]);
+
+  useEffect(() => {
+    const available = new Set(programOptions.map((item) => item.value));
+    setSelectedProgramKeys((current) => {
+      const next = current.filter((item) => available.has(item));
+      return next.length === current.length ? current : next;
+    });
+  }, [programOptions]);
+
   const fixedChartDimensions = new Set<ExploreChartDimension>([
     ...(mode === 'period' ? ['period' as const] : []),
-    ...(facultyKey ? ['faculty' as const] : []),
-    ...(programKey ? ['program' as const] : []),
-    ...(cohort ? ['cohort' as const] : []),
+    ...(singleSelectedFaculty ? ['faculty' as const] : []),
+    ...(singleSelectedProgram ? ['program' as const] : []),
+    ...(singleSelectedCohort ? ['cohort' as const] : []),
   ]);
   const meaningfulChartGroups = chartDimensions
     .map((item) => item.id)
@@ -379,6 +432,7 @@ export function GraduationAnalyticsPage() {
   const displayedChartGroup = exploreRequest.resolvedChart?.groupBy ?? chartGroupBy;
   const displayedChartSeries = exploreRequest.resolvedChart?.seriesBy ?? chartSeriesBy;
   const displayedChartMode = exploreRequest.resolvedChart?.mode ?? mode;
+  const displayedCohorts = explore?.scope.cohorts ?? selectedCohorts;
   const selectedChartMetric = chartMetrics.find((item) => item.id === displayedChartMetric) ?? chartMetrics[0];
   const selectedChartDimension = chartDimensions.find((item) => item.id === displayedChartGroup) ?? chartDimensions[0];
   const isRequestedCumulativeTimeline = mode === 'cohortCumulative' && chartGroupBy === 'period';
@@ -479,8 +533,8 @@ export function GraduationAnalyticsPage() {
       if (earliestPeriod) setStartPeriodId(earliestPeriod.periodId);
       if (latestPeriod) setCutoffPeriodId(latestPeriod.periodId);
     }
-    setChartGroupBy(recommendedChartGroup(next, cohort, facultyKey, programKey));
-    setChartSeriesBy(next === 'cohortCumulative' && !cohort ? 'cohort' : '');
+    setChartGroupBy(recommendedChartGroup(next, singleSelectedCohort, singleSelectedFaculty, singleSelectedProgram));
+    setChartSeriesBy(next === 'cohortCumulative' && !singleSelectedCohort ? 'cohort' : '');
   };
 
   const handleStartPeriodChange = (nextPeriodId: number) => {
@@ -497,38 +551,46 @@ export function GraduationAnalyticsPage() {
     if (startIndex >= 0 && nextIndex < startIndex) setStartPeriodId(nextPeriodId);
   };
 
-  const handleCohortChange = (next: string) => {
-    setCohort(next);
-    if (next && chartGroupBy === 'cohort') {
-      setChartGroupBy(recommendedChartGroup(mode, next, facultyKey, programKey));
+  const handleCohortChange = (next: string[]) => {
+    setSelectedCohorts(next);
+    const fixedCohort = next.length === 1 ? next[0] : '';
+    if (fixedCohort && chartGroupBy === 'cohort') {
+      setChartGroupBy(recommendedChartGroup(mode, fixedCohort, singleSelectedFaculty, singleSelectedProgram));
     }
-    if (next && chartSeriesBy === 'cohort') setChartSeriesBy('');
-    if (!next && mode === 'cohortCumulative' && chartGroupBy === 'period' && !chartSeriesBy) {
+    if (fixedCohort && chartSeriesBy === 'cohort') setChartSeriesBy('');
+    if (!fixedCohort && mode === 'cohortCumulative' && chartGroupBy === 'period' && !chartSeriesBy) {
       setChartSeriesBy('cohort');
     }
   };
 
-  const handleFacultyChange = (next: string) => {
-    setFacultyKey(next);
-    setProgramKey('');
-    if (next && chartGroupBy === 'faculty') {
-      setChartGroupBy(recommendedChartGroup(mode, cohort, next, ''));
+  const handleFacultyChange = (next: string[]) => {
+    setSelectedFacultyKeys(next);
+    const fixedFaculty = next.length === 1 ? next[0] : '';
+    const allowedPrograms = new Set((facets?.programs ?? [])
+      .filter((program) => next.length === 0 || Boolean(program.parentValue && next.includes(program.parentValue)))
+      .map((program) => programSelectionValue(program.parentValue, program.value)));
+    const nextPrograms = selectedProgramKeys.filter((item) => allowedPrograms.has(item));
+    setSelectedProgramKeys(nextPrograms);
+    const fixedProgram = nextPrograms.length === 1 ? nextPrograms[0] : '';
+    if (fixedFaculty && chartGroupBy === 'faculty') {
+      setChartGroupBy(recommendedChartGroup(mode, singleSelectedCohort, fixedFaculty, fixedProgram));
     }
-    if (next && chartSeriesBy === 'faculty') setChartSeriesBy('');
+    if (fixedFaculty && chartSeriesBy === 'faculty') setChartSeriesBy('');
   };
 
-  const handleProgramChange = (next: string) => {
-    setProgramKey(next);
-    if (next && chartGroupBy === 'program') {
-      setChartGroupBy(recommendedChartGroup(mode, cohort, facultyKey, next));
+  const handleProgramChange = (next: string[]) => {
+    setSelectedProgramKeys(next);
+    const fixedProgram = next.length === 1 ? next[0] : '';
+    if (fixedProgram && chartGroupBy === 'program') {
+      setChartGroupBy(recommendedChartGroup(mode, singleSelectedCohort, singleSelectedFaculty, fixedProgram));
     }
-    if (next && chartSeriesBy === 'program') setChartSeriesBy('');
+    if (fixedProgram && chartSeriesBy === 'program') setChartSeriesBy('');
   };
 
   const resetFilters = () => {
-    setFacultyKey('');
-    setProgramKey('');
-    setCohort('');
+    setSelectedFacultyKeys([]);
+    setSelectedProgramKeys([]);
+    setSelectedCohorts([]);
     setChartGroupBy(recommendedChartGroup(mode, '', '', ''));
     setChartSeriesBy(mode === 'cohortCumulative' ? 'cohort' : '');
   };
@@ -543,6 +605,20 @@ export function GraduationAnalyticsPage() {
     if (result.revision.skippedRowCount > 0) {
       toast.warning(`Đã bỏ ${result.revision.skippedRowCount} dòng không xác định được khóa.`);
     }
+  };
+
+  const handlePeriodDeleted = async (period: GraduationManagedPeriod) => {
+    setVisibleRoundsByYear((current) => ({
+      ...current,
+      [period.academicYearStart]: Math.max(current[period.academicYearStart] ?? 0, period.roundNumber),
+    }));
+    if (historyPeriodId === period.periodId) {
+      setHistoryPeriodId(null);
+      setRevisions([]);
+    }
+    if (previewPeriod?.periodId === period.periodId) setPreviewPeriod(null);
+    await loadPeriods();
+    toast.success(`Đã xóa dữ liệu Đợt ${period.roundNumber}. Lịch sử tải lên vẫn được lưu.`);
   };
 
   const addRound = () => {
@@ -581,10 +657,10 @@ export function GraduationAnalyticsPage() {
     {mode === 'cohortCumulative' ? <>
       <label>Từ đợt<select value={startPeriodId ?? ''} onChange={(event) => handleStartPeriodChange(Number(event.target.value))}>{periodsByAcademicYear.map(([academicYearLabel, yearPeriods]) => <optgroup key={academicYearLabel} label={academicYearLabel}>{yearPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodOptionLabel(period)}</option>)}</optgroup>)}</select></label>
       <label>Đến đợt<select value={cutoffPeriodId ?? ''} onChange={(event) => handleCutoffPeriodChange(Number(event.target.value))}>{periodsByAcademicYear.map(([academicYearLabel, yearPeriods]) => <optgroup key={academicYearLabel} label={academicYearLabel}>{yearPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodOptionLabel(period)}</option>)}</optgroup>)}</select></label>
-    </> : <label>Mốc dữ liệu<select value={cutoffPeriodId ?? ''} onChange={(event) => { setCutoffPeriodId(Number(event.target.value)); setFacultyKey(''); setProgramKey(''); setCohort(''); setChartGroupBy(recommendedChartGroup(mode, '', '', '')); setChartSeriesBy(''); }}>{chronologicalPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodLabel(period)}</option>)}</select></label>}
-    <label>Khóa<select value={cohort} onChange={(event) => handleCohortChange(event.target.value)}><option value="">Tất cả khóa</option>{facets?.cohorts.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-    <label>Khoa<select value={facultyKey} onChange={(event) => handleFacultyChange(event.target.value)}><option value="">Tất cả khoa</option>{facets?.faculties.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-    <label>Chuyên ngành<select value={programKey} onChange={(event) => handleProgramChange(event.target.value)}><option value="">Tất cả chuyên ngành</option>{availablePrograms.map((item) => <option key={`${item.parentValue}-${item.value}`} value={item.value}>{item.label}</option>)}</select></label>
+    </> : <label>Mốc dữ liệu<select value={cutoffPeriodId ?? ''} onChange={(event) => { setCutoffPeriodId(Number(event.target.value)); setSelectedFacultyKeys([]); setSelectedProgramKeys([]); setSelectedCohorts([]); setChartGroupBy(recommendedChartGroup(mode, '', '', '')); setChartSeriesBy(''); }}>{chronologicalPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodLabel(period)}</option>)}</select></label>}
+    <div className="graduation-filter-field"><span>Khóa</span><GraduationFilterMultiSelect options={(facets?.cohorts ?? []).map((item) => ({ value: item, label: item }))} value={selectedCohorts} onChange={handleCohortChange} allLabel="Tất cả khóa" selectedLabel={(count) => `${count} khóa đã chọn`} searchPlaceholder="Tìm khóa..." searchAriaLabel="Tìm khóa" dialogAriaLabel="Chọn các khóa cần thống kê" emptyMessage="Không tìm thấy khóa phù hợp." /></div>
+    <div className="graduation-filter-field"><span>Khoa</span><GraduationFilterMultiSelect options={facultyOptions} value={selectedFacultyKeys} onChange={handleFacultyChange} allLabel="Tất cả khoa" selectedLabel={(count) => `${count} khoa đã chọn`} searchPlaceholder="Tìm khoa..." searchAriaLabel="Tìm khoa" dialogAriaLabel="Chọn các khoa cần thống kê" emptyMessage="Không tìm thấy khoa phù hợp." /></div>
+    <div className="graduation-filter-field"><span>Chuyên ngành</span><GraduationFilterMultiSelect options={programOptions} value={selectedProgramKeys} onChange={handleProgramChange} allLabel="Tất cả chuyên ngành" selectedLabel={(count) => `${count} chuyên ngành đã chọn`} searchPlaceholder="Tìm chuyên ngành..." searchAriaLabel="Tìm chuyên ngành" dialogAriaLabel="Chọn các chuyên ngành cần thống kê" emptyMessage="Không tìm thấy chuyên ngành phù hợp." /></div>
     <button type="button" className="btn graduation-filter-reset" onClick={resetFilters}><RotateCcw aria-hidden="true" />Đặt lại</button>
   </div>;
 
@@ -609,7 +685,7 @@ export function GraduationAnalyticsPage() {
                 <span>TỔNG QUAN KẾT QUẢ</span>
                 <h2>Kết quả tốt nghiệp và cơ cấu xếp loại</h2>
               </div>
-              <p>{explore.scope.cohort ? `Khóa ${explore.scope.cohort}` : 'Tất cả khóa'}</p>
+              <p>{displayedCohorts.length === 0 ? 'Tất cả khóa' : displayedCohorts.length === 1 ? `Khóa ${displayedCohorts[0]}` : `${displayedCohorts.length} khóa đã chọn`}</p>
             </header>
             <section className="graduation-result-summary__kpis" aria-label="Các chỉ số tốt nghiệp chính">
               {explore.kpis.map((kpi) => <div key={kpi.id} data-kpi={kpi.id}>
@@ -636,7 +712,7 @@ export function GraduationAnalyticsPage() {
             </section>
           </article>
           {renderExploreControls()}
-          <div className="graduation-scope-note"><strong>{explore.scope.mode === 'cohortCumulative' ? (explore.scope.cohort ? `Tích lũy ${explore.scope.cohort}` : 'Tích lũy tất cả khóa') : 'Riêng đợt được chọn'}</strong><span>{explore.scope.startPeriodLabel}{explore.scope.startPeriodId !== explore.scope.cutoffPeriodId ? ` → ${explore.scope.cutoffPeriodLabel}` : ''} · {explore.scope.includedPeriodCount} đợt</span></div>
+          <div className="graduation-scope-note"><strong>{explore.scope.mode === 'cohortCumulative' ? (displayedCohorts.length > 0 ? `Tích lũy ${displayedCohorts.join(', ')}` : 'Tích lũy tất cả khóa') : 'Riêng đợt được chọn'}</strong><span>{explore.scope.startPeriodLabel}{explore.scope.startPeriodId !== explore.scope.cutoffPeriodId ? ` → ${explore.scope.cutoffPeriodLabel}` : ''} · {explore.scope.includedPeriodCount} đợt</span></div>
           <div className="graduation-workspace graduation-explore-chart-workspace">
             <aside className="graduation-builder">
               <div className="graduation-builder__heading">
@@ -677,7 +753,7 @@ export function GraduationAnalyticsPage() {
           </div>
           <GraduationSummaryTable
             rows={explore.breakdown}
-            fileName={`thong-ke-tot-nghiep-${cohort || 'theo-dot'}`}
+            fileName={`thong-ke-tot-nghiep-${displayedCohorts.join('-') || 'theo-dot'}`}
             subtitle={explore.scope.startPeriodId === explore.scope.cutoffPeriodId
               ? explore.scope.cutoffPeriodLabel
               : `${explore.scope.startPeriodLabel} → ${explore.scope.cutoffPeriodLabel}`}
@@ -694,12 +770,38 @@ export function GraduationAnalyticsPage() {
       <div className="graduation-import-toolbar">
         <label>Năm học<select value={academicYearStart} onChange={(event) => { setAcademicYearStart(Number(event.target.value)); setHistoryPeriodId(null); setRevisions([]); }}>{academicYears.map((year) => <option key={year} value={year}>{year}–{year + 1}</option>)}</select></label>
       </div>
-      <div className="graduation-period-manager"><table><thead><tr><th>Đợt</th><th>Trạng thái</th><th>Tháng/năm xét</th><th>File đang dùng</th><th>Người tải lên</th><th>Số sinh viên</th><th>Lần cập nhật</th><th>Dòng bỏ</th><th>Hành động</th></tr></thead><tbody>{rounds.map((round) => { const period = managedByRound.get(round); const canRemove = !period && round === visibleRoundCount && visibleRoundCount > Math.max(1, highestImportedRound); return <tr key={round}><td><strong>Đợt {round}</strong></td><td><span className={`graduation-period-status ${period ? 'is-ready' : 'is-empty'}`}><i />{period ? 'Đã có dữ liệu' : 'Chờ tải lên'}</span></td><td>{period ? `${String(period.reviewMonth).padStart(2, '0')}/${period.reviewYear}` : <span className="graduation-muted">Chọn khi tải lên</span>}</td><td title={period?.originalFileName}>{period ? <><strong className="graduation-file-name">{period.originalFileName}</strong><small>Tải lên vào {new Date(period.importedAtUtc).toLocaleTimeString('vi-VN')} ngày {new Date(period.importedAtUtc).toLocaleDateString('vi-VN')}</small></> : <span className="graduation-muted">Chưa chọn file Excel</span>}</td><td>{period?.importedByName || '—'}</td><td>{period ? formatNumber(period.studentCount) : '—'}</td><td>{period ? `Lần ${period.activeRevisionNumber}` : '—'}</td><td className={period?.skippedRowCount ? 'has-warning' : ''}>{period ? period.skippedRowCount : '—'}</td><td><div className="graduation-row-actions"><button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => setImportTarget({ academicYearStart, roundNumber: round, period })} title={period ? `Tải lên lại Đợt ${round}` : `Tải file lên cho Đợt ${round}`} aria-label={period ? `Tải lên lại Đợt ${round}` : `Tải file lên cho Đợt ${round}`}><Upload aria-hidden="true" /></button>{period && <button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => setPreviewPeriod(period)} title={`Xem dữ liệu đã tải lên của Đợt ${round}`} aria-label={`Xem dữ liệu đã tải lên của Đợt ${round}`}><Eye aria-hidden="true" /></button>}{period && <button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => void toggleHistory(period.periodId)} aria-expanded={historyPeriodId === period.periodId} title={`${historyPeriodId === period.periodId ? 'Ẩn' : 'Xem'} lịch sử cập nhật Đợt ${round}`} aria-label={`${historyPeriodId === period.periodId ? 'Ẩn' : 'Xem'} lịch sử cập nhật Đợt ${round}`}><History aria-hidden="true" /></button>}{canRemove && <button type="button" className="btn btn-secondary graduation-icon-button graduation-icon-button--danger" onClick={removeLatestEmptyRound} title={`Xóa Đợt ${round}`} aria-label={`Xóa Đợt ${round}`}><Trash2 aria-hidden="true" /></button>}</div></td></tr>; })}</tbody></table></div>
+      <div className="graduation-period-manager">
+        <table>
+          <thead><tr><th>Đợt</th><th>Trạng thái</th><th>Tháng/năm xét</th><th>File đang dùng</th><th>Người tải lên</th><th>Số sinh viên</th><th>Lần cập nhật</th><th>Dòng bỏ</th><th>Hành động</th></tr></thead>
+          <tbody>{rounds.map((round) => {
+            const period = managedByRound.get(round);
+            const canRemove = !period && round === visibleRoundCount && visibleRoundCount > Math.max(1, highestImportedRound);
+            return <tr key={round}>
+              <td><strong>Đợt {round}</strong></td>
+              <td><span className={`graduation-period-status ${period ? 'is-ready' : 'is-empty'}`}><i />{period ? 'Đã có dữ liệu' : 'Chờ tải lên'}</span></td>
+              <td>{period ? `${String(period.reviewMonth).padStart(2, '0')}/${period.reviewYear}` : <span className="graduation-muted">Chọn khi tải lên</span>}</td>
+              <td title={period?.originalFileName}>{period ? <><strong className="graduation-file-name">{period.originalFileName}</strong><small>Tải lên vào {new Date(period.importedAtUtc).toLocaleTimeString('vi-VN')} ngày {new Date(period.importedAtUtc).toLocaleDateString('vi-VN')}</small></> : <span className="graduation-muted">Chưa chọn file Excel</span>}</td>
+              <td>{period?.importedByName || '—'}</td>
+              <td>{period ? formatNumber(period.studentCount) : '—'}</td>
+              <td>{period ? `Lần ${period.activeRevisionNumber}` : '—'}</td>
+              <td className={period?.skippedRowCount ? 'has-warning' : ''}>{period ? period.skippedRowCount : '—'}</td>
+              <td><div className="graduation-row-actions">
+                <button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => setImportTarget({ academicYearStart, roundNumber: round, period })} title={period ? `Tải lên lại Đợt ${round}` : `Tải file lên cho Đợt ${round}`} aria-label={period ? `Tải lên lại Đợt ${round}` : `Tải file lên cho Đợt ${round}`}><Upload aria-hidden="true" /></button>
+                {period && <button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => setPreviewPeriod(period)} title={`Xem dữ liệu đã tải lên của Đợt ${round}`} aria-label={`Xem dữ liệu đã tải lên của Đợt ${round}`}><Eye aria-hidden="true" /></button>}
+                {period && <button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => void toggleHistory(period.periodId)} aria-expanded={historyPeriodId === period.periodId} title={`${historyPeriodId === period.periodId ? 'Ẩn' : 'Xem'} lịch sử cập nhật Đợt ${round}`} aria-label={`${historyPeriodId === period.periodId ? 'Ẩn' : 'Xem'} lịch sử cập nhật Đợt ${round}`}><History aria-hidden="true" /></button>}
+                {period && <button type="button" className="btn btn-secondary graduation-icon-button graduation-icon-button--danger" onClick={() => setDeletePeriod(period)} title={`Xóa dữ liệu Đợt ${round}`} aria-label={`Xóa dữ liệu Đợt ${round}`}><Trash2 aria-hidden="true" /></button>}
+                {canRemove && <button type="button" className="btn btn-secondary graduation-icon-button graduation-icon-button--danger" onClick={removeLatestEmptyRound} title={`Xóa Đợt ${round}`} aria-label={`Xóa Đợt ${round}`}><Trash2 aria-hidden="true" /></button>}
+              </div></td>
+            </tr>;
+          })}</tbody>
+        </table>
+      </div>
       <div className="graduation-add-round"><button type="button" onClick={addRound}><Plus size={16} /> Thêm Đợt {visibleRoundCount + 1}</button></div>
       {historyPeriodId && <div className="graduation-history"><h3>Lịch sử cập nhật</h3>{historyLoading ? <div className="graduation-state"><LoaderCircle className="spin" /> Đang tải...</div> : <table><thead><tr><th>Lần cập nhật</th><th>File</th><th>Thời gian</th><th>Người tải lên</th><th>Số sinh viên</th><th>Dòng bỏ</th><th>Lý do thay thế</th></tr></thead><tbody>{revisions.map((revision) => <tr key={revision.revisionId}><td>Lần {revision.revisionNumber}</td><td>{revision.originalFileName}</td><td>{new Date(revision.importedAtUtc).toLocaleString('vi-VN')}</td><td>{revision.importedByName}</td><td>{formatNumber(revision.importedRowCount)}</td><td>{revision.skippedRowCount}</td><td>{revision.replaceReason ?? 'Tải lên lần đầu'}</td></tr>)}</tbody></table>}</div>}
     </section>}
 
     <GraduationImportDialog isOpen={Boolean(importTarget)} target={importTarget} onClose={() => setImportTarget(null)} onCommitted={handleCommitted} />
     <GraduationSavedPreviewDialog period={previewPeriod} onClose={() => setPreviewPeriod(null)} />
+    <GraduationDeletePeriodDialog period={deletePeriod} onClose={() => setDeletePeriod(null)} onDeleted={handlePeriodDeleted} />
   </div>;
 }
