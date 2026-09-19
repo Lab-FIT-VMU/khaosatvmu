@@ -255,6 +255,7 @@ export interface GraduationManagedPeriod {
   studentCount: number;
   skippedRowCount: number;
   importedAtUtc: string;
+  importedByName: string;
 }
 
 export interface GraduationImportCommitResultV3 {

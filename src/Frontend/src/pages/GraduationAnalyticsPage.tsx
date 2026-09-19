@@ -9,6 +9,7 @@ import {
   ChartNoAxesCombined,
   CircleAlert,
   Donut,
+  Eye,
   FileSpreadsheet,
   History,
   LineChart as LineChartIcon,
@@ -22,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { GraduationEChart } from '../components/graduation/GraduationEChart';
 import { GraduationSummaryTable } from '../components/graduation/GraduationSummaryTable';
+import { GraduationSavedPreviewDialog } from '../components/graduation/GraduationSavedPreviewDialog';
 import {
   GraduationImportDialog,
   type GraduationImportTarget,
@@ -144,6 +146,8 @@ const formatNumber = (value: number) => value.toLocaleString('vi-VN');
 const formatRate = (value: number) => `${value.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}%`;
 const periodLabel = (period: GraduationManagedPeriod) =>
   `${period.academicYearLabel} · Đợt ${period.roundNumber} · ${String(period.reviewMonth).padStart(2, '0')}/${period.reviewYear}`;
+const periodOptionLabel = (period: GraduationManagedPeriod) =>
+  `Đợt ${period.roundNumber} · ${String(period.reviewMonth).padStart(2, '0')}/${period.reviewYear}`;
 
 const compatibleChartPoints = (
   result: GraduationExploreResultV3,
@@ -241,6 +245,7 @@ export function GraduationAnalyticsPage() {
   const exploreError = exploreRequest.error;
   const [academicYearStart, setAcademicYearStart] = useState(currentAcademicYearStart());
   const [importTarget, setImportTarget] = useState<GraduationImportTarget | null>(null);
+  const [previewPeriod, setPreviewPeriod] = useState<GraduationManagedPeriod | null>(null);
   const [historyPeriodId, setHistoryPeriodId] = useState<number | null>(null);
   const [revisions, setRevisions] = useState<GraduationRevisionV3[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -325,6 +330,15 @@ export function GraduationAnalyticsPage() {
   }, []);
   const chronologicalPeriods = useMemo(() => [...periods].sort((a, b) =>
     a.academicYearStart - b.academicYearStart || a.roundNumber - b.roundNumber), [periods]);
+  const periodsByAcademicYear = useMemo(() => {
+    const groups = new Map<string, GraduationManagedPeriod[]>();
+    chronologicalPeriods.forEach((period) => {
+      const group = groups.get(period.academicYearLabel);
+      if (group) group.push(period);
+      else groups.set(period.academicYearLabel, [period]);
+    });
+    return [...groups.entries()];
+  }, [chronologicalPeriods]);
   const managedPeriods = useMemo(() => periods
     .filter((period) => period.academicYearStart === academicYearStart)
     .sort((a, b) => a.roundNumber - b.roundNumber), [academicYearStart, periods]);
@@ -556,7 +570,7 @@ export function GraduationAnalyticsPage() {
     try {
       setRevisions(await graduationAnalyticsApi.revisions(periodId));
     } catch {
-      toast.error('Không tải được lịch sử import.');
+      toast.error('Không tải được lịch sử tải lên.');
     } finally {
       setHistoryLoading(false);
     }
@@ -565,8 +579,8 @@ export function GraduationAnalyticsPage() {
   const renderExploreControls = () => <div className={`graduation-v3-controls${mode === 'cohortCumulative' ? ' is-range' : ''}`}>
     <label>Phạm vi<select value={mode} onChange={(event) => handleModeChange(event.target.value as GraduationExploreModeV3)}><option value="period">Riêng một đợt</option><option value="cohortCumulative">Tích lũy qua các đợt</option></select></label>
     {mode === 'cohortCumulative' ? <>
-      <label>Từ đợt<select value={startPeriodId ?? ''} onChange={(event) => handleStartPeriodChange(Number(event.target.value))}>{chronologicalPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodLabel(period)}</option>)}</select></label>
-      <label>Đến đợt<select value={cutoffPeriodId ?? ''} onChange={(event) => handleCutoffPeriodChange(Number(event.target.value))}>{chronologicalPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodLabel(period)}</option>)}</select></label>
+      <label>Từ đợt<select value={startPeriodId ?? ''} onChange={(event) => handleStartPeriodChange(Number(event.target.value))}>{periodsByAcademicYear.map(([academicYearLabel, yearPeriods]) => <optgroup key={academicYearLabel} label={academicYearLabel}>{yearPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodOptionLabel(period)}</option>)}</optgroup>)}</select></label>
+      <label>Đến đợt<select value={cutoffPeriodId ?? ''} onChange={(event) => handleCutoffPeriodChange(Number(event.target.value))}>{periodsByAcademicYear.map(([academicYearLabel, yearPeriods]) => <optgroup key={academicYearLabel} label={academicYearLabel}>{yearPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodOptionLabel(period)}</option>)}</optgroup>)}</select></label>
     </> : <label>Mốc dữ liệu<select value={cutoffPeriodId ?? ''} onChange={(event) => { setCutoffPeriodId(Number(event.target.value)); setFacultyKey(''); setProgramKey(''); setCohort(''); setChartGroupBy(recommendedChartGroup(mode, '', '', '')); setChartSeriesBy(''); }}>{chronologicalPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodLabel(period)}</option>)}</select></label>}
     <label>Khóa<select value={cohort} onChange={(event) => handleCohortChange(event.target.value)}><option value="">Tất cả khóa</option>{facets?.cohorts.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
     <label>Khoa<select value={facultyKey} onChange={(event) => handleFacultyChange(event.target.value)}><option value="">Tất cả khoa</option>{facets?.faculties.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
@@ -580,12 +594,12 @@ export function GraduationAnalyticsPage() {
     {error && <div className="graduation-alert" role="alert">{error}</div>}
 
     <nav className="graduation-view-switch" aria-label="Màn hình thống kê tốt nghiệp">
-      <button type="button" className={view === 'manage' ? 'is-selected' : ''} onClick={() => setView('manage')}>Import dữ liệu</button>
+      <button type="button" className={view === 'manage' ? 'is-selected' : ''} onClick={() => setView('manage')}>Tải lên dữ liệu</button>
       <button type="button" className={view === 'explore' ? 'is-selected' : ''} onClick={() => setView('explore')}>Khám phá chi tiết</button>
     </nav>
 
     {view === 'explore' && <section className="graduation-tab-panel">
-      {periods.length === 0 ? <div className="graduation-empty"><FileSpreadsheet size={42} /><h2>Chưa có dữ liệu v3</h2><p>Chuyển sang Quản lý đợt import để tải danh sách sinh viên tốt nghiệp đầu tiên.</p><button className="btn btn-primary" type="button" onClick={() => setView('manage')}>Quản lý đợt</button></div> : <>
+      {periods.length === 0 ? <div className="graduation-empty"><FileSpreadsheet size={42} /><h2>Chưa có dữ liệu</h2><p>Chuyển sang tab Tải lên dữ liệu để tải danh sách sinh viên tốt nghiệp đầu tiên.</p><button className="btn btn-primary" type="button" onClick={() => setView('manage')}>Tải lên dữ liệu</button></div> : <>
         {exploreError && <div className="graduation-alert" role="alert">{exploreError}</div>}
         {!explore && <>{renderExploreControls()}{exploreLoading && <div className="graduation-overview-status"><LoaderCircle className="spin" /> Đang tính số liệu...</div>}</>}
         {explore && <>
@@ -680,11 +694,12 @@ export function GraduationAnalyticsPage() {
       <div className="graduation-import-toolbar">
         <label>Năm học<select value={academicYearStart} onChange={(event) => { setAcademicYearStart(Number(event.target.value)); setHistoryPeriodId(null); setRevisions([]); }}>{academicYears.map((year) => <option key={year} value={year}>{year}–{year + 1}</option>)}</select></label>
       </div>
-      <div className="graduation-period-manager"><table><thead><tr><th>Đợt</th><th>Trạng thái</th><th>Tháng/năm xét</th><th>File đang dùng</th><th>Số sinh viên</th><th>Lần cập nhật</th><th>Dòng bỏ</th><th>Hành động</th></tr></thead><tbody>{rounds.map((round) => { const period = managedByRound.get(round); const canRemove = !period && round === visibleRoundCount && visibleRoundCount > Math.max(1, highestImportedRound); return <tr key={round}><td><strong>Đợt {round}</strong></td><td><span className={`graduation-period-status ${period ? 'is-ready' : 'is-empty'}`}><i />{period ? 'Đã có dữ liệu' : 'Chờ import'}</span></td><td>{period ? `${String(period.reviewMonth).padStart(2, '0')}/${period.reviewYear}` : <span className="graduation-muted">Chọn khi import</span>}</td><td title={period?.originalFileName}>{period ? <><strong className="graduation-file-name">{period.originalFileName}</strong><small>Import {new Date(period.importedAtUtc).toLocaleString('vi-VN')}</small></> : <span className="graduation-muted">Chưa chọn file Excel</span>}</td><td>{period ? formatNumber(period.studentCount) : '—'}</td><td>{period ? `Lần ${period.activeRevisionNumber}` : '—'}</td><td className={period?.skippedRowCount ? 'has-warning' : ''}>{period ? period.skippedRowCount : '—'}</td><td><div className="graduation-row-actions"><button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => setImportTarget({ academicYearStart, roundNumber: round, period })} title={period ? `Import lại Đợt ${round}` : `Import file cho Đợt ${round}`} aria-label={period ? `Import lại Đợt ${round}` : `Import file cho Đợt ${round}`}><Upload aria-hidden="true" /></button>{period && <button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => void toggleHistory(period.periodId)} aria-expanded={historyPeriodId === period.periodId} title={`${historyPeriodId === period.periodId ? 'Ẩn' : 'Xem'} lịch sử cập nhật Đợt ${round}`} aria-label={`${historyPeriodId === period.periodId ? 'Ẩn' : 'Xem'} lịch sử cập nhật Đợt ${round}`}><History aria-hidden="true" /></button>}{canRemove && <button type="button" className="btn btn-secondary graduation-icon-button graduation-icon-button--danger" onClick={removeLatestEmptyRound} title={`Xóa Đợt ${round}`} aria-label={`Xóa Đợt ${round}`}><Trash2 aria-hidden="true" /></button>}</div></td></tr>; })}</tbody></table></div>
+      <div className="graduation-period-manager"><table><thead><tr><th>Đợt</th><th>Trạng thái</th><th>Tháng/năm xét</th><th>File đang dùng</th><th>Người tải lên</th><th>Số sinh viên</th><th>Lần cập nhật</th><th>Dòng bỏ</th><th>Hành động</th></tr></thead><tbody>{rounds.map((round) => { const period = managedByRound.get(round); const canRemove = !period && round === visibleRoundCount && visibleRoundCount > Math.max(1, highestImportedRound); return <tr key={round}><td><strong>Đợt {round}</strong></td><td><span className={`graduation-period-status ${period ? 'is-ready' : 'is-empty'}`}><i />{period ? 'Đã có dữ liệu' : 'Chờ tải lên'}</span></td><td>{period ? `${String(period.reviewMonth).padStart(2, '0')}/${period.reviewYear}` : <span className="graduation-muted">Chọn khi tải lên</span>}</td><td title={period?.originalFileName}>{period ? <><strong className="graduation-file-name">{period.originalFileName}</strong><small>Tải lên vào {new Date(period.importedAtUtc).toLocaleTimeString('vi-VN')} ngày {new Date(period.importedAtUtc).toLocaleDateString('vi-VN')}</small></> : <span className="graduation-muted">Chưa chọn file Excel</span>}</td><td>{period?.importedByName || '—'}</td><td>{period ? formatNumber(period.studentCount) : '—'}</td><td>{period ? `Lần ${period.activeRevisionNumber}` : '—'}</td><td className={period?.skippedRowCount ? 'has-warning' : ''}>{period ? period.skippedRowCount : '—'}</td><td><div className="graduation-row-actions"><button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => setImportTarget({ academicYearStart, roundNumber: round, period })} title={period ? `Tải lên lại Đợt ${round}` : `Tải file lên cho Đợt ${round}`} aria-label={period ? `Tải lên lại Đợt ${round}` : `Tải file lên cho Đợt ${round}`}><Upload aria-hidden="true" /></button>{period && <button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => setPreviewPeriod(period)} title={`Xem dữ liệu đã tải lên của Đợt ${round}`} aria-label={`Xem dữ liệu đã tải lên của Đợt ${round}`}><Eye aria-hidden="true" /></button>}{period && <button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => void toggleHistory(period.periodId)} aria-expanded={historyPeriodId === period.periodId} title={`${historyPeriodId === period.periodId ? 'Ẩn' : 'Xem'} lịch sử cập nhật Đợt ${round}`} aria-label={`${historyPeriodId === period.periodId ? 'Ẩn' : 'Xem'} lịch sử cập nhật Đợt ${round}`}><History aria-hidden="true" /></button>}{canRemove && <button type="button" className="btn btn-secondary graduation-icon-button graduation-icon-button--danger" onClick={removeLatestEmptyRound} title={`Xóa Đợt ${round}`} aria-label={`Xóa Đợt ${round}`}><Trash2 aria-hidden="true" /></button>}</div></td></tr>; })}</tbody></table></div>
       <div className="graduation-add-round"><button type="button" onClick={addRound}><Plus size={16} /> Thêm Đợt {visibleRoundCount + 1}</button></div>
-      {historyPeriodId && <div className="graduation-history"><h3>Lịch sử cập nhật</h3>{historyLoading ? <div className="graduation-state"><LoaderCircle className="spin" /> Đang tải...</div> : <table><thead><tr><th>Lần cập nhật</th><th>File</th><th>Thời gian</th><th>Người import</th><th>Số sinh viên</th><th>Dòng bỏ</th><th>Lý do thay thế</th></tr></thead><tbody>{revisions.map((revision) => <tr key={revision.revisionId}><td>Lần {revision.revisionNumber}</td><td>{revision.originalFileName}</td><td>{new Date(revision.importedAtUtc).toLocaleString('vi-VN')}</td><td>{revision.importedByName}</td><td>{formatNumber(revision.importedRowCount)}</td><td>{revision.skippedRowCount}</td><td>{revision.replaceReason ?? 'Import lần đầu'}</td></tr>)}</tbody></table>}</div>}
+      {historyPeriodId && <div className="graduation-history"><h3>Lịch sử cập nhật</h3>{historyLoading ? <div className="graduation-state"><LoaderCircle className="spin" /> Đang tải...</div> : <table><thead><tr><th>Lần cập nhật</th><th>File</th><th>Thời gian</th><th>Người tải lên</th><th>Số sinh viên</th><th>Dòng bỏ</th><th>Lý do thay thế</th></tr></thead><tbody>{revisions.map((revision) => <tr key={revision.revisionId}><td>Lần {revision.revisionNumber}</td><td>{revision.originalFileName}</td><td>{new Date(revision.importedAtUtc).toLocaleString('vi-VN')}</td><td>{revision.importedByName}</td><td>{formatNumber(revision.importedRowCount)}</td><td>{revision.skippedRowCount}</td><td>{revision.replaceReason ?? 'Tải lên lần đầu'}</td></tr>)}</tbody></table>}</div>}
     </section>}
 
     <GraduationImportDialog isOpen={Boolean(importTarget)} target={importTarget} onClose={() => setImportTarget(null)} onCommitted={handleCommitted} />
+    <GraduationSavedPreviewDialog period={previewPeriod} onClose={() => setPreviewPeriod(null)} />
   </div>;
 }

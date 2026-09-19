@@ -316,6 +316,8 @@
   background: #f7f9fa;
 }
 .graduation-import__picker.has-file { border-color: #b9d4de; background: #f2f9fb; }
+.graduation-import__picker--readonly { grid-template-columns: auto minmax(0, 1fr) auto; }
+.graduation-import__picker--readonly > svg { color: #087fa9; }
 .graduation-import__picker input[type='file'] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .graduation-import__picker label { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
 .graduation-import__file-icon {
@@ -442,7 +444,7 @@
 .graduation-v3-table > div { max-height: 420px; scrollbar-gutter: stable; }
 .graduation-v3-table table, .graduation-period-manager table, .graduation-history table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 13px; }
 .graduation-v3-table th, .graduation-v3-table td, .graduation-period-manager th, .graduation-period-manager td, .graduation-history th, .graduation-history td { padding: 9px 10px; border-right: 1px solid #edf0f2; border-bottom: 1px solid #edf0f2; text-align: right; }
-.graduation-v3-table th:first-child, .graduation-v3-table td:first-child, .graduation-v3-table th:nth-child(2), .graduation-v3-table td:nth-child(2), .graduation-period-manager th:nth-child(-n+4), .graduation-period-manager td:nth-child(-n+4), .graduation-history th:nth-child(-n+4), .graduation-history td:nth-child(-n+4) { text-align: left; }
+.graduation-v3-table th:first-child, .graduation-v3-table td:first-child, .graduation-v3-table th:nth-child(2), .graduation-v3-table td:nth-child(2), .graduation-period-manager th:nth-child(-n+5), .graduation-period-manager td:nth-child(-n+5), .graduation-history th:nth-child(-n+4), .graduation-history td:nth-child(-n+4) { text-align: left; }
 .graduation-v3-table th, .graduation-period-manager th, .graduation-history th { background: #f7f9fa; color: #000000; }
 .graduation-v3-table thead th { position: sticky; top: 0; z-index: 1; }
 .graduation-sort-button { display: flex; width: 100%; min-height: 24px; align-items: center; justify-content: flex-end; gap: 5px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
@@ -457,19 +459,20 @@
 .graduation-year-picker { display: flex; padding: 10px 12px; border: 1px solid #dfe4e8; border-top: 0; background: #fff; }
 .graduation-year-picker label { width: 220px; }
 .graduation-period-manager { border: 1px solid #dfe4e8; border-top: 0; background: #fff; }
-.graduation-period-manager table { min-width: 980px; table-layout: fixed; }
+.graduation-period-manager table { min-width: 1140px; table-layout: fixed; }
 .graduation-period-manager th { position: sticky; top: 0; z-index: 1; height: 40px; padding-block: 0; white-space: nowrap; }
 .graduation-period-manager th:nth-child(1) { width: 74px; }
 .graduation-period-manager th:nth-child(2) { width: 116px; }
 .graduation-period-manager th:nth-child(3) { width: 124px; }
 .graduation-period-manager th:nth-child(4) { width: auto; }
-.graduation-period-manager th:nth-child(5) { width: 104px; }
-.graduation-period-manager th:nth-child(6) { width: 112px; }
-.graduation-period-manager th:nth-child(7) { width: 86px; }
-.graduation-period-manager th:nth-child(8) { width: 116px; }
+.graduation-period-manager th:nth-child(5) { width: 150px; }
+.graduation-period-manager th:nth-child(6) { width: 104px; }
+.graduation-period-manager th:nth-child(7) { width: 112px; }
+.graduation-period-manager th:nth-child(8) { width: 86px; }
+.graduation-period-manager th:nth-child(9) { width: 130px; }
 .graduation-period-manager td { height: 48px; vertical-align: middle; font-variant-numeric: tabular-nums; }
 .graduation-period-manager td:nth-child(4) { min-width: 0; }
-.graduation-period-manager th:nth-child(8), .graduation-period-manager td:nth-child(8) { text-align: center; }
+.graduation-period-manager th:nth-child(9), .graduation-period-manager td:nth-child(9) { text-align: center; }
 .graduation-period-manager .has-warning { color: #9a6812; font-weight: 700; }
 .graduation-row-actions { display: flex; justify-content: center; gap: 6px; }
 .graduation-row-actions .btn { white-space: nowrap; }
@@ -508,7 +511,7 @@
 .graduation-import-heading__summary strong { color: #000000; font-size: 16px; font-variant-numeric: tabular-nums; }
 .graduation-import-toolbar {
   display: grid;
-  grid-template-columns: 180px;
+  grid-template-columns: 150px;
   align-items: end;
   gap: 12px;
   padding: 10px 12px;
@@ -575,7 +578,7 @@
   .graduation-import-heading { align-items: flex-start; flex-direction: column; }
   .graduation-import-heading__summary { width: 100%; }
   .graduation-import-heading__summary span:first-child { padding-left: 0; border-left: 0; }
-  .graduation-import-toolbar { grid-template-columns: 180px; }
+  .graduation-import-toolbar { grid-template-columns: 150px; }
 }
 
 @media (max-width: 560px) {

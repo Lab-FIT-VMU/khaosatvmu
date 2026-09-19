@@ -110,7 +110,17 @@ public sealed class EfGraduationAnalyticsV3Service(
 
         var now = DateTime.UtcNow;
         var actorId = currentUser.UserId ?? Guid.Empty;
-        var actorName = currentUser.UserEmail?.Trim() ?? "system";
+        var actor = currentUser.UserId is null
+            ? null
+            : await db.Users.AsNoTracking()
+                .Where(x => x.Id == currentUser.UserId.Value)
+                .Select(x => new { x.DisplayName, x.Email })
+                .FirstOrDefaultAsync(cancellationToken);
+        var actorName = !string.IsNullOrWhiteSpace(actor?.Email)
+            ? actor!.Email
+            : !string.IsNullOrWhiteSpace(currentUser.UserEmail)
+                ? currentUser.UserEmail.Trim()
+                : actor?.DisplayName ?? "Không xác định";
         if (period is null)
         {
             period = new GraduationPeriod
@@ -194,6 +204,54 @@ public sealed class EfGraduationAnalyticsV3Service(
             .OrderByDescending(x => x.RevisionNumber)
             .ToListAsync(cancellationToken);
         return revisions.Select(ToRevisionDto).ToList();
+    }
+
+    public async Task<ParsedGraduationImport> GetActivePreviewAsync(
+        long periodId,
+        CancellationToken cancellationToken)
+    {
+        var revision = await (
+            from period in db.GraduationPeriods.AsNoTracking()
+            join activeRevision in db.GraduationImportRevisions.AsNoTracking()
+                on period.ActiveRevisionId equals activeRevision.RevisionId
+            where period.PeriodId == periodId
+            select activeRevision)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (revision is null)
+        {
+            throw new GraduationAnalyticsException(
+                GraduationAnalyticsV3ErrorCodes.PeriodNotFound,
+                "Không tìm thấy dữ liệu của đợt tốt nghiệp.");
+        }
+
+        var aggregates = await db.GraduationAggregateRows.AsNoTracking()
+            .Where(x => x.RevisionId == revision.RevisionId)
+            .OrderBy(x => x.FacultyNameRaw)
+            .ThenBy(x => x.ProgramNameRaw)
+            .ThenBy(x => x.CohortCode)
+            .ThenBy(x => x.GraduationRank)
+            .ThenBy(x => x.IsWorkStudy)
+            .Select(x => new GraduationImportAggregate(
+                x.FacultyNameRaw,
+                x.FacultyKey,
+                x.ProgramNameRaw,
+                x.ProgramKey,
+                x.DerivedProgramCode,
+                x.CohortCode,
+                x.GraduationRank,
+                x.IsWorkStudy,
+                x.StudentCount))
+            .ToListAsync(cancellationToken);
+
+        return new ParsedGraduationImport(
+            revision.OriginalFileName,
+            revision.SourceSheetName,
+            revision.FileHash,
+            revision.SourceRowCount,
+            revision.ImportedRowCount,
+            revision.SkippedRowCount,
+            aggregates,
+            DeserializeWarnings(revision.SkippedSummaryJson));
     }
 
     public async Task<GraduationExploreResultV3Dto> ExploreAsync(
@@ -449,7 +507,8 @@ public sealed class EfGraduationAnalyticsV3Service(
             revision.OriginalFileName,
             revision.ImportedRowCount,
             revision.SkippedRowCount,
-            revision.ImportedAtUtc);
+            revision.ImportedAtUtc,
+            revision.ImportedByName);
 
     private static GraduationRevisionDto ToRevisionDto(GraduationImportRevision revision) => new(
         revision.RevisionId,

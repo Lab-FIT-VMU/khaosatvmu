@@ -60,6 +60,8 @@ export const graduationAnalyticsApi = {
   },
   revisions: (periodId: number) =>
     apiRequest<GraduationRevisionV3[]>(`${basePath}/managed-periods/${periodId}/revisions`),
+  activePreview: (periodId: number) =>
+    apiRequest<GraduationImportPreviewV3>(`${basePath}/managed-periods/${periodId}/preview`),
   previewImport: async (file: File) => {
     const form = new FormData();
     form.append('file', file);

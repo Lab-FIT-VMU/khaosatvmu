@@ -46,7 +46,8 @@ public sealed record GraduationPeriodV3Dto(
     string OriginalFileName,
     int StudentCount,
     int SkippedRowCount,
-    DateTime ImportedAtUtc);
+    DateTime ImportedAtUtc,
+    string ImportedByName);
 
 public sealed record GraduationImportCommitResultDto(
     GraduationPeriodV3Dto Period,
@@ -175,6 +176,10 @@ public interface IGraduationAnalyticsV3Service
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<GraduationRevisionDto>> GetRevisionsAsync(
+        long periodId,
+        CancellationToken cancellationToken);
+
+    Task<ParsedGraduationImport> GetActivePreviewAsync(
         long periodId,
         CancellationToken cancellationToken);
 

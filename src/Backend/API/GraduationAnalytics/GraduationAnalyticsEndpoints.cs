@@ -29,6 +29,15 @@ public static class GraduationAnalyticsEndpoints
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
         });
 
+        group.MapGet("/managed-periods/{periodId:long}/preview", async (
+            long periodId,
+            [FromServices] IGraduationAnalyticsV3Service service,
+            CancellationToken ct) =>
+        {
+            try { return Results.Ok(await service.GetActivePreviewAsync(periodId, ct)); }
+            catch (GraduationAnalyticsException exception) { return ToError(exception); }
+        });
+
         group.MapPost("/imports/preview", async (
             HttpRequest request,
             [FromServices] IGraduationImportParser parser,
