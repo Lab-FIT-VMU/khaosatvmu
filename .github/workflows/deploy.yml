@@ -47,14 +47,13 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 30m
           script: |
             set -e
             cd ${{ secrets.VPS_PROJECT_PATH }}
             git fetch origin master
             git reset --hard origin/master
             git clean -fd
-            docker compose stop api frontend
-            docker compose build api
-            docker compose build frontend
+            docker compose build api frontend
             docker compose up -d
             docker image prune -f
