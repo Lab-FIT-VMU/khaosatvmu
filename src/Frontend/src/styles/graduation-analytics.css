@@ -554,13 +554,14 @@
 .graduation-period-manager th:nth-child(2) { width: 116px; }
 .graduation-period-manager th:nth-child(3) { width: 124px; }
 .graduation-period-manager th:nth-child(4) { width: auto; }
-.graduation-period-manager th:nth-child(5) { width: 150px; }
+.graduation-period-manager th:nth-child(5) { width: 190px; }
 .graduation-period-manager th:nth-child(6) { width: 104px; }
 .graduation-period-manager th:nth-child(7) { width: 112px; }
 .graduation-period-manager th:nth-child(8) { width: 86px; }
 .graduation-period-manager th:nth-child(9) { width: 164px; }
 .graduation-period-manager td { height: 48px; vertical-align: middle; font-variant-numeric: tabular-nums; }
 .graduation-period-manager td:nth-child(4) { min-width: 0; }
+.graduation-period-manager td:nth-child(5) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .graduation-period-manager th:nth-child(9), .graduation-period-manager td:nth-child(9) { text-align: center; }
 .graduation-period-manager .has-warning { color: #9a6812; font-weight: 700; }
 .graduation-row-actions { display: flex; justify-content: center; gap: 6px; }

@@ -779,7 +779,7 @@ export function GraduationAnalyticsPage() {
               <td><span className={`graduation-period-status ${period ? 'is-ready' : 'is-empty'}`}><i />{period ? 'Đã có dữ liệu' : 'Chờ tải lên'}</span></td>
               <td>{period ? `${String(period.reviewMonth).padStart(2, '0')}/${period.reviewYear}` : <span className="graduation-muted">Chọn khi tải lên</span>}</td>
               <td title={period?.originalFileName}>{period ? <><strong className="graduation-file-name">{period.originalFileName}</strong><small>Tải lên vào {new Date(period.importedAtUtc).toLocaleTimeString('vi-VN')} ngày {new Date(period.importedAtUtc).toLocaleDateString('vi-VN')}</small></> : <span className="graduation-muted">Chưa chọn file Excel</span>}</td>
-              <td>{period?.importedByName || '—'}</td>
+              <td title={period?.importedByName}>{period?.importedByName || '—'}</td>
               <td>{period ? formatNumber(period.studentCount) : '—'}</td>
               <td>{period ? `Lần ${period.activeRevisionNumber}` : '—'}</td>
               <td className={period?.skippedRowCount ? 'has-warning' : ''}>{period ? period.skippedRowCount : '—'}</td>
