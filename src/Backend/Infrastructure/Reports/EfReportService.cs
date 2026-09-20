@@ -2261,4 +2261,203 @@ public sealed class EfReportService(
             AnswerScaleKinds.Options,
             scale.AnswerScaleName);
     }
+
+    public async Task<OpenCommentAnalysisReportDto> GetOpenCommentAnalysisAsync(
+        int? semesterId,
+        int? semesterSurveyId,
+        int? facultyId,
+        int? departmentId,
+        int? lecturerId,
+        string? search,
+        bool? validOnly,
+        CancellationToken cancellationToken = default)
+    {
+        var sectionSurveyQuery = (await VisibleSectionSurveysAsync(cancellationToken)).AsQueryable();
+
+        if (semesterSurveyId is { } ssId)
+        {
+            sectionSurveyQuery = sectionSurveyQuery.Where(x => x.SemesterSurveyId == ssId);
+        }
+        else if (semesterId is { } semId)
+        {
+            var allowed = await db.SemesterSurveys.AsNoTracking()
+                .Where(x => x.SemesterId == semId)
+                .Select(x => x.SemesterSurveyId)
+                .ToListAsync(cancellationToken);
+            sectionSurveyQuery = sectionSurveyQuery.Where(x => allowed.Contains(x.SemesterSurveyId));
+        }
+
+        var sectionSurveys = await sectionSurveyQuery.ToListAsync(cancellationToken);
+        if (sectionSurveys.Count == 0)
+        {
+            return new OpenCommentAnalysisReportDto(0, 0, 0m, 0, 0, []);
+        }
+
+        var sectionIds = sectionSurveys.Select(x => x.CourseSectionId).Distinct().ToList();
+        var sections = await db.CourseSections.AsNoTracking()
+            .Where(x => sectionIds.Contains(x.CourseSectionId))
+            .ToListAsync(cancellationToken);
+
+        var courseIds = sections.Select(x => x.CourseId).Distinct().ToList();
+        var courses = await db.Courses.AsNoTracking()
+            .Where(x => courseIds.Contains(x.CourseId))
+            .ToDictionaryAsync(x => x.CourseId, x => x, cancellationToken);
+
+        var lecturerIds = sections.Select(x => x.LecturerId).Distinct().ToList();
+        var lecturers = await db.Lecturers.AsNoTracking()
+            .Where(x => lecturerIds.Contains(x.LecturerId))
+            .ToListAsync(cancellationToken);
+
+        var sectionById = sections.ToDictionary(x => x.CourseSectionId);
+        var lecturerById = lecturers.ToDictionary(x => x.LecturerId);
+
+        var deptIds = lecturers.Where(x => x.DepartmentId.HasValue).Select(x => x.DepartmentId!.Value)
+            .Concat(courses.Values.Where(x => x.DepartmentId.HasValue).Select(x => x.DepartmentId!.Value))
+            .Distinct()
+            .ToList();
+        var departments = deptIds.Count == 0
+            ? new Dictionary<int, Department>()
+            : await db.Departments.AsNoTracking()
+                .Where(x => deptIds.Contains(x.DepartmentId))
+                .ToDictionaryAsync(x => x.DepartmentId, x => x, cancellationToken);
+
+        var facIds = lecturers.Where(x => x.FacultyId.HasValue).Select(x => x.FacultyId!.Value)
+            .Concat(courses.Values.Where(x => x.FacultyId.HasValue).Select(x => x.FacultyId!.Value))
+            .Concat(departments.Values.Where(x => x.FacultyId.HasValue).Select(x => x.FacultyId!.Value))
+            .Distinct()
+            .ToList();
+        var faculties = facIds.Count == 0
+            ? new Dictionary<int, string>()
+            : await db.Faculties.AsNoTracking()
+                .Where(x => facIds.Contains(x.FacultyId))
+                .ToDictionaryAsync(x => x.FacultyId, x => x.FacultyName, cancellationToken);
+
+        var matchedSections = new Dictionary<int, (CourseSection? Section, Course? Course, Lecturer? Lecturer, int? FacultyId, string FacultyName, int? DepartmentId, string DepartmentName, string LecturerName)>();
+
+        foreach (var css in sectionSurveys)
+        {
+            sectionById.TryGetValue(css.CourseSectionId, out var sec);
+            courses.TryGetValue(sec?.CourseId ?? 0, out var crs);
+            lecturerById.TryGetValue(sec?.LecturerId ?? 0, out var lec);
+
+            int? reportDepartmentId = crs?.DepartmentId ?? lec?.DepartmentId;
+            int? reportFacultyId = crs?.FacultyId;
+            if (reportFacultyId is null
+                && reportDepartmentId is { } owningDepartmentId
+                && departments.TryGetValue(owningDepartmentId, out var owningDepartment))
+            {
+                reportFacultyId = owningDepartment.FacultyId;
+            }
+            reportFacultyId ??= lec?.FacultyId;
+
+            if (facultyId is { } fId && reportFacultyId != fId) continue;
+            if (departmentId is { } dId && reportDepartmentId != dId) continue;
+            if (lecturerId is { } lId && lec?.LecturerId != lId) continue;
+
+            var facultyName = reportFacultyId is { } fId2 && faculties.TryGetValue(fId2, out var fName) ? fName : "Chưa thuộc khoa";
+            var departmentName = reportDepartmentId is { } dId2 && departments.TryGetValue(dId2, out var d) ? d.DepartmentName : "Chưa thuộc bộ môn";
+            var lecturerName = LecturerNameOf(lec, sec);
+
+            matchedSections[css.CourseSectionSurveyId] = (sec, crs, lec, reportFacultyId, facultyName, reportDepartmentId, departmentName, lecturerName);
+        }
+
+        var matchedCssIds = matchedSections.Keys.ToList();
+        if (matchedCssIds.Count == 0)
+        {
+            return new OpenCommentAnalysisReportDto(0, 0, 0m, 0, 0, []);
+        }
+
+        var baseResponsesQuery = db.SurveyResponses.AsNoTracking()
+            .Where(x => matchedCssIds.Contains(x.CourseSectionSurveyId));
+
+        int totalResponses = await baseResponsesQuery.CountAsync(cancellationToken);
+
+        var commentsQuery = baseResponsesQuery
+            .Where(x => x.AdditionalComments != null && x.AdditionalComments.Trim() != "");
+
+        if (validOnly == true)
+        {
+            var thresholds = await scoringThresholds.GetAsync(cancellationToken);
+            commentsQuery = commentsQuery.Where(thresholds.CountsTowardScore());
+        }
+
+        var responsesWithComments = await commentsQuery
+            .OrderByDescending(x => x.SubmittedAt)
+            .Select(x => new
+            {
+                x.ResponseId,
+                x.CourseSectionSurveyId,
+                x.AdditionalComments,
+                x.SubmittedAt,
+                x.Score,
+                x.IsValid
+            })
+            .ToListAsync(cancellationToken);
+
+        var term = search?.Trim().ToLowerInvariant();
+        var commentItems = new List<OpenCommentItemDto>(responsesWithComments.Count);
+
+        foreach (var resp in responsesWithComments)
+        {
+            if (!matchedSections.TryGetValue(resp.CourseSectionSurveyId, out var meta))
+            {
+                continue;
+            }
+
+            var courseCode = meta.Course?.CourseCode ?? string.Empty;
+            var courseName = meta.Course?.CourseName ?? string.Empty;
+            var sectionName = meta.Section?.SectionName ?? string.Empty;
+            var comments = resp.AdditionalComments?.Trim() ?? string.Empty;
+
+            if (!string.IsNullOrEmpty(term))
+            {
+                if (!comments.ToLowerInvariant().Contains(term)
+                    && !courseCode.ToLowerInvariant().Contains(term)
+                    && !courseName.ToLowerInvariant().Contains(term)
+                    && !sectionName.ToLowerInvariant().Contains(term)
+                    && !meta.LecturerName.ToLowerInvariant().Contains(term)
+                    && !meta.DepartmentName.ToLowerInvariant().Contains(term)
+                    && !meta.FacultyName.ToLowerInvariant().Contains(term))
+                {
+                    continue;
+                }
+            }
+
+            commentItems.Add(new OpenCommentItemDto(
+                resp.ResponseId,
+                resp.CourseSectionSurveyId,
+                comments,
+                resp.SubmittedAt,
+                resp.Score,
+                resp.IsValid,
+                courseCode,
+                courseName,
+                sectionName,
+                meta.LecturerName,
+                meta.DepartmentName,
+                meta.FacultyName,
+                meta.FacultyId,
+                meta.DepartmentId,
+                meta.Lecturer?.LecturerId));
+        }
+
+        int totalComments = commentItems.Count;
+        decimal commentRate = totalResponses > 0
+            ? Math.Round((decimal)totalComments / totalResponses * 100, 1)
+            : 0m;
+        int sectionCountWithComments = commentItems.Select(x => x.CourseSectionSurveyId).Distinct().Count();
+        int lecturerCountWithComments = commentItems
+            .Select(x => x.LecturerName)
+            .Where(x => !string.IsNullOrEmpty(x) && x != "Chưa phân công")
+            .Distinct()
+            .Count();
+
+        return new OpenCommentAnalysisReportDto(
+            totalComments,
+            totalResponses,
+            commentRate,
+            sectionCountWithComments,
+            lecturerCountWithComments,
+            commentItems);
+    }
 }

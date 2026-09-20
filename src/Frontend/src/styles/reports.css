@@ -2278,3 +2278,30 @@
 .reports-rank .catalog-result-count {
   display: none;
 }
+
+/* ------------------------------------------- Phân tích ý kiến mở */
+.reports-comments-workspace {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reports-cell-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--reports-primary, #0788b8);
+  font-size: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+  outline: none;
+}
+
+.reports-cell-link:hover {
+  color: #036e99;
+  text-decoration: underline;
+}

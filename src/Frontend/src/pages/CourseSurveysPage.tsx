@@ -12,6 +12,7 @@ import {
   Palette,
   QrCode,
   Save,
+  Search,
   Trash2,
   TriangleAlert,
   UsersRound,
@@ -26,6 +27,7 @@ import type { SurveyPreviewData } from '../components/SurveyFormPreview';
 import { QRCodeModal } from '../components/QRCodeModal';
 import { TablePagination } from '../components/TablePagination';
 import { useSemester } from '../context/semesterContext';
+import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
 import { ApiError } from '../services/apiClient';
 import {
   downloadCourseSurveyQrExcel,
@@ -41,7 +43,7 @@ import type {
   SurveyTemplate,
 } from '../types';
 import { emptySurveyFormConfig, surveyFormTemplates } from '../utils/surveyFormTemplates';
-import { toVietnameseFileSlug } from '../utils/vietnamese';
+import { foldVietnamese, toVietnameseFileSlug } from '../utils/vietnamese';
 import '../styles/catalogs.css';
 import '../styles/survey-operations.css';
 
@@ -52,6 +54,95 @@ interface ScheduleForm {
 
 /** Một học kỳ có thể có hàng trăm lớp nên bảng lớp được phân trang. */
 const sectionPageSize = 20;
+
+const sectionFilterColumns: FilterableColumn<CourseSectionSurvey>[] = [
+  { key: 'facultyName', value: (row) => row.facultyName },
+  { key: 'departmentName', value: (row) => row.departmentName },
+  { key: 'sectionName', value: (row) => `${row.courseName} - ${row.sectionName}` },
+  { key: 'lecturerName', value: (row) => row.lecturerName || 'Chưa phân công' },
+  { key: 'classSize', value: (row) => String(row.classSize), numeric: true },
+  {
+    key: 'startTime',
+    value: (row) => formatRange(row.startTime, row.endTime),
+    sortValue: (row) => new Date(row.startTime).getTime(),
+  },
+  { key: 'responseCount', value: (row) => String(row.responseCount), numeric: true },
+];
+
+interface CampaignSectionsViewProps {
+  sections: CourseSectionSurvey[];
+  surveyName: string;
+  children: (state: {
+    visibleSections: CourseSectionSurvey[];
+    filteredCount: number;
+    filterHeader: (key: string, label: string) => React.ReactNode;
+  }) => React.ReactNode;
+}
+
+const CampaignSectionsView: React.FC<CampaignSectionsViewProps> = ({
+  sections,
+  surveyName,
+  children,
+}) => {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const foldedSearch = foldVietnamese(search);
+  const searchedSections = foldedSearch
+    ? sections.filter((section) => foldVietnamese([
+      section.facultyName,
+      section.departmentName,
+      section.courseCode,
+      section.courseName,
+      section.sectionName,
+      section.lecturerName,
+    ].join(' ')).includes(foldedSearch))
+    : sections;
+  const filters = useColumnFilters(searchedSections, sectionFilterColumns);
+  const totalPages = Math.max(1, Math.ceil(filters.visibleRows.length / sectionPageSize));
+  const currentPage = Math.min(page, totalPages);
+  const firstIndex = (currentPage - 1) * sectionPageSize;
+  const visibleSections = filters.visibleRows.slice(firstIndex, firstIndex + sectionPageSize);
+
+  return (
+    <>
+      {sections.length > 0 && (
+        <div className="campaign-section-toolbar">
+          <label className="catalog-search campaign-section-search">
+            <Search aria-hidden="true" size={16} />
+            <input
+              type="search"
+              value={search}
+              placeholder="Tìm lớp, học phần, giảng viên..."
+              aria-label={`Tìm kiếm lớp trong đợt ${surveyName}`}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+            />
+          </label>
+        </div>
+      )}
+
+      {children({
+        visibleSections,
+        filteredCount: filters.visibleRows.length,
+        filterHeader: filters.filterHeader,
+      })}
+
+      {filters.visibleRows.length > 0 && (
+        <div className="section-survey-pagination">
+          <TablePagination
+            page={currentPage}
+            pageSize={sectionPageSize}
+            totalItems={filters.visibleRows.length}
+            itemLabel="lớp học phần"
+            onPageChange={setPage}
+          />
+        </div>
+      )}
+    </>
+  );
+};
 
 function messageFrom(error: unknown): string {
   return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
@@ -153,7 +244,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
   const [sectionSurveys, setSectionSurveys] = useState<Record<number, CourseSectionSurvey[]>>({});
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-  const [sectionPages, setSectionPages] = useState<Record<number, number>>({});
 
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -272,7 +362,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   const [addSchedule, setAddSchedule] = useState<ScheduleForm>(defaultSchedule);
   const [addError, setAddError] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<number | null>(null);
-
   // Nạp danh sách template khảo sát. Bộ câu hỏi thuộc quyền
   // COURSE_QUESTION_SETS_ACCESS mà vai trò chỉ đọc không có, nên gọi vào là 403 và
   // trang hiện một dải lỗi đỏ thừa. Template cũng chỉ dùng để tạo đợt, mà vai trò đó
@@ -732,15 +821,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
       {semesterId && !loading && semesterSurveys.map((survey) => {
         const sections = sectionSurveys[survey.semesterSurveyId] ?? [];
         const isExpanded = expanded[survey.semesterSurveyId] ?? false;
-        const totalPages = Math.max(1, Math.ceil(sections.length / sectionPageSize));
-        const page = Math.min(sectionPages[survey.semesterSurveyId] ?? 1, totalPages);
-        const firstIndex = (page - 1) * sectionPageSize;
-        const visibleSections = sections.slice(firstIndex, firstIndex + sectionPageSize);
-        const changePage = (nextPage: number) =>
-          setSectionPages((prev) => ({
-            ...prev,
-            [survey.semesterSurveyId]: Math.min(Math.max(1, nextPage), totalPages),
-          }));
 
         return (
           <section className="semester-survey-card" key={survey.semesterSurveyId}>
@@ -861,19 +941,21 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
             </header>
 
             {isExpanded && (
+              <CampaignSectionsView sections={sections} surveyName={survey.surveyName}>
+                {({ visibleSections, filteredCount, filterHeader }) => (
               <div className="campaign-table-scroll" id={`semester-survey-${survey.semesterSurveyId}`}>
                 <table className="campaign-table">
                   <thead>
                     {/* Bề rộng theo phần trăm để tỷ lệ cột giữ nguyên ở mọi cỡ màn hình. */}
                     <tr>
-                      <th style={{ width: '12%' }}>Khoa / Viện</th>
-                      <th style={{ width: '11%' }}>Bộ môn</th>
-                      <th style={{ width: '20%' }}>Lớp học phần</th>
-                      <th style={{ width: '15%' }}>Giảng viên</th>
-                      <th style={{ width: '4%' }}>Sĩ số</th>
+                      <th style={{ width: '12%' }}>{filterHeader('facultyName', 'Khoa / Viện')}</th>
+                      <th style={{ width: '11%' }}>{filterHeader('departmentName', 'Bộ môn')}</th>
+                      <th style={{ width: '20%' }}>{filterHeader('sectionName', 'Lớp học phần')}</th>
+                      <th style={{ width: '15%' }}>{filterHeader('lecturerName', 'Giảng viên')}</th>
+                      <th style={{ width: '4%' }}>{filterHeader('classSize', 'Sĩ số')}</th>
                       <th style={{ width: '16%' }}>Đường dẫn riêng</th>
-                      <th style={{ width: '10%' }}>Thời gian mở</th>
-                      <th style={{ width: '6%' }}>Lượt trả lời</th>
+                      <th style={{ width: '10%' }}>{filterHeader('startTime', 'Thời gian mở')}</th>
+                      <th style={{ width: '6%' }}>{filterHeader('responseCount', 'Lượt trả lời')}</th>
                       <th style={{ width: '6%' }}>Ảnh QR</th>
                     </tr>
                   </thead>
@@ -881,6 +963,13 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                     {sections.length === 0 && (
                       <tr>
                         <td colSpan={9}>Đang tải danh sách lớp...</td>
+                      </tr>
+                    )}
+                    {sections.length > 0 && filteredCount === 0 && (
+                      <tr>
+                        <td colSpan={9} className="campaign-filter-empty">
+                          Không có lớp học phần nào phù hợp với tìm kiếm và bộ lọc.
+                        </td>
                       </tr>
                     )}
                     {visibleSections.map((section) => (
@@ -961,18 +1050,8 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                   </tbody>
                 </table>
               </div>
-            )}
-
-            {isExpanded && sections.length > 0 && (
-              <div className="section-survey-pagination">
-                <TablePagination
-                  page={page}
-                  pageSize={sectionPageSize}
-                  totalItems={sections.length}
-                  itemLabel="lớp học phần"
-                  onPageChange={changePage}
-                />
-              </div>
+                )}
+              </CampaignSectionsView>
             )}
           </section>
         );

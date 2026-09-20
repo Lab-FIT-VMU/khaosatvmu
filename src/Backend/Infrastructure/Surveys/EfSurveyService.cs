@@ -1118,9 +1118,19 @@ public sealed class EfSurveyService(
         // Đếm sống từ "SurveyResponses" chứ không đọc cột đã chốt trên
         // "CourseSectionSurveys": mấy cột đó chỉ đúng tới lần bấm Tính lại điểm gần
         // nhất, còn trang Tiến độ phải phản ánh phiếu vừa về.
+        var courseSectionSurveyIds = sectionSurveys
+            .Select(x => x.CourseSectionSurveyId)
+            .ToList();
         var responseCounts = await ResponseValidityCountsAsync(
-            sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList(),
+            courseSectionSurveyIds,
             cancellationToken);
+        var openCommentCounts = await db.SurveyResponses.AsNoTracking()
+            .Where(x => courseSectionSurveyIds.Contains(x.CourseSectionSurveyId)
+                && x.AdditionalComments != null
+                && x.AdditionalComments != "")
+            .GroupBy(x => x.CourseSectionSurveyId)
+            .Select(group => new { CourseSectionSurveyId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(x => x.CourseSectionSurveyId, x => x.Count, cancellationToken);
         var sectionIds = sectionSurveys.Select(x => x.CourseSectionId).Distinct().ToList();
         var sections = await db.CourseSections.AsNoTracking()
             .Where(x => sectionIds.Contains(x.CourseSectionId))
@@ -1194,7 +1204,8 @@ public sealed class EfSurveyService(
                     section?.ClassSize ?? 0,
                     tally.Total,
                     tally.Valid,
-                    tally.Total - tally.Valid);
+                    tally.Total - tally.Valid,
+                    openCommentCounts.GetValueOrDefault(sectionSurvey.CourseSectionSurveyId));
             })
             .OrderBy(x => x.CourseCode)
             .ThenBy(x => x.SectionName)

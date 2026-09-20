@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   ListFilter,
   LoaderCircle,
+  MessageSquareText,
   Network,
   ShieldAlert,
   X,
@@ -23,6 +24,7 @@ import { DataTable, type Column, type DataTableSortDirection } from '../componen
 import { QuestionAnalysisChart } from '../components/QuestionAnalysisChart';
 import { SchoolSurveyOverview } from '../components/reports/SchoolSurveyOverview';
 import { ScopeAnalysisDetail, type ScopeSelection } from '../components/reports/ScopeAnalysisDetail';
+import { OpenCommentAnalysis } from '../components/reports/OpenCommentAnalysis';
 import { UpdateScoresButton } from '../components/UpdateScoresButton';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { SectionSurveyResponsesPage } from './SectionSurveyResponsesPage';
@@ -49,6 +51,11 @@ import type {
   SemesterSurvey,
   SurveyResultDetail,
 } from '../types';
+import {
+  getActiveSemesterSurveyId,
+  selectAvailableSemesterSurveyId,
+  setActiveSemesterSurveyId,
+} from '../utils/surveySelection';
 import { useScoringThresholds } from '../hooks/useScoringThresholds';
 import {
   COMPLETED_COMPLETION_RATE,
@@ -267,7 +274,7 @@ interface RankedUnit {
   responseCount: number;
   validResponseCount: number;
   invalidResponseCount: number;
-  /** Tỷ lệ phản hồi: số phiếu đã thu ÷ sĩ số, giống bảng tra cứu chi tiết. */
+  /** Tỷ lệ phản hồi: số phiếu đã thu ÷ tổng số phiếu phải thu, giống bảng tra cứu chi tiết. */
   responseRate: number;
   /** Tỷ lệ phiếu hợp lệ: số phiếu hợp lệ ÷ số phiếu đã thu. */
   validRate: number;
@@ -337,7 +344,7 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
   },
   {
     key: 'classSize',
-    header: 'Sĩ số',
+    header: 'Tổng số phiếu phải thu',
     width: '6%',
     numeric: true,
     sortValue: (item) => item.classSize,
@@ -437,7 +444,7 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
 const facultyRankExportColumns: ExportColumn<RankedUnit>[] = [
   { key: 'name', header: 'Khoa / Viện', width: 28 },
   { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number', align: 'right' },
-  { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number', align: 'right' },
+  { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number', align: 'right' },
   { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number', align: 'right' },
   { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
   { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number', align: 'right' },
@@ -496,7 +503,7 @@ const departmentRankColumns = (onOpenDetail?: (id: number) => void): Column<Rank
   },
   {
     key: 'classSize',
-    header: 'Sĩ số',
+    header: 'Tổng số phiếu phải thu',
     width: '6%',
     numeric: true,
     sortValue: (item) => item.classSize,
@@ -597,7 +604,7 @@ const departmentRankExportColumns: ExportColumn<RankedUnit>[] = [
   { key: 'facultyName', header: 'Khoa / Viện', width: 26 },
   { key: 'name', header: 'Bộ môn', width: 28 },
   { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number', align: 'right' },
-  { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number', align: 'right' },
+  { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number', align: 'right' },
   { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number', align: 'right' },
   { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
   { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number', align: 'right' },
@@ -655,7 +662,7 @@ const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
     fileName: exportFileName,
     subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
     summaryNotes: [
-      'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Sĩ số.',
+      'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu.',
       'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
       'Số phiếu không hợp lệ là phiếu bị bộ lọc nhiễu loại, không tham gia tính điểm.',
       'Chỉ gộp các lớp học phần đủ điều kiện tính điểm.',
@@ -733,7 +740,7 @@ const RankedCourseTable: React.FC<{
     },
     {
       key: 'classSize',
-      header: 'Sĩ số',
+      header: 'Tổng số phiếu phải thu',
       width: '4%',
       numeric: true,
       sortValue: (item) => item.classSize,
@@ -835,7 +842,7 @@ const RankedCourseTable: React.FC<{
     fileName: 'xep-hang-hoc-phan',
     subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
     summaryNotes: [
-      'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Sĩ số.',
+      'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu.',
       'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
       'Số phiếu không hợp lệ là phiếu bị bộ lọc nhiễu loại, không tham gia tính điểm.',
       'Chỉ gộp các lớp học phần đủ điều kiện tính điểm.',
@@ -846,7 +853,7 @@ const RankedCourseTable: React.FC<{
       { key: 'name', header: 'Học phần', width: 32 },
       { key: 'code', header: 'Mã học phần', width: 14 },
       { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number' as const, align: 'right' as const },
-      { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
+      { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
       { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number' as const, align: 'right' as const },
       { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
       { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number' as const, align: 'right' as const },
@@ -938,7 +945,9 @@ export const ReportsOverviewPage: React.FC = () => {
   const [facultyId, setFacultyId] = useState<number | undefined>(initialRoute.facultyId);
   const [departmentId, setDepartmentId] = useState<number | undefined>(initialRoute.departmentId);
   const [lecturerId, setLecturerId] = useState<number | undefined>(initialRoute.lecturerFilterId);
-  const [semesterSurveyId, setSemesterSurveyId] = useState<number | undefined>(initialRoute.semesterSurveyId);
+  const [semesterSurveyId, setSemesterSurveyId] = useState<number | undefined>(
+    initialRoute.semesterSurveyId ?? (Number(getActiveSemesterSurveyId()) || undefined),
+  );
   // Tăng lên sau mỗi lần Cập nhật điểm: các khối số liệu của trang theo dõi số này
   // để nạp lại, các khối con dùng nó làm key để dựng lại từ đầu.
   const [reloadToken, setReloadToken] = useState(0);
@@ -950,6 +959,7 @@ export const ReportsOverviewPage: React.FC = () => {
       || initialRoute.screen === 'faculties'
       || initialRoute.screen === 'departments'
       || initialRoute.screen === 'courses'
+      || initialRoute.screen === 'comments'
       ? initialRoute.screen
       : 'details',
   );
@@ -1040,6 +1050,13 @@ export const ReportsOverviewPage: React.FC = () => {
 
   const navigateToWorkspace = useCallback(
     (nextWorkspace: ReportWorkspace) => {
+      setWorkspace(nextWorkspace);
+      setSurveyId(null);
+      setSurveyTitle(null);
+      setUnidentifiedLecturer(null);
+      setLecturer(null);
+      setLecturerDetail(null);
+      setScope(null);
       navigateToRoute(routeFromState(nextWorkspace, nextWorkspace === 'details' ? {} : {
         facultyId: undefined,
         departmentId: undefined,
@@ -1127,6 +1144,7 @@ export const ReportsOverviewPage: React.FC = () => {
   // Bài khảo sát là bộ lọc chung của cả trang nên giữ nguyên màn hình đang xem.
   const changeSemesterSurvey = useCallback(
     (nextSemesterSurveyId?: number) => {
+      setActiveSemesterSurveyId(nextSemesterSurveyId);
       navigateToRoute(routeFromState(workspace, { semesterSurveyId: nextSemesterSurveyId }));
     },
     [navigateToRoute, routeFromState, workspace],
@@ -1151,6 +1169,7 @@ export const ReportsOverviewPage: React.FC = () => {
       setDepartmentId(route.departmentId);
       setLecturerId(route.lecturerFilterId);
       setSemesterSurveyId(route.semesterSurveyId);
+      if (route.semesterSurveyId) setActiveSemesterSurveyId(route.semesterSurveyId);
       setSearch(route.search ?? '');
       setAnalysisView(route.analysisView ?? 'faculties');
       setComparisonSemesterId(route.comparisonSemesterId);
@@ -1196,7 +1215,7 @@ export const ReportsOverviewPage: React.FC = () => {
         setLecturer({ lecturerId: 0, fullName: named.name } as LecturerPerformanceReport);
       } else if (route.screen === 'overview' || route.screen === 'details'
         || route.screen === 'faculties' || route.screen === 'departments'
-        || route.screen === 'courses') {
+        || route.screen === 'courses' || route.screen === 'comments') {
         setWorkspace(route.screen);
         setSurveyId(null);
         setSurveyTitle(null);
@@ -1291,8 +1310,8 @@ export const ReportsOverviewPage: React.FC = () => {
   // trỏ tới bài không còn thuộc kỳ) thì rơi về bài đầu tiên của kỳ.
   useEffect(() => {
     if (semesterSurveys.length === 0) return;
-    const isValid = semesterSurveys.some((item) => item.semesterSurveyId === semesterSurveyId);
-    if (!isValid) setSemesterSurveyId(semesterSurveys[0].semesterSurveyId);
+    const selected = selectAvailableSemesterSurveyId(semesterSurveys, semesterSurveyId);
+    if (Number(selected) !== semesterSurveyId) setSemesterSurveyId(Number(selected) || undefined);
   }, [semesterSurveys, semesterSurveyId]);
 
   // Debounce ô tìm kiếm.
@@ -1465,7 +1484,7 @@ export const ReportsOverviewPage: React.FC = () => {
   ]);
 
   // KPI gộp từ kết quả đang lọc — cùng cách tính với cột "Hoàn thành": chỉ phiếu hợp lệ.
-  // Dải số liệu đứng ngay trên bảng nên phải nói đúng những cột của bảng: sĩ số,
+  // Dải số liệu đứng ngay trên bảng nên phải nói đúng những cột của bảng: tổng số phiếu phải thu,
   // phiếu đã thu, phiếu hợp lệ, phiếu không hợp lệ và tỷ lệ phản hồi.
   const kpi = useMemo(() => {
     const totalTarget = results.reduce((sum, item) => sum + item.classSize, 0);
@@ -1805,7 +1824,7 @@ export const ReportsOverviewPage: React.FC = () => {
     },
     {
       key: 'classSize',
-      header: 'Sĩ số',
+      header: 'Tổng số phiếu phải thu',
       sortValue: (item) => item.classSize,
       filterValue: (item) => String(item.classSize),
       numeric: true,
@@ -1849,8 +1868,8 @@ export const ReportsOverviewPage: React.FC = () => {
     },
     {
       /*
-        Tỷ lệ phản hồi = số phiếu đã thu / sĩ số, đúng vế thứ nhất của ngưỡng tính
-        điểm. Trước đây cột này lấy phiếu hợp lệ / sĩ số nhưng vẫn gọi là "Hoàn
+        Tỷ lệ phản hồi = số phiếu đã thu / tổng số phiếu phải thu, đúng vế thứ nhất của ngưỡng tính
+        điểm. Trước đây cột này lấy phiếu hợp lệ / tổng số phiếu phải thu nhưng vẫn gọi là "Hoàn
         thành", nên đọc ra không khớp với ngưỡng đang cấu hình ở phần cài đặt.
         Dòng phụ "x/y hợp lệ" bỏ đi vì đã có cột Số phiếu hợp lệ riêng.
       */
@@ -1949,7 +1968,7 @@ export const ReportsOverviewPage: React.FC = () => {
     },
     {
       key: 'classSize',
-      header: 'Sĩ số',
+      header: 'Tổng số phiếu phải thu',
       width: '6%',
       numeric: true,
       sortValue: (item) => item.classSize,
@@ -1958,7 +1977,7 @@ export const ReportsOverviewPage: React.FC = () => {
     },
     {
       key: 'responseCount',
-      header: 'Phiếu thu',
+      header: 'Số phiếu đã thu',
       width: '9%',
       numeric: true,
       sortValue: (item) => item.responseCount,
@@ -2212,8 +2231,8 @@ export const ReportsOverviewPage: React.FC = () => {
                   columns: [
                     { key: 'sectionName', header: 'Lớp HP', width: 14, align: 'center' as const },
                     { key: 'courseName', header: 'Tên môn học', width: 28 },
-                    { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
-                    { key: 'responseCount', header: 'Phiếu thu', width: 10, type: 'number' as const, align: 'right' as const },
+                    { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
+                    { key: 'responseCount', header: 'Số phiếu đã thu', width: 10, type: 'number' as const, align: 'right' as const },
                     { key: 'validResponseCount', header: 'Hợp lệ', width: 10, type: 'number' as const, align: 'right' as const },
                     {
                       key: 'completionRate',
@@ -2301,6 +2320,17 @@ export const ReportsOverviewPage: React.FC = () => {
               <BookOpen className="operation-icon" aria-hidden="true" />
               <strong>Theo Học phần</strong>
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={workspace === 'comments'}
+              className={`reports-workspace-tab${workspace === 'comments' ? ' is-active' : ''}`}
+              title="Phân tích và tổng hợp ý kiến mở do sinh viên đóng góp"
+              onClick={() => navigateToWorkspace('comments')}
+            >
+              <MessageSquareText className="operation-icon" aria-hidden="true" />
+              <strong>Phân tích ý kiến mở</strong>
+            </button>
             {/* Ba tab trên là ba cách gộp số liệu; tab này là bảng từng dòng lớp để
                 lọc và mở chi tiết nên đứng cuối cùng. */}
             <button
@@ -2365,6 +2395,31 @@ export const ReportsOverviewPage: React.FC = () => {
             </div>
           )}
 
+          {workspace === 'comments' && (
+            selectedSemesterId !== undefined ? (
+              <OpenCommentAnalysis
+                key={`${selectedSemesterId}-${semesterSurveyId}-${reloadToken}`}
+                semesterId={selectedSemesterId}
+                semesterSurveyId={semesterSurveyId}
+                semesterLabel={semesterLabel}
+                surveyName={semesterSurveys.find((s) => s.semesterSurveyId === semesterSurveyId)?.surveyName}
+                faculties={faculties}
+                departments={departments}
+                lecturers={lecturers}
+                onOpenSurvey={openSurvey}
+                onOpenLecturer={(lecId, lecName) => {
+                  const lec = lecturers.find((l) => l.lecturerId === lecId);
+                  openLecturer(lecId, lecName || lec?.fullName || '');
+                }}
+                onOpenUnidentifiedLecturer={openUnidentifiedLecturer}
+              />
+            ) : (
+              <div className="operations-empty" role="status">
+                <strong>Vui lòng chọn học kỳ để xem phân tích ý kiến mở.</strong>
+              </div>
+            )
+          )}
+
           {/*
             Dải số liệu là phần tổng của chính bảng bên dưới, nên từng ô ứng đúng
             một cột của bảng và dùng đúng tên cột đó. Trước đây "Chỉ tiêu phiếu" và
@@ -2377,8 +2432,8 @@ export const ReportsOverviewPage: React.FC = () => {
               Số lớp khảo sát
               <strong>{kpi.classCount.toLocaleString('vi-VN')}</strong>
             </span>
-            <span className="reports-kpi-item" title="Tổng sĩ số của các lớp đang lọc">
-              Tổng sĩ số
+            <span className="reports-kpi-item" title="Tổng số phiếu phải thu của các lớp đang lọc">
+              Tổng số phiếu phải thu
               <strong>{kpi.totalTarget.toLocaleString('vi-VN')}</strong>
             </span>
             <span className="reports-kpi-item" title="Mọi lượt nộp, kể cả phiếu bị lọc nhiễu">
@@ -2393,7 +2448,7 @@ export const ReportsOverviewPage: React.FC = () => {
               Số phiếu không hợp lệ
               <strong>{kpi.totalInvalid.toLocaleString('vi-VN')}</strong>
             </span>
-            <span className="reports-kpi-item" title="Số phiếu đã thu / tổng sĩ số">
+            <span className="reports-kpi-item" title="Số phiếu đã thu / tổng số phiếu phải thu">
               Tỷ lệ phản hồi
               <strong>{kpi.responseRate.toFixed(1)}%</strong>
             </span>
@@ -2422,14 +2477,14 @@ export const ReportsOverviewPage: React.FC = () => {
                 info: {
                   'Học kỳ': semesterLabel,
                   'Số lớp khảo sát': kpi.classCount,
-                  'Tổng sĩ số': kpi.totalTarget,
+                  'Tổng số phiếu phải thu': kpi.totalTarget,
                   'Số phiếu đã thu': `${kpi.totalResponses} (đạt ${kpi.responseRate.toFixed(1)}%)`,
                   'Số phiếu hợp lệ': kpi.totalCollected,
                   'Số phiếu không hợp lệ': kpi.totalInvalid,
                 },
                 summaryNotes: [
                   'Điểm trung bình học phần được tính trên thang điểm 5.0 từ các phiếu đánh giá hợp lệ.',
-                  'Tỷ lệ phản hồi = Số phiếu đã thu / Sĩ số sinh viên lớp học phần.',
+                  'Tỷ lệ phản hồi = Số phiếu đã thu / Tổng số phiếu phải thu.',
                   'Phiếu không hợp lệ là phiếu bị bộ lọc nhiễu loại và không tham gia tính điểm.',
                 ],
                 sheets: [
@@ -2443,7 +2498,7 @@ export const ReportsOverviewPage: React.FC = () => {
                       { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'center' as const },
                       { key: 'sectionName', header: 'Nhóm lớp', width: 10, align: 'center' as const },
                       { key: 'lecturerName', header: 'Giảng viên', width: 22 },
-                      { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
+                      { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
                       { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
                       { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
                       { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number' as const, align: 'right' as const },
@@ -2484,8 +2539,8 @@ export const ReportsOverviewPage: React.FC = () => {
                       { key: 'lecturerName', header: 'Giảng viên', width: 22 },
                       { key: 'departmentName', header: 'Bộ môn', width: 20 },
                       { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
-                      { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
-                      { key: 'validResponseCount', header: 'Phiếu hợp lệ', width: 12, type: 'number' as const, align: 'right' as const },
+                      { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
+                      { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 12, type: 'number' as const, align: 'right' as const },
                       {
                         key: 'averageScore',
                         header: 'Điểm TB',

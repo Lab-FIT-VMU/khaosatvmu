@@ -1524,6 +1524,28 @@
   border: 0;
 }
 
+.campaign-section-toolbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--operations-border);
+  background: #f8fafb;
+}
+
+.campaign-section-search {
+  align-self: flex-end;
+  width: clamp(240px, 28vw, 380px);
+  background: #ffffff;
+}
+
+.campaign-filter-empty {
+  padding: 24px 12px !important;
+  color: #5e6972;
+  text-align: center !important;
+}
+
 .semester-survey-card .campaign-table th,
 .semester-survey-card .campaign-table td {
   vertical-align: middle;
@@ -1554,6 +1576,11 @@
   .semester-survey-card .campaign-link-input {
     min-width: 180px;
   }
+
+  .campaign-section-search {
+    width: 100%;
+  }
+
 }
 
 /* ---------------------------------------------------------------------------

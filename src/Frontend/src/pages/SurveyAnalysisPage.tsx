@@ -36,6 +36,11 @@ import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/reports.css';
 import '../styles/catalogs.css';
+import {
+  getActiveSemesterSurveyId,
+  selectAvailableSemesterSurveyId,
+  setActiveSemesterSurveyId,
+} from '../utils/surveySelection';
 
 /*
   Ô chọn đợt khảo sát, viết riêng cho trang này.
@@ -496,7 +501,9 @@ export const SurveyAnalysisPage: React.FC = () => {
 
   const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
   const [semesterSurveyId, setSemesterSurveyId] = useState<string>(
-    initialRoute.semesterSurveyId ? String(initialRoute.semesterSurveyId) : '',
+    initialRoute.semesterSurveyId
+      ? String(initialRoute.semesterSurveyId)
+      : getActiveSemesterSurveyId(),
   );
 
   const [normalization, setNormalization] = useState<SemesterSurveyNormalization | null>(null);
@@ -523,7 +530,9 @@ export const SurveyAnalysisPage: React.FC = () => {
     setSelectedLecturerId(route.lecturerId ?? null);
     if (route.semesterId) setSemesterId(String(route.semesterId));
     if (route.semesterId) {
-      setSemesterSurveyId(route.semesterSurveyId ? String(route.semesterSurveyId) : '');
+      const nextSurveyId = route.semesterSurveyId ? String(route.semesterSurveyId) : '';
+      setSemesterSurveyId(nextSurveyId);
+      if (nextSurveyId) setActiveSemesterSurveyId(nextSurveyId);
     }
   }, []);
 
@@ -567,12 +576,7 @@ export const SurveyAnalysisPage: React.FC = () => {
         const next = await surveyApi.semesterSurveys(Number(semesterId));
         if (cancelled) return;
         setSemesterSurveys(next);
-        setSemesterSurveyId((current) => {
-          if (current && next.some((item) => String(item.semesterSurveyId) === current)) {
-            return current;
-          }
-          return next.length > 0 ? String(next[0].semesterSurveyId) : '';
-        });
+        setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(next, current));
         setLoadError(null);
       } catch (error) {
         if (!cancelled) setLoadError(messageFrom(error));
@@ -769,7 +773,7 @@ export const SurveyAnalysisPage: React.FC = () => {
           nút Cập nhật điểm.
         </p>
         <p className="z-legend__note">
-          <strong>Tỷ lệ phản hồi</strong> = Số phiếu đã thu ÷ Tổng sĩ số.
+          <strong>Tỷ lệ phản hồi</strong> = Số phiếu đã thu ÷ Tổng số phiếu phải thu.
         </p>
         <p className="z-legend__note">
           <strong>Tỷ lệ phiếu hợp lệ</strong> = Số phiếu hợp lệ ÷ Số phiếu đã thu.
@@ -833,7 +837,7 @@ export const SurveyAnalysisPage: React.FC = () => {
       ...extra,
       `Số liệu chỉ gộp lớp qua cả hai tiêu chí: tỷ lệ phản hồi ≥ ${thresholds.minimumResponseRate}%`
         + ` và tỷ lệ phiếu hợp lệ ≥ ${thresholds.minimumValidRate}%.`,
-      'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng sĩ số.',
+      'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu.',
       'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
       'Số liệu lấy theo lần bấm Cập nhật điểm gần nhất.',
       ...(shown < total
@@ -877,7 +881,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               textColumn('facultyName', 'Khoa / Viện', 32),
               countColumn('sectionCount', 'Số lớp', 8),
               countColumn('lecturerCount', 'Số giảng viên', 8),
-              countColumn('totalClassSize', 'Tổng sĩ số'),
+              countColumn('totalClassSize', 'Tổng số phiếu phải thu'),
               countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
@@ -948,7 +952,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               textColumn('courseCode', 'Mã học phần', 14),
               textColumn('sectionName', 'Lớp học phần', 12),
               textColumn('lecturerName', 'Giảng viên', 24),
-              countColumn('classSize', 'Sĩ số', 8),
+              countColumn('classSize', 'Tổng số phiếu phải thu', 8),
               countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
@@ -990,7 +994,7 @@ export const SurveyAnalysisPage: React.FC = () => {
             rows.length,
             data.rows.length,
             isScoped
-              ? ['Dòng Toàn trường: Số lớp, Số phiếu đã thu và Điểm trung bình tính trên toàn trường; Tổng sĩ số, Số phiếu hợp lệ và hai tỷ lệ cộng từ các bộ môn trong bảng.']
+              ? ['Dòng Toàn trường: Số lớp, Số phiếu đã thu và Điểm trung bình tính trên toàn trường; Tổng số phiếu phải thu, Số phiếu hợp lệ và hai tỷ lệ cộng từ các bộ môn trong bảng.']
               : [],
           ),
         ),
@@ -1003,7 +1007,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               textColumn('departmentName', 'Bộ môn', 26),
               countColumn('sectionCount', 'Số lớp', 8),
               countColumn('lecturerCount', 'Số giảng viên', 8),
-              countColumn('totalClassSize', 'Tổng sĩ số'),
+              countColumn('totalClassSize', 'Tổng số phiếu phải thu'),
               countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
@@ -1057,7 +1061,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               textColumn('courseCode', 'Mã học phần', 14),
               countColumn('sectionCount', 'Số lớp', 8),
               countColumn('lecturerCount', 'Số giảng viên', 8),
-              countColumn('totalClassSize', 'Tổng sĩ số'),
+              countColumn('totalClassSize', 'Tổng số phiếu phải thu'),
               countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
@@ -1091,9 +1095,9 @@ export const SurveyAnalysisPage: React.FC = () => {
             'Giảng viên': report.fullName,
             'Bộ môn': report.departmentName,
             'Khoa / Viện': report.facultyName,
-            'Số lớp': `${report.sectionCount} lớp · tổng sĩ số ${classSize.toLocaleString('vi-VN')}`,
+            'Số lớp': `${report.sectionCount} lớp · tổng số phiếu phải thu ${classSize.toLocaleString('vi-VN')}`,
             'Điểm trung bình': report.averageScore.toFixed(2),
-            'Phiếu thu': `${report.totalResponseCount.toLocaleString('vi-VN')} phiếu (${responseRate.toFixed(1)}%)`,
+            'Số phiếu đã thu': `${report.totalResponseCount.toLocaleString('vi-VN')} phiếu (${responseRate.toFixed(1)}%)`,
           },
           notesFor('lecturer', rows.length, report.sections.length, [
             'Điểm trung bình học phần = trung bình mọi lớp cùng học phần, kể cả lớp người khác dạy.',
@@ -1107,7 +1111,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               textColumn('courseCode', 'Mã HP', 12),
               textColumn('courseName', 'Học phần', 30),
               textColumn('sectionName', 'Lớp', 12),
-              countColumn('classSize', 'Sĩ số', 8),
+              countColumn('classSize', 'Tổng số phiếu phải thu', 8),
               countColumn('responseCount', 'Số phiếu đã thu', 12),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
@@ -1148,9 +1152,9 @@ export const SurveyAnalysisPage: React.FC = () => {
           {
             'Số giảng viên thu được phiếu': lecturers.length,
             'Số lớp giảng dạy': totalSections,
-            'Tổng sĩ số': classSize.toLocaleString('vi-VN'),
-            'Phiếu thu về': `${responses.toLocaleString('vi-VN')} (${(responseRate ?? 0).toFixed(1)}%)`,
-            'Phiếu hợp lệ': `${validResponses.toLocaleString('vi-VN')} (${(validRate ?? 0).toFixed(1)}%)`,
+            'Tổng số phiếu phải thu': classSize.toLocaleString('vi-VN'),
+            'Số phiếu đã thu': `${responses.toLocaleString('vi-VN')} (${(responseRate ?? 0).toFixed(1)}%)`,
+            'Số phiếu hợp lệ': `${validResponses.toLocaleString('vi-VN')} (${(validRate ?? 0).toFixed(1)}%)`,
             'Điểm trung bình chung': overallScore === null ? '—' : overallScore.toFixed(2),
             'Giảng viên có lớp cảnh báo': lecturersWithWarning > 0
               ? `${lecturersWithWarning} giảng viên (${totalWarnings} lớp Z-Score ≤ −1)`
@@ -1169,11 +1173,11 @@ export const SurveyAnalysisPage: React.FC = () => {
               textColumn('departmentName', 'Bộ môn', 22),
               textColumn('fullName', 'Giảng viên', 26),
               countColumn('sectionCount', 'Số lớp', 8),
-              countColumn('totalClassSize', 'Tổng sĩ số'),
-              countColumn('responseCount', 'Số phiếu thu', 10),
+              countColumn('totalClassSize', 'Tổng số phiếu phải thu'),
+              countColumn('responseCount', 'Số phiếu đã thu', 10),
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
-              rateColumn('validResponseRate', 'Tỷ lệ hợp lệ'),
+              rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
               scoreColumn('averageScore', 'Điểm trung bình', 2, 8),
               scoreColumn('minScore', 'Lớp thấp nhất'),
               scoreColumn('maxScore', 'Lớp cao nhất'),
@@ -1269,6 +1273,7 @@ export const SurveyAnalysisPage: React.FC = () => {
             placeholder={semesterSurveys.length === 0 ? 'Chưa có đợt nào' : 'Chọn đợt khảo sát'}
             onChange={(nextCampaignId) => {
               setSemesterSurveyId(nextCampaignId);
+              setActiveSemesterSurveyId(nextCampaignId);
               navigateAnalysis({
                 tab,
                 semesterId: Number(semesterId) || undefined,
@@ -1512,7 +1517,7 @@ const NormalizationGroupTab: React.FC<{
                 {groupFilters.filterHeader('lecturerCount', 'Số giảng viên')}
               </th>
               <th scope="col" style={{ width: '7%' }}>
-                {groupFilters.filterHeader('totalClassSize', 'Tổng sĩ số')}
+                {groupFilters.filterHeader('totalClassSize', 'Tổng số phiếu phải thu')}
               </th>
               <th scope="col" style={{ width: '8%' }}>
                 {groupFilters.filterHeader('responseCount', 'Số phiếu đã thu')}
@@ -1520,7 +1525,7 @@ const NormalizationGroupTab: React.FC<{
               <th scope="col" style={{ width: '8%' }}>
                 {groupFilters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '9%' }} title="Số phiếu đã thu chia tổng sĩ số">
+              <th scope="col" style={{ width: '9%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu">
                 {groupFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
               <th scope="col" style={{ width: '9%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
@@ -1782,7 +1787,7 @@ const NormalizationSectionTab: React.FC<{
                 {sectionFilters.filterHeader('lecturerName', 'Giảng viên')}
               </th>
               <th scope="col" style={{ width: '3%' }}>
-                {sectionFilters.filterHeader('classSize', 'Sĩ số')}
+                {sectionFilters.filterHeader('classSize', 'Tổng số phiếu phải thu')}
               </th>
               <th scope="col" style={{ width: '5%' }}>
                 {sectionFilters.filterHeader('responseCount', 'Số phiếu đã thu')}
@@ -1790,7 +1795,7 @@ const NormalizationSectionTab: React.FC<{
               <th scope="col" style={{ width: '5%' }}>
                 {sectionFilters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '5%' }} title="Số phiếu đã thu chia sĩ số lớp">
+              <th scope="col" style={{ width: '5%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu lớp">
                 {sectionFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
               <th scope="col" style={{ width: '5%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
@@ -1976,7 +1981,7 @@ const DepartmentTab: React.FC<{
                 {filters.filterHeader('lecturerCount', 'Số giảng viên')}
               </th>
               <th scope="col" style={{ width: '5%' }}>
-                {filters.filterHeader('totalClassSize', 'Tổng sĩ số')}
+                {filters.filterHeader('totalClassSize', 'Tổng số phiếu phải thu')}
               </th>
               <th scope="col" style={{ width: '6%' }}>
                 {filters.filterHeader('responseCount', 'Số phiếu đã thu')}
@@ -1984,7 +1989,7 @@ const DepartmentTab: React.FC<{
               <th scope="col" style={{ width: '6%' }}>
                 {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '6%' }} title="Số phiếu đã thu chia tổng sĩ số">
+              <th scope="col" style={{ width: '6%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu">
                 {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
               <th scope="col" style={{ width: '6%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
@@ -2206,7 +2211,7 @@ const CourseDiagnosisTab: React.FC<{
                 {filters.filterHeader('lecturerCount', 'Số giảng viên')}
               </th>
               <th scope="col" style={{ width: '4%' }}>
-                {filters.filterHeader('totalClassSize', 'Tổng sĩ số')}
+                {filters.filterHeader('totalClassSize', 'Tổng số phiếu phải thu')}
               </th>
               <th scope="col" style={{ width: '4%' }}>
                 {filters.filterHeader('responseCount', 'Số phiếu đã thu')}
@@ -2214,7 +2219,7 @@ const CourseDiagnosisTab: React.FC<{
               <th scope="col" style={{ width: '4%' }}>
                 {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '5%' }} title="Số phiếu đã thu chia tổng sĩ số">
+              <th scope="col" style={{ width: '5%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu">
                 {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
               <th scope="col" style={{ width: '5%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
@@ -2473,7 +2478,7 @@ const LecturerTab: React.FC<{
   return (
     <>
       <section className="statistics-summary">
-        {/* Dòng này chỉ giữ vài số đầu bảng: sĩ số, phiếu thu và phiếu hợp lệ đã có ở
+        {/* Dòng này chỉ giữ vài số đầu bảng: tổng số phiếu phải thu, phiếu đã thu và phiếu hợp lệ đã có ở
             dòng tổng cuối bảng, để cả ra đây thì nút Chú thích và nút xuất bị đẩy
             xuống dòng thứ hai. */}
         <span>
@@ -2508,19 +2513,19 @@ const LecturerTab: React.FC<{
                 {filters.filterHeader('sectionCount', 'Số lớp')}
               </th>
               <th scope="col" style={{ width: '6%' }}>
-                {filters.filterHeader('totalClassSize', 'Tổng sĩ số')}
+                {filters.filterHeader('totalClassSize', 'Tổng số phiếu phải thu')}
               </th>
               <th scope="col" style={{ width: '7%' }}>
-                {filters.filterHeader('responseCount', 'Số phiếu thu')}
+                {filters.filterHeader('responseCount', 'Số phiếu đã thu')}
               </th>
               <th scope="col" style={{ width: '7%' }}>
                 {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '7%' }} title="Số phiếu đã thu chia tổng sĩ số">
+              <th scope="col" style={{ width: '7%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu">
                 {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
               </th>
               <th scope="col" style={{ width: '7%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
-                {filters.filterHeader('validResponseRate', 'Tỷ lệ hợp lệ')}
+                {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
               </th>
               <th scope="col" style={{ width: '7%' }}>
                 {filters.filterHeader('averageScore', 'Điểm trung bình')}
@@ -2695,10 +2700,10 @@ const LecturerReportView: React.FC<{
           </p>
         </div>
         <div className="section-responses-stats">
-          <span>{report.sectionCount} lớp · tổng sĩ số {totalClassSize.toLocaleString('vi-VN')}</span>
+          <span>{report.sectionCount} lớp · tổng số phiếu phải thu {totalClassSize.toLocaleString('vi-VN')}</span>
           <span>Điểm trung bình {report.averageScore.toFixed(2)}</span>
           <span>
-            {report.totalResponseCount.toLocaleString('vi-VN')} phiếu thu ({overallRate.toFixed(1)}%)
+            {report.totalResponseCount.toLocaleString('vi-VN')} phiếu đã thu ({overallRate.toFixed(1)}%)
           </span>
         </div>
       </section>
@@ -2716,10 +2721,10 @@ const LecturerReportView: React.FC<{
                 <th scope="col">{filters.filterHeader('courseCode', 'Mã HP')}</th>
                 <th scope="col">{filters.filterHeader('courseName', 'Học phần')}</th>
                 <th scope="col">{filters.filterHeader('sectionName', 'Lớp')}</th>
-                <th scope="col">{filters.filterHeader('classSize', 'Sĩ số')}</th>
+                <th scope="col">{filters.filterHeader('classSize', 'Tổng số phiếu phải thu')}</th>
                 <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu đã thu')}</th>
                 <th scope="col">{filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}</th>
-                <th scope="col" title="Số phiếu đã thu chia sĩ số">
+                <th scope="col" title="Số phiếu đã thu chia tổng số phiếu phải thu">
                   {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
                 </th>
                 <th scope="col" title="Số phiếu hợp lệ chia số phiếu đã thu">

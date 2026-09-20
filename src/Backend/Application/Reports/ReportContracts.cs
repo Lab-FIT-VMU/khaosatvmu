@@ -356,4 +356,42 @@ public interface IReportService
         int count,
         bool lowestFirst,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Lấy danh sách và phân tích các ý kiến mở do sinh viên đóng góp.</summary>
+    Task<OpenCommentAnalysisReportDto> GetOpenCommentAnalysisAsync(
+        int? semesterId,
+        int? semesterSurveyId,
+        int? facultyId,
+        int? departmentId,
+        int? lecturerId,
+        string? search,
+        bool? validOnly,
+        CancellationToken cancellationToken = default);
 }
+
+/// <summary>Một ý kiến mở (AdditionalComments) do sinh viên đóng góp trong phiếu khảo sát.</summary>
+public sealed record OpenCommentItemDto(
+    int ResponseId,
+    int CourseSectionSurveyId,
+    string AdditionalComments,
+    DateTime SubmittedAt,
+    decimal Score,
+    bool IsValid,
+    string CourseCode,
+    string CourseName,
+    string SectionName,
+    string LecturerName,
+    string DepartmentName,
+    string FacultyName,
+    int? FacultyId,
+    int? DepartmentId,
+    int? LecturerId);
+
+/// <summary>Báo cáo phân tích tổng hợp các ý kiến mở.</summary>
+public sealed record OpenCommentAnalysisReportDto(
+    int TotalComments,
+    int TotalResponses,
+    decimal CommentRate,
+    int SectionCountWithComments,
+    int LecturerCountWithComments,
+    IReadOnlyList<OpenCommentItemDto> Comments);

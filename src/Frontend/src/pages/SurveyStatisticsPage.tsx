@@ -30,6 +30,11 @@ import { foldVietnamese } from '../utils/vietnamese';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
+import {
+  getActiveSemesterSurveyId,
+  selectAvailableSemesterSurveyId,
+  setActiveSemesterSurveyId,
+} from '../utils/surveySelection';
 
 /*
   Ô chọn đợt khảo sát, viết riêng cho trang này.
@@ -246,7 +251,7 @@ export const SurveyStatisticsPage: React.FC = () => {
   }, [activeSemesterId]);
 
   const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
-  const [semesterSurveyId, setSemesterSurveyId] = useState<string>('');
+  const [semesterSurveyId, setSemesterSurveyId] = useState<string>(getActiveSemesterSurveyId);
   const [statistics, setStatistics] = useState<SemesterSurveyStatistics | null>(null);
 
   const [loading, setLoading] = useState(false);
@@ -271,7 +276,7 @@ export const SurveyStatisticsPage: React.FC = () => {
         const next = await surveyApi.semesterSurveys(Number(semesterId));
         if (cancelled) return;
         setSemesterSurveys(next);
-        setSemesterSurveyId(next.length > 0 ? String(next[0].semesterSurveyId) : '');
+        setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(next, current));
         setLoadError(null);
       } catch (error) {
         if (!cancelled) setLoadError(messageFrom(error));
@@ -399,7 +404,7 @@ export const SurveyStatisticsPage: React.FC = () => {
         numeric: true,
       },
       {
-        // Tỷ lệ phản hồi = số phiếu đã thu ÷ sĩ số. Cột completionRate của API tính
+        // Tỷ lệ phản hồi = số phiếu đã thu ÷ tổng số phiếu phải thu. Cột completionRate của API tính
         // theo phiếu hợp lệ nên không dùng lại được, phải tự tính.
         key: 'responseRate',
         value: (row) => `${responseRateOf(row.totalResponseCount, row.classSize).toFixed(1)}%`,
@@ -424,7 +429,7 @@ export const SurveyStatisticsPage: React.FC = () => {
       },
       {
         key: 'openCommentCount',
-        value: (row) => String(row.openCommentCount),
+        value: (row) => String(row.openCommentCount ?? 0),
         numeric: true,
       },
       {
@@ -492,7 +497,7 @@ export const SurveyStatisticsPage: React.FC = () => {
             + `${filteredRows.length - exportedEligible} không đủ điều kiện)`,
         },
         summaryNotes: [
-          'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Sĩ số.',
+          'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu.',
           'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
           'Số phiếu không hợp lệ là phiếu bị bộ lọc nhiễu loại, không tham gia tính điểm.',
           'C1, C2… là điểm trung bình từng câu hỏi (thang 5.0) từ phiếu hợp lệ; nội dung câu ở sheet "Danh sach cau hoi". Câu bẫy không đánh số và không có trong bảng.',
@@ -514,7 +519,7 @@ export const SurveyStatisticsPage: React.FC = () => {
             { key: 'facultyName', header: 'Khoa / Viện', width: 24 },
             { key: 'departmentName', header: 'Bộ môn', width: 22 },
             { key: 'lecturerName', header: 'Giảng viên', width: 26 },
-            { key: 'classSize', header: 'Sĩ số', width: 8, type: 'number' as const, align: 'right' as const },
+            { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 8, type: 'number' as const, align: 'right' as const },
             { key: 'totalResponseCount', header: 'Số phiếu đã thu', width: 12, type: 'number' as const, align: 'right' as const },
             { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 12, type: 'number' as const, align: 'right' as const },
             { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
@@ -623,7 +628,10 @@ export const SurveyStatisticsPage: React.FC = () => {
           <CampaignSelect
             id="statistics-campaign-select"
             value={semesterSurveyId}
-            onChange={setSemesterSurveyId}
+            onChange={(value) => {
+              setSemesterSurveyId(value);
+              setActiveSemesterSurveyId(value);
+            }}
             disabled={semesterSurveys.length === 0}
             placeholder={semesterSurveys.length === 0 ? 'Chưa có đợt nào' : 'Chọn đợt khảo sát'}
             options={semesterSurveys.map((survey) => ({
@@ -781,7 +789,7 @@ export const SurveyStatisticsPage: React.FC = () => {
                   {filters.filterHeader('lecturerName', 'Giảng viên')}
                 </th>
                 <th className="col-metric" scope="col">
-                  {filters.filterHeader('classSize', 'Sĩ số')}
+                  {filters.filterHeader('classSize', 'Tổng số phiếu phải thu')}
                 </th>
                 <th className="col-metric" scope="col">
                   {filters.filterHeader('totalResponseCount', 'Số phiếu đã thu')}
@@ -795,7 +803,7 @@ export const SurveyStatisticsPage: React.FC = () => {
                 <th
                   className="col-metric"
                   scope="col"
-                  title={`Số phiếu đã thu chia sĩ số. Vòng 1: cần ≥ ${thresholds.minimumResponseRate}%`}
+                  title={`Số phiếu đã thu chia tổng số phiếu phải thu. Vòng 1: cần ≥ ${thresholds.minimumResponseRate}%`}
                 >
                   {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
                 </th>
@@ -951,7 +959,7 @@ export const SurveyStatisticsPage: React.FC = () => {
                         row.averageScore.toFixed(2)
                       )}
                     </td>
-                    <td className="num col-right col-right-2">{row.openCommentCount}</td>
+                    <td className="num col-right col-right-2">{row.openCommentCount ?? 0}</td>
                     <td
                       className="col-right col-right-1"
                       title={isEligible ? 'Đủ điều kiện' : 'Không đủ điều kiện'}

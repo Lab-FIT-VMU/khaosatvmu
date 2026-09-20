@@ -4,7 +4,6 @@ import {
   ChevronRight,
   CircleAlert,
   Eye,
-  FileSpreadsheet,
   ListChecks,
   LoaderCircle,
   Pencil,
@@ -632,7 +631,7 @@ export const SurveyTemplatesPage: React.FC = () => {
           <p>
             Bảng "SurveyTemplates", "SurveyQuestionSections" và "SurveyQuestions". Câu hỏi chia
             theo mục, mỗi câu có thang trả lời riêng nên một bộ trộn được nhiều loại thang. Bộ
-            mới tạo bằng Import Excel; ở đây chỉ sửa lại bộ đã có.
+            mới tạo từ nút Thêm bộ khảo sát mới; ở đây chỉ sửa lại bộ đã có.
           </p>
         </div>
       </header>
@@ -664,8 +663,8 @@ export const SurveyTemplatesPage: React.FC = () => {
           fileName: 'danh-sach-bo-cau-hoi-khao-sat',
           subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
         }}
-        /* Cố ý KHÔNG truyền onAddNew: bộ mới chỉ vào qua Import Excel, để tệp
-           Excel là nguồn duy nhất và người soạn khỏi gõ tay hàng chục câu. */
+        onAddNew={() => setIsImportOpen(true)}
+        addNewLabel="Thêm bộ khảo sát mới"
         toolbarActions={(
           <>
             <button
@@ -678,14 +677,6 @@ export const SurveyTemplatesPage: React.FC = () => {
             >
               <ListChecks aria-hidden="true" size={16} />
               <span>Thang trả lời</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm catalog-add-button"
-              onClick={() => setIsImportOpen(true)}
-            >
-              <FileSpreadsheet aria-hidden="true" size={16} />
-              <span>Import Excel</span>
             </button>
           </>
         )}

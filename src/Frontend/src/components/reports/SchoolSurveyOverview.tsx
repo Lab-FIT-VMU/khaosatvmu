@@ -176,7 +176,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
         'Điểm trung bình': `${data.overallAverageScore.toFixed(2)} / 5.0`,
         'Lớp đủ điều kiện tính điểm':
           `${formatNumber(data.scoredSectionCount)} / ${formatNumber(data.totalSections)} lớp`,
-        'Phiếu hợp lệ dùng để tính điểm': formatNumber(data.scoredValidResponseCount),
+        'Số phiếu hợp lệ dùng để tính điểm': formatNumber(data.scoredValidResponseCount),
         [`Lớp hoàn thành (≥${COMPLETED_COMPLETION_RATE}%)`]: data.completedSectionCount,
         [`Lớp đang thu (${LAGGING_COMPLETION_RATE}-${COMPLETED_COMPLETION_RATE - 1}%)`]: data.inProgressSectionCount,
       },
@@ -192,7 +192,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
         columns: [
           { key: 'facultyName', header: 'Khoa / Viện', width: 28 },
           { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number' as const, align: 'right' as const },
-          { key: 'totalResponses', header: 'Phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
+          { key: 'totalResponses', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
           { key: 'totalTargetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
           {
             key: 'completionRate',
@@ -221,7 +221,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
           { key: 'departmentName', header: 'Bộ môn', width: 24 },
           { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
           { key: 'sectionCount', header: 'Số lớp', width: 10, type: 'number' as const, align: 'right' as const },
-          { key: 'totalResponses', header: 'Phiếu thu', width: 12, type: 'number' as const, align: 'right' as const },
+          { key: 'totalResponses', header: 'Số phiếu đã thu', width: 12, type: 'number' as const, align: 'right' as const },
           { key: 'totalTargetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
           {
             key: 'completionRate',

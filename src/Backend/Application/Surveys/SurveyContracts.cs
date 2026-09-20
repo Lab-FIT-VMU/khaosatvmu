@@ -596,7 +596,9 @@ public sealed record CourseSectionSurveyDto(
     /// <summary>Số phiếu qua được bộ lọc — phần duy nhất được tính vào tiến độ.</summary>
     int ValidResponseCount,
     /// <summary>Số phiếu bị bộ lọc loại. Bằng ResponseCount trừ ValidResponseCount.</summary>
-    int InvalidResponseCount);
+    int InvalidResponseCount,
+    /// <summary>Số phiếu có nội dung trong ô “Ý kiến khác”.</summary>
+    int OpenCommentCount);
 
 /// <summary>
 /// Phạm vi lớp được phát phiếu. Dùng chung cho lúc tạo đợt và lúc bổ sung thêm

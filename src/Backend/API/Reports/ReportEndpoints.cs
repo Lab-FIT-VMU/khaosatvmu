@@ -140,6 +140,29 @@ public static class ReportEndpoints
             return Results.Ok(results);
         });
 
+        group.MapGet("/open-comments", async (
+            int? semesterId,
+            int? semesterSurveyId,
+            int? facultyId,
+            int? departmentId,
+            int? lecturerId,
+            string? search,
+            bool? validOnly,
+            IReportService reportService,
+            CancellationToken cancellationToken) =>
+        {
+            var analysis = await reportService.GetOpenCommentAnalysisAsync(
+                semesterId,
+                semesterSurveyId,
+                facultyId,
+                departmentId,
+                lecturerId,
+                search,
+                validOnly,
+                cancellationToken);
+            return Results.Ok(analysis);
+        });
+
         return app;
     }
 }

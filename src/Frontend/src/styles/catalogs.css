@@ -906,6 +906,7 @@
 .catalog-modal-backdrop.modal-backdrop {
   padding: 24px;
   background: rgba(28, 38, 45, 0.48);
+  z-index: 1300;
 }
 
 /* Chiều cao bám theo nội dung: chốt cứng 900px thì form vài ô cũng chiếm gần

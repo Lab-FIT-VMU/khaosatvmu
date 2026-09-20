@@ -42,6 +42,11 @@ import '../styles/dashboard.css';
 // và nằm bung ra thành từng dòng.
 import '../styles/survey-statistics.css';
 import { foldVietnamese } from '../utils/vietnamese';
+import {
+  getActiveSemesterSurveyId,
+  selectAvailableSemesterSurveyId,
+  setActiveSemesterSurveyId,
+} from '../utils/surveySelection';
 
 /*
   Ô chọn đợt khảo sát, viết riêng cho trang này.
@@ -285,7 +290,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 }) => {
   const { academicYears, activeSemesterId, setActiveSemesterId } = useSemester();
   const [comparisonOptions, setComparisonOptions] = useState<SchoolOverviewComparisonOption[]>([]);
-  const [selectedSemesterSurveyId, setSelectedSemesterSurveyId] = useState<number | undefined>(undefined);
+  const [selectedSemesterSurveyId, setSelectedSemesterSurveyId] = useState<number | undefined>(
+    Number(getActiveSemesterSurveyId()) || undefined,
+  );
   const [comparisonKey, setComparisonKey] = useState('auto');
   const [overviewData, setOverviewData] = useState<SchoolSurveyOverviewData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -315,12 +322,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       setSelectedSemesterSurveyId(undefined);
       return;
     }
-    setSelectedSemesterSurveyId((prev) => {
-      if (prev && currentSemesterSurveys.some((survey) => survey.semesterSurveyId === prev)) {
-        return prev;
-      }
-      return currentSemesterSurveys[0]?.semesterSurveyId;
-    });
+    setSelectedSemesterSurveyId((prev) =>
+      Number(selectAvailableSemesterSurveyId(currentSemesterSurveys, prev)) || undefined,
+    );
   }, [activeSemesterId, currentSemesterSurveys]);
 
   useEffect(() => {
@@ -572,7 +576,10 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   ? 'Chưa có đợt khảo sát nào'
                   : 'Chọn đợt khảo sát'
               }
-              onChange={(next) => setSelectedSemesterSurveyId(next ? Number(next) : undefined)}
+              onChange={(next) => {
+                setSelectedSemesterSurveyId(next ? Number(next) : undefined);
+                setActiveSemesterSurveyId(next);
+              }}
               options={currentSemesterSurveys.map((survey) => ({
                 value: String(survey.semesterSurveyId),
                 label: `${survey.surveyName} · ${survey.sectionSurveyCount} lớp`,
@@ -1044,7 +1051,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                   <th scope="col" style={{ width: 48 }}>STT</th>
                   <th scope="col">Khoa/Viện</th>
                   <th scope="col" style={{ width: 130 }}>Quy mô</th>
-                  <th scope="col" style={{ width: 150 }}>Phiếu hợp lệ / Chỉ tiêu</th>
+                  <th scope="col" style={{ width: 150 }}>Số phiếu hợp lệ / Tổng số phiếu phải thu</th>
                   <th scope="col" style={{ width: 180 }}>Tiến độ thu phiếu</th>
                   <th scope="col" style={{ width: 110 }}>Điểm trung bình</th>
                   <th scope="col" style={{ width: 130 }}>Trạng thái</th>

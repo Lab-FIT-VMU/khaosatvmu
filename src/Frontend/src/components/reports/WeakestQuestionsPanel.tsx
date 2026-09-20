@@ -56,7 +56,7 @@ export const WeakestQuestionsPanel: React.FC<WeakestQuestionsPanelProps> = ({
                 <th className="catalog-table__index" scope="col">STT</th>
                 <th scope="col" style={{ width: '44%' }}>Tiêu chí</th>
                 <th scope="col" style={{ width: '18%' }}>Thang trả lời</th>
-                <th scope="col" style={{ width: '13%' }}>Phiếu hợp lệ</th>
+                <th scope="col" style={{ width: '13%' }}>Số phiếu hợp lệ</th>
                 <th scope="col" style={{ width: '12%' }}>Điểm trung bình</th>
                 <th scope="col" style={{ width: '13%' }}>Xếp loại</th>
               </tr>

@@ -245,6 +245,8 @@ export interface CourseSectionSurvey {
   validResponseCount: number;
   /** Số phiếu bị bộ lọc loại. */
   invalidResponseCount: number;
+  /** Số phiếu có nội dung trong ô “Ý kiến khác”. */
+  openCommentCount: number;
 }
 
 /** Số câu đã chọn ở một mức trả lời trong cùng một phiếu. */
@@ -898,4 +900,35 @@ export interface RolePermissionMatrix {
 export interface RolePermissionGrantDto {
   permissionId: string;
   isGranted: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// PHÂN TÍCH Ý KIẾN MỞ (OPEN COMMENTS ANALYSIS)
+// ---------------------------------------------------------------------------
+
+export interface OpenCommentItem {
+  responseId: number;
+  courseSectionSurveyId: number;
+  additionalComments: string;
+  submittedAt: string;
+  score: number;
+  isValid: boolean;
+  courseCode: string;
+  courseName: string;
+  sectionName: string;
+  lecturerName: string;
+  departmentName: string;
+  facultyName: string;
+  facultyId: number | null;
+  departmentId: number | null;
+  lecturerId: number | null;
+}
+
+export interface OpenCommentAnalysisReport {
+  totalComments: number;
+  totalResponses: number;
+  commentRate: number;
+  sectionCountWithComments: number;
+  lecturerCountWithComments: number;
+  comments: OpenCommentItem[];
 }
