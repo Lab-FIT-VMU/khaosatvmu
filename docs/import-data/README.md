@@ -4,3 +4,4 @@
 - Import tệp này tại màn hình **Ngành đào tạo** trước khi tải dữ liệu vào module **Thống kê tốt nghiệp**.
 - Tên khoa/viện trong tệp phải tồn tại trong danh mục Khoa / Viện của môi trường đích.
 - File chỉ chứa ba cột danh mục chuẩn; các tên viết tắt và cách viết khác trong file tốt nghiệp được hệ thống seed để tự đối chiếu.
+- Mã chương trình chất lượng cao, nâng cao và chương trình chọn dùng hậu tố lần lượt `-CLC`, `-NC` và `-C` để mã ngành luôn duy nhất.

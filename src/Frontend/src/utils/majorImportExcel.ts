@@ -103,6 +103,11 @@ export async function downloadMajorImportTemplate(
       { value: 'Kỹ thuật Điện tử - Viễn thông', type: String },
       { value: 'Khoa Điện - Điện tử', type: String },
     ],
+    [
+      { value: 'CNT-CLC', type: String },
+      { value: 'Công nghệ thông tin (CLC)', type: String },
+      { value: 'Viện Đào tạo chất lượng cao', type: String },
+    ],
   ];
 
   await writeWorkbook(

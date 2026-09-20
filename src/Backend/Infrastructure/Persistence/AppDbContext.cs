@@ -212,6 +212,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.MajorCode).HasMaxLength(30).IsRequired();
             entity.Property(x => x.MajorName).IsRequired();
             entity.HasIndex(x => x.FacultyId);
+            entity.HasIndex(x => x.MajorCode)
+                .IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
             entity.HasOne<Faculty>()
                 .WithMany()
                 .HasForeignKey(x => x.FacultyId)

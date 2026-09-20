@@ -388,7 +388,8 @@
 .graduation-delete-dialog__warning strong { font-size: 14px; }
 .graduation-delete-dialog__warning p { margin: 4px 0 0; color: #633838; font-size: 13px; line-height: 1.45; }
 .graduation-delete-dialog > label { display: grid; gap: 6px; color: #20262c; font-size: 13px; font-weight: 700; }
-.graduation-delete-dialog > label > span { color: #b52d2d; }
+.graduation-delete-dialog__label-text { display: inline-flex; align-items: baseline; gap: 3px; width: max-content; }
+.graduation-delete-dialog__label-text > span { color: #b52d2d; }
 .graduation-delete-dialog textarea { box-sizing: border-box; width: 100%; min-height: 82px; resize: vertical; padding: 9px 10px; border: 1px solid #cfd7dc; border-radius: 3px; background: #fff; color: #20262c; font: inherit; font-weight: 400; line-height: 1.4; }
 .graduation-delete-dialog textarea:focus { border-color: #0788b8; outline: 2px solid rgb(7 136 184 / 14%); }
 .graduation-delete-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid #e4e8eb; }

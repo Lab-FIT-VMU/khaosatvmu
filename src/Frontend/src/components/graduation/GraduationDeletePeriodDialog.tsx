@@ -78,7 +78,9 @@ export function GraduationDeletePeriodDialog({
       </div>
 
       <label>
-        Lý do xóa <span aria-hidden="true">*</span>
+        <span className="graduation-delete-dialog__label-text">
+          Lý do xóa <span aria-hidden="true">*</span>
+        </span>
         <textarea
           value={reason}
           onChange={(event) => setReason(event.target.value)}
