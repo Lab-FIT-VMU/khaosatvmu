@@ -115,6 +115,24 @@ public sealed class ClosedXmlGraduationImportParserTests
             x.IsWorkStudy);
     }
 
+    [Theory]
+    [InlineData("CNT-63-CL")]
+    [InlineData("CNT 63 CL")]
+    [InlineData("CNT_63.CL")]
+    public async Task ParseAsync_AcceptsCommonClassCodeSeparators(string classCode)
+    {
+        using var stream = CreateWorkbook(workbook =>
+        {
+            AddSourceSheet(workbook, "TongHop",
+                ["Khá", classCode, "Viện Đào tạo chất lượng cao", "Công nghệ thông tin (NC)", ""]);
+        });
+
+        var result = await _parser.ParseAsync(stream, "source.xlsx", CancellationToken.None);
+
+        result.Aggregates.Should().ContainSingle(x =>
+            x.DerivedProgramCode == "CNT" && x.CohortCode == "K63");
+    }
+
     [Fact]
     public async Task ParseAsync_RealSampleRegression_WhenSampleDirectoryIsProvided()
     {
@@ -125,9 +143,15 @@ public sealed class ClosedXmlGraduationImportParserTests
         }
 
         var results = new List<ParsedGraduationImport>();
-        foreach (var path in Directory.GetFiles(sampleDirectory, "*.xlsx").OrderBy(x => x))
+        foreach (var path in Directory.GetFiles(sampleDirectory, "*.xlsx")
+                     .Where(path => !Path.GetFileName(path).StartsWith("~$", StringComparison.Ordinal))
+                     .OrderBy(x => x))
         {
-            await using var stream = File.OpenRead(path);
+            await using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
             results.Add(await _parser.ParseAsync(stream, Path.GetFileName(path), CancellationToken.None));
         }
 

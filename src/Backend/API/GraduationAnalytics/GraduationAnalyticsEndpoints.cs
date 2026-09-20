@@ -55,13 +55,15 @@ public static class GraduationAnalyticsEndpoints
         group.MapPost("/imports/preview", async (
             HttpRequest request,
             [FromServices] IGraduationImportParser parser,
+            [FromServices] IGraduationImportCatalogResolver catalogResolver,
             CancellationToken ct) =>
         {
             try
             {
                 var file = await ReadWorkbookAsync(request, ct);
                 await using var stream = file.OpenReadStream();
-                return Results.Ok(await parser.ParseAsync(stream, file.FileName, ct));
+                var parsed = await parser.ParseAsync(stream, file.FileName, ct);
+                return Results.Ok(await catalogResolver.ResolveAsync(parsed, ct));
             }
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
         }).AddEndpointFilter<RequireAntiforgeryFilter>();
@@ -69,6 +71,7 @@ public static class GraduationAnalyticsEndpoints
         group.MapPost("/imports/commit", async (
             HttpRequest request,
             [FromServices] IGraduationImportParser parser,
+            [FromServices] IGraduationImportCatalogResolver catalogResolver,
             [FromServices] IGraduationAnalyticsV3Service service,
             CancellationToken ct) =>
         {
@@ -84,7 +87,8 @@ public static class GraduationAnalyticsEndpoints
                 var replaceReason = form["replaceReason"].FirstOrDefault();
                 var previewFileHash = RequiredText(form, "previewFileHash");
                 await using var stream = file.OpenReadStream();
-                var parsed = await parser.ParseAsync(stream, file.FileName, ct);
+                var parsed = await catalogResolver.ResolveAsync(
+                    await parser.ParseAsync(stream, file.FileName, ct), ct);
                 if (!string.Equals(parsed.FileHash, previewFileHash, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new GraduationAnalyticsException(

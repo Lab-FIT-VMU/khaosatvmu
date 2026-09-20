@@ -54,6 +54,8 @@ public sealed class GraduationAggregateRow
 {
     public long AggregateRowId { get; set; }
     public long RevisionId { get; set; }
+    public int? FacultyId { get; set; }
+    public int? MajorId { get; set; }
     public string FacultyNameRaw { get; set; } = string.Empty;
     public string FacultyKey { get; set; } = string.Empty;
     public string ProgramNameRaw { get; set; } = string.Empty;

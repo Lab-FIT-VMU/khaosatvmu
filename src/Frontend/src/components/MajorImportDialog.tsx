@@ -35,7 +35,8 @@ const fileErrorMessages: Record<MajorImportFileErrorCode, string> = {
   FILE_TYPE: 'Chỉ chấp nhận tệp Excel có định dạng .xlsx.',
   FILE_SIZE: 'Tệp Excel không được lớn hơn 5 MB.',
   FILE_EMPTY: 'Tệp Excel không có dữ liệu.',
-  NAME_HEADER_MISSING: 'Không tìm thấy cột "Tên ngành học" trong hàng tiêu đề.',
+  CODE_HEADER_MISSING: 'Không tìm thấy cột "Mã ngành" trong hàng tiêu đề.',
+  NAME_HEADER_MISSING: 'Không tìm thấy cột "Tên ngành đào tạo" trong hàng tiêu đề.',
   FACULTY_HEADER_MISSING: 'Không tìm thấy cột "Tên khoa viện" trong hàng tiêu đề.',
   NO_DATA_ROWS: 'Tệp Excel chưa có dòng ngành học nào.',
   READ_FAILED: 'Không thể đọc tệp Excel. Hãy kiểm tra tệp không bị hỏng hoặc đặt mật khẩu.',
@@ -130,7 +131,11 @@ export function MajorImportDialog({
         const row = rowByNumber.get(item.rowNumber);
         return {
           rowNumber: item.rowNumber,
-          values: [row?.majorName ?? item.name ?? '', row?.facultyName ?? item.facultyName ?? ''],
+          values: [
+            row?.majorCode ?? '',
+            row?.majorName ?? item.name ?? '',
+            row?.facultyName ?? item.facultyName ?? '',
+          ],
           reason: catalogErrorMessage(item.errorCode),
         };
       })
@@ -138,14 +143,14 @@ export function MajorImportDialog({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Import ngành học từ Excel">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Import ngành đào tạo từ Excel">
       <div className="admin-import-dialog" aria-busy={parsing}>
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
           <p>
-            Hàng đầu tiên cần có cột <strong>Tên ngành học</strong> và cột{' '}
-            <strong>Tên khoa viện</strong>. Tên khoa viện được tra ngược trong danh mục Khoa / Viện
-            để lấy đúng <strong>FacultyId</strong>.
+            Hàng đầu tiên cần có các cột <strong>Mã ngành</strong>, <strong>Tên ngành đào tạo</strong>{' '}
+            và <strong>Tên khoa viện</strong>. Các tên viết tắt và cách viết khác trong file tốt
+            nghiệp được hệ thống tự đối chiếu.
           </p>
         </div>
 
@@ -219,7 +224,7 @@ export function MajorImportDialog({
             {rows.length > 0 && (
               <section className="admin-import-preview" aria-label="Xem trước dữ liệu import">
                 <header>
-                  <strong>{rows.length} ngành học sẵn sàng import</strong>
+                  <strong>{rows.length} ngành đào tạo sẵn sàng import</strong>
                   <span>Hiển thị toàn bộ danh sách</span>
                 </header>
                 <div className="admin-import-table-scroll">
@@ -227,7 +232,8 @@ export function MajorImportDialog({
                     <thead>
                       <tr>
                         <th>Dòng</th>
-                        <th>Tên ngành học</th>
+                        <th>Mã ngành</th>
+                        <th>Tên ngành đào tạo</th>
                         <th>Tên khoa viện</th>
                       </tr>
                     </thead>
@@ -236,8 +242,13 @@ export function MajorImportDialog({
                         <tr key={row.rowNumber}>
                           <td>{row.rowNumber}</td>
                           <td>
+                            {row.majorCode || (
+                              <span className="admin-import-invalid">Thiếu mã ngành</span>
+                            )}
+                          </td>
+                          <td>
                             {row.majorName || (
-                              <span className="admin-import-invalid">Thiếu tên ngành học</span>
+                              <span className="admin-import-invalid">Thiếu tên ngành đào tạo</span>
                             )}
                           </td>
                           <td>
@@ -332,7 +343,7 @@ export function MajorImportDialog({
                 ) : (
                   <Upload aria-hidden="true" />
                 )}
-                {importing ? 'Đang lưu...' : `Import ${rows.length || ''} ngành học`}
+                {importing ? 'Đang lưu...' : `Import ${rows.length || ''} ngành đào tạo`}
               </button>
             </>
           )}

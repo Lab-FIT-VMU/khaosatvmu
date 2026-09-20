@@ -564,6 +564,8 @@ public sealed record SemesterSurveyStatisticsDto(
     string AcademicYearName,
     /// <summary>Thời điểm tính gần nhất trong các lớp; null là chưa lớp nào được tính.</summary>
     DateTime? LastCalculatedAt,
+    /// <summary>Email người thực hiện lần tính điểm gần nhất; null với dữ liệu lịch sử chưa ghi nhận người.</summary>
+    string? LastCalculatedByEmail,
     /// <summary>Số phiếu về sau lần tính gần nhất, cảnh báo số đang xem đã cũ.</summary>
     int ResponsesSinceLastCalculation,
     IReadOnlyList<StatisticsQuestionColumnDto> QuestionColumns,

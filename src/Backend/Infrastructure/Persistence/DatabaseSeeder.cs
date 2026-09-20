@@ -1,5 +1,6 @@
 using Application.UserAdministration;
 using Domain;
+using Infrastructure.Catalog;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Persistence;
@@ -14,6 +15,7 @@ public static class DatabaseSeeder
         var roles = await EnsureRolesAsync(db, cancellationToken);
         var permissions = await EnsurePermissionsAsync(db, cancellationToken);
         await EnsureRolePermissionsAsync(db, roles, permissions, cancellationToken);
+        await CatalogImportAliasSeeder.SeedAsync(db, cancellationToken);
         if (includeDevelopmentData)
         {
             await EnsureDevUserAsync(db, roles, cancellationToken);

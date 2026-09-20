@@ -16,7 +16,9 @@ public sealed record GraduationImportAggregate(
     string CohortCode,
     GraduationRank GraduationRank,
     bool IsWorkStudy,
-    int StudentCount);
+    int StudentCount,
+    int? FacultyId = null,
+    int? MajorId = null);
 
 public sealed record GraduationImportWarning(
     string Code,
@@ -40,5 +42,12 @@ public interface IGraduationImportParser
     Task<ParsedGraduationImport> ParseAsync(
         Stream workbookStream,
         string originalFileName,
+        CancellationToken cancellationToken);
+}
+
+public interface IGraduationImportCatalogResolver
+{
+    Task<ParsedGraduationImport> ResolveAsync(
+        ParsedGraduationImport parsedImport,
         CancellationToken cancellationToken);
 }

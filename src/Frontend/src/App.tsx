@@ -73,8 +73,6 @@ import type {
   Course,
   CourseSection,
   CourseSectionSurvey,
-  Curriculum,
-  CurriculumCourse,
   Criterion,
   SemesterSurvey,
   SurveyCampaign,
@@ -246,10 +244,6 @@ function DashboardApp() {
   const [majors, setMajors] = useState<Major[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [sections, setSections] = useState<CourseSection[]>([]);
-  // Hai bảng khung chương trình, cần để đếm số nhóm lớp của một ngành học.
-  // Chưa có màn hình quản lý nên hiện luôn rỗng.
-  const [curricula] = useState<Curriculum[]>([]);
-  const [curriculumCourses] = useState<CurriculumCourse[]>([]);
   const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [campaigns, setCampaigns] = useState<SurveyCampaign[]>([]);
   const [surveyCounters, setSurveyCounters] = useState({ qrScanCount: 0 });
@@ -449,14 +443,15 @@ function DashboardApp() {
 
   const handleSaveMajor = async (
     majorId: number | null,
+    majorCode: string,
     majorName: string,
     facultyId: number
   ): Promise<string | null> => {
     try {
       if (majorId === null) {
-        await catalogApi.createMajor(majorName, facultyId);
+        await catalogApi.createMajor(majorCode, majorName, facultyId);
       } else {
-        await catalogApi.updateMajor(majorId, majorName, facultyId);
+        await catalogApi.updateMajor(majorId, majorCode, majorName, facultyId);
       }
       setMajors(await catalogApi.majors());
       return null;
@@ -714,9 +709,6 @@ function DashboardApp() {
               <MajorsPage
                 majors={majors}
                 faculties={faculties}
-                curricula={curricula}
-                curriculumCourses={curriculumCourses}
-                sections={sections}
                 onSaveMajor={handleSaveMajor}
                 onDeleteMajor={handleDeleteMajor}
                 onImportMajors={handleImportMajors}

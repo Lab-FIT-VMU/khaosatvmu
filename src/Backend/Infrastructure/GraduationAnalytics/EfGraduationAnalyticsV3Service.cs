@@ -153,6 +153,8 @@ public sealed class EfGraduationAnalyticsV3Service(
             new GraduationAggregateRow
             {
                 RevisionId = revision.RevisionId,
+                FacultyId = x.FacultyId,
+                MajorId = x.MajorId,
                 FacultyNameRaw = x.FacultyNameRaw,
                 FacultyKey = x.FacultyKey,
                 ProgramNameRaw = x.ProgramNameRaw,
@@ -260,7 +262,9 @@ public sealed class EfGraduationAnalyticsV3Service(
                 x.CohortCode,
                 x.GraduationRank,
                 x.IsWorkStudy,
-                x.StudentCount))
+                x.StudentCount,
+                x.FacultyId,
+                x.MajorId))
             .ToListAsync(cancellationToken);
 
         return new ParsedGraduationImport(

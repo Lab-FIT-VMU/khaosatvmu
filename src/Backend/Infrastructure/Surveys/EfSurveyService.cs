@@ -2252,6 +2252,18 @@ public sealed class EfSurveyService(
             .DefaultIfEmpty()
             .Max();
         var lastCalculated = lastCalculatedAt == default ? (DateTime?)null : lastCalculatedAt;
+        var lastCalculatedByEmail = lastCalculated is null
+            ? null
+            : await (
+                from change in db.SurveyScoringChangeLogs.AsNoTracking()
+                join user in db.Users.AsNoTracking()
+                    on change.ChangedByUserId equals user.Id into users
+                from user in users.DefaultIfEmpty()
+                where change.SemesterSurveyId == semesterSurveyId
+                    && change.Kind == ScoringChangeKinds.ScoresRecalculated
+                orderby change.ChangedAt descending, change.SurveyScoringChangeLogId descending
+                select user != null ? user.Email : null)
+                .FirstOrDefaultAsync(cancellationToken);
 
         // Phiếu về sau lần tính gần nhất: dấu hiệu con số đang xem đã cũ.
         var responsesSince = lastCalculated is null || cssIds.Count == 0
@@ -2328,6 +2340,7 @@ public sealed class EfSurveyService(
             semester?.SemesterName ?? string.Empty,
             academicYear?.AcademicYearName ?? string.Empty,
             lastCalculated,
+            lastCalculatedByEmail,
             responsesSince,
             questionColumns,
             attentionCheckCount,

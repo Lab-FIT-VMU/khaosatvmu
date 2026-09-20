@@ -4,7 +4,7 @@ public sealed record FacultyDto(int FacultyId, string FacultyName);
 
 public sealed record DepartmentDto(int DepartmentId, string DepartmentName, int? FacultyId);
 
-public sealed record MajorDto(int MajorId, string MajorName, int FacultyId);
+public sealed record MajorDto(int MajorId, string MajorCode, string MajorName, int FacultyId);
 
 /// <summary>Chức vụ của giảng viên. Bảng "Positions".</summary>
 public sealed record PositionDto(int PositionId, string PositionName);
@@ -190,7 +190,7 @@ public sealed record SaveDepartmentCommand(int DepartmentId, string DepartmentNa
 
 public sealed record SavePositionCommand(string PositionName);
 
-public sealed record SaveMajorCommand(string MajorName, int FacultyId);
+public sealed record SaveMajorCommand(string MajorCode, string MajorName, int FacultyId);
 
 public sealed record SaveLecturerCommand(
     string FullName,
@@ -215,7 +215,11 @@ public sealed record ImportFacultyRowCommand(int RowNumber, string FacultyName);
 /// <summary>Mã bộ môn do người dùng tự nhập trong tệp; "Departments"."DepartmentId" không tự tăng.</summary>
 public sealed record ImportDepartmentRowCommand(int RowNumber, int DepartmentId, string DepartmentName, string? FacultyName);
 
-public sealed record ImportMajorRowCommand(int RowNumber, string MajorName, string? FacultyName);
+public sealed record ImportMajorRowCommand(
+    int RowNumber,
+    string MajorCode,
+    string MajorName,
+    string? FacultyName);
 
 /// <summary>
 /// Một dòng giảng viên trong tệp Excel. Khoa viện, bộ môn và chức vụ đi vào theo TÊN.
@@ -488,8 +492,10 @@ public static class CatalogErrorCodes
     public const string PositionNameExists = "CATALOG_POSITION_NAME_EXISTS";
 
     public const string MajorNotFound = "CATALOG_MAJOR_NOT_FOUND";
+    public const string MajorCodeRequired = "CATALOG_MAJOR_CODE_REQUIRED";
     public const string MajorNameRequired = "CATALOG_MAJOR_NAME_REQUIRED";
     public const string MajorFacultyRequired = "CATALOG_MAJOR_FACULTY_REQUIRED";
+    public const string MajorExists = "CATALOG_MAJOR_EXISTS";
 
     public const string AcademicYearNotFound = "CATALOG_ACADEMIC_YEAR_NOT_FOUND";
     public const string AcademicYearNameRequired = "CATALOG_ACADEMIC_YEAR_NAME_REQUIRED";

@@ -178,7 +178,7 @@ public static class CatalogEndpoints
             ICatalogService service,
             CancellationToken cancellationToken) =>
             ToResult(await service.CreateMajorAsync(
-                new SaveMajorCommand(request.MajorName, request.FacultyId),
+                new SaveMajorCommand(request.MajorCode, request.MajorName, request.FacultyId),
                 cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
             .RequireAuthorization(AuthPolicies.MajorsAccess);
@@ -190,7 +190,7 @@ public static class CatalogEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.UpdateMajorAsync(
                 majorId,
-                new SaveMajorCommand(request.MajorName, request.FacultyId),
+                new SaveMajorCommand(request.MajorCode, request.MajorName, request.FacultyId),
                 cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
             .RequireAuthorization(AuthPolicies.MajorsAccess);
@@ -211,6 +211,7 @@ public static class CatalogEndpoints
             var rows = request.Rows?
                 .Select(x => new ImportMajorRowCommand(
                     x.RowNumber,
+                    x.MajorCode ?? string.Empty,
                     x.MajorName ?? string.Empty,
                     x.FacultyName))
                 .ToList() ?? [];
@@ -565,7 +566,7 @@ public static class CatalogEndpoints
 
     public sealed record SavePositionRequest(string PositionName);
 
-    public sealed record SaveMajorRequest(string MajorName, int FacultyId);
+    public sealed record SaveMajorRequest(string MajorCode, string MajorName, int FacultyId);
 
     public sealed record ImportFacultiesRequest(IReadOnlyList<ImportFacultyRowRequest>? Rows);
 
@@ -577,7 +578,11 @@ public static class CatalogEndpoints
 
     public sealed record ImportMajorsRequest(IReadOnlyList<ImportMajorRowRequest>? Rows);
 
-    public sealed record ImportMajorRowRequest(int RowNumber, string MajorName, string? FacultyName);
+    public sealed record ImportMajorRowRequest(
+        int RowNumber,
+        string MajorCode,
+        string MajorName,
+        string? FacultyName);
 
     public sealed record SaveAcademicYearRequest(string AcademicYearName)
     {

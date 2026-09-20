@@ -36,6 +36,7 @@ export interface Position {
 /** Bảng "Majors" */
 export interface Major {
   majorId: number;
+  majorCode: string;
   majorName: string;
   facultyId: number;
 }

@@ -15,6 +15,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Faculty> Faculties => Set<Faculty>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<Major> Majors => Set<Major>();
+    public DbSet<FacultyImportAlias> FacultyImportAliases => Set<FacultyImportAlias>();
+    public DbSet<MajorImportAlias> MajorImportAliases => Set<MajorImportAlias>();
     public DbSet<Position> Positions => Set<Position>();
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<Lecturer> Lecturers => Set<Lecturer>();
@@ -207,11 +209,38 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("Majors");
             entity.HasKey(x => x.MajorId);
+            entity.Property(x => x.MajorCode).HasMaxLength(30).IsRequired();
             entity.Property(x => x.MajorName).IsRequired();
             entity.HasIndex(x => x.FacultyId);
             entity.HasOne<Faculty>()
                 .WithMany()
                 .HasForeignKey(x => x.FacultyId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<FacultyImportAlias>(entity =>
+        {
+            entity.ToTable("FacultyImportAliases");
+            entity.HasKey(x => x.FacultyImportAliasId);
+            entity.Property(x => x.Alias).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.NormalizedAlias).HasMaxLength(200).IsRequired();
+            entity.HasIndex(x => x.NormalizedAlias).IsUnique();
+            entity.HasOne<Faculty>()
+                .WithMany()
+                .HasForeignKey(x => x.FacultyId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MajorImportAlias>(entity =>
+        {
+            entity.ToTable("MajorImportAliases");
+            entity.HasKey(x => x.MajorImportAliasId);
+            entity.Property(x => x.Alias).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.NormalizedAlias).HasMaxLength(300).IsRequired();
+            entity.HasIndex(x => new { x.MajorId, x.NormalizedAlias }).IsUnique();
+            entity.HasOne<Major>()
+                .WithMany()
+                .HasForeignKey(x => x.MajorId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -634,10 +663,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 x.IsWorkStudy,
             }).IsUnique();
             entity.HasIndex(x => new { x.RevisionId, x.CohortCode });
+            entity.HasIndex(x => x.FacultyId);
+            entity.HasIndex(x => x.MajorId);
             entity.HasOne<GraduationImportRevision>()
                 .WithMany()
                 .HasForeignKey(x => x.RevisionId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<Faculty>()
+                .WithMany()
+                .HasForeignKey(x => x.FacultyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Major>()
+                .WithMany()
+                .HasForeignKey(x => x.MajorId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<GraduationPeriod>()
