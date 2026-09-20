@@ -283,6 +283,7 @@ export const catalogErrorMessages: Record<string, string> = {
   CATALOG_POSITION_NAME_EXISTS: 'Tên chức vụ đã tồn tại.',
   CATALOG_MAJOR_NOT_FOUND: 'Không tìm thấy ngành đào tạo.',
   CATALOG_MAJOR_CODE_REQUIRED: 'Thiếu mã ngành.',
+  CATALOG_MAJOR_CODE_EXISTS: 'Mã ngành đã tồn tại trong hệ thống.',
   CATALOG_MAJOR_NAME_REQUIRED: 'Thiếu tên ngành đào tạo.',
   CATALOG_MAJOR_FACULTY_REQUIRED: 'Thiếu tên khoa viện (cột FacultyId không được để trống).',
   CATALOG_MAJOR_EXISTS: 'Ngành đào tạo này đã tồn tại trong khoa / viện.',

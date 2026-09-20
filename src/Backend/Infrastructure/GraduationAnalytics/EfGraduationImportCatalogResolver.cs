@@ -77,7 +77,7 @@ public sealed partial class EfGraduationImportCatalogResolver(AppDbContext db)
             }
 
             if (!string.IsNullOrWhiteSpace(aggregate.DerivedProgramCode) &&
-                CodeKey(aggregate.DerivedProgramCode) != CodeKey(major.Code))
+                CodeKey(aggregate.DerivedProgramCode) != CatalogBaseCodeKey(major.Code))
             {
                 unresolved.Add(
                     $"Mã lớp suy ra '{aggregate.DerivedProgramCode}' không khớp mã ngành '{major.Code}' của '{major.Name}'");
@@ -163,6 +163,14 @@ public sealed partial class EfGraduationImportCatalogResolver(AppDbContext db)
 
     private static string CodeKey(string value) => AliasKey(value.Replace('Ð', 'Đ'));
 
+    /// <summary>
+    /// Mã danh mục là mã duy nhất (CNT-CLC, CNT-NC, MKT-C), còn mã suy ra từ
+    /// tên lớp chỉ là mã ngành gốc (CNT, MKT). Bỏ hậu tố loại chương trình trước
+    /// khi kiểm tra để không làm thay đổi quy tắc đọc tên lớp hiện hữu.
+    /// </summary>
+    private static string CatalogBaseCodeKey(string value) =>
+        CodeKey(ProgramTypeSuffixRegex().Replace(value.Trim(), string.Empty));
+
     private static string DisplayKey(string value) =>
         WhitespaceRegex().Replace(RemoveDiacritics(value).Trim(), " ").ToUpperInvariant();
 
@@ -182,4 +190,7 @@ public sealed partial class EfGraduationImportCatalogResolver(AppDbContext db)
 
     [GeneratedRegex(@"\s+", RegexOptions.CultureInvariant)]
     private static partial Regex WhitespaceRegex();
+
+    [GeneratedRegex(@"-(?:CLC|NC|C)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ProgramTypeSuffixRegex();
 }

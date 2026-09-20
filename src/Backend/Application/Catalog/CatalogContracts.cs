@@ -493,6 +493,7 @@ public static class CatalogErrorCodes
 
     public const string MajorNotFound = "CATALOG_MAJOR_NOT_FOUND";
     public const string MajorCodeRequired = "CATALOG_MAJOR_CODE_REQUIRED";
+    public const string MajorCodeExists = "CATALOG_MAJOR_CODE_EXISTS";
     public const string MajorNameRequired = "CATALOG_MAJOR_NAME_REQUIRED";
     public const string MajorFacultyRequired = "CATALOG_MAJOR_FACULTY_REQUIRED";
     public const string MajorExists = "CATALOG_MAJOR_EXISTS";
