@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CircleAlert, LoaderCircle } from 'lucide-react';
+import { AlertTriangle, CircleAlert, Info, LoaderCircle } from 'lucide-react';
 import { reportApi } from '../../services/reportApi';
 import type {
   QuestionRating,
   SchoolSurveyOverview as SchoolSurveyOverviewData,
 } from '../../types';
 import { ExportDropdown } from '../ExportDropdown';
+import { NoteModalButton } from '../NoteModalButton';
 import { FacultyScoreChart } from './FacultyScoreChart';
 import { FacultyCompletionChart } from './FacultyCompletionChart';
 import { WeakestQuestionsPanel } from './WeakestQuestionsPanel';
+import { SchoolCriteriaChart } from './SchoolCriteriaChart';
 import { formatNumber } from './theme';
 import type { ReportAnalysisView } from '../../pages/reportRoute';
 import {
@@ -58,6 +60,8 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
   const [questionLowest, setQuestionLowest] = useState(true);
   const [rankedQuestions, setRankedQuestions] = useState<QuestionRating[] | null>(null);
   const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [criteriaQuestions, setCriteriaQuestions] = useState<QuestionRating[] | null>(null);
+  const [criteriaLoading, setCriteriaLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!semesterId) return;
@@ -126,6 +130,42 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
     };
   }, [analysisView, semesterId, semesterSurveyId, questionCount, questionLowest]);
 
+  const criteriaKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (analysisView !== 'criteria' || !semesterId) return;
+
+    const key = `${semesterId}|${semesterSurveyId ?? ''}`;
+    if (criteriaKeyRef.current === key && criteriaQuestions !== null) return;
+
+    let cancelled = false;
+    setCriteriaLoading(true);
+
+    reportApi
+      .questionRanking({
+        semesterId,
+        semesterSurveyId,
+        count: maxQuestionCount,
+        lowest: false,
+      })
+      .then((questions) => {
+        if (cancelled) return;
+        criteriaKeyRef.current = key;
+        const sorted = [...(questions || [])].sort((a, b) => a.questionOrder - b.questionOrder);
+        setCriteriaQuestions(sorted);
+      })
+      .catch(() => {
+        if (!cancelled) setCriteriaQuestions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCriteriaLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [analysisView, semesterId, semesterSurveyId, criteriaQuestions]);
+
   /** Ô số nhận mọi thao tác gõ, nhưng chỉ chốt lại khi giá trị nằm trong khoảng hợp lệ. */
   const changeQuestionCount = (value: string) => {
     setQuestionInput(value);
@@ -173,6 +213,10 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
       subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
       info: {
         'Năm học / Học kỳ': `${data.academicYearName} · ${data.semesterName}`,
+        'Tổng số phiếu phải thu': `${formatNumber(data.totalTargetResponses)} phiếu`,
+        'Số phiếu đã thu': `${formatNumber(data.totalSubmittedResponses)} lượt`,
+        'Số phiếu hợp lệ': `${formatNumber(data.totalResponses)} phiếu`,
+        'Tỷ lệ phản hồi': `${data.responseRate.toFixed(1)}%`,
         'Điểm trung bình': `${data.overallAverageScore.toFixed(2)} / 5.0`,
         'Lớp đủ điều kiện tính điểm':
           `${formatNumber(data.scoredSectionCount)} / ${formatNumber(data.totalSections)} lớp`,
@@ -290,67 +334,150 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
       ) : (
         <>
           {/*
-            Dải số liệu nói đúng một chuyện: mặt bằng điểm được dựng trên tập lớp
-            nào. Tiến độ thu phiếu đã bỏ — xem ở trang Tiến độ thu phiếu là đủ, để
-            ở đây chỉ khiến người đọc lẫn hai câu chuyện khác nhau.
+            Lưới thẻ KPI tổng quan: phân cấp rõ ràng giữa 2 nhóm chỉ số:
+            1. Tiến độ thu thập phiếu (Quy mô khảo sát)
+            2. Kết quả đánh giá & Lọc tính điểm
           */}
-          <div className="reports-exec-band">
-            <span
-              className="reports-exec-stat"
-              title="Điểm trung bình, chỉ gộp phiếu hợp lệ của lớp đủ điều kiện"
-            >
-              Điểm trung bình
-              <strong>{data.overallAverageScore.toFixed(2)}</strong>
-              <small>/ 5.0</small>
-            </span>
+          <div className="reports-overview-sections">
+            <div className="reports-overview-group">
+              <div className="reports-overview-group-header">
+                <span className="reports-overview-group-title">Tiến độ thu thập phiếu</span>
+              </div>
+              <div className="reports-overview-kpis" role="region" aria-label="Tiến độ thu thập phiếu">
+                <div
+                  className="reports-overview-kpi-card"
+                  title="Tổng số sinh viên thuộc diện khảo sát theo danh sách lớp"
+                >
+                  <span className="reports-overview-kpi-label">Tổng số phiếu phải thu</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">{formatNumber(data.totalTargetResponses)}</strong>
+                    <span className="reports-overview-kpi-unit">phiếu</span>
+                  </div>
+                  <span className="reports-overview-kpi-sub">Chỉ tiêu sinh viên cần khảo sát</span>
+                </div>
 
-            <span
-              className="reports-exec-stat"
-              title="Lớp qua được hai vòng lọc trên tổng số lớp đã phát phiếu"
-            >
-              Lớp đủ điều kiện
-              <strong>
-                {formatNumber(data.scoredSectionCount)} / {formatNumber(data.totalSections)}
-              </strong>
-              <small>
-                {data.totalSections > 0
-                  ? `${((data.scoredSectionCount / data.totalSections) * 100).toFixed(1)}%`
-                  : '—'}
-              </small>
-            </span>
+                <div
+                  className="reports-overview-kpi-card"
+                  title="Tổng số lượt sinh viên đã hoàn thành và gửi phiếu khảo sát"
+                >
+                  <span className="reports-overview-kpi-label">Số phiếu đã thu</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">{formatNumber(data.totalSubmittedResponses)}</strong>
+                    <span className="reports-overview-kpi-unit">lượt</span>
+                  </div>
+                  <span className="reports-overview-kpi-sub">Tổng số lượt phiếu đã nộp</span>
+                </div>
 
-            <span
-              className="reports-exec-stat"
-              title="Số phiếu hợp lệ thực sự được dùng để tính điểm"
-            >
-              Phiếu dùng để tính điểm
-              <strong>{formatNumber(data.scoredValidResponseCount)}</strong>
-              <small>phiếu hợp lệ của lớp đủ điều kiện</small>
-            </span>
+                <div
+                  className="reports-overview-kpi-card"
+                  title="Số phiếu hợp lệ sau khi loại bỏ phiếu trả lời ẩu, làm quá nhanh hoặc chọn đồng loạt"
+                >
+                  <span className="reports-overview-kpi-label">Số phiếu hợp lệ</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">{formatNumber(data.totalResponses)}</strong>
+                    <span className="reports-overview-kpi-unit">phiếu</span>
+                    {data.totalSubmittedResponses > 0 && (
+                      <span className="reports-overview-kpi-badge">
+                        {((data.totalResponses / data.totalSubmittedResponses) * 100).toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
+                  <span className="reports-overview-kpi-sub">Vượt qua các bộ lọc chất lượng</span>
+                </div>
 
-            <span
-              className="reports-exec-stat"
-              title="Phiếu hợp lệ của những lớp không qua vòng lọc, không góp vào điểm"
-            >
-              Phiếu bị loại khỏi tính điểm
-              <strong>
-                {formatNumber(Math.max(0, data.totalResponses - data.scoredValidResponseCount))}
-              </strong>
-              <small>phiếu hợp lệ của lớp chưa đủ điều kiện</small>
-            </span>
+                <div
+                  className="reports-overview-kpi-card"
+                  title="Tỷ lệ sinh viên phản hồi trên tổng số phiếu cần thu (phiếu đã thu / phải thu)"
+                >
+                  <span className="reports-overview-kpi-label">Tỷ lệ phản hồi</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">{data.responseRate.toFixed(1)}%</strong>
+                  </div>
+                  <span className="reports-overview-kpi-sub">Phiếu đã thu trên chỉ tiêu</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="reports-overview-group">
+              <div className="reports-overview-group-header">
+                <span className="reports-overview-group-title">Kết quả đánh giá & Lọc tính điểm</span>
+              </div>
+              <div className="reports-overview-kpis" role="region" aria-label="Kết quả đánh giá và tính điểm">
+                <div
+                  className="reports-overview-kpi-card"
+                  title="Điểm trung bình, chỉ gộp phiếu hợp lệ của lớp đủ điều kiện"
+                >
+                  <span className="reports-overview-kpi-label">Điểm trung bình</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">{data.overallAverageScore.toFixed(2)}</strong>
+                    <span className="reports-overview-kpi-scale">/ 5.0</span>
+                  </div>
+                  <span className="reports-overview-kpi-sub">Chỉ tính lớp đủ điều kiện</span>
+                </div>
+
+                <div
+                  className="reports-overview-kpi-card"
+                  title="Lớp qua được hai vòng lọc trên tổng số lớp đã phát phiếu"
+                >
+                  <span className="reports-overview-kpi-label">Lớp đủ điều kiện</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">
+                      {formatNumber(data.scoredSectionCount)}
+                      <span className="reports-overview-kpi-denom"> / {formatNumber(data.totalSections)}</span>
+                    </strong>
+                    {data.totalSections > 0 && (
+                      <span className="reports-overview-kpi-badge">
+                        {((data.scoredSectionCount / data.totalSections) * 100).toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
+                  <span className="reports-overview-kpi-sub">Lớp qua cả 2 vòng lọc</span>
+                </div>
+
+                <div
+                  className="reports-overview-kpi-card"
+                  title="Số phiếu hợp lệ thực sự được dùng để tính điểm"
+                >
+                  <span className="reports-overview-kpi-label">Phiếu dùng để tính điểm</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">{formatNumber(data.scoredValidResponseCount)}</strong>
+                    <span className="reports-overview-kpi-unit">phiếu</span>
+                  </div>
+                  <span className="reports-overview-kpi-sub">Phiếu hợp lệ của lớp đủ điều kiện</span>
+                </div>
+
+                <div
+                  className="reports-overview-kpi-card"
+                  title="Phiếu hợp lệ của những lớp không qua vòng lọc, không góp vào điểm"
+                >
+                  <span className="reports-overview-kpi-label">Phiếu bị loại khỏi tính điểm</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">
+                      {formatNumber(Math.max(0, data.totalResponses - data.scoredValidResponseCount))}
+                    </strong>
+                    <span className="reports-overview-kpi-unit">phiếu</span>
+                  </div>
+                  <span className="reports-overview-kpi-sub">Phiếu hợp lệ của lớp chưa đủ ĐK</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/*
-            Hai chữ "phiếu hợp lệ" và "lớp đủ điều kiện" lặp lại khắp dải số liệu và
-            các bảng bên dưới, nên nói rõ nghĩa đúng một lần ngay dưới dải thay vì để
-            người đọc đoán.
+            Hộp ghi chú định nghĩa các khái niệm mấu chốt, đóng khung gọn gàng, có icon và cấu trúc mạch lạc
           */}
-          <p className="reports-exec-band-note">
-            <strong>Phiếu hợp lệ</strong> là phiếu không bị lọc nhiễu (trả lời sai câu kiểm
-            tra chú ý, chọn cùng một mức cho mọi câu, làm nhanh bất thường).{' '}
-            <strong>Lớp đủ điều kiện</strong> là lớp qua cả hai ngưỡng tỷ lệ phản hồi và tỷ
-            lệ phiếu hợp lệ; chỉ những lớp này mới được tính vào điểm trung bình.
-          </p>
+          <div className="reports-exec-note">
+            <Info className="operation-icon" aria-hidden="true" />
+            <div className="reports-exec-note-content">
+              <span>
+                <strong>Phiếu hợp lệ:</strong> Phiếu không bị lọc nhiễu (trả lời sai câu kiểm tra chú ý, chọn cùng một mức cho mọi câu, làm nhanh bất thường).
+              </span>
+              <span className="reports-exec-note-sep" aria-hidden="true">•</span>
+              <span>
+                <strong>Lớp đủ điều kiện:</strong> Lớp qua cả hai ngưỡng tỷ lệ phản hồi và tỷ lệ phiếu hợp lệ; chỉ những lớp này mới được tính vào điểm trung bình.
+              </span>
+            </div>
+          </div>
 
           <div className="reports-analysis-tabs" role="tablist" aria-label="Chọn nhóm phân tích">
             <button
@@ -370,6 +497,15 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
               onClick={() => onAnalysisViewChange('quality')}
             >
               Chất lượng phản hồi
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={analysisView === 'criteria'}
+              className={analysisView === 'criteria' ? 'is-active' : ''}
+              onClick={() => onAnalysisViewChange('criteria')}
+            >
+              Điểm theo tiêu chí
             </button>
           </div>
 
@@ -440,6 +576,40 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
                 lowestFirst={questionLowest}
               />
             </div>
+          </div>
+          )}
+
+          {/* Hàng thứ 3: Biểu đồ điểm trung bình các tiêu chí câu hỏi toàn trường */}
+          {analysisView === 'criteria' && (
+          <div className="reports-exec-card reports-analysis-panel" role="tabpanel">
+            <header className="reports-exec-card-head">
+              <div>
+                <h3>
+                  Điểm trung bình {criteriaQuestions && criteriaQuestions.length > 0
+                    ? `${criteriaQuestions.length} tiêu chí — toàn trường`
+                    : 'tiêu chí — toàn trường'}
+                </h3>
+                <span className="reports-exec-card-note">
+                  Đường nét đứt = điểm TB toàn trường ({data.overallAverageScore.toFixed(2)})
+                </span>
+              </div>
+              <div className="reports-exec-actions">
+                <NoteModalButton title="Lưu ý khi sử dụng số liệu">
+                  <ul className="dashboard-notes" style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+                    <li>Trục hoành hiển thị các tiêu chí đánh giá từ C1 đến C{criteriaQuestions?.length || 24}.</li>
+                    <li>Trục tung biểu thị điểm trung bình đánh giá theo thang điểm từ 0 đến 5.</li>
+                    <li>Đường nét đứt ngang thể hiện điểm trung bình chung toàn trường ({data.overallAverageScore.toFixed(2)}).</li>
+                    <li>Màu sắc cột: Xanh lá (≥ 3.8), Vàng (3.5 – 3.79), Cam (3.2 – 3.49), Đỏ (&lt; 3.2).</li>
+                    <li>Số lượt đánh giá của từng tiêu chí được tính dựa trên số phiếu dùng để tính điểm (phiếu hợp lệ của các lớp đủ điều kiện).</li>
+                  </ul>
+                </NoteModalButton>
+              </div>
+            </header>
+            <SchoolCriteriaChart
+              questions={criteriaQuestions ?? []}
+              schoolAverage={data.overallAverageScore}
+              loading={criteriaLoading}
+            />
           </div>
           )}
         </>

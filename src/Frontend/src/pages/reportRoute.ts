@@ -1,5 +1,5 @@
 export type ReportWorkspace = 'overview' | 'details' | 'faculties' | 'departments' | 'courses' | 'comments';
-export type ReportAnalysisView = 'faculties' | 'quality';
+export type ReportAnalysisView = 'faculties' | 'quality' | 'criteria';
 /**
  * Ba cấp của trang chi tiết mở từ nút "Xem KQ" trên các bảng xếp hạng. Cấp trên
  * là phạm vi đang xem, cấp dưới là danh sách nằm trong phạm vi đó:
@@ -127,7 +127,7 @@ export const parseReportRoute = (hash = window.location.hash): ReportRouteState 
 
   const analysis = query.get('analysis');
   const analysisView: ReportAnalysisView | undefined =
-    analysis === 'quality' || analysis === 'faculties' ? analysis : undefined;
+    analysis === 'quality' || analysis === 'faculties' || analysis === 'criteria' ? analysis : undefined;
   const sort = query.get('sort');
   const resultSortKey = reportResultSortKeys.find((key) => key === sort);
 

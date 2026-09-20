@@ -1,0 +1,87 @@
+{
+  "schema_version": 2,
+  "updated_at_utc": "2026-09-20",
+  "task_labels": {
+    "classes": ["Negative", "Neutral", "Positive"],
+    "derived_labels": ["Mixed", "Uncertain"],
+    "excluded_source_labels": {
+      "neu_esc": {
+        "3": "Toxic"
+      }
+    },
+    "exclusion_policy": "Source labels listed here are dropped before training. They are never folded into Negative or any other class of the three-class task; Toxic rows stay out of the corpus and only their row counts are recorded for auditing."
+  },
+  "source_roles": {
+    "licensed_training_source": "neu_esc",
+    "in_domain_benchmark": "uit_vsfc",
+    "decision_recorded_at_utc": "2026-09-20",
+    "rationale": "NEU-ESC declares an Apache-2.0 license in the dataset metadata published by its authors, so it can carry the three-class training artifact. UIT-VSFC has no license file and stays limited to offline research/evaluation, so it is used as the in-domain benchmark instead of being the only training source.",
+    "combined_corpus_rule": "Every sample keeps a DatasetSource value. Metrics are always reported per source, and the three-class task never mixes an unlicensed source into a distributable artifact."
+  },
+  "uit_vsfc": {
+    "name": "UIT-VSFC v1.0",
+    "official_page": "https://nlp.uit.edu.vn/datasets",
+    "download_folder_id": "1xclbjHHK58zk2X6iqbvMPS2rcy9y9E0X",
+    "repository": "https://github.com/kietnv/uit-vsfc",
+    "repository_commit_audited": "62ab3370b77634e5fa438b911b5f156ca41eba25",
+    "license": "unverified-no-license-file",
+    "license_status": "unverified-no-license-file",
+    "allowed_stage": "offline-research-evaluation-only",
+    "access_requirement": "Public Google Drive folder; no gating.",
+    "sentiment_mapping": {
+      "0": "Negative",
+      "1": "Neutral",
+      "2": "Positive"
+    },
+    "excluded_sentiment_labels": {},
+    "split_files": {
+      "train": "train/sents.txt",
+      "dev": "dev/sents.txt",
+      "test": "test/sents.txt"
+    },
+    "citation": "Kiet Van Nguyen, Vu Duc Nguyen, Phu Xuan-Vinh Nguyen, Tham Thi-Hong Truong, Ngan Luu-Thuy Nguyen. UIT-VSFC: Vietnamese Students' Feedback Corpus for Sentiment Analysis. KSE 2018."
+  },
+  "neu_esc": {
+    "name": "NEU-ESC",
+    "official_dataset": "https://huggingface.co/datasets/hung20gg/NEU-ESC",
+    "paper": "https://arxiv.org/abs/2506.23524",
+    "license": "Apache-2.0",
+    "license_source": "Machine-readable `license: apache-2.0` in the YAML frontmatter of the dataset card published by the dataset authors, which is the origin channel this dataset is released through.",
+    "license_evidence": {
+      "dataset_card_file": "README.md",
+      "dataset_card_sha256": "50305717b3b475bb808d212b96807d14d21cd4549ff37504f3ee6a5a1c429717",
+      "card_frontmatter_quote": "license: apache-2.0",
+      "card_license_section_quote": "This dataset is released under an open-source license for research and educational purposes. Please ensure proper citation when using it in your work.",
+      "note": "The dataset card is public even though the CSV files are gated, so this evidence can be verified before requesting access."
+    },
+    "license_note": "Both statements live in the same card, but they are not equivalent: the frontmatter tag is `apache-2.0` while the body only says 'an open-source license for research and educational purposes'. The tag is recorded here, but the body wording suggests a narrower scope. Confirm with the dataset owners before derived artifacts are distributed outside the project team.",
+    "license_verified_from_origin": true,
+    "gated": "auto",
+    "access_requirement": "Gated dataset (`gated: auto`). File names are public but content requires a Hugging Face account that accepted the dataset conditions plus an access token passed as HF_TOKEN.",
+    "revision_pinned": "daf543ad1992153cd2be9fec3cb59aa0fc714147",
+    "last_modified_utc": "2025-03-17T07:51:17.000Z",
+    "files": {
+      "train": "train_set.csv",
+      "val": "val_set.csv",
+      "test": "test_set.csv"
+    },
+    "dataset_card_file": "README.md",
+    "columns": {
+      "text": "Text",
+      "sentiment": "Sentiment",
+      "topic": "Classification"
+    },
+    "sentiment_mapping": {
+      "0": "Neutral",
+      "1": "Positive",
+      "2": "Negative"
+    },
+    "excluded_sentiment_labels": {
+      "3": "Toxic"
+    },
+    "toxic_policy": "exclude-from-three-class-sentiment-v1",
+    "status": "licensed-training-source-pending-local-download",
+    "enabled": true,
+    "citation": "Nguyen Quang Hung, Mai Phan Quoc Hung, Nguyen Thi Hong Hanh, Duong Phuong Giang. NEU-ESC: NEU Dataset for Educational Sentiment Analysis and Topic Classification. 2024."
+  }
+}

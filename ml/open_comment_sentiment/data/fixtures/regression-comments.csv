@@ -1,0 +1,31 @@
+CaseId,Text,ReferenceSentiment,EdgeCase,NeedsAdjudication,IsSynthetic
+REG-001,"Giảng viên nhiệt tình, bài giảng dễ hiểu.",Positive,typical-positive,N,Y
+REG-002,"Nội dung quá nhanh và thầy ít giải đáp thắc mắc.",Negative,typical-negative,N,Y
+REG-003,"Nên bổ sung thêm một buổi thực hành.",Neutral,suggestion-neutral,N,Y
+REG-004,"Cô hướng dẫn rất tận tâm nhưng lịch kiểm tra thay đổi quá nhiều.",Mixed,mixed-two-clauses,Y,Y
+REG-005,"Không có ý kiến.",Uncertain,empty-opinion,N,Y
+REG-006,"Khong co y kien",Uncertain,no-diacritics,N,Y
+REG-007,"ok",Uncertain,single-token,N,Y
+REG-008,"Thầy dạy không dễ hiểu chút nào.",Negative,negation,N,Y
+REG-009,"Không phải là thầy dạy dở, chỉ là em chưa theo kịp.",Uncertain,double-negation,Y,Y
+REG-010,"sv k học đc j",Negative,abbreviation,Y,Y
+REG-011,"Hay quá, bài tập nhiều không kịp thở :)))",Uncertain,sarcasm-with-emoji,Y,Y
+REG-012,"!!!",Uncertain,non-linguistic,N,Y
+REG-013,"asdfgh",Uncertain,gibberish,N,Y
+REG-014,"nên đăng tài liệu sớm hơn",Neutral,lowercase-suggestion,N,Y
+REG-015,"Tài liệu luôn đăng quá muộn làm sinh viên không chuẩn bị được.",Negative,request-phrased-as-negative,N,Y
+REG-016,"Phòng học nóng và máy chiếu mờ.",Negative,facilities,N,Y
+REG-017,"Thầy dạy bình thường, không có gì đặc biệt.",Neutral,lukewarm,N,Y
+REG-018,"Cô rất nhiệt tình nhưng phòng học chật và nóng.",Mixed,mixed-teaching-and-facility,Y,Y
+REG-019,"Môn này khó nhưng thầy giảng kỹ nên em vẫn hiểu.",Mixed,mixed-difficulty,Y,Y
+REG-020,"Em xin phép không nêu ý kiến.",Uncertain,declined-to-answer,N,Y
+REG-021,"Nội dung ổn.",Uncertain,vague-short,N,Y
+REG-022,"Bài giảng đúng tiến độ và đủ tài liệu.",Neutral,factual-positive-free,N,Y
+REG-023,"Thầy cho điểm không công bằng, rất bức xúc!!!",Negative,strong-negative-punctuation,N,Y
+REG-024,"thầy dạy hay lắm lun á mà cho bài tập hơi nhìu",Mixed,informal-mixed,Y,Y
+REG-025,"Cần thêm ví dụ thực tế vì lý thuyết hơi nhiều.",Neutral,mild-criticism,Y,Y
+REG-026,"Cô luôn trả lời câu hỏi của sinh viên rất nhanh.",Positive,typical-positive-support,N,Y
+REG-027,"Không biết",Uncertain,uncertain-phrase,N,Y
+REG-028,"Đề thi không sát nội dung đã học.",Negative,assessment-mismatch,N,Y
+REG-029,"em thấy bình thường ạ",Uncertain,polite-vague,Y,Y
+REG-030,"Bài giảng hay nhưng âm thanh micro lúc rõ lúc không.",Mixed,mixed-content-and-equipment,Y,Y
