@@ -7,8 +7,6 @@ import {
   ClipboardList,
   Clock,
   GraduationCap,
-  Info,
-  Lock,
   MessageSquare,
   LoaderCircle,
   Send,
@@ -18,10 +16,58 @@ import { Modal } from '../components/Modal';
 import { ApiError } from '../services/apiClient';
 import { publicSurveyApi, surveyErrorMessage } from '../services/surveyApi';
 import { maximumTextAnswerLength } from '../types';
-import type { AnswerScale, PublicSurvey } from '../types';
+import type { AnswerScale, PublicSurvey, SurveyFormConfig } from '../types';
+import {
+  coverStyleOf,
+  customText,
+  isFieldVisible,
+  textStyleOf,
+  textOr,
+  themeStyleOf,
+  titleStyleOf,
+} from '../utils/surveyForm';
 import '../styles/public-survey.css';
 
 const maximumCommentLength = 1000;
+
+/** Nội dung dải lưu ý khi đợt không đặt chữ riêng. */
+const defaultIntroText = 'Vui lòng đọc kỹ từng câu hỏi và trả lời dựa trên trải nghiệm thực tế của'
+  + ' bạn. Phiếu này không ghi tên, mã sinh viên hay bất kỳ thông tin nào nhận ra bạn: giảng viên'
+  + ' chỉ nhận được kết quả tổng hợp của cả lớp, không xem được từng phiếu riêng lẻ.';
+
+/**
+ * Hình thức phiếu kèm trong lời báo lỗi của màn chặn. Server gửi nó cùng `errorCode`
+ * khi link có thật nhưng chưa mở, đã hết hạn hoặc lớp đã đủ phiếu — nhờ vậy màn chặn
+ * vẫn đúng màu và đúng câu chữ của đợt dù chưa tải được phiếu.
+ */
+function blockedFormOf(error: unknown): SurveyFormConfig | null {
+  if (!(error instanceof ApiError)) return null;
+
+  const config = error.body.formConfig;
+  return config && typeof config === 'object' ? (config as SurveyFormConfig) : null;
+}
+
+/**
+ * Câu chữ của màn chặn do đợt đặt. Mỗi mã lỗi lấy đúng một trường; đợt không đặt thì
+ * trả null để dùng câu mặc định theo mã lỗi.
+ */
+function blockedMessage(
+  errorCode: string | null,
+  config: SurveyFormConfig | null,
+): string | null {
+  if (!config) return null;
+
+  switch (errorCode) {
+    case 'SURVEY_LINK_NOT_STARTED':
+      return customText(config.notOpenMessage);
+    case 'SURVEY_LINK_EXPIRED':
+      return customText(config.closedMessage);
+    case 'SURVEY_CLASS_FULL':
+      return customText(config.classFullMessage);
+    default:
+      return null;
+  }
+}
 
 /**
  * Bài làm dở và vé bắt đầu nằm CHUNG một ô localStorage. Nếu tách hai chỗ thì có
@@ -160,6 +206,9 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
   const [survey, setSurvey] = useState<PublicSurvey | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** Mã lỗi và hình thức phiếu của lần tải hỏng, để vẽ màn chặn theo đúng đợt. */
+  const [blockedCode, setBlockedCode] = useState<string | null>(null);
+  const [blockedForm, setBlockedForm] = useState<SurveyFormConfig | null>(null);
 
   // Giá trị thô theo "SurveyResponseAnswers"."AnswerValue": số mức đã chọn dạng
   // chuỗi với câu chọn mức, nội dung đã gõ với câu tự nhập.
@@ -189,6 +238,8 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
         const loadedSurvey = await publicSurveyApi.survey(linkToken);
         setSurvey(loadedSurvey);
         setLoadError(null);
+        setBlockedCode(null);
+        setBlockedForm(null);
 
         // Có bài làm dở kèm vé thì vào thẳng màn làm bài, khỏi bắt bấm lại.
         const draft = readDraft(linkToken);
@@ -199,6 +250,8 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
         }
       } catch (error) {
         setLoadError(messageFrom(error));
+        setBlockedCode(error instanceof ApiError ? error.errorCode : null);
+        setBlockedForm(blockedFormOf(error));
       } finally {
         setLoading(false);
       }
@@ -235,6 +288,10 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
   };
 
   const sectionGroups = useMemo(() => (survey ? buildSectionGroups(survey) : []), [survey]);
+
+  // Hình thức phiếu do quản trị đặt lúc tạo đợt. Không có thì mọi thứ về mẫu mặc định.
+  const form = survey?.formConfig ?? null;
+  const theme = useMemo(() => themeStyleOf(form), [form]);
 
   // Danh sách phẳng cho thanh tiến độ, lưới điều hướng và việc tìm câu chưa trả lời.
   const questionRows = useMemo(
@@ -310,34 +367,46 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
 
   if (loading) {
     return (
+      <div className="public-survey-shell">
       <main className="public-survey">
         <div className="public-survey-state" role="status">
           <LoaderCircle className="auth-spin" aria-hidden="true" />
           <span>Đang tải phiếu khảo sát...</span>
         </div>
       </main>
+      </div>
     );
   }
 
   if (loadError || !survey) {
+    // Màn chặn: dùng màu và câu chữ của đợt nếu server gửi kèm cấu hình, không thì
+    // rơi về câu mặc định theo mã lỗi như trước.
     return (
-      <main className="public-survey">
+      <div className="public-survey-shell">
+      <main className="public-survey" style={themeStyleOf(blockedForm)}>
         <div className="public-survey-state public-survey-state--error" role="alert">
           <CircleAlert aria-hidden="true" />
-          <span>{loadError ?? 'Không tìm thấy phiếu khảo sát.'}</span>
+          <span>
+            {blockedMessage(blockedCode, blockedForm)
+              ?? loadError
+              ?? 'Không tìm thấy phiếu khảo sát.'}
+          </span>
         </div>
       </main>
+      </div>
     );
   }
 
   if (submitted) {
     return (
-      <main className="public-survey public-survey--done">
+      <div className="public-survey-shell">
+      <main className="public-survey public-survey--done" style={theme}>
         <div className="public-quiz">
           {heroVisible && (
             <div className="public-intro-hero">
               <img
-                src="/survey-hero.png"
+                src={form?.coverImageUrl || '/headerimg/green.png'}
+                style={coverStyleOf(form)}
                 alt=""
                 aria-hidden="true"
                 onError={() => setHeroVisible(false)}
@@ -346,6 +415,11 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
           )}
 
           <section className="public-done" aria-live="polite">
+            {form?.logoUrl && (
+              <div className="public-survey-logo">
+                <img src={form.logoUrl} alt="" />
+              </div>
+            )}
             {/* Dấu tích kèm mấy tia toả: vẽ luôn bằng SVG cho gọn, không thêm thư viện. */}
             <svg
               className="public-done-mark"
@@ -371,16 +445,20 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
               />
             </svg>
 
-            <h1>Đã gửi phiếu khảo sát thành công!</h1>
+            <h1>{textOr(form?.thankYouTitle, 'Đã gửi phiếu khảo sát thành công!')}</h1>
             <p>
-              Cảm ơn bạn đã tham gia khảo sát. Ý kiến của bạn sẽ được tổng hợp và sử dụng để
-              cải thiện chất lượng giảng dạy.
+              {textOr(
+                form?.thankYouMessage,
+                'Cảm ơn bạn đã tham gia khảo sát. Ý kiến của bạn sẽ được tổng hợp và sử dụng để'
+                  + ' cải thiện chất lượng giảng dạy.',
+              )}
             </p>
           </section>
 
           <p className="public-intro-footnote">Phiên bản thử nghiệm</p>
         </div>
       </main>
+      </div>
     );
   }
 
@@ -390,17 +468,19 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
   // ghi ra là chỉ luôn cho người làm ẩu biết cần ngồi chờ bao lâu cho đủ.
   if (!startTicket) {
     return (
-      <main className="public-survey public-survey--intro">
+      <div className="public-survey-shell">
+      <main className="public-survey public-survey--intro" style={theme}>
         <div className="public-intro">
           {/*
-            Ảnh bìa tuỳ chọn: đặt tệp tại `src/Frontend/public/survey-hero.png`.
+            Ảnh bìa tuỳ chọn: đặt tệp tại `src/Frontend/public/headerimg/green.png`.
             Không có tệp thì onError gỡ luôn cả dải, phiếu vẫn hiển thị bình thường
             chứ không để lại một ô ảnh vỡ.
           */}
           {heroVisible && (
             <div className="public-intro-hero">
               <img
-                src="/survey-hero.png"
+                src={form?.coverImageUrl || '/headerimg/green.png'}
+                style={coverStyleOf(form)}
                 alt=""
                 aria-hidden="true"
                 onError={() => setHeroVisible(false)}
@@ -409,70 +489,117 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
           )}
 
           <section className="public-intro-card">
+            {/* Logo của đợt, nếu quản trị có đặt lúc tạo. */}
+            {form?.logoUrl && (
+              <div className="public-survey-logo">
+                <img src={form.logoUrl} alt="" />
+              </div>
+            )}
             <header className="public-intro-head">
               {/* Tiêu đề là tên ĐỢT khảo sát; tên bộ câu hỏi là chuyện nội bộ. */}
-              <h1>{survey.surveyName || survey.templateName}</h1>
-              <p>
-                {survey.courseCode} – {survey.courseName}
-              </p>
+              <h1 style={titleStyleOf(form)}>
+                {textOr(form?.title, survey.surveyName || survey.templateName)}
+              </h1>
+              {isFieldVisible(form, 'templateName') && (
+                <p className="public-intro-template">{survey.templateName}</p>
+              )}
+              {isFieldVisible(form, 'course') && (
+                <p>
+                  {survey.courseCode} – {survey.courseName}
+                </p>
+              )}
             </header>
 
+            {/* Từng ô thông tin bật/tắt được trong màn soạn phiếu của quản trị. */}
             <dl className="public-intro-meta">
-              <div className="public-intro-meta-item">
-                <ClipboardList aria-hidden="true" />
-                <div>
-                  <dt>Lớp học phần</dt>
-                  <dd>{survey.sectionName}</dd>
+              {isFieldVisible(form, 'section') && (
+                <div className="public-intro-meta-item">
+                  <ClipboardList aria-hidden="true" />
+                  <div>
+                    <dt>Lớp học phần</dt>
+                    <dd>{survey.sectionName}</dd>
+                  </div>
                 </div>
-              </div>
-              <div className="public-intro-meta-item">
-                <UserRound aria-hidden="true" />
-                <div>
-                  <dt>Giảng viên</dt>
-                  <dd>{survey.lecturerName || 'Chưa phân công'}</dd>
+              )}
+              {isFieldVisible(form, 'lecturer') && (
+                <div className="public-intro-meta-item">
+                  <UserRound aria-hidden="true" />
+                  <div>
+                    <dt>Giảng viên</dt>
+                    <dd>{survey.lecturerName || 'Chưa phân công'}</dd>
+                  </div>
                 </div>
-              </div>
-              <div className="public-intro-meta-item">
-                <CalendarDays aria-hidden="true" />
-                <div>
-                  <dt>Học kỳ</dt>
-                  <dd>
-                    {survey.semesterName} ({survey.academicYearName})
-                  </dd>
+              )}
+              {isFieldVisible(form, 'semester') && (
+                <div className="public-intro-meta-item">
+                  <CalendarDays aria-hidden="true" />
+                  <div>
+                    <dt>Học kỳ</dt>
+                    <dd>
+                      {survey.semesterName} ({survey.academicYearName})
+                    </dd>
+                  </div>
                 </div>
-              </div>
+              )}
+              {isFieldVisible(form, 'credits') && survey.credits > 0 && (
+                <div className="public-intro-meta-item">
+                  <ClipboardList aria-hidden="true" />
+                  <div>
+                    <dt>Số tín chỉ</dt>
+                    <dd>{survey.credits}</dd>
+                  </div>
+                </div>
+              )}
+              {isFieldVisible(form, 'faculty') && survey.facultyName && (
+                <div className="public-intro-meta-item">
+                  <ClipboardList aria-hidden="true" />
+                  <div>
+                    <dt>Khoa</dt>
+                    <dd>{survey.facultyName}</dd>
+                  </div>
+                </div>
+              )}
+              {isFieldVisible(form, 'department') && survey.departmentName && (
+                <div className="public-intro-meta-item">
+                  <ClipboardList aria-hidden="true" />
+                  <div>
+                    <dt>Bộ môn</dt>
+                    <dd>{survey.departmentName}</dd>
+                  </div>
+                </div>
+              )}
+              {isFieldVisible(form, 'questionCount') && (
+                <div className="public-intro-meta-item">
+                  <ClipboardList aria-hidden="true" />
+                  <div>
+                    <dt>Số câu hỏi</dt>
+                    <dd>{totalQuestions}</dd>
+                  </div>
+                </div>
+              )}
             </dl>
 
             {/* Khoảng thời gian dài hơn hẳn bốn ô trên nên tách xuống một hàng riêng. */}
-            <dl className="public-intro-meta public-intro-meta--full">
-              <div className="public-intro-meta-item">
-                <Clock aria-hidden="true" />
-                <div>
-                  <dt>Thời gian làm bài</dt>
-                  <dd>{formatRange(survey.startTime, survey.endTime)}</dd>
+            {isFieldVisible(form, 'schedule') && (
+              <dl className="public-intro-meta public-intro-meta--full">
+                <div className="public-intro-meta-item">
+                  <Clock aria-hidden="true" />
+                  <div>
+                    <dt>Thời gian làm bài</dt>
+                    <dd>{formatRange(survey.startTime, survey.endTime)}</dd>
+                  </div>
                 </div>
-              </div>
-            </dl>
+              </dl>
+            )}
 
+            {/* Một dải lưu ý duy nhất; dòng đầu và nội dung có định dạng riêng. */}
             <div className="public-intro-notice">
-              <Info aria-hidden="true" />
               <div>
-                <strong>Trước khi bắt đầu</strong>
-                <p>
-                  Vui lòng đọc kỹ từng câu hỏi và trả lời dựa trên trải nghiệm thực tế của bạn.
-                  Ý kiến của bạn sẽ được sử dụng để cải thiện chất lượng giảng dạy.
-                </p>
-              </div>
-            </div>
-
-            <div className="public-intro-notice">
-              <Lock aria-hidden="true" />
-              <div>
-                <strong>Cam kết ẩn danh</strong>
-                <p>
-                  Phiếu này không ghi tên, mã sinh viên hay bất kỳ thông tin nào nhận ra bạn.
-                  Giảng viên chỉ nhận được kết quả tổng hợp của cả lớp, không xem được từng
-                  phiếu riêng lẻ.
+                <strong style={textStyleOf(form?.noticeHeadingStyle)}>
+                  {textOr(form?.introHeading, 'Lưu ý')}
+                </strong>
+                <p style={textStyleOf(form?.noticeTextStyle)}>
+                  {textOr(form?.intro, defaultIntroText)}
                 </p>
               </div>
             </div>
@@ -480,7 +607,12 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
             {!survey.isOpen && (
               <div className="public-survey-alert" role="alert">
                 <CircleAlert aria-hidden="true" />
-                <span>Phiếu khảo sát chưa mở hoặc đã hết hạn nên không thể làm bài.</span>
+                <span>
+                  {textOr(
+                    form?.closedMessage,
+                    'Phiếu khảo sát chưa mở hoặc đã hết hạn nên không thể làm bài.',
+                  )}
+                </span>
               </div>
             )}
 
@@ -514,16 +646,19 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
           <p className="public-intro-footnote">Phiên bản thử nghiệm</p>
         </div>
       </main>
+      </div>
     );
   }
 
   return (
-    <main className="public-survey public-survey--quiz">
+    <div className="public-survey-shell">
+    <main className="public-survey public-survey--quiz" style={theme}>
       <div className="public-quiz">
         {heroVisible && (
           <div className="public-intro-hero">
             <img
-              src="/survey-hero.png"
+              src={form?.coverImageUrl || '/headerimg/green.png'}
+              style={coverStyleOf(form)}
               alt=""
               aria-hidden="true"
               onError={() => setHeroVisible(false)}
@@ -532,62 +667,103 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
         )}
 
         <section className="public-quiz-card">
-          <span className="public-quiz-badge">
-            <GraduationCap aria-hidden="true" />
-            {survey.templateName}
-          </span>
-          <h1>{survey.surveyName || survey.templateName}</h1>
+          {/* Logo của đợt đi theo suốt phiếu, không chỉ ở màn mở đầu. */}
+          {form?.logoUrl && (
+            <div className="public-survey-logo">
+              <img src={form.logoUrl} alt="" />
+            </div>
+          )}
+          {isFieldVisible(form, 'templateName') && (
+            <span className="public-quiz-badge">
+              <GraduationCap aria-hidden="true" />
+              {survey.templateName}
+            </span>
+          )}
+          <h1 style={titleStyleOf(form)}>
+            {textOr(form?.title, survey.surveyName || survey.templateName)}
+          </h1>
 
           <dl className="public-quiz-meta">
-            <div className="public-quiz-meta-item">
-              <BookOpen aria-hidden="true" />
-              <div>
-                <dt>
-                  {survey.courseCode} – {survey.courseName}
-                </dt>
-                <dd>Lớp học phần: {survey.sectionName}</dd>
+            {(isFieldVisible(form, 'course') || isFieldVisible(form, 'section')) && (
+              <div className="public-quiz-meta-item">
+                <BookOpen aria-hidden="true" />
+                <div>
+                  {isFieldVisible(form, 'course') && (
+                    <dt>
+                      {survey.courseCode} – {survey.courseName}
+                    </dt>
+                  )}
+                  {isFieldVisible(form, 'section') && <dd>Lớp học phần: {survey.sectionName}</dd>}
+                </div>
               </div>
-            </div>
-            <div className="public-quiz-meta-item">
-              <UserRound aria-hidden="true" />
-              <div>
-                <dt>Giảng viên</dt>
-                <dd>{survey.lecturerName || 'Chưa phân công'}</dd>
+            )}
+            {isFieldVisible(form, 'lecturer') && (
+              <div className="public-quiz-meta-item">
+                <UserRound aria-hidden="true" />
+                <div>
+                  <dt>Giảng viên</dt>
+                  <dd>{survey.lecturerName || 'Chưa phân công'}</dd>
+                </div>
               </div>
-            </div>
-            <div className="public-quiz-meta-item">
-              <CalendarDays aria-hidden="true" />
-              <div>
-                <dt>
-                  {survey.semesterName} ({survey.academicYearName})
-                </dt>
-                <dd>Số câu hỏi: {totalQuestions}</dd>
+            )}
+            {(isFieldVisible(form, 'semester') || isFieldVisible(form, 'questionCount')) && (
+              <div className="public-quiz-meta-item">
+                <CalendarDays aria-hidden="true" />
+                <div>
+                  {isFieldVisible(form, 'semester') && (
+                    <dt>
+                      {survey.semesterName} ({survey.academicYearName})
+                    </dt>
+                  )}
+                  {isFieldVisible(form, 'questionCount') && <dd>Số câu hỏi: {totalQuestions}</dd>}
+                </div>
               </div>
-            </div>
-            <div className="public-quiz-meta-item">
-              <Clock aria-hidden="true" />
-              <div>
-                <dt>Phiếu mở</dt>
-                <dd>{formatRange(survey.startTime, survey.endTime)}</dd>
+            )}
+            {((isFieldVisible(form, 'faculty') && survey.facultyName)
+              || (isFieldVisible(form, 'department') && survey.departmentName)) && (
+              <div className="public-quiz-meta-item">
+                <BookOpen aria-hidden="true" />
+                <div>
+                  {isFieldVisible(form, 'faculty') && survey.facultyName && (
+                    <dt>{survey.facultyName}</dt>
+                  )}
+                  {isFieldVisible(form, 'department') && survey.departmentName && (
+                    <dd>{survey.departmentName}</dd>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+            {isFieldVisible(form, 'schedule') && (
+              <div className="public-quiz-meta-item">
+                <Clock aria-hidden="true" />
+                <div>
+                  <dt>Phiếu mở</dt>
+                  <dd>{formatRange(survey.startTime, survey.endTime)}</dd>
+                </div>
+              </div>
+            )}
           </dl>
 
-          <div className="public-intro-notice">
-            <Info aria-hidden="true" />
-            <div>
-              <strong>Lưu ý trước khi làm bài</strong>
-              <p>
-                Vui lòng đọc kỹ từng câu hỏi và trả lời dựa trên trải nghiệm thực tế của bạn.
-                Ý kiến của bạn sẽ được sử dụng để cải thiện chất lượng giảng dạy.
-              </p>
+          {isFieldVisible(form, 'quizNotice') && (
+            <div className="public-intro-notice">
+              <div>
+                <strong>Lưu ý trước khi làm bài</strong>
+                <p>
+                  {textOr(form?.intro, defaultIntroText)}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           {!survey.isOpen && (
             <div className="public-survey-alert" role="alert">
               <CircleAlert aria-hidden="true" />
-              <span>Phiếu khảo sát chưa mở hoặc đã hết hạn nên không thể nộp bài.</span>
+              <span>
+                {textOr(
+                  form?.closedMessage,
+                  'Phiếu khảo sát chưa mở hoặc đã hết hạn nên không thể nộp bài.',
+                )}
+              </span>
             </div>
           )}
         </section>
@@ -692,6 +868,7 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
             </section>
           ))}
 
+          {isFieldVisible(form, 'commentBox') && (
           <section className="public-quiz-card public-quiz-comments">
             <span className="public-quiz-badge">
               <MessageSquare aria-hidden="true" />
@@ -716,7 +893,9 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
               {comments.length}/{maximumCommentLength}
             </span>
           </section>
+          )}
 
+          {isFieldVisible(form, 'questionReview') && (
           <section className="public-quiz-card public-quiz-review" aria-labelledby="question-review-title">
             <div className="public-quiz-progress">
               <span className="public-quiz-progress-label">
@@ -761,6 +940,7 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
               })}
             </div>
           </section>
+          )}
 
           {submitError && (
             <div className="public-survey-alert" role="alert">
@@ -786,7 +966,7 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
             ) : (
               <>
                 <Send aria-hidden="true" />
-                Nộp bài khảo sát
+                {textOr(form?.submitLabel, 'Nộp bài khảo sát')}
               </>
             )}
           </button>
@@ -855,11 +1035,12 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
               onClick={() => void handleSubmitConfirmed()}
             >
               <Send aria-hidden="true" />
-              Nộp bài
+              {textOr(form?.submitLabel, 'Nộp bài')}
             </button>
           </div>
         </div>
       </Modal>
     </main>
+    </div>
   );
 };

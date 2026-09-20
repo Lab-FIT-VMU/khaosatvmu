@@ -1474,12 +1474,26 @@
 
 /* Khối mô tả bám mép trái; cụm nút mới là phần bị đẩy sang phải. Để `margin-left: auto`
    ở đây thì mô tả trôi theo nút, chừa một khoảng trống to ở giữa hàng. */
+/* Mô tả LUÔN xuống hàng riêng dưới tên đợt: để chung hàng thì tên đợt dài ngắn khác
+   nhau kéo nó lúc nằm cùng hàng lúc rớt xuống, nhìn mỗi đợt một kiểu. */
 .semester-survey-meta {
+  order: 3;
+  flex: 1 0 100%;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 14px;
   min-width: 0;
+  margin-left: 0;
+}
+
+.semester-survey-toggle {
+  order: 1;
+  flex: 1 1 auto;
+}
+
+.semester-survey-actions {
+  order: 2;
 }
 
 .semester-survey-meta > span {

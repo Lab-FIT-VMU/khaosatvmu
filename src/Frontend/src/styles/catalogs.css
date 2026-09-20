@@ -2009,3 +2009,639 @@
     transform: scale(1) translateY(0);
   }
 }
+
+/* ----- Màn soạn hình thức phiếu: thư viện mẫu + trình sửa ----- */
+
+/* Hộp thoại của màn soạn: gần kín màn hình, vì bên trong là bản dựng phiếu thật. */
+/* Hai lớp để thắng `.catalog-modal-card.modal-card` ở trên, không phải dùng !important. */
+.catalog-modal-card.catalog-modal-card--designer {
+  width: min(1280px, 96vw);
+  max-width: none;
+  height: min(88vh, 900px);
+}
+
+/* Thân hộp thoại phải là khối co giãn CÓ chiều cao thật, không thì `height: 100%` của
+   thư viện mẫu và trình sửa tính ra "auto", nội dung tràn ra ngoài mà không cuộn được. */
+.catalog-modal-card--designer .catalog-modal-body.modal-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.catalog-modal-card--designer .catalog-modal-body.modal-body > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ----- Bước 1: thư viện mẫu ----- */
+
+.survey-designer__gallery {
+  padding: 14px 16px;
+  overflow: auto;
+}
+
+.survey-designer__note {
+  margin: 0 0 12px;
+  padding: 6px 8px;
+  border-left: 3px solid #b45309;
+  background: #fffaf2;
+  color: #000000;
+  font-size: 13px;
+}
+
+.survey-designer__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.survey-designer__card {
+  display: grid;
+  gap: 4px;
+  padding: 0 0 10px;
+  border: 1px solid #dfe4e8;
+  background: #ffffff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.survey-designer__card:hover {
+  border-color: #0788b8;
+}
+
+.survey-designer__card--current {
+  border-color: #0788b8;
+  box-shadow: 0 0 0 2px rgba(7, 136, 184, 0.18);
+}
+
+/* Ảnh thu nhỏ của mẫu là chính phiếu thật, thu bằng transform: dựng lại một bản vẽ
+   riêng thì sớm muộn cũng lệch với phiếu. */
+.survey-designer__card-thumb {
+  display: block;
+  height: 190px;
+  overflow: hidden;
+  border-bottom: 1px solid #dfe4e8;
+}
+
+.survey-designer__card-scale {
+  display: block;
+  width: 760px;
+  transform: scale(0.29);
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+.survey-designer__card-name {
+  padding: 8px 10px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.survey-designer__card-desc {
+  padding: 0 10px;
+  color: #445;
+  font-size: 12px;
+}
+
+/* ----- Bước 2: trình sửa ----- */
+
+/* `minmax(0, 1fr)` cho HÀNG là chỗ quyết định: để hàng tự cao theo nội dung thì bảng
+   bên phải dài bao nhiêu lưới cao bấy nhiêu, phần thừa bị thân hộp thoại cắt mất và
+   cuộn tới giữa chừng là hết. */
+.survey-designer__editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.survey-designer__preview {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  background: #eef1f3;
+}
+
+.survey-designer__preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #dfe4e8;
+  background: #f7f9fa;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.survey-designer__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Nút đổi khổ xem trước. Chỉ bóp bề ngang khung dựng phiếu; mọi quy tắc thu hẹp của
+   phiếu đo theo khung (@container) nên bản điện thoại hiện đúng như máy thật. */
+.survey-designer__device {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #dfe4e8;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #000000;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.survey-designer__device.is-on {
+  border-color: #0788b8;
+  background: #eaf6fa;
+  font-weight: 700;
+}
+
+.survey-designer__device-frame {
+  margin: 0 auto;
+}
+
+/* 390px là khổ ngang thông dụng của điện thoại; viền để thấy rõ mép phiếu. */
+.survey-designer__device-frame.is-mobile {
+  width: 390px;
+  max-width: 100%;
+  border: 1px solid #cfd7dc;
+  box-shadow: 0 6px 20px rgba(20, 32, 40, 0.12);
+}
+
+/* Thẻ chuyển màn: đổi cả bản xem trước lẫn nhóm cấu hình bên phải. */
+.survey-designer__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.survey-designer__tab {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #000000;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.survey-designer__tab.is-on {
+  border-color: #dfe4e8;
+  border-bottom-color: #ffffff;
+  background: #ffffff;
+  font-weight: 700;
+}
+
+/* Khung cuộn được; chỉ chặn thao tác với RUỘT phiếu, đặt lên cả khung thì con lăn
+   và thanh cuộn chết theo. */
+.survey-designer__preview-frame {
+  overflow: auto;
+  padding: 12px;
+}
+
+/* Thu nhỏ cả bản dựng: khung xem trước hẹp hơn màn hình sinh viên nên năm mức trả lời
+   bị rớt xuống hai hàng, nhìn không ra phiếu thật. `zoom` (khác `transform: scale`)
+   tính lại cả kích thước bố cục, nên bề ngang quy ra CSS pixel rộng thêm đúng 1/0.8 và
+   thanh cuộn vẫn đúng chiều cao. */
+.survey-designer__preview-frame > * {
+  zoom: 0.8;
+  pointer-events: none;
+}
+
+/* Màn sửa tại chỗ: mở lại thao tác chuột cho bản dựng. */
+.survey-designer__preview-frame--editable > * {
+  pointer-events: auto;
+}
+
+/* Vùng sửa được: viền mờ khi rê chuột, viền đậm khi đang chọn — giống cách Google
+   Forms cho bấm thẳng vào từng khối trên biểu mẫu. */
+.survey-region {
+  position: relative;
+  outline: 1px dashed transparent;
+  outline-offset: 2px;
+  cursor: pointer;
+}
+
+.survey-region:hover {
+  outline-color: #9fc9da;
+}
+
+.survey-region.is-selected {
+  outline: 2px solid #0788b8;
+}
+
+/* Thanh lệnh gắn ngay dưới vùng đang chọn, không phải bay tự do giữa màn hình. */
+.survey-region__toolbar {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #cfd7dc;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(20, 32, 40, 0.16);
+  cursor: default;
+}
+
+.survey-region__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #000000;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.survey-region__btn:hover {
+  background: #eef4f7;
+}
+
+.survey-region__btn.is-on {
+  border-color: #0788b8;
+  background: #eaf6fa;
+  font-weight: 700;
+}
+
+.survey-region__select {
+  min-height: 28px;
+  max-width: 150px;
+  padding: 0 6px;
+  border: 1px solid #dfe4e8;
+  border-radius: 3px;
+  background: #ffffff;
+  font: inherit;
+  font-size: 12px;
+}
+
+.survey-region__size {
+  width: 56px;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid #dfe4e8;
+  border-radius: 3px;
+  font: inherit;
+  font-size: 12px;
+}
+
+/* Ô chọn tệp nấp sau nút "Thay ảnh". */
+.survey-region__btn input[type='file'] {
+  display: none;
+}
+
+.survey-region__move {
+  flex: 1 0 100%;
+  display: grid;
+  gap: 4px;
+  padding: 6px 4px 2px;
+  border-top: 1px solid #eef1f3;
+}
+
+.survey-region__move p {
+  margin: 0;
+  color: #445;
+  font-size: 11px;
+}
+
+.survey-region__move label {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* Chữ sửa tại chỗ: lúc không sửa trông y như phiếu thật.
+   Cố ý để `display: inline` — inline-block thì gạch chân của thẻ cha không vẽ xuyên
+   qua được, bấm nút U mà chữ không có gì đổi. */
+.survey-region__text {
+  display: inline;
+  white-space: pre-line;
+  outline: 0;
+}
+
+/* Vùng đang chọn thì ô chữ nở thành một khối có nền và khoảng đệm, gõ và soát cho dễ;
+   `display: block` vẫn giữ được gạch chân vì khối trong luồng vẫn nhận text-decoration
+   của thẻ cha. */
+.survey-region.is-selected .survey-region__text {
+  display: block;
+  min-height: 3.2em;
+  padding: 8px 10px;
+  border: 1px solid #0788b8;
+  border-radius: 3px;
+  background: #ffffff;
+}
+
+.survey-region.is-selected .survey-region__text:focus {
+  box-shadow: 0 0 0 3px rgba(7, 136, 184, 0.16);
+}
+
+.survey-designer__panel {
+  padding: 12px;
+  border-left: 1px solid #dfe4e8;
+  min-height: 0;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+.survey-designer__panel section {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #eef1f3;
+}
+
+.survey-designer__panel section:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+
+.survey-designer__panel h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.survey-designer__hint {
+  margin: 0 0 8px;
+  color: #445;
+  font-size: 12px;
+}
+
+.survey-designer__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.survey-designer__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #dfe4e8;
+  background: #ffffff;
+  color: #000000;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.survey-designer__toggle.is-on {
+  border-color: #0788b8;
+  background: #eaf6fa;
+  font-weight: 700;
+}
+
+.survey-designer__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 10px;
+}
+
+.survey-designer__fields--one {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.survey-designer__check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.survey-designer__check em {
+  color: #445;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.survey-designer__color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.survey-designer__color input[type='color'] {
+  width: 44px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid #dfe4e8;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.survey-designer__color > span {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.survey-designer__image {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.survey-designer__image > img {
+  width: 96px;
+  height: 56px;
+  flex: 0 0 96px;
+  object-fit: contain;
+  border: 1px solid #dfe4e8;
+  background: #ffffff;
+}
+
+.survey-designer__image-actions {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.survey-designer__image-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* Nút mở màn soạn, nằm trong biểu mẫu tạo đợt. */
+.survey-form-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #dfe4e8;
+  background: #f7f9fa;
+  font-size: 13px;
+}
+
+.survey-form-picker strong {
+  font-size: 13px;
+}
+
+.survey-form-picker span {
+  color: #445;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .survey-designer__editor {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 240px minmax(0, 1fr);
+  }
+
+  .survey-designer__panel {
+    border-left: 0;
+    border-top: 1px solid #dfe4e8;
+  }
+}
+
+/* ----- Hộp chọn ảnh của phiếu: ảnh hệ thống hoặc ảnh tải lên ----- */
+
+.survey-image-picker {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  min-height: 320px;
+  border: 1px solid #dfe4e8;
+}
+
+.survey-image-picker__tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border-right: 1px solid #dfe4e8;
+  background: #f7f9fa;
+}
+
+.survey-image-picker__tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #000000;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.survey-image-picker__tab:hover {
+  background: #eef4f7;
+}
+
+.survey-image-picker__tab.is-on {
+  border-color: #cfd7dc;
+  background: #ffffff;
+  font-weight: 700;
+}
+
+.survey-image-picker__body {
+  padding: 12px;
+  overflow: auto;
+}
+
+/* Mỗi ảnh một dòng, trải hết bề ngang: ảnh đầu phiếu là dải ngang nên xem nhỏ theo
+   lưới thì không đoán được nó nằm trên phiếu ra sao. */
+.survey-image-picker__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.survey-image-picker__item {
+  display: block;
+  padding: 0;
+  border: 1px solid #dfe4e8;
+  background: #ffffff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.survey-image-picker__item:hover {
+  border-color: #0788b8;
+}
+
+.survey-image-picker__item.is-current {
+  border-color: #0788b8;
+  box-shadow: 0 0 0 2px rgba(7, 136, 184, 0.18);
+}
+
+.survey-image-picker__item img {
+  display: block;
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+}
+
+.survey-image-picker__item span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+/* Ô màu nhỏ: màu chủ đạo sẽ được gợi ý kèm ảnh này. */
+.survey-image-picker__swatch {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+}
+
+.survey-image-picker__upload {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 160px;
+  padding: 16px;
+  border: 1px dashed #cfd7dc;
+  background: #f7f9fa;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.survey-image-picker__upload input[type='file'] {
+  display: none;
+}
+
+/* Nhãn của ô ảnh trong bảng bên phải: không phải <label> vì không trỏ tới ô nhập nào. */
+.survey-designer__label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}

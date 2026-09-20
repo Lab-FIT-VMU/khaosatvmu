@@ -149,3 +149,6 @@ temp/
 artifacts/verify-api/
 artifacts/verify-tests/
 
+
+# Ảnh của phiếu khảo sát do quản trị tải lên: dữ liệu vận hành, không phải mã nguồn.
+src/Backend/API/App_Data/

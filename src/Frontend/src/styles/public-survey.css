@@ -2,10 +2,32 @@
    Phiếu khảo sát công khai: sinh viên mở bằng link riêng hoặc mã QR của lớp.
    --------------------------------------------------------------------------- */
 
+/*
+  Vỏ ngoài của phiếu, và cũng là mốc đo cho mọi quy tắc thu hẹp bên dưới. Các quy tắc
+  đó dùng @container chứ không dùng @media: màn soạn phiếu cần xem trước bản điện thoại
+  trong một khung hẹp ngay giữa màn hình rộng, mà @media thì chỉ biết bề ngang cửa sổ.
+  Trên phiếu thật vỏ này rộng đúng bằng cửa sổ nên các mốc vẫn y như cũ.
+*/
+.public-survey-shell {
+  container: survey / inline-size;
+}
+
+/*
+  MỘT màu chủ đạo cho cả phiếu. Mọi sắc độ khác — nền nhạt, viền, chữ đậm hơn, quầng
+  sáng lúc focus — đều pha ra từ `--survey-primary` bằng color-mix, nên đổi một chỗ là
+  cả phiếu đổi theo mà vẫn giữ đúng tương quan đậm nhạt. Không đặt màu nào thì rơi về
+  xanh lá cũ, phiếu của đợt chưa tuỳ biến không đổi một nét.
+*/
 .public-survey {
+  --survey-primary-color: var(--survey-primary, #1f7a45);
+  --survey-primary-strong: color-mix(in srgb, var(--survey-primary-color) 82%, #000000);
+  --survey-primary-soft: color-mix(in srgb, var(--survey-primary-color) 8%, #ffffff);
+  --survey-primary-line: color-mix(in srgb, var(--survey-primary-color) 28%, #ffffff);
+  --survey-primary-glow: color-mix(in srgb, var(--survey-primary-color) 18%, transparent);
+
   min-height: 100vh;
   padding: 28px 16px 40px;
-  background: #f5f7f8;
+  background: var(--survey-bg, #f5f7f8);
   color: #000000;
   font-size: 13px;
 }
@@ -25,7 +47,7 @@
 
 .public-survey-header h1 {
   margin: 0 0 6px;
-  color: #123f57;
+  color: var(--survey-primary-strong);
   font-size: 22px;
   font-weight: 700;
 }
@@ -35,7 +57,7 @@
   width: 56px;
   height: 3px;
   margin: 10px auto 0;
-  background: #0788b8;
+  background: var(--survey-primary-color);
   content: '';
 }
 
@@ -57,9 +79,9 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border: 1px solid #d7e7ed;
+  border: 1px solid var(--survey-primary-line);
   border-radius: 999px;
-  background: #f2f8fa;
+  background: var(--survey-primary-soft);
   color: #000000;
   font-size: 12px;
 }
@@ -67,7 +89,7 @@
 .public-survey-context svg {
   width: 14px;
   height: 14px;
-  color: #0788b8;
+  color: var(--survey-primary-color);
 }
 
 .public-survey-note {
@@ -75,15 +97,15 @@
   gap: 10px;
   margin-top: 18px;
   padding: 12px;
-  border-left: 3px solid #0788b8;
-  background: #f2f8fa;
+  border-left: 3px solid var(--survey-primary-color);
+  background: var(--survey-primary-soft);
 }
 
 .public-survey-note svg {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  color: #0788b8;
+  color: var(--survey-primary-color);
 }
 
 .public-survey-note strong {
@@ -118,22 +140,22 @@
   gap: 10px;
   margin-top: 18px;
   padding: 12px;
-  border: 1px solid #cfe6d8;
-  border-left: 3px solid #14865a;
-  background: #f2faf6;
+  border: 1px solid var(--survey-primary-line);
+  border-left: 3px solid var(--survey-primary-strong);
+  background: var(--survey-primary-soft);
 }
 
 .public-survey-pledge svg {
   flex-shrink: 0;
   width: 16px;
   height: 16px;
-  color: #14865a;
+  color: var(--survey-primary-strong);
 }
 
 .public-survey-pledge strong {
   display: block;
   margin-bottom: 2px;
-  color: #0f6b47;
+  color: var(--survey-primary-strong);
   font-size: 12px;
 }
 
@@ -164,7 +186,7 @@
 .public-survey-progress-bar > span {
   display: block;
   height: 100%;
-  background: #0788b8;
+  background: var(--survey-primary-color);
   transition: width 0.2s ease;
 }
 
@@ -226,7 +248,7 @@
 .public-survey-radio input {
   width: 16px;
   height: 16px;
-  accent-color: #0788b8;
+  accent-color: var(--survey-primary-color);
   cursor: pointer;
 }
 
@@ -270,8 +292,8 @@
 }
 
 .public-survey-text-question textarea:focus {
-  border-color: #0788b8;
-  box-shadow: 0 0 0 2px rgba(7, 136, 184, 0.14);
+  border-color: var(--survey-primary-color);
+  box-shadow: 0 0 0 2px var(--survey-primary-glow);
   outline: 0;
 }
 
@@ -301,8 +323,8 @@
 }
 
 .public-survey-comments textarea:focus {
-  border-color: #0788b8;
-  box-shadow: 0 0 0 2px rgba(7, 136, 184, 0.14);
+  border-color: var(--survey-primary-color);
+  box-shadow: 0 0 0 2px var(--survey-primary-glow);
   outline: 0;
 }
 
@@ -345,7 +367,7 @@
   padding: 0 18px;
   border: 0;
   border-radius: 4px;
-  background: #0788b8;
+  background: var(--survey-primary-color);
   color: #ffffff;
   font-family: inherit;
   font-size: 13px;
@@ -354,7 +376,7 @@
 }
 
 .public-survey-actions .btn:disabled {
-  background: #9dc4d4;
+  background: var(--survey-primary-line);
   cursor: not-allowed;
 }
 
@@ -402,12 +424,12 @@
 .public-survey-success svg {
   width: 42px;
   height: 42px;
-  color: #137b3b;
+  color: var(--survey-primary-strong);
 }
 
 .public-survey-success h1 {
   margin: 0;
-  color: #123f57;
+  color: var(--survey-primary-strong);
   font-size: 20px;
 }
 
@@ -468,7 +490,7 @@
 .public-survey-option input {
   width: 22px;
   height: 22px;
-  accent-color: #0788b8;
+  accent-color: var(--survey-primary-color);
   cursor: pointer;
 }
 
@@ -486,7 +508,7 @@
   text-align: right;
 }
 
-@media (max-width: 760px) {
+@container survey (max-width: 760px) {
   .public-survey {
     padding: 12px 10px 28px;
   }
@@ -536,7 +558,7 @@
   }
 }
 
-@media (max-width: 380px) {
+@container survey (max-width: 380px) {
   .public-survey-option input {
     width: 20px;
     height: 20px;
@@ -572,7 +594,7 @@
   overflow: hidden;
   margin-bottom: 12px;
   border-radius: 8px;
-  background: #e8f1ea;
+  background: var(--survey-primary-soft);
 }
 
 .public-intro-hero img {
@@ -586,7 +608,7 @@
 .public-intro-card {
   padding: 26px 30px 30px;
   border: 1px solid #dfe4e8;
-  border-top: 5px solid #1f7a45;
+  border-top: 5px solid var(--survey-primary-color);
   border-radius: 8px;
   background: #ffffff;
 }
@@ -643,7 +665,7 @@
   width: 20px;
   height: 20px;
   margin-top: 2px;
-  color: #1f7a45;
+  color: var(--survey-primary-color);
 }
 
 .public-intro-meta-item dt {
@@ -669,9 +691,9 @@
   gap: 12px;
   margin-top: 16px;
   padding: 14px 16px;
-  border: 1px solid #dbe7ef;
+  border: 1px solid var(--survey-primary-line);
   border-radius: 6px;
-  background: #f4f9fc;
+  background: var(--survey-primary-soft);
 }
 
 .public-intro-notice > svg {
@@ -679,7 +701,7 @@
   width: 20px;
   height: 20px;
   margin-top: 2px;
-  color: #1668a8;
+  color: var(--survey-primary-strong);
 }
 
 .public-intro-notice strong {
@@ -713,7 +735,7 @@
   padding: 0 18px;
   border: 0;
   border-radius: 6px;
-  background: #1f7a45;
+  background: var(--survey-submit, var(--survey-primary-color));
   color: #ffffff;
   font-family: inherit;
   font-size: 17px;
@@ -722,16 +744,16 @@
 }
 
 .public-intro-start:hover:not(:disabled) {
-  background: #196138;
+  background: var(--survey-primary-strong);
 }
 
 .public-intro-start:focus-visible {
-  outline: 2px solid #16281d;
+  outline: 2px solid var(--survey-primary-strong);
   outline-offset: 2px;
 }
 
 .public-intro-start:disabled {
-  background: #a9bdb0;
+  background: var(--survey-primary-line);
   cursor: not-allowed;
 }
 
@@ -749,7 +771,7 @@
   letter-spacing: 0.02em;
 }
 
-@media (max-width: 640px) {
+@container survey (max-width: 640px) {
   .public-survey--intro {
     padding: 0 0 28px;
   }
@@ -851,8 +873,8 @@
   gap: 7px;
   padding: 5px 12px;
   border-radius: 999px;
-  background: #e6f2ea;
-  color: #1a5c36;
+  background: var(--survey-primary-soft);
+  color: var(--survey-primary-strong);
   font-size: 13px;
   font-weight: 650;
 }
@@ -908,7 +930,7 @@
   width: 20px;
   height: 20px;
   margin-top: 2px;
-  color: #1f7a45;
+  color: var(--survey-primary-color);
 }
 
 .public-quiz-meta-item dt {
@@ -955,7 +977,7 @@
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: #1f7a45;
+  background: var(--survey-primary-color);
   transition: width 160ms ease;
 }
 
@@ -996,8 +1018,8 @@
   margin: 0;
   padding: 14px 26px;
   border-bottom: 1px solid #dfe4e8;
-  background: #f2f6f3;
-  color: #1f7a45;
+  background: var(--survey-primary-soft);
+  color: var(--survey-primary-color);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -1044,7 +1066,7 @@
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: #1f7a45;
+  background: var(--survey-primary-color);
   color: #ffffff;
   font-size: 14px;
   font-weight: 700;
@@ -1097,20 +1119,20 @@
 }
 
 .public-quiz-option:hover {
-  border-color: #b7d8c5;
-  background: #f2f9f5;
+  border-color: var(--survey-primary-line);
+  background: var(--survey-primary-soft);
 }
 
 .public-quiz-option.is-selected {
-  border-color: #1f7a45;
-  background: #eef7f1;
+  border-color: var(--survey-primary-color);
+  background: var(--survey-primary-soft);
 }
 
 .public-quiz-option input {
   width: 18px;
   height: 18px;
   margin: 0;
-  accent-color: #1f7a45;
+  accent-color: var(--survey-primary-color);
   cursor: pointer;
 }
 
@@ -1158,9 +1180,9 @@
 
 .public-quiz-text textarea:focus,
 .public-quiz-comments textarea:focus {
-  border-color: #1f7a45;
+  border-color: var(--survey-primary-color);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(31, 122, 69, 0.14);
+  box-shadow: 0 0 0 3px var(--survey-primary-glow);
 }
 
 .public-quiz-text .public-survey-counter,
@@ -1212,7 +1234,7 @@
   width: 20px;
   height: 20px;
   margin-top: 2px;
-  color: #1f7a45;
+  color: var(--survey-primary-color);
 }
 
 .public-question-review-heading h2 {
@@ -1267,24 +1289,24 @@
 }
 
 .public-question-review-item.is-answered {
-  border-color: #1f7a45;
-  color: #176236;
+  border-color: var(--survey-primary-color);
+  color: var(--survey-primary-strong);
 }
 
 .public-question-review-item.is-answered > span:last-child {
-  background: #1f7a45;
+  background: var(--survey-primary-color);
   color: #ffffff;
 }
 
 .public-question-review-item:hover {
-  border-color: #1f7a45;
+  border-color: var(--survey-primary-color);
   transform: translateY(-1px);
 }
 
 .public-question-review-item:focus-visible {
   outline: 0;
-  border-color: #176236;
-  box-shadow: 0 0 0 3px rgba(31, 122, 69, 0.18);
+  border-color: var(--survey-primary-strong);
+  box-shadow: 0 0 0 3px var(--survey-primary-glow);
 }
 
 .public-quiz-submit {
@@ -1295,7 +1317,7 @@
   margin: 0;
 }
 
-@media (max-width: 720px) {
+@container survey (max-width: 720px) {
   .public-survey--quiz {
     padding: 0 0 32px;
   }
@@ -1465,7 +1487,7 @@
   height: 46px;
   margin: 0 auto;
   border-radius: 999px;
-  background: #1f7a45;
+  background: var(--survey-primary-color);
   color: #ffffff;
   font-size: 26px;
   font-weight: 700;
@@ -1498,9 +1520,9 @@
   gap: 6px;
   margin: 18px 0 0;
   padding: 14px 16px;
-  border: 1px solid #cfe3d6;
+  border: 1px solid var(--survey-primary-line);
   border-radius: 8px;
-  background: #f2f9f5;
+  background: var(--survey-primary-soft);
   text-align: left;
 }
 
@@ -1559,17 +1581,17 @@
 
 .public-submit-ok {
   border: 0;
-  background: #1f7a45;
+  background: var(--survey-primary-color);
   color: #ffffff;
 }
 
 .public-submit-ok:hover {
-  background: #186237;
+  background: var(--survey-primary-strong);
 }
 
 .public-submit-cancel:focus-visible,
 .public-submit-ok:focus-visible {
-  outline: 2px solid #1f7a45;
+  outline: 2px solid var(--survey-primary-color);
   outline-offset: 2px;
 }
 
@@ -1578,7 +1600,7 @@
   height: 18px;
 }
 
-@media (max-width: 480px) {
+@container survey (max-width: 480px) {
   .public-submit-actions {
     grid-template-columns: 1fr;
   }
@@ -1628,7 +1650,7 @@
   line-height: 1.65;
 }
 
-@media (max-width: 720px) {
+@container survey (max-width: 720px) {
   .public-survey--done {
     padding: 0 0 32px;
   }
@@ -1647,4 +1669,41 @@
   .public-done p {
     font-size: 14px;
   }
+}
+
+/* Chữ do quản trị soạn: giữ nguyên chỗ xuống dòng họ đã gõ. */
+.public-intro-head h1,
+.public-intro-notice strong,
+.public-intro-notice p {
+  white-space: pre-line;
+}
+
+/* Logo của đợt trên đầu phiếu. Đợt không đặt logo thì khối này không được vẽ ra. */
+.public-survey-logo {
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* Khung trải hết bề ngang phiếu, cao 80px cố định. Ảnh phóng tới khi cả hai cạnh phủ
+   kín khung rồi cắt phần thừa (object-fit: cover) — không chừa khoảng trống nào hai
+   bên, và khung không co giãn theo khổ ảnh. */
+.public-survey-logo img {
+  display: block;
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+}
+
+/* Tên bộ câu hỏi dưới tiêu đề màn mở đầu; quản trị tắt được trong màn soạn phiếu. */
+.public-intro-template {
+  margin: 4px 0 0;
+  color: #445;
+  font-size: 12px;
+}
+
+/* Bản xem trước trong màn soạn phiếu: vẫn là phiếu thật, chỉ bỏ chiều cao tràn màn
+   hình để nằm gọn trong khung xem trước. */
+.public-survey--preview {
+  min-height: 0;
+  padding: 12px;
 }

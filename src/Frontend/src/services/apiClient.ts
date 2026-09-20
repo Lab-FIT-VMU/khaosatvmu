@@ -1,4 +1,4 @@
-interface ApiErrorBody {
+interface ApiErrorBody extends Record<string, unknown> {
   errorCode?: string;
   title?: string;
 }
@@ -6,11 +6,17 @@ interface ApiErrorBody {
 export class ApiError extends Error {
   public readonly status: number;
   public readonly errorCode: string;
+  /**
+   * Thân của lời báo lỗi, ngoài `errorCode`. Hầu hết lỗi không có gì thêm nên để rỗng;
+   * phiếu khảo sát công khai dùng chỗ này để gửi kèm hình thức phiếu cho màn chặn.
+   */
+  public readonly body: Record<string, unknown>;
 
-  constructor(status: number, errorCode: string) {
+  constructor(status: number, errorCode: string, body: Record<string, unknown> = {}) {
     super(errorCode);
     this.status = status;
     this.errorCode = errorCode;
+    this.body = body;
   }
 }
 
@@ -26,7 +32,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as ApiErrorBody;
-    throw new ApiError(response.status, body.errorCode ?? 'API_REQUEST_FAILED');
+    throw new ApiError(response.status, body.errorCode ?? 'API_REQUEST_FAILED', body);
   }
 
   // 204/empty bodies (e.g. NoContent) have nothing to parse

@@ -421,6 +421,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                     "\"EndTime\" > \"StartTime\""));
             entity.HasKey(x => x.SemesterSurveyId);
             entity.Property(x => x.SurveyName).IsRequired();
+            // Hình thức phiếu, ghi một lần lúc tạo đợt. Để 'jsonb' cho Postgres kiểm
+            // tra cú pháp ngay lúc ghi; null là dùng mẫu mặc định.
+            entity.Property(x => x.FormConfigJson).HasColumnType("jsonb");
             entity.HasIndex(x => x.SemesterId);
             entity.HasIndex(x => x.SurveyTemplateId);
             entity.HasOne<Semester>()
