@@ -121,10 +121,10 @@ export const catalogApi = {
     csrfRequest<boolean>(`/api/catalog/positions/${positionId}`, 'DELETE'),
 
   majors: () => apiRequest<Major[]>('/api/catalog/majors'),
-  createMajor: (majorName: string, facultyId: number) =>
-    csrfRequest<Major>('/api/catalog/majors', 'POST', { majorName, facultyId }),
-  updateMajor: (majorId: number, majorName: string, facultyId: number) =>
-    csrfRequest<Major>(`/api/catalog/majors/${majorId}`, 'PUT', { majorName, facultyId }),
+  createMajor: (majorCode: string, majorName: string, facultyId: number) =>
+    csrfRequest<Major>('/api/catalog/majors', 'POST', { majorCode, majorName, facultyId }),
+  updateMajor: (majorId: number, majorCode: string, majorName: string, facultyId: number) =>
+    csrfRequest<Major>(`/api/catalog/majors/${majorId}`, 'PUT', { majorCode, majorName, facultyId }),
   deleteMajor: (majorId: number) =>
     csrfRequest<boolean>(`/api/catalog/majors/${majorId}`, 'DELETE'),
   importMajors: (rows: ImportMajorRow[]) =>
@@ -281,9 +281,11 @@ export const catalogErrorMessages: Record<string, string> = {
   CATALOG_POSITION_NOT_FOUND: 'Không tìm thấy chức vụ.',
   CATALOG_POSITION_NAME_REQUIRED: 'Thiếu tên chức vụ.',
   CATALOG_POSITION_NAME_EXISTS: 'Tên chức vụ đã tồn tại.',
-  CATALOG_MAJOR_NOT_FOUND: 'Không tìm thấy ngành học.',
-  CATALOG_MAJOR_NAME_REQUIRED: 'Thiếu tên ngành học.',
+  CATALOG_MAJOR_NOT_FOUND: 'Không tìm thấy ngành đào tạo.',
+  CATALOG_MAJOR_CODE_REQUIRED: 'Thiếu mã ngành.',
+  CATALOG_MAJOR_NAME_REQUIRED: 'Thiếu tên ngành đào tạo.',
   CATALOG_MAJOR_FACULTY_REQUIRED: 'Thiếu tên khoa viện (cột FacultyId không được để trống).',
+  CATALOG_MAJOR_EXISTS: 'Ngành đào tạo này đã tồn tại trong khoa / viện.',
   CATALOG_ACADEMIC_YEAR_NOT_FOUND: 'Không tìm thấy năm học.',
   CATALOG_ACADEMIC_YEAR_NAME_REQUIRED: 'Thiếu tên năm học.',
   CATALOG_ACADEMIC_YEAR_NAME_EXISTS: 'Tên năm học đã tồn tại.',

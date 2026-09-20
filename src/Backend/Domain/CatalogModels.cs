@@ -37,12 +37,31 @@ public sealed class Department : ISoftDeletable
 public sealed class Major : ISoftDeletable
 {
     public int MajorId { get; set; }
+    public string MajorCode { get; set; } = string.Empty;
     public string MajorName { get; set; } = string.Empty;
 
     /// <summary>NOT NULL: ngành học luôn thuộc một khoa viện (ON DELETE CASCADE).</summary>
     public int FacultyId { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
+}
+
+/// <summary>Tên khác của khoa/viện thường xuất hiện trong các tệp nghiệp vụ.</summary>
+public sealed class FacultyImportAlias
+{
+    public long FacultyImportAliasId { get; set; }
+    public int FacultyId { get; set; }
+    public string Alias { get; set; } = string.Empty;
+    public string NormalizedAlias { get; set; } = string.Empty;
+}
+
+/// <summary>Tên khác của ngành đào tạo thường xuất hiện trong các tệp nghiệp vụ.</summary>
+public sealed class MajorImportAlias
+{
+    public long MajorImportAliasId { get; set; }
+    public int MajorId { get; set; }
+    public string Alias { get; set; } = string.Empty;
+    public string NormalizedAlias { get; set; } = string.Empty;
 }
 
 /// <summary>Bảng "AcademicYears".</summary>

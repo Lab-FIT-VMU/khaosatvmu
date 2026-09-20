@@ -10,24 +10,16 @@ import { SearchableSelect } from '../components/SearchableSelect';
 import { MajorImportDialog } from '../components/MajorImportDialog';
 import { catalogErrorMessage, type CatalogImportResponse } from '../services/catalogApi';
 import type { ImportMajorRow } from '../utils/majorImportExcel';
-import type {
-  CourseSection,
-  Curriculum,
-  CurriculumCourse,
-  Faculty,
-  Major,
-} from '../types';
+import type { Faculty, Major } from '../types';
 import { foldVietnamese } from '../utils/vietnamese';
 
 interface MajorsPageProps {
   majors: Major[];
   faculties: Faculty[];
-  curricula: Curriculum[];
-  curriculumCourses: CurriculumCourse[];
-  sections: CourseSection[];
   /** Trả về mã lỗi của API, null nếu lưu thành công. */
   onSaveMajor: (
     majorId: number | null,
+    majorCode: string,
     majorName: string,
     facultyId: number,
   ) => Promise<string | null>;
@@ -36,18 +28,16 @@ interface MajorsPageProps {
 }
 
 interface MajorForm {
+  majorCode: string;
   majorName: string;
   facultyId: string;
 }
 
-const emptyForm: MajorForm = { majorName: '', facultyId: '' };
+const emptyForm: MajorForm = { majorCode: '', majorName: '', facultyId: '' };
 
 export const MajorsPage: React.FC<MajorsPageProps> = ({
   majors,
   faculties,
-  curricula,
-  curriculumCourses,
-  sections,
   onSaveMajor,
   onDeleteMajor,
   onImportMajors,
@@ -69,22 +59,6 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
   const facultyNameOf = (facultyId: number) =>
     faculties.find((faculty) => faculty.facultyId === facultyId)?.facultyName ?? '—';
 
-  // Số nhóm lớp của một ngành đi theo chuỗi khóa ngoại trong dtb.md:
-  // Majors -> Curricula -> CurriculumCourses -> Courses -> CourseSections.
-  const sectionCountOf = (majorId: number) => {
-    const curriculumIds = curricula
-      .filter((curriculum) => curriculum.majorId === majorId)
-      .map((curriculum) => curriculum.curriculumId);
-    if (curriculumIds.length === 0) return 0;
-
-    const courseIds = new Set(
-      curriculumCourses
-        .filter((row) => curriculumIds.includes(row.curriculumId))
-        .map((row) => row.courseId)
-    );
-    return sections.filter((section) => courseIds.has(section.courseId)).length;
-  };
-
   const openCreate = () => {
     setEditing(null);
     setForm({ ...emptyForm, facultyId: faculties[0] ? String(faculties[0].facultyId) : '' });
@@ -94,7 +68,7 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
 
   const openEdit = (major: Major) => {
     setEditing(major);
-    setForm({ majorName: major.majorName, facultyId: String(major.facultyId) });
+    setForm({ majorCode: major.majorCode, majorName: major.majorName, facultyId: String(major.facultyId) });
     setValidationError('');
     setIsModalOpen(true);
   };
@@ -102,7 +76,12 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const name = form.majorName.trim();
+    const code = form.majorCode.trim();
 
+    if (!code) {
+      setValidationError('Vui lòng nhập mã ngành.');
+      return;
+    }
     if (!name) {
       setValidationError('Vui lòng nhập tên ngành.');
       return;
@@ -114,7 +93,7 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
     }
 
     setSaving(true);
-    const errorCode = await onSaveMajor(editing?.majorId ?? null, name, Number(form.facultyId));
+    const errorCode = await onSaveMajor(editing?.majorId ?? null, code, name, Number(form.facultyId));
     setSaving(false);
     if (errorCode) {
       setValidationError(catalogErrorMessage(errorCode));
@@ -142,7 +121,7 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
   const handleImport = async (rows: ImportMajorRow[]): Promise<CatalogImportResponse> => {
     const result = await onImportMajors(rows);
     if (result.createdCount > 0) {
-      toast.success(`Đã import ${result.createdCount} ngành học`, {
+      toast.success(`Đã import ${result.createdCount} ngành đào tạo`, {
         description: result.skippedCount > 0 ? `${result.skippedCount} dòng bị bỏ qua` : undefined,
       });
     } else {
@@ -162,28 +141,25 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
 
   const columns: Column<Major>[] = [
     {
+      key: 'majorCode',
+      header: 'Mã ngành',
+      width: '16%',
+      filterValue: (item) => item.majorCode,
+      render: (item) => <span className="catalog-cell-primary">{item.majorCode || '—'}</span>,
+    },
+    {
       key: 'majorName',
-      header: 'Tên ngành học',
-      width: '40%',
+      header: 'Tên ngành đào tạo',
+      width: '42%',
       filterValue: (item) => item.majorName,
       render: (item) => <span className="catalog-cell-primary">{item.majorName}</span>,
     },
     {
       key: 'facultyId',
       header: 'Khoa viện',
-      width: '32%',
+      width: '30%',
       filterValue: (item) => facultyNameOf(item.facultyId),
       render: (item) => facultyNameOf(item.facultyId),
-    },
-    {
-      key: 'sectionCount',
-      header: 'Số nhóm lớp',
-      width: '16%',
-      filterValue: (item) => String(sectionCountOf(item.majorId)),
-      numeric: true,
-      render: (item) => (
-        <span className="catalog-cell-primary">{sectionCountOf(item.majorId)}</span>
-      ),
     },
     {
       key: 'actions',
@@ -230,7 +206,7 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
         data={filtered}
         searchValue={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Tìm nhanh theo tên ngành học..."
+        searchPlaceholder="Tìm nhanh theo tên ngành đào tạo..."
         exportConfig={{
           title: 'DANH SÁCH NGÀNH ĐÀO TẠO',
           fileName: 'danh-sach-nganh-dao-tao',
@@ -246,7 +222,7 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
         currentFilter={facultyFilter}
         onFilterChange={setFacultyFilter}
         onAddNew={canManageCatalog ? openCreate : undefined}
-        addNewLabel="Thêm ngành học"
+        addNewLabel="Thêm ngành đào tạo"
         toolbarActions={(
           <button
             type="button"
@@ -257,7 +233,7 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
             <span>Import Excel</span>
           </button>
         )}
-        emptyMessage="Chưa có ngành học nào trong danh mục."
+        emptyMessage="Chưa có ngành đào tạo nào trong danh mục."
         keyExtractor={(item) => String(item.majorId)}
         pageSize={20}
       />
@@ -265,12 +241,24 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editing ? 'Sửa ngành học' : 'Thêm ngành học'}
+        title={editing ? 'Sửa ngành đào tạo' : 'Thêm ngành đào tạo'}
       >
         <form className="catalog-form" onSubmit={(event) => void handleSubmit(event)}>
           {validationError && (
             <div className="catalog-validation-error" role="alert">{validationError}</div>
           )}
+          <div className="form-group">
+            <label htmlFor="major-code">Mã ngành</label>
+            <input
+              id="major-code"
+              type="text"
+              placeholder="CNT"
+              value={form.majorCode}
+              onChange={(event) => updateForm({ majorCode: event.target.value.toUpperCase() })}
+              maxLength={30}
+              required
+            />
+          </div>
           <div className="form-group">
             <label htmlFor="major-name">Tên ngành</label>
             <input

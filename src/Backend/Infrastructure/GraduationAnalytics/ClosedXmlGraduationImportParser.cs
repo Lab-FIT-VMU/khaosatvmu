@@ -290,7 +290,7 @@ public sealed partial class ClosedXmlGraduationImportParser : IGraduationImportP
 
     private static bool TryParseClassCode(string value, out string? programCode, out string cohortCode)
     {
-        var compact = WhitespaceRegex().Replace(value.Normalize(NormalizationForm.FormKC), string.Empty)
+        var compact = ClassSeparatorRegex().Replace(value.Normalize(NormalizationForm.FormKC), string.Empty)
             .Replace('Ð', 'Đ')
             .ToUpperInvariant();
         var match = ClassCodeRegex().Match(compact);
@@ -360,6 +360,9 @@ public sealed partial class ClosedXmlGraduationImportParser : IGraduationImportP
 
     [GeneratedRegex(@"\s+", RegexOptions.CultureInvariant)]
     private static partial Regex WhitespaceRegex();
+
+    [GeneratedRegex(@"[\s\-_.\/]+", RegexOptions.CultureInvariant)]
+    private static partial Regex ClassSeparatorRegex();
 
     [GeneratedRegex(@"^(?<program>[\p{L}]{2,10})(?<cohort>\d{2})(?:ĐH|DH|CL|CH)\d{0,2}$", RegexOptions.CultureInvariant)]
     private static partial Regex ClassCodeRegex();

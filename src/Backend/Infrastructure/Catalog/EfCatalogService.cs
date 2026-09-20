@@ -393,14 +393,19 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
     public async Task<IReadOnlyList<MajorDto>> GetMajorsAsync(CancellationToken cancellationToken = default) =>
         await db.Majors
             .OrderBy(x => x.MajorName)
-            .Select(x => new MajorDto(x.MajorId, x.MajorName, x.FacultyId))
+            .Select(x => new MajorDto(x.MajorId, x.MajorCode, x.MajorName, x.FacultyId))
             .ToListAsync(cancellationToken);
 
     public async Task<CatalogOperationResult<MajorDto>> CreateMajorAsync(
         SaveMajorCommand command,
         CancellationToken cancellationToken = default)
     {
+        var code = NormalizeMajorCode(command.MajorCode);
         var name = command.MajorName?.Trim() ?? string.Empty;
+        if (code.Length == 0)
+        {
+            return Failed<MajorDto>(CatalogErrorCodes.MajorCodeRequired);
+        }
         if (name.Length == 0)
         {
             return Failed<MajorDto>(CatalogErrorCodes.MajorNameRequired);
@@ -410,11 +415,17 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<MajorDto>(CatalogErrorCodes.FacultyNotFound);
         }
 
-        var major = new Major { MajorName = name, FacultyId = command.FacultyId };
+        if (await MajorNameTakenAsync(name, command.FacultyId, null, cancellationToken))
+        {
+            return Failed<MajorDto>(CatalogErrorCodes.MajorExists);
+        }
+
+        var major = new Major { MajorCode = code, MajorName = name, FacultyId = command.FacultyId };
         db.Majors.Add(major);
         await db.SaveChangesAsync(cancellationToken);
+        await CatalogImportAliasSeeder.SeedAsync(db, cancellationToken);
 
-        return Succeeded(new MajorDto(major.MajorId, major.MajorName, major.FacultyId));
+        return Succeeded(new MajorDto(major.MajorId, major.MajorCode, major.MajorName, major.FacultyId));
     }
 
     public async Task<CatalogOperationResult<MajorDto>> UpdateMajorAsync(
@@ -428,7 +439,12 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<MajorDto>(CatalogErrorCodes.MajorNotFound);
         }
 
+        var code = NormalizeMajorCode(command.MajorCode);
         var name = command.MajorName?.Trim() ?? string.Empty;
+        if (code.Length == 0)
+        {
+            return Failed<MajorDto>(CatalogErrorCodes.MajorCodeRequired);
+        }
         if (name.Length == 0)
         {
             return Failed<MajorDto>(CatalogErrorCodes.MajorNameRequired);
@@ -437,12 +453,18 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         {
             return Failed<MajorDto>(CatalogErrorCodes.FacultyNotFound);
         }
+        if (await MajorNameTakenAsync(name, command.FacultyId, majorId, cancellationToken))
+        {
+            return Failed<MajorDto>(CatalogErrorCodes.MajorExists);
+        }
 
+        major.MajorCode = code;
         major.MajorName = name;
         major.FacultyId = command.FacultyId;
         await db.SaveChangesAsync(cancellationToken);
+        await CatalogImportAliasSeeder.SeedAsync(db, cancellationToken);
 
-        return Succeeded(new MajorDto(major.MajorId, major.MajorName, major.FacultyId));
+        return Succeeded(new MajorDto(major.MajorId, major.MajorCode, major.MajorName, major.FacultyId));
     }
 
     public async Task<CatalogOperationResult<bool>> DeleteMajorAsync(
@@ -469,11 +491,24 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var items = new List<CatalogImportItemDto>(rows.Count);
         var created = new List<Major>();
 
+        var existingMajors = await db.Majors
+            .Select(x => new { x.FacultyId, x.MajorName })
+            .ToListAsync(cancellationToken);
+        var existingNames = existingMajors
+            .Select(x => (x.FacultyId, Name: NormalizeLooseKey(x.MajorName)))
+            .ToHashSet();
+
         foreach (var row in rows)
         {
+            var code = NormalizeMajorCode(row.MajorCode);
             var name = row.MajorName?.Trim() ?? string.Empty;
             var facultyName = row.FacultyName?.Trim() ?? string.Empty;
 
+            if (code.Length == 0)
+            {
+                items.Add(new CatalogImportItemDto(row.RowNumber, name, facultyName, false, CatalogErrorCodes.MajorCodeRequired));
+                continue;
+            }
             if (name.Length == 0)
             {
                 items.Add(new CatalogImportItemDto(row.RowNumber, name, facultyName, false, CatalogErrorCodes.MajorNameRequired));
@@ -490,8 +525,17 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 items.Add(new CatalogImportItemDto(row.RowNumber, name, facultyName, false, CatalogErrorCodes.FacultyNotFound));
                 continue;
             }
+            var normalizedName = NormalizeLooseKey(name);
+            if (existingNames.Contains((facultyId, normalizedName)))
+            {
+                items.Add(new CatalogImportItemDto(row.RowNumber, name, facultyName, false, CatalogErrorCodes.MajorExists));
+                continue;
+            }
 
-            created.Add(new Major { MajorName = name, FacultyId = facultyId });
+            existingNames.Add((facultyId, normalizedName));
+
+            var major = new Major { MajorCode = code, MajorName = name, FacultyId = facultyId };
+            created.Add(major);
             items.Add(new CatalogImportItemDto(row.RowNumber, name, facultyName, true, null));
         }
 
@@ -500,6 +544,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             db.Majors.AddRange(created);
             await db.SaveChangesAsync(cancellationToken);
         }
+
+        await CatalogImportAliasSeeder.SeedAsync(db, cancellationToken);
 
         return Succeeded(new CatalogImportDto(rows.Count, created.Count, rows.Count - created.Count, items));
     }
@@ -2053,6 +2099,31 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
 
     private static string NormalizeKey(string value) => value.Trim().ToLowerInvariant();
 
+    private static string NormalizeMajorCode(string? value) =>
+        string.Concat((value ?? string.Empty).Normalize(NormalizationForm.FormKC)
+            .Where(character => !char.IsWhiteSpace(character) && character is not '-' and not '_' and not '.'))
+            .ToUpperInvariant();
+
+    internal static string NormalizeImportAlias(string value)
+    {
+        var loose = NormalizeLooseKey(value);
+        return string.Concat(loose.Where(char.IsLetterOrDigit));
+    }
+
+    private async Task<bool> MajorNameTakenAsync(
+        string name,
+        int facultyId,
+        int? exceptMajorId,
+        CancellationToken cancellationToken)
+    {
+        var normalized = NormalizeLooseKey(name);
+        var existing = await db.Majors
+            .Where(x => x.FacultyId == facultyId && (exceptMajorId == null || x.MajorId != exceptMajorId))
+            .Select(x => x.MajorName)
+            .ToListAsync(cancellationToken);
+        return existing.Any(x => NormalizeLooseKey(x) == normalized);
+    }
+
     /// <summary>
     /// Khoá tra cứu NỚI cho tên tiếng Việt: bỏ hết dấu thanh và đổi đ thành d.
     ///
@@ -2687,7 +2758,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         major.IsDeleted = false;
         major.DeletedAt = null;
         await db.SaveChangesAsync(cancellationToken);
-        return Succeeded(new MajorDto(major.MajorId, major.MajorName, major.FacultyId));
+        return Succeeded(new MajorDto(major.MajorId, major.MajorCode, major.MajorName, major.FacultyId));
     }
 
     public async Task<CatalogOperationResult<AcademicYearDto>> RestoreAcademicYearAsync(

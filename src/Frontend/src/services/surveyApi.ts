@@ -527,6 +527,8 @@ export interface SemesterSurveyStatistics {
   academicYearName: string;
   /** ISO 8601, null là chưa lớp nào được tính. */
   lastCalculatedAt: string | null;
+  /** Email người thực hiện lần tính gần nhất; null với dữ liệu lịch sử cũ. */
+  lastCalculatedByEmail: string | null;
   /** Số phiếu về sau lần tính gần nhất. Khác 0 nghĩa là số đang xem đã cũ. */
   responsesSinceLastCalculation: number;
   questionColumns: StatisticsQuestionColumn[];

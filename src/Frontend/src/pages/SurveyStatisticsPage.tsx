@@ -685,6 +685,9 @@ export const SurveyStatisticsPage: React.FC = () => {
           )}
           <span>
             Tính điểm lần cuối: <strong>{formatDateTime(statistics.lastCalculatedAt)}</strong>
+            {statistics.lastCalculatedByEmail && (
+              <> · bởi <strong>{statistics.lastCalculatedByEmail}</strong></>
+            )}
           </span>
           {/* Hai vòng lọc đang áp, in ra ngay cạnh số liệu để không ai phải đoán
               bảng đang bỏ lớp nào. Đổi cấu hình ở nút Cập nhật điểm. */}
