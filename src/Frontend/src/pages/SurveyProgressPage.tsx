@@ -7,8 +7,8 @@ import {
   CircleAlert,
   ClipboardCheck,
   LoaderCircle,
+  MessageSquareText,
   Target,
-  TriangleAlert,
 } from 'lucide-react';
 import { useSemester } from '../context/semesterContext';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
@@ -23,6 +23,11 @@ import '../styles/survey-operations.css';
 // Thanh chọn học kỳ / đợt dùng .statistics-toolbar nằm trong tệp này.
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
+import {
+  getActiveSemesterSurveyId,
+  selectAvailableSemesterSurveyId,
+  setActiveSemesterSurveyId,
+} from '../utils/surveySelection';
 
 /*
   Ô chọn đợt khảo sát, viết riêng cho trang này.
@@ -237,7 +242,7 @@ interface ProgressItem {
   targetCount: number;
   /** Mọi lượt nộp của lớp. */
   actualCount: number;
-  /** Số phiếu đã thu chia sĩ số. */
+  /** Số phiếu đã thu chia tổng số phiếu phải thu. */
   rate: number;
   status: 'Đạt chỉ tiêu' | 'Đang thu' | 'Chậm tiến độ';
 }
@@ -248,7 +253,7 @@ const progressColumns = [
   { key: 'name', header: 'Học phần', width: 28 },
   { key: 'code', header: 'Nhóm lớp', width: 14, align: 'center' as const },
   { key: 'lecturerName', header: 'Giảng viên', width: 24 },
-  { key: 'targetCount', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
+  { key: 'targetCount', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
   { key: 'actualCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
   {
     // Xuất SỐ kèm mã định dạng chứ không xuất chuỗi "18%": ô chữ thì Excel sắp
@@ -275,7 +280,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
     activeSemesterLabel,
     setActiveSemesterId,
   } = useSemester();
-  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('');
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>(getActiveSemesterSurveyId);
   const [search, setSearch] = useState('');
 
   const semesterOptions = useMemo(
@@ -292,10 +297,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
   // Không còn lựa chọn "tất cả đợt": trang luôn bám đúng một đợt, mặc định là đợt
   // đầu danh sách và tự nhảy sang đợt khác khi danh sách đổi theo học kỳ.
   useEffect(() => {
-    setSelectedSurveyId((prev) => {
-      if (prev && semesterSurveys.some((s) => String(s.semesterSurveyId) === prev)) return prev;
-      return semesterSurveys[0] ? String(semesterSurveys[0].semesterSurveyId) : '';
-    });
+    setSelectedSurveyId((prev) => selectAvailableSemesterSurveyId(semesterSurveys, prev));
   }, [semesterSurveys]);
 
   const displayedSections = useMemo(() => {
@@ -307,7 +309,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
   // Mỗi lớp học phần đã được phát phiếu là một dòng theo dõi. Các số phiếu đều do
   // API khảo sát đếm sống từ bảng "SurveyResponses", không phải số tạm.
   //
-  // Tỷ lệ phản hồi tính trên MỌI phiếu đã thu chia sĩ số: ở đây chỉ cần biết sinh
+  // Tỷ lệ phản hồi tính trên MỌI phiếu đã thu chia tổng số phiếu phải thu: ở đây chỉ cần biết sinh
   // viên đã nộp tới đâu, còn phiếu có qua bộ lọc nhiễu hay không là chuyện của
   // các trang thống kê kết quả.
   const progressItems: ProgressItem[] = useMemo(() => {
@@ -343,6 +345,10 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
 
   const completedCount = progressItems.filter((i) => i.status === 'Đạt chỉ tiêu').length;
   const laggingCount = progressItems.filter((i) => i.status === 'Chậm tiến độ').length;
+  const openCommentCount = displayedSections.reduce(
+    (total, section) => total + (Number(section.openCommentCount) || 0),
+    0
+  );
 
   const filtered = progressItems.filter(
     (item) =>
@@ -367,13 +373,13 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
       subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
       info: {
         'Tổng số lớp khảo sát': progressItems.length,
-        'Tổng sĩ số': totalTarget,
-        'Tổng phiếu đã thu': `${totalActual} (đạt ${overallRate}%)`,
+        'Tổng số phiếu phải thu': totalTarget,
+        'Số phiếu đã thu': `${totalActual} (đạt ${overallRate}%)`,
         [`Lớp đạt chỉ tiêu (≥${COMPLETED_COMPLETION_RATE}%)`]: completedCount,
         [`Lớp chậm tiến độ (<${LAGGING_COMPLETION_RATE}%)`]: laggingCount,
       },
       summaryNotes: [
-        'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Sĩ số lớp học phần.',
+        'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu.',
         'Báo cáo này chỉ theo dõi tiến độ thu phiếu, không xét phiếu hợp lệ hay bị bộ lọc loại.',
       ],
       sheets: [
@@ -452,7 +458,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
     },
     {
       key: 'targetCount',
-      header: 'Sĩ số',
+      header: 'Tổng số phiếu phải thu',
       width: '5%',
       filterValue: (item) => String(item.targetCount),
       numeric: true,
@@ -574,7 +580,10 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
               <CampaignSelect
                 id="progress-campaign-select"
                 value={selectedSurveyId}
-                onChange={setSelectedSurveyId}
+                onChange={(value) => {
+                  setSelectedSurveyId(value);
+                  setActiveSemesterSurveyId(value);
+                }}
                 disabled={semesterSurveys.length === 0}
                 placeholder={semesterSurveys.length === 0 ? 'Chưa có đợt nào' : 'Chọn đợt khảo sát'}
                 options={semesterSurveys.map((survey) => ({
@@ -592,25 +601,25 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
               <span className="operation-metric-icon"><Target className="operation-icon" aria-hidden="true" /></span>
               <span className="operation-metric-label">Số phiếu dự kiến thu về</span>
               <strong className="operation-metric-value">{totalTarget.toLocaleString()}</strong>
-              <span className="operation-metric-note">Theo tổng sĩ số tất cả nhóm lớp</span>
+              <span className="operation-metric-note">Theo tổng số phiếu phải thu tất cả nhóm lớp</span>
             </div>
             <div className="operation-metric operation-metric--success">
               <span className="operation-metric-icon"><ClipboardCheck className="operation-icon" aria-hidden="true" /></span>
-              <span className="operation-metric-label">Phiếu đã thu</span>
+              <span className="operation-metric-label">Số phiếu đã thu</span>
               <strong className="operation-metric-value">{totalActual.toLocaleString()}</strong>
               <span className="operation-metric-note">Tỷ lệ phản hồi đạt {overallRate}% theo số phiếu dự kiến thu về  </span>
             </div>
             <div className="operation-metric operation-metric--warning">
               <span className="operation-metric-icon"><CheckCircle2 className="operation-icon" aria-hidden="true" /></span>
-              <span className="operation-metric-label">Nhóm đạt từ {COMPLETED_COMPLETION_RATE}%</span>
+              <span className="operation-metric-label">Nhóm đạt chỉ tiêu (≥ {COMPLETED_COMPLETION_RATE}%)</span>
               <strong className="operation-metric-value">{completedCount} / {progressItems.length}</strong>
               <span className="operation-metric-note">Nhóm đạt chỉ tiêu thu phiếu</span>
             </div>
-            <div className="operation-metric operation-metric--danger">
-              <span className="operation-metric-icon"><TriangleAlert className="operation-icon" aria-hidden="true" /></span>
-              <span className="operation-metric-label">Nhóm dưới 20%</span>
-              <strong className="operation-metric-value">{laggingCount}</strong>
-              <span className="operation-metric-note">Cần gửi nhắc nhở</span>
+            <div className="operation-metric">
+              <span className="operation-metric-icon"><MessageSquareText className="operation-icon" aria-hidden="true" /></span>
+              <span className="operation-metric-label">Số ý kiến mở</span>
+              <strong className="operation-metric-value">{(Number.isFinite(openCommentCount) ? openCommentCount : 0).toLocaleString()}</strong>
+              <span className="operation-metric-note">Ý kiến khác do sinh viên nhập</span>
             </div>
           </section>
 

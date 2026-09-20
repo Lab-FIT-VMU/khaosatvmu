@@ -1,6 +1,7 @@
 using API.Auth;
 using Application.Surveys;
 using Domain;
+using Infrastructure.Surveys;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Surveys;
@@ -252,17 +253,6 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSurveyResponseAsync(responseId, cancellationToken)));
 
-        campaignGroup.MapPut("/course-section-surveys/{courseSectionSurveyId:int}/schedule", async (
-            int courseSectionSurveyId,
-            SaveSurveyScheduleRequest request,
-            ISurveyService service,
-            CancellationToken cancellationToken) =>
-            ToResult(await service.UpdateCourseSectionSurveyScheduleAsync(
-                courseSectionSurveyId,
-                new SaveSurveyScheduleCommand(request.StartTime, request.EndTime),
-                cancellationToken)))
-            .AddEndpointFilter<RequireAntiforgeryFilter>();
-
         // ------------------------------------------------------- Thống kê điểm
 
         surveyStatisticsGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/statistics", async (
@@ -362,15 +352,109 @@ public static class SurveyEndpoints
             ToResult(await publication.SetAsync(semesterSurveyId, request.Publish, cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>();
 
+        // Hình thức phiếu của một đợt. Tách khỏi lệnh sửa đợt vì luật khác hẳn: sửa tên
+        // hay lịch thì lúc nào cũng được, còn hình thức phiếu khoá từ khi phiếu đầu tiên
+        // mở ra.
+        campaignGroup.MapPut("/semester-surveys/{semesterSurveyId:int}/form-config", async (
+            int semesterSurveyId,
+            SaveSurveyFormConfigRequest request,
+            ISurveyService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.SaveSemesterSurveyFormConfigAsync(
+                semesterSurveyId,
+                request.FormConfig,
+                cancellationToken);
+
+            // Cấu hình rỗng là hợp lệ (đợt quay về mẫu mặc định) nên không dùng ToResult
+            // được: ở đó Value null bị hiểu là thất bại.
+            return result.Succeeded
+                ? Results.Ok(new { formConfig = result.Value })
+                : Results.Json(
+                    new { errorCode = result.ErrorCode },
+                    statusCode: StatusCodeOf(result.ErrorCode));
+        })
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
         // Phiếu của sinh viên: mở bằng link hoặc mã QR nên không yêu cầu đăng nhập.
+        // Ảnh của phiếu: quản trị tải lên lúc tạo đợt, sinh viên xem không cần đăng nhập.
+        campaignGroup.MapPost("/form-assets", async (
+            HttpRequest request,
+            [FromServices] SurveyFormAssetStore assets,
+            CancellationToken cancellationToken) =>
+        {
+            if (!request.HasFormContentType)
+            {
+                return Results.Json(
+                    new { errorCode = SurveyErrorCodes.InvalidRequest },
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var form = await request.ReadFormAsync(cancellationToken);
+            var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
+            if (file is null)
+            {
+                return Results.Json(
+                    new { errorCode = SurveyErrorCodes.InvalidRequest },
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var error = SurveyFormAssetStore.Validate(file.FileName, file.Length);
+            if (error is not null)
+            {
+                return Results.Json(
+                    new { errorCode = error },
+                    statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            await using var content = file.OpenReadStream();
+            var storedName = await assets.SaveAsync(file.FileName, content, cancellationToken);
+
+            // Trả sẵn đường dẫn để giao diện đặt thẳng vào cấu hình, khỏi tự ghép chuỗi.
+            return Results.Ok(new { url = $"/api/public/surveys/form-assets/{storedName}" });
+        })
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
         var publicGroup = endpoints.MapGroup("/api/public/surveys")
             .AllowAnonymous();
+
+        // Sinh viên mở phiếu bằng link hay mã QR nên ảnh phải xem được khi chưa đăng nhập.
+        publicGroup.MapGet("/form-assets/{storedName}", (
+            string storedName,
+            HttpResponse response,
+            [FromServices] SurveyFormAssetStore assets) =>
+        {
+            var file = assets.Open(storedName);
+            if (file is null)
+            {
+                return Results.NotFound();
+            }
+
+            // Tên tệp do hệ thống sinh và không bao giờ bị ghi đè, nên cho trình duyệt
+            // giữ lâu: một đợt có vài nghìn lớp, mỗi lần sinh viên mở phiếu mà tải lại
+            // logo với ảnh bìa là tốn băng thông vô ích.
+            response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            return Results.File(file.Value.Content, file.Value.ContentType);
+        });
 
         publicGroup.MapGet("/{linkToken}", async (
             string linkToken,
             ISurveyService service,
             CancellationToken cancellationToken) =>
-            ToResult(await service.GetPublicSurveyAsync(linkToken, cancellationToken)))
+        {
+            var result = await service.GetPublicSurveyAsync(linkToken, cancellationToken);
+            if (result.Succeeded && result.Value is not null)
+            {
+                return Results.Ok(result.Value);
+            }
+
+            // Màn chặn (chưa mở, hết hạn, lớp đủ phiếu) cũng phải theo hình thức của đợt,
+            // nên trả kèm cấu hình khi biết được là đợt nào. Chỉ đúng khối cấu hình —
+            // câu hỏi đã bị tầng dịch vụ cắt khỏi kết quả trước khi tới đây.
+            return Results.Json(
+                new { errorCode = result.ErrorCode, formConfig = result.Value?.FormConfig },
+                statusCode: StatusCodeOf(result.ErrorCode));
+        })
             .RequireRateLimiting("PublicSurveyConcurrency");
 
         // Cú bấm "Bắt đầu làm bài" là mốc tính thời gian làm bài. Không cache
@@ -439,7 +523,13 @@ public static class SurveyEndpoints
             return Results.Ok(result.Value);
         }
 
-        var statusCode = result.ErrorCode switch
+        return Results.Json(new { errorCode = result.ErrorCode }, statusCode: StatusCodeOf(result.ErrorCode));
+    }
+
+    /// <summary>Mã HTTP ứng với một mã lỗi nghiệp vụ.</summary>
+    private static int StatusCodeOf(string? errorCode)
+    {
+        return errorCode switch
         {
             SurveyErrorCodes.OutOfScope => StatusCodes.Status403Forbidden,
             SurveyErrorCodes.ResultsNotPublished => StatusCodes.Status403Forbidden,
@@ -466,11 +556,13 @@ public static class SurveyEndpoints
             SurveyErrorCodes.ScoringThresholdInvalid => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status400BadRequest
         };
-        return Results.Json(new { errorCode = result.ErrorCode }, statusCode: statusCode);
     }
 
     /// <summary>Phát hành hoặc thu hồi kết quả của một đợt.</summary>
     public sealed record SetSurveyPublicationRequest(bool Publish);
+
+    /// <summary>Hình thức phiếu gửi lên từ màn soạn phiếu; null là trả đợt về mẫu mặc định.</summary>
+    public sealed record SaveSurveyFormConfigRequest(SurveyFormConfigDto? FormConfig);
 
     /// <summary>Hai vòng lọc lớp được tính điểm, đơn vị phần trăm.</summary>
     public sealed record SaveScoringThresholdsRequest(
@@ -540,7 +632,9 @@ public static class SurveyEndpoints
         DateTime StartTime,
         DateTime EndTime,
         string? ScopeType,
-        int? ScopeId)
+        int? ScopeId,
+        /// <summary>Hình thức phiếu; bỏ trống thì dùng mẫu mặc định.</summary>
+        SurveyFormConfigDto? FormConfig = null)
     {
         public CreateSemesterSurveyCommand ToCommand() =>
             new(
@@ -551,7 +645,8 @@ public static class SurveyEndpoints
                 EndTime,
                 // Client cũ không gửi phạm vi thì giữ nguyên hành vi cũ: phát cả kỳ.
                 ScopeType ?? SurveyScopeTypes.All,
-                ScopeId);
+                ScopeId,
+                FormConfig);
     }
 
     public sealed record UpdateSemesterSurveyRequest(

@@ -149,3 +149,16 @@ temp/
 artifacts/verify-api/
 artifacts/verify-tests/
 
+# ==========================================
+# 9. Local ML datasets, environments & artifacts
+# ==========================================
+ml/**/.venv/
+ml/**/data/raw/
+ml/**/data/processed/
+ml/**/artifacts/
+ml/**/__pycache__/
+ml/**/*.pyc
+
+
+# Ảnh của phiếu khảo sát do quản trị tải lên: dữ liệu vận hành, không phải mã nguồn.
+src/Backend/API/App_Data/

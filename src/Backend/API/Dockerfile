@@ -17,6 +17,13 @@ COPY --from=build /app/publish .
 
 ARG APP_UID=64198
 ENV APP_UID=${APP_UID}
+
+# Ảnh của phiếu khảo sát (logo, ảnh bìa) nằm ngoài cơ sở dữ liệu. Tạo sẵn thư mục và
+# trao quyền cho người chạy ứng dụng: ổ đĩa gắn vào đúng chỗ này thừa hưởng quyền của
+# thư mục có sẵn trong ảnh, còn để Docker tự tạo thì thư mục thuộc root và ứng dụng
+# chạy bằng tài khoản thường không ghi được.
+RUN mkdir -p /app/App_Data/survey-form-assets && chown -R $APP_UID /app/App_Data
+
 USER $APP_UID
 
 ENTRYPOINT ["dotnet", "API.dll"]

@@ -1,5 +1,5 @@
-export type ReportWorkspace = 'overview' | 'details' | 'faculties' | 'departments' | 'courses';
-export type ReportAnalysisView = 'faculties' | 'quality';
+export type ReportWorkspace = 'overview' | 'details' | 'faculties' | 'departments' | 'courses' | 'comments';
+export type ReportAnalysisView = 'faculties' | 'quality' | 'criteria';
 /**
  * Ba cấp của trang chi tiết mở từ nút "Xem KQ" trên các bảng xếp hạng. Cấp trên
  * là phạm vi đang xem, cấp dưới là danh sách nằm trong phạm vi đó:
@@ -96,7 +96,8 @@ export const parseReportRoute = (hash = window.location.hash): ReportRouteState 
   let scopeId: number | undefined;
 
   if (routeSegment === 'details' || routeSegment === 'overview'
-    || routeSegment === 'faculties' || routeSegment === 'departments' || routeSegment === 'courses') {
+    || routeSegment === 'faculties' || routeSegment === 'departments' || routeSegment === 'courses'
+    || routeSegment === 'comments') {
     screen = routeSegment;
   } else if (routeSegment === scopeRouteSegment) {
     // `/reports/scope/khoa-vien/15` — cấp và mã đơn vị phải cùng có, thiếu một
@@ -126,7 +127,7 @@ export const parseReportRoute = (hash = window.location.hash): ReportRouteState 
 
   const analysis = query.get('analysis');
   const analysisView: ReportAnalysisView | undefined =
-    analysis === 'quality' || analysis === 'faculties' ? analysis : undefined;
+    analysis === 'quality' || analysis === 'faculties' || analysis === 'criteria' ? analysis : undefined;
   const sort = query.get('sort');
   const resultSortKey = reportResultSortKeys.find((key) => key === sort);
 

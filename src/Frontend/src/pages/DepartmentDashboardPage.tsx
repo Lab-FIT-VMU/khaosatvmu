@@ -16,6 +16,11 @@ import { surveyApi, type DepartmentDashboard } from '../services/surveyApi';
 import type { SemesterSurvey } from '../types';
 import { ExportDropdown } from '../components/ExportDropdown';
 import { MarqueeText } from '../components/MarqueeText';
+import {
+  getActiveSemesterSurveyId,
+  selectAvailableSemesterSurveyId,
+  setActiveSemesterSurveyId,
+} from '../utils/surveySelection';
 import '../styles/dashboard.css';
 
 interface DepartmentDashboardPageProps {
@@ -75,7 +80,9 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
 }) => {
   const { activeSemesterId, activeSemesterLabel } = useSemester();
   const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
-  const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
+  const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(
+    Number(getActiveSemesterSurveyId()) || null,
+  );
   const [metrics, setMetrics] = useState<DepartmentDashboard | null>(null);
   const [unidentified, setUnidentified] = useState<UnidentifiedLecturerReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -100,10 +107,9 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
         if (cancelled) return;
         setSemesterSurveys(surveys);
         setUnidentified(report);
-        setSelectedSurveyId((prev) => {
-          if (prev && surveys.some((s) => s.semesterSurveyId === prev)) return prev;
-          return surveys.length > 0 ? surveys[0].semesterSurveyId : null;
-        });
+        setSelectedSurveyId((prev) =>
+          Number(selectAvailableSemesterSurveyId(surveys, prev)) || null,
+        );
       } catch {
         if (!cancelled) {
           setSemesterSurveys([]);
@@ -215,7 +221,11 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                 <select
                   id="dept-dashboard-survey-select"
                   value={selectedSurveyId ?? ''}
-                  onChange={(e) => setSelectedSurveyId(e.target.value ? Number(e.target.value) : null)}
+                  onChange={(e) => {
+                    const next = e.target.value ? Number(e.target.value) : null;
+                    setSelectedSurveyId(next);
+                    setActiveSemesterSurveyId(next);
+                  }}
                   // Chặn bề rộng vì ô chọn tự giãn theo tên đợt dài nhất.
                   style={{
                     height: '32px',
@@ -295,7 +305,7 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                       columns: [
                         { key: 'courseSectionCode', header: 'Mã lớp HP', width: 16, align: 'center' as const },
                         { key: 'courseName', header: 'Tên học phần', width: 28 },
-                        { key: 'classSize', header: 'Sĩ số', width: 10, type: 'number' as const, align: 'right' as const },
+                        { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
                         { key: 'unidentifiedReason', header: 'Lý do chưa xác định', width: 26 },
                       ],
                       data: unidentified.sections,

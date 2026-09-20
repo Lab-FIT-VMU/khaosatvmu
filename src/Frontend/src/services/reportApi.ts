@@ -8,6 +8,7 @@ import type {
   SectionSurveyAnalysis,
   SurveyQuestionSummaryReport,
   SurveyResultDetail,
+  OpenCommentAnalysisReport,
 } from '../types';
 import { apiRequest } from './apiClient';
 
@@ -119,6 +120,29 @@ export const reportApi = {
     const queryString = query.toString();
     return apiRequest<SurveyResultDetail[]>(
       queryString ? `/api/v1/reports/results?${queryString}` : '/api/v1/reports/results',
+    );
+  },
+
+  openComments: (params?: {
+    semesterId?: number;
+    semesterSurveyId?: number;
+    facultyId?: number;
+    departmentId?: number;
+    lecturerId?: number;
+    search?: string;
+    validOnly?: boolean;
+  }) => {
+    const query = new URLSearchParams();
+    if (params?.semesterId) query.append('semesterId', String(params.semesterId));
+    if (params?.semesterSurveyId) query.append('semesterSurveyId', String(params.semesterSurveyId));
+    if (params?.facultyId) query.append('facultyId', String(params.facultyId));
+    if (params?.departmentId) query.append('departmentId', String(params.departmentId));
+    if (params?.lecturerId) query.append('lecturerId', String(params.lecturerId));
+    if (params?.search) query.append('search', params.search);
+    if (params?.validOnly !== undefined) query.append('validOnly', String(params.validOnly));
+    const queryString = query.toString();
+    return apiRequest<OpenCommentAnalysisReport>(
+      queryString ? `/api/v1/reports/open-comments?${queryString}` : '/api/v1/reports/open-comments',
     );
   },
 };

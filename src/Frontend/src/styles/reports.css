@@ -1486,8 +1486,163 @@
   background: #eef1f4;
 }
 
-/* ---------- Hàng KPI ---------- */
-/* Dải KPI mỏng của bảng tổng quan toàn trường. */
+/* ---------- Hàng KPI tổng quan toàn trường ---------- */
+/* Lưới thẻ chỉ số tổng quan: chia 2 nhóm rõ ràng, mỗi nhóm 4 cột, số to nổi bật. */
+.reports-overview-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reports-overview-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reports-overview-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reports-overview-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4d5962;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reports-overview-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reports-overview-kpi-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 12px 14px;
+  background: #ffffff;
+  border: 1px solid var(--reports-border);
+  border-radius: 4px;
+  min-height: 86px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.reports-overview-kpi-card:hover {
+  border-color: #b9d9e5;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.reports-overview-kpi-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #4d5962;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reports-overview-kpi-value {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+}
+
+.reports-overview-kpi-num {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #20262c;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.reports-overview-kpi-denom {
+  font-size: 14px;
+  font-weight: 500;
+  color: #68737d;
+}
+
+.reports-overview-kpi-scale {
+  font-size: 13px;
+  font-weight: 500;
+  color: #68737d;
+}
+
+.reports-overview-kpi-unit {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #68737d;
+}
+
+.reports-overview-kpi-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: #eaf5ee;
+  color: #137b3b;
+  font-variant-numeric: tabular-nums;
+}
+
+.reports-overview-kpi-sub {
+  font-size: 11.5px;
+  color: #68737d;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Khối ghi chú giải nghĩa các thuật ngữ chính, đóng khung gọn và có icon dẫn nhập */
+.reports-exec-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f7f9fa;
+  border: 1px solid var(--reports-border);
+  border-left: 3px solid var(--reports-primary);
+  border-radius: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #4d5962;
+}
+
+.reports-exec-note .operation-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  margin-top: 2px;
+  color: var(--reports-primary);
+}
+
+.reports-exec-note-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.reports-exec-note-content strong {
+  color: #20262c;
+  font-weight: 600;
+}
+
+.reports-exec-note-sep {
+  color: #a0aec0;
+  user-select: none;
+}
+
+/* Dải KPI một hàng (fallback và dùng ở reports-summary-metrics). */
 .reports-exec-band {
   display: flex;
   align-items: center;
@@ -1499,11 +1654,6 @@
   border-radius: 4px;
 }
 
-/*
-  Cả ba mảnh chữ trong một ô số liệu (nhãn, con số, chú thích) đều để đọc được,
-  nên dùng chung một màu đậm và chỉ phân cấp bằng cỡ chữ với độ đậm. Trước đây
-  nhãn và chú thích để màu xám nhạt, đứng cạnh con số đen thành ra chỗ mờ chỗ rõ.
-*/
 .reports-exec-stat {
   display: inline-flex;
   align-items: center;
@@ -1511,7 +1661,7 @@
   min-width: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #000000;
+  color: #20262c;
   white-space: nowrap;
 }
 
@@ -1527,30 +1677,29 @@
 }
 
 .reports-exec-stat strong {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  color: #000000;
+  color: #20262c;
   line-height: 1.2;
 }
 
 .reports-exec-stat small {
-  font-size: 13px;
-  font-weight: 600;
-  color: #000000;
+  font-size: 12px;
+  font-weight: 500;
+  color: #68737d;
 }
 
-/* Giải nghĩa hai thuật ngữ dùng xuyên suốt trang, đặt ngay dưới dải số liệu. */
 .reports-exec-band-note {
   margin: 6px 0 0;
   padding: 0 2px;
   font-size: 13px;
   line-height: 1.55;
-  color: #000000;
+  color: #4d5962;
 }
 
 .reports-exec-band-note strong {
-  font-weight: 700;
-  color: #000000;
+  font-weight: 600;
+  color: #20262c;
 }
 
 /* Một nhóm phân tích tại một thời điểm, tránh bốn biểu đồ và một bảng nối dài trang. */
@@ -2230,6 +2379,10 @@
 
 /* ---------- Responsive tổng quan ---------- */
 @media (max-width: 1100px) {
+  .reports-overview-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .reports-exec-stat + .reports-exec-stat {
     padding-left: 0;
     border-left: 0;
@@ -2259,6 +2412,20 @@
 }
 
 @media (max-width: 600px) {
+  .reports-overview-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .reports-exec-note-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .reports-exec-note-sep {
+    display: none;
+  }
+
   .reports-exec-compare select,
   .reports-exec-compare-deltas {
     width: 100%;
@@ -2275,4 +2442,31 @@
 /* Số lượng đã nằm trong tiêu đề bảng, không lặp lại ở thanh công cụ. */
 .reports-rank .catalog-result-count {
   display: none;
+}
+
+/* ------------------------------------------- Phân tích ý kiến mở */
+.reports-comments-workspace {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reports-cell-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--reports-primary, #0788b8);
+  font-size: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+  outline: none;
+}
+
+.reports-cell-link:hover {
+  color: #036e99;
+  text-decoration: underline;
 }

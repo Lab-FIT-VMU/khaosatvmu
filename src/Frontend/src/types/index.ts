@@ -217,6 +217,8 @@ export interface SemesterSurvey {
   responseCount: number;
   /** Lớp của kỳ chưa có bài khảo sát trong đợt, do được thêm vào sau lúc tạo đợt. */
   missingSectionCount: number;
+  /** Hình thức phiếu đang lưu; null là dùng mẫu mặc định. */
+  formConfig: SurveyFormConfig | null;
 }
 
 /** Bảng "CourseSectionSurveys": bài khảo sát riêng của một lớp học phần. */
@@ -243,6 +245,8 @@ export interface CourseSectionSurvey {
   validResponseCount: number;
   /** Số phiếu bị bộ lọc loại. */
   invalidResponseCount: number;
+  /** Số phiếu có nội dung trong ô “Ý kiến khác”. */
+  openCommentCount: number;
 }
 
 /** Số câu đã chọn ở một mức trả lời trong cùng một phiếu. */
@@ -327,6 +331,11 @@ export interface PublicSurvey {
   lecturerName: string;
   semesterName: string;
   academicYearName: string;
+  /** Số tín chỉ của học phần; 0 khi chưa nhập. Phiếu chỉ hiện khi quản trị bật. */
+  credits: number;
+  /** Khoa và bộ môn của học phần; rỗng khi học phần chưa gắn. */
+  facultyName: string;
+  departmentName: string;
   startTime: string;
   endTime: string;
   isOpen: boolean;
@@ -340,6 +349,77 @@ export interface PublicSurvey {
     answerScaleId: number;
     sectionId: number;
   }[];
+  /** Hình thức phiếu do quản trị đặt lúc tạo đợt; null là dùng mẫu mặc định. */
+  formConfig: SurveyFormConfig | null;
+}
+
+/**
+ * Hình thức phiếu khảo sát: màu, ảnh và các đoạn chữ. Mọi trường đều có thể vắng,
+ * vắng thì dùng mặc định của hệ thống — đợt cũ không có cấu hình nào vẫn hiển thị
+ * y như trước.
+ *
+ * Chỉ đặt được lúc tạo đợt, tạo xong không sửa.
+ */
+/** Định dạng một đoạn chữ; trường nào bỏ trống là giữ kiểu mặc định của phiếu. */
+export interface SurveyTextStyle {
+  bold?: boolean | null;
+  italic?: boolean | null;
+  underline?: boolean | null;
+  fontSize?: number | null;
+  /** 'left' | 'center' | 'right' */
+  align?: string | null;
+}
+
+export interface SurveyFormConfig {
+  /** Phiên bản cấu trúc cấu hình, đi kèm dữ liệu chứ không suy từ mã nguồn. */
+  version: number;
+
+  /** Mã mẫu phiếu đã chọn trong thư viện mẫu; chỉ để màn soạn biết đang sửa mẫu nào. */
+  templateId?: string | null;
+
+  primaryColor?: string | null;
+  backgroundColor?: string | null;
+  submitButtonColor?: string | null;
+
+  logoUrl?: string | null;
+  coverImageUrl?: string | null;
+  /** Vùng ảnh bìa hiện trong khung, dạng "50% 40%"; null là canh giữa. */
+  coverPosition?: string | null;
+
+  /** Định dạng chữ của tiêu đề phiếu. Bỏ trống thì theo mẫu mặc định. */
+  titleFont?: string | null;
+  titleFontSize?: number | null;
+  titleBold?: boolean | null;
+  titleItalic?: boolean | null;
+  titleUnderline?: boolean | null;
+  titleAlign?: string | null;
+
+  /**
+   * Những thông tin KHÔNG cho hiện trên phiếu (mã trong `surveyInfoFields`). Ghi phần
+   * bị ẩn chứ không ghi phần được hiện, để đợt cũ và thông tin thêm sau đều mặc định hiện.
+   */
+  hiddenFields?: string[] | null;
+
+  title?: string | null;
+  /** Dòng đầu của dải lưu ý; bỏ trống là "Lưu ý". */
+  introHeading?: string | null;
+  /** Nội dung dải lưu ý. */
+  intro?: string | null;
+  /** Định dạng riêng cho dòng đầu và cho nội dung của dải lưu ý. */
+  noticeHeadingStyle?: SurveyTextStyle | null;
+  noticeTextStyle?: SurveyTextStyle | null;
+  submitLabel?: string | null;
+  thankYouTitle?: string | null;
+  thankYouMessage?: string | null;
+
+  /**
+   * Chữ của ba màn chặn, mỗi câu ứng với đúng một mã lỗi của phiếu công khai:
+   * `notOpenMessage` ↔ SURVEY_LINK_NOT_STARTED, `closedMessage` ↔ SURVEY_LINK_EXPIRED,
+   * `classFullMessage` ↔ SURVEY_CLASS_FULL.
+   */
+  notOpenMessage?: string | null;
+  closedMessage?: string | null;
+  classFullMessage?: string | null;
 }
 
 export interface SurveyCampaign {
@@ -820,4 +900,35 @@ export interface RolePermissionMatrix {
 export interface RolePermissionGrantDto {
   permissionId: string;
   isGranted: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// PHÂN TÍCH Ý KIẾN MỞ (OPEN COMMENTS ANALYSIS)
+// ---------------------------------------------------------------------------
+
+export interface OpenCommentItem {
+  responseId: number;
+  courseSectionSurveyId: number;
+  additionalComments: string;
+  submittedAt: string;
+  score: number;
+  isValid: boolean;
+  courseCode: string;
+  courseName: string;
+  sectionName: string;
+  lecturerName: string;
+  departmentName: string;
+  facultyName: string;
+  facultyId: number | null;
+  departmentId: number | null;
+  lecturerId: number | null;
+}
+
+export interface OpenCommentAnalysisReport {
+  totalComments: number;
+  totalResponses: number;
+  commentRate: number;
+  sectionCountWithComments: number;
+  lecturerCountWithComments: number;
+  comments: OpenCommentItem[];
 }

@@ -6,8 +6,10 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 0 0 12px;
-  padding: 8px 10px;
+  /* Dải này chỉ có một dòng chữ nhắc ngưỡng, không đáng chiếm chỗ của bảng số liệu
+     phía dưới — bó sát chiều cao chữ. */
+  margin: 0 0 8px;
+  padding: 4px 10px;
   border: 1px solid #b9d9e5;
   border-left: 3px solid #0788b8;
   background: #f2f9fb;

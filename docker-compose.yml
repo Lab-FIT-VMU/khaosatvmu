@@ -50,8 +50,13 @@ services:
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:?can-i-please-have-a-google-client-secret}
       AllowedHosts: ${ALLOWED_HOSTS:-localhost}
       SurveyTicket__SigningKey: ${SurveyTicket__SigningKey:?can-i-please-have-a-signing-key}
+      # Ảnh của phiếu khảo sát lưu ra đĩa, không vào cơ sở dữ liệu. Phải trỏ vào ổ gắn
+      # ngoài, để dựng lại container không mất logo và ảnh bìa của các đợt đã tạo.
+      SurveyFormAssets__Path: /app/App_Data/survey-form-assets
     expose:
       - "8080"
+    volumes:
+      - survey_form_assets:/app/App_Data/survey-form-assets
     depends_on:
       db:
         condition: service_healthy
@@ -88,3 +93,4 @@ services:
 volumes:
   postgres_data:
   pgadmin_data:
+  survey_form_assets:

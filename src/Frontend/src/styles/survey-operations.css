@@ -1474,12 +1474,26 @@
 
 /* Khối mô tả bám mép trái; cụm nút mới là phần bị đẩy sang phải. Để `margin-left: auto`
    ở đây thì mô tả trôi theo nút, chừa một khoảng trống to ở giữa hàng. */
+/* Mô tả LUÔN xuống hàng riêng dưới tên đợt: để chung hàng thì tên đợt dài ngắn khác
+   nhau kéo nó lúc nằm cùng hàng lúc rớt xuống, nhìn mỗi đợt một kiểu. */
 .semester-survey-meta {
+  order: 3;
+  flex: 1 0 100%;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 14px;
   min-width: 0;
+  margin-left: 0;
+}
+
+.semester-survey-toggle {
+  order: 1;
+  flex: 1 1 auto;
+}
+
+.semester-survey-actions {
+  order: 2;
 }
 
 .semester-survey-meta > span {
@@ -1508,6 +1522,28 @@
 
 .semester-survey-card .campaign-table-scroll {
   border: 0;
+}
+
+.campaign-section-toolbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--operations-border);
+  background: #f8fafb;
+}
+
+.campaign-section-search {
+  align-self: flex-end;
+  width: clamp(240px, 28vw, 380px);
+  background: #ffffff;
+}
+
+.campaign-filter-empty {
+  padding: 24px 12px !important;
+  color: #5e6972;
+  text-align: center !important;
 }
 
 .semester-survey-card .campaign-table th,
@@ -1540,6 +1576,11 @@
   .semester-survey-card .campaign-link-input {
     min-width: 180px;
   }
+
+  .campaign-section-search {
+    width: 100%;
+  }
+
 }
 
 /* ---------------------------------------------------------------------------
@@ -1919,4 +1960,9 @@
   width: 14px;
   height: 14px;
   flex: 0 0 14px;
+}
+
+/* Cột Ảnh QR chỉ có một nút, căn giữa cho thẳng với tiêu đề cột. */
+.campaign-table td.campaign-qr-cell .campaign-row-actions {
+  justify-content: center;
 }

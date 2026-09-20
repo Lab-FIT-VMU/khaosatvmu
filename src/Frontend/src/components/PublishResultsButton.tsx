@@ -59,6 +59,16 @@ export const PublishResultsButton: React.FC<{
 
   const handleClick = async () => {
     const publish = !state.isPublished;
+
+    // Đợt còn đang thu phiếu thì số liệu còn chạy từng ngày. Nút vẫn bấm được để
+    // người dùng nhận được lời giải thích, thay vì nút xám không nói gì.
+    if (publish && !state.hasEnded) {
+      toast.error('Chưa phát hành được', {
+        description: 'Đợt khảo sát chưa kết thúc. Chờ hết thời gian thu phiếu rồi phát hành.',
+      });
+      return;
+    }
+
     const confirmed = window.confirm(publish
       ? 'Phát hành kết quả đợt này? Trưởng bộ môn và giảng viên sẽ xem được số liệu'
         + ' trong phạm vi của họ.'
@@ -84,8 +94,7 @@ export const PublishResultsButton: React.FC<{
       type="button"
       className={state.isPublished ? 'btn btn-secondary' : 'btn btn-primary'}
       onClick={() => void handleClick()}
-      // Chưa hết thời gian thu phiếu thì số liệu còn chạy từng ngày, chưa phát hành được.
-      disabled={saving || (!state.isPublished && !state.hasEnded)}
+      disabled={saving}
       title={state.isPublished
         ? `Đã phát hành${state.changedAt ? ` lúc ${formatDateTime(state.changedAt)}` : ''}`
           + `${state.changedByName ? ` bởi ${state.changedByName}` : ''}.`

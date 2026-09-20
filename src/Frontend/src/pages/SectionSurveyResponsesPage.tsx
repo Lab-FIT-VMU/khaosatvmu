@@ -313,8 +313,8 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
       'Lớp học phần': sectionSurvey?.sectionName,
       'Giảng viên': sectionSurvey?.lecturerName || 'Chưa gắn GV',
       'Đơn vị': sectionSurvey ? `${sectionSurvey.departmentName || ''} · ${sectionSurvey.facultyName || ''}` : undefined,
-      'Sĩ số': sectionSurvey?.classSize,
-      'Phiếu hợp lệ': analysis?.responseCount ?? sectionSurvey?.validResponseCount,
+      'Tổng số phiếu phải thu': sectionSurvey?.classSize,
+      'Số phiếu hợp lệ': analysis?.responseCount ?? sectionSurvey?.validResponseCount,
       'Điểm trung bình': analysis?.averageScore ? `${analysis.averageScore.toFixed(2)} / 5.0` : undefined,
     },
   }), [sectionSurvey, analysis, courseSectionSurveyId]);
@@ -345,7 +345,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
             </h2>
             <p>
               Lớp <strong>{sectionSurvey.sectionName}</strong> · GV:{' '}
-              {sectionSurvey.lecturerName || 'Chưa phân công'} · Sĩ số {sectionSurvey.classSize}
+              {sectionSurvey.lecturerName || 'Chưa phân công'} · Tổng số phiếu phải thu {sectionSurvey.classSize}
             </p>
           </div>
           {/* Chỉ giữ icon ở ô cảnh báo, chỗ nó thực sự nói thêm được điều gì. */}
@@ -485,8 +485,8 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
             'Học phần': `${sectionSurvey?.courseCode || ''} - ${sectionSurvey?.courseName || ''}`,
             'Lớp học phần': sectionSurvey?.sectionName,
             'Giảng viên': sectionSurvey?.lecturerName || 'Chưa phân công',
-            'Sĩ số sinh viên': sectionSurvey?.classSize,
-            'Tổng số phiếu thu': responses.length,
+            'Tổng số phiếu phải thu': sectionSurvey?.classSize,
+            'Số phiếu đã thu': responses.length,
             'Số phiếu hợp lệ': validResponses.length,
             'Điểm trung bình': displayAverageScore !== null && displayAverageScore > 0
               ? displayAverageScore.toFixed(2)

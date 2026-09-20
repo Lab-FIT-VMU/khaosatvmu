@@ -5,13 +5,14 @@ import type {
   PublicSurvey,
   QuestionRating,
   SemesterSurvey,
+  SurveyFormConfig,
   SurveyResponseDetail,
   SurveyResponseSummary,
   SurveyTemplate,
 } from '../types';
 import { maximumSectionsPerTemplate } from '../types';
 import type { ScoringThresholds } from '../utils/reportThresholds';
-import { ApiError, apiRequest, csrfRequest } from './apiClient';
+import { ApiError, apiRequest, csrfRequest, getCsrfToken } from './apiClient';
 
 export interface SaveAnswerScaleOptionPayload {
   /** 1..5, không bắt buộc liên tiếp (thang Có/Không dùng 1 và 5). */
@@ -671,6 +672,42 @@ export const surveyApi = {
   deleteSemesterSurvey: (semesterSurveyId: number) =>
     csrfRequest<boolean>(`/api/surveys/semester-surveys/${semesterSurveyId}`, 'DELETE'),
   /**
+   * Đổi hình thức phiếu của một đợt. Chỉ làm được trước giờ phiếu đầu tiên mở; muộn
+   * hơn server trả SURVEY_FORM_CONFIG_LOCKED.
+   */
+  saveSemesterSurveyFormConfig: (semesterSurveyId: number, formConfig: SurveyFormConfig | null) =>
+    csrfRequest<{ formConfig: SurveyFormConfig | null }>(
+      `/api/surveys/semester-surveys/${semesterSurveyId}/form-config`,
+      'PUT',
+      { formConfig },
+    ),
+  /**
+   * Tải ảnh của phiếu (logo, ảnh bìa) lên server, trả về đường dẫn để đặt vào cấu hình.
+   * Ảnh nằm ngoài cơ sở dữ liệu nên gửi bằng multipart chứ không phải JSON.
+   */
+  uploadSurveyFormAsset: async (file: File): Promise<{ url: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+
+    const token = await getCsrfToken();
+    const send = (csrfToken: string) =>
+      apiRequest<{ url: string }>('/api/surveys/form-assets', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': csrfToken },
+        body: form,
+      });
+
+    try {
+      return await send(token);
+    } catch (error) {
+      // Vé CSRF hết hạn thì xin vé mới rồi gửi lại, giống csrfRequest.
+      if (error instanceof ApiError && error.errorCode === 'AUTH_CSRF_INVALID') {
+        return send(await getCsrfToken(true));
+      }
+      throw error;
+    }
+  },
+  /**
    * Trạng thái phát hành kết quả của một đợt. Ai cũng đọc được để giao diện nói rõ
    * vì sao chưa có số liệu; chỉ quản trị mới đổi được.
    */
@@ -769,16 +806,6 @@ export const surveyApi = {
       `/api/surveys/course-section-surveys/${courseSectionSurveyId}/clear-responses`,
       'POST',
     ),
-
-  updateSectionSurveySchedule: (
-    courseSectionSurveyId: number,
-    schedule: { startTime: string; endTime: string },
-  ) =>
-    csrfRequest<CourseSectionSurvey>(
-      `/api/surveys/course-section-surveys/${courseSectionSurveyId}/schedule`,
-      'PUT',
-      schedule,
-    ),
 };
 
 /** Phiếu của sinh viên: mở bằng link hoặc QR nên không cần đăng nhập. */
@@ -809,15 +836,20 @@ export const publicSurveyApi = {
 export interface CreateSemesterSurveyPayload {
   /** Tên đợt do quản trị đặt. Bắt buộc, backend trả SURVEY_SEMESTER_SURVEY_NAME_REQUIRED nếu trống. */
   surveyName: string;
-  /** Phạm vi lớp được phát phiếu. Bỏ trống thì backend hiểu là cả kỳ. */
-  scopeType: SurveyScopeType;
-  /** Mã khoa / bộ môn / lớp học phần. Bỏ trống khi scopeType là 'all'. */
-  scopeId: number | null;
+  /**
+   * Đợt luôn phát cho MỌI lớp học phần của kỳ, nên không gửi phạm vi nữa; backend
+   * không nhận trường này thì tự hiểu là cả kỳ.
+   */
   semesterId: number;
   surveyTemplateId: number;
   /** ISO 8601 (UTC) */
   startTime: string;
   endTime: string;
+  /**
+   * Hình thức phiếu. Chỉ gửi được lúc tạo — đợt đã tạo thì không sửa cấu hình nữa,
+   * nên `UpdateSemesterSurveyPayload` không có trường này. Null là dùng mẫu mặc định.
+   */
+  formConfig?: SurveyFormConfig | null;
 }
 
 export interface UpdateSemesterSurveyPayload {
@@ -917,6 +949,17 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_NOT_ENDED:
     'Đợt khảo sát chưa kết thúc nên chưa phát hành kết quả được.',
   SURVEY_SEMESTER_SURVEY_NAME_REQUIRED: 'Vui lòng đặt tên cho bài khảo sát.',
+  SURVEY_FORM_CONFIG_COLOR_INVALID:
+    'Mã màu của phiếu không hợp lệ. Dùng dạng #RRGGBB, ví dụ #0788b8.',
+  SURVEY_FORM_CONFIG_TEXT_TOO_LONG:
+    'Một đoạn chữ tuỳ biến của phiếu quá dài. Rút ngắn còn tối đa 1000 ký tự.',
+  SURVEY_FORM_ASSET_TOO_LARGE: 'Ảnh vượt quá 10 MB. Chọn ảnh nhẹ hơn.',
+  SURVEY_FORM_ASSET_TYPE_NOT_ALLOWED: 'Chỉ nhận ảnh PNG, JPG hoặc WEBP.',
+  SURVEY_FORM_CONFIG_FONT_INVALID:
+    'Phông, cỡ chữ hoặc canh chữ của tiêu đề không hợp lệ. Chọn lại trong danh sách.',
+  SURVEY_FORM_CONFIG_FIELD_INVALID: 'Có thông tin hiển thị không hợp lệ. Tải lại trang rồi thử lại.',
+  SURVEY_FORM_CONFIG_LOCKED:
+    'Đợt đã tới giờ mở phiếu nên không đổi được hình thức phiếu nữa.',
   SURVEY_SEMESTER_SURVEY_HAS_RESPONSES: 'Đợt khảo sát đã có phiếu trả lời nên không xóa được.',
   SURVEY_SCOPE_TYPE_UNSUPPORTED: 'Kiểu phạm vi không hợp lệ.',
   SURVEY_SCOPE_ID_REQUIRED: 'Vui lòng chọn đơn vị cho phạm vi đã chọn.',

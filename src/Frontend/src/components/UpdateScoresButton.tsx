@@ -190,7 +190,7 @@ const ScoringThresholdDialog: React.FC<{
               onChange={(event) => setResponseRate(event.target.value)}
               required
             />
-            <p className="answer-scale-hint">Số phiếu đã thu ÷ Sĩ số. Mặc định 50%.</p>
+            <p className="answer-scale-hint">Số phiếu đã thu ÷ Tổng số phiếu phải thu. Mặc định 50%.</p>
           </div>
           <div className="form-group">
             <label htmlFor="threshold-valid-rate">

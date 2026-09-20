@@ -1,17 +1,18 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays,
   ChevronDown,
   ChevronUp,
   CircleAlert,
-  ClipboardList,
   Copy,
   LoaderCircle,
   Pencil,
   Plus,
   Download,
+  Palette,
   QrCode,
   Save,
+  Search,
   Trash2,
   TriangleAlert,
   UsersRound,
@@ -21,24 +22,28 @@ import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole, ROLE_CODES } from '../auth/roles';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { SearchableSelect } from '../components/SearchableSelect';
-import { SurveyScopePicker } from '../components/SurveyScopePicker';
+import { SurveyFormDesigner } from '../components/SurveyFormDesigner';
+import type { SurveyPreviewData } from '../components/SurveyFormPreview';
 import { QRCodeModal } from '../components/QRCodeModal';
 import { TablePagination } from '../components/TablePagination';
 import { useSemester } from '../context/semesterContext';
+import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
 import { ApiError } from '../services/apiClient';
 import {
   downloadCourseSurveyQrExcel,
   surveyApi,
   surveyErrorMessage,
   surveyLinkOf,
-  type SurveyScopeType,
 } from '../services/surveyApi';
 import type {
+  AnswerScale,
   CourseSectionSurvey,
   SemesterSurvey,
+  SurveyFormConfig,
   SurveyTemplate,
 } from '../types';
-import { toVietnameseFileSlug } from '../utils/vietnamese';
+import { emptySurveyFormConfig, surveyFormTemplates } from '../utils/surveyFormTemplates';
+import { foldVietnamese, toVietnameseFileSlug } from '../utils/vietnamese';
 import '../styles/catalogs.css';
 import '../styles/survey-operations.css';
 
@@ -49,6 +54,95 @@ interface ScheduleForm {
 
 /** Một học kỳ có thể có hàng trăm lớp nên bảng lớp được phân trang. */
 const sectionPageSize = 20;
+
+const sectionFilterColumns: FilterableColumn<CourseSectionSurvey>[] = [
+  { key: 'facultyName', value: (row) => row.facultyName },
+  { key: 'departmentName', value: (row) => row.departmentName },
+  { key: 'sectionName', value: (row) => `${row.courseName} - ${row.sectionName}` },
+  { key: 'lecturerName', value: (row) => row.lecturerName || 'Chưa phân công' },
+  { key: 'classSize', value: (row) => String(row.classSize), numeric: true },
+  {
+    key: 'startTime',
+    value: (row) => formatRange(row.startTime, row.endTime),
+    sortValue: (row) => new Date(row.startTime).getTime(),
+  },
+  { key: 'responseCount', value: (row) => String(row.responseCount), numeric: true },
+];
+
+interface CampaignSectionsViewProps {
+  sections: CourseSectionSurvey[];
+  surveyName: string;
+  children: (state: {
+    visibleSections: CourseSectionSurvey[];
+    filteredCount: number;
+    filterHeader: (key: string, label: string) => React.ReactNode;
+  }) => React.ReactNode;
+}
+
+const CampaignSectionsView: React.FC<CampaignSectionsViewProps> = ({
+  sections,
+  surveyName,
+  children,
+}) => {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const foldedSearch = foldVietnamese(search);
+  const searchedSections = foldedSearch
+    ? sections.filter((section) => foldVietnamese([
+      section.facultyName,
+      section.departmentName,
+      section.courseCode,
+      section.courseName,
+      section.sectionName,
+      section.lecturerName,
+    ].join(' ')).includes(foldedSearch))
+    : sections;
+  const filters = useColumnFilters(searchedSections, sectionFilterColumns);
+  const totalPages = Math.max(1, Math.ceil(filters.visibleRows.length / sectionPageSize));
+  const currentPage = Math.min(page, totalPages);
+  const firstIndex = (currentPage - 1) * sectionPageSize;
+  const visibleSections = filters.visibleRows.slice(firstIndex, firstIndex + sectionPageSize);
+
+  return (
+    <>
+      {sections.length > 0 && (
+        <div className="campaign-section-toolbar">
+          <label className="catalog-search campaign-section-search">
+            <Search aria-hidden="true" size={16} />
+            <input
+              type="search"
+              value={search}
+              placeholder="Tìm lớp, học phần, giảng viên..."
+              aria-label={`Tìm kiếm lớp trong đợt ${surveyName}`}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
+            />
+          </label>
+        </div>
+      )}
+
+      {children({
+        visibleSections,
+        filteredCount: filters.visibleRows.length,
+        filterHeader: filters.filterHeader,
+      })}
+
+      {filters.visibleRows.length > 0 && (
+        <div className="section-survey-pagination">
+          <TablePagination
+            page={currentPage}
+            pageSize={sectionPageSize}
+            totalItems={filters.visibleRows.length}
+            itemLabel="lớp học phần"
+            onPageChange={setPage}
+          />
+        </div>
+      )}
+    </>
+  );
+};
 
 function messageFrom(error: unknown): string {
   return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
@@ -71,6 +165,21 @@ function formatRange(startTime: string, endTime: string): string {
   const formatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
   return `${formatter.format(new Date(startTime))} → ${formatter.format(new Date(endTime))}`;
 }
+
+/**
+ * Chỉ ngày, không giờ. Dùng cho cột Thời gian mở của bảng lớp: mọi lớp trong đợt
+ * dùng chung một lịch nên giờ giấc lặp lại y hệt ở hàng trăm dòng, chỉ tổ chiếm
+ * chỗ. Giờ cụ thể vẫn xem được ở dòng mô tả của đợt và trong mã QR.
+ */
+function formatDateRange(startTime: string, endTime: string): string {
+  const formatter = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short' });
+  return `${formatter.format(new Date(startTime))} → ${formatter.format(new Date(endTime))}`;
+}
+
+/** Tên mẫu đang chọn, để nút mở màn soạn nói rõ đợt đang dùng hình thức nào. */
+const templateNameOf = (config: SurveyFormConfig | null | undefined): string =>
+  surveyFormTemplates.find((template) => template.id === config?.templateId)?.name
+    ?? 'Chưa chọn mẫu';
 
 const defaultSchedule = (): ScheduleForm => {
   const now = new Date();
@@ -130,10 +239,11 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     roleCode === ROLE_CODES.departmentManager || roleCode === ROLE_CODES.lecturer;
 
   const [templates, setTemplates] = useState<SurveyTemplate[]>([]);
+  /** Thang trả lời của mọi bộ, để màn soạn phiếu dựng đúng các mức của từng câu. */
+  const [answerScales, setAnswerScales] = useState<AnswerScale[]>([]);
   const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
   const [sectionSurveys, setSectionSurveys] = useState<Record<number, CourseSectionSurvey[]>>({});
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-  const [sectionPages, setSectionPages] = useState<Record<number, number>>({});
 
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -144,11 +254,64 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createSurveyName, setCreateSurveyName] = useState('');
   const [createTemplateId, setCreateTemplateId] = useState('');
-  const [createScopeType, setCreateScopeType] = useState<SurveyScopeType>('all');
-  const [createScopeId, setCreateScopeId] = useState('');
   const [createSchedule, setCreateSchedule] = useState<ScheduleForm>(defaultSchedule);
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  /** Hình thức phiếu của đợt sắp tạo. */
+  const [createFormConfig, setCreateFormConfig] = useState<SurveyFormConfig>(emptySurveyFormConfig);
+  /**
+   * Màn soạn phiếu đang mở cho ai: 'create' là đợt sắp tạo, một đợt là đợt đã có.
+   * Null là đóng.
+   */
+  const [designerTarget, setDesignerTarget] = useState<'create' | SemesterSurvey | null>(null);
+  const [savingFormConfig, setSavingFormConfig] = useState(false);
+  /**
+   * Cấu hình mở màn soạn. Phải giữ nguyên tham chiếu giữa các lần vẽ: màn soạn coi
+   * mỗi giá trị mới là một lần mở mới và nạp lại bản nháp, tạo object mới ở đây thì
+   * gõ chữ nào cũng bị nuốt.
+   */
+  const designerValue = useMemo(
+    () => (designerTarget === null || designerTarget === 'create'
+      ? createFormConfig
+      : designerTarget.formConfig ?? emptySurveyFormConfig()),
+    [designerTarget, createFormConfig],
+  );
+
+  /**
+   * Tên đợt và bộ câu hỏi THẬT đưa vào màn soạn. Xem trước phải là đúng phiếu sinh viên
+   * sẽ nhận, nên phải chọn bộ câu hỏi và đặt tên đợt trước rồi mới soạn được hình thức.
+   */
+  const designerData = useMemo((): SurveyPreviewData | undefined => {
+    const isCreate = designerTarget === 'create' || designerTarget === null;
+    const templateId = isCreate ? Number(createTemplateId) : designerTarget.surveyTemplateId;
+    const template = templates.find((item) => item.surveyTemplateId === templateId);
+    if (!template) return undefined;
+
+    const scaleById = new Map(answerScales.map((scale) => [scale.answerScaleId, scale]));
+    const questionsOfSection = (sectionId: number) => template.questions
+      .filter((question) => question.sectionId === sectionId)
+      .map((question) => ({
+        questionText: question.questionText,
+        // Thang loại Text không có mức nào; xem trước dựng thành ô nhập chữ.
+        options: (scaleById.get(question.answerScaleId)?.options ?? [])
+          .map((option) => ({ value: option.value, displayText: option.displayText })),
+      }));
+
+    return {
+      surveyName: isCreate ? createSurveyName : designerTarget.surveyName,
+      templateName: template.templateName,
+      sections: template.sections
+        .map((section) => ({
+          sectionName: section.sectionName,
+          questions: questionsOfSection(section.sectionId),
+        }))
+        .filter((section) => section.questions.length > 0),
+      questionCount: template.questions.length,
+    };
+  }, [designerTarget, createTemplateId, createSurveyName, templates, answerScales]);
+
+  /** Chưa chọn bộ câu hỏi hoặc chưa đặt tên đợt thì chưa soạn hình thức được. */
+  const canDesignCreateForm = createSurveyName.trim().length > 0 && createTemplateId !== '';
 
   const [editingSurvey, setEditingSurvey] = useState<SemesterSurvey | null>(null);
   const [editSurveyName, setEditSurveyName] = useState('');
@@ -164,11 +327,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     narrowedCustomCount: number;
     closingEarlierCount: number;
   } | null>(null);
-
-  const [editingSection, setEditingSection] = useState<CourseSectionSurvey | null>(null);
-  const [editSchedule, setEditSchedule] = useState<ScheduleForm>(defaultSchedule);
-  const [editError, setEditError] = useState<string | null>(null);
-  const [savingSchedule, setSavingSchedule] = useState(false);
 
   const [deleting, setDeleting] = useState<SemesterSurvey | null>(null);
   const [qrTarget, setQrTarget] = useState<CourseSectionSurvey | null>(null);
@@ -201,17 +359,9 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
 
   // Bổ sung lớp vào đợt đã có: thêm khoa/bộ môn khác, hoặc bù lớp nhập thiếu.
   const [addTarget, setAddTarget] = useState<SemesterSurvey | null>(null);
-  const [addScopeType, setAddScopeType] = useState<SurveyScopeType>('all');
-  const [addScopeId, setAddScopeId] = useState('');
   const [addSchedule, setAddSchedule] = useState<ScheduleForm>(defaultSchedule);
   const [addError, setAddError] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<number | null>(null);
-  const editingSectionParent = editingSection
-    ? semesterSurveys.find(
-        (survey) => survey.semesterSurveyId === editingSection.semesterSurveyId
-      ) ?? null
-    : null;
-
   // Nạp danh sách template khảo sát. Bộ câu hỏi thuộc quyền
   // COURSE_QUESTION_SETS_ACCESS mà vai trò chỉ đọc không có, nên gọi vào là 403 và
   // trang hiện một dải lỗi đỏ thừa. Template cũng chỉ dùng để tạo đợt, mà vai trò đó
@@ -220,8 +370,14 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     if (!canManageCampaign) return;
     const load = async () => {
       try {
-        const nextTemplates = await surveyApi.templates();
+        // Thang trả lời tải cùng bộ câu hỏi: màn soạn phiếu dựng câu hỏi thật nên phải
+        // biết mỗi câu có những mức nào.
+        const [nextTemplates, nextScales] = await Promise.all([
+          surveyApi.templates(),
+          surveyApi.answerScales(),
+        ]);
         setTemplates(nextTemplates);
+        setAnswerScales(nextScales);
       } catch (error) {
         setLoadError(messageFrom(error));
       }
@@ -327,10 +483,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
       setCreateError('Vui lòng chọn bộ câu hỏi khảo sát.');
       return;
     }
-    if (createScopeType !== 'all' && !createScopeId) {
-      setCreateError('Vui lòng chọn đơn vị cho phạm vi đã chọn.');
-      return;
-    }
     if (new Date(createSchedule.endTime) <= new Date(createSchedule.startTime)) {
       setCreateError('Thời gian đóng phải sau thời gian mở.');
       return;
@@ -340,12 +492,11 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     try {
       const created = await surveyApi.createSemesterSurvey({
         surveyName: createSurveyName.trim(),
-        scopeType: createScopeType,
-        scopeId: createScopeType === 'all' ? null : Number(createScopeId),
         semesterId: Number(semesterId),
         surveyTemplateId: Number(createTemplateId),
         startTime: toIso(createSchedule.startTime),
         endTime: toIso(createSchedule.endTime),
+        formConfig: createFormConfig,
       });
       await loadSemesterSurveys(semesterId);
       setExpanded((prev) => ({ ...prev, [created.semesterSurveyId]: true }));
@@ -357,6 +508,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
       setIsCreateOpen(false);
       setCreateError(null);
       setCreateSurveyName('');
+      setCreateFormConfig(emptySurveyFormConfig());
     } catch (error) {
       setCreateError(messageFrom(error));
     } finally {
@@ -364,40 +516,18 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     }
   };
 
-  const handleSaveSchedule = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!editingSection) return;
-    if (new Date(editSchedule.endTime) <= new Date(editSchedule.startTime)) {
-      setEditError('Thời gian đóng phải sau thời gian mở.');
-      return;
-    }
-    const parent = semesterSurveys.find(
-      (survey) => survey.semesterSurveyId === editingSection.semesterSurveyId
-    );
-    if (parent && (
-      new Date(editSchedule.startTime) < new Date(parent.startTime)
-      || new Date(editSchedule.endTime) > new Date(parent.endTime)
-    )) {
-      setEditError('Thời gian của lớp phải nằm trọn trong thời gian mở và đóng của đợt khảo sát.');
-      return;
-    }
-
-    setSavingSchedule(true);
+  /** Lưu hình thức phiếu của một đợt ĐÃ TẠO. Server chặn nếu đợt đã tới giờ mở. */
+  const saveFormConfig = async (survey: SemesterSurvey, config: SurveyFormConfig) => {
+    setSavingFormConfig(true);
     try {
-      await surveyApi.updateSectionSurveySchedule(editingSection.courseSectionSurveyId, {
-        startTime: toIso(editSchedule.startTime),
-        endTime: toIso(editSchedule.endTime),
-      });
-      await loadSections(editingSection.semesterSurveyId);
+      await surveyApi.saveSemesterSurveyFormConfig(survey.semesterSurveyId, config);
       await loadSemesterSurveys(semesterId);
-      onSurveysChanged?.();
-      toast.success('Đã cập nhật thời gian mở khảo sát');
-      setEditingSection(null);
-      setEditError(null);
+      setDesignerTarget(null);
+      toast.success('Đã lưu hình thức phiếu', { description: survey.surveyName });
     } catch (error) {
-      setEditError(messageFrom(error));
+      toast.error(messageFrom(error));
     } finally {
-      setSavingSchedule(false);
+      setSavingFormConfig(false);
     }
   };
 
@@ -512,8 +642,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   /** Mở hộp thoại bổ sung, điền sẵn khung giờ theo đợt để khỏi gõ lại. */
   const openAddSections = (survey: SemesterSurvey) => {
     setAddTarget(survey);
-    setAddScopeType('all');
-    setAddScopeId('');
     setAddSchedule({
       startTime: toLocalInput(survey.startTime),
       endTime: toLocalInput(survey.endTime),
@@ -524,10 +652,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   const handleAddSections = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!addTarget) return;
-    if (addScopeType !== 'all' && !addScopeId) {
-      setAddError('Vui lòng chọn đơn vị cho phạm vi đã chọn.');
-      return;
-    }
     if (new Date(addSchedule.endTime) <= new Date(addSchedule.startTime)) {
       setAddError('Thời gian đóng phải sau thời gian mở.');
       return;
@@ -544,8 +668,10 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     setAddingId(semesterSurveyId);
     try {
       const result = await surveyApi.addSectionsToSemesterSurvey(semesterSurveyId, {
-        scopeType: addScopeType,
-        scopeId: addScopeType === 'all' ? null : Number(addScopeId),
+        // Đợt luôn phủ cả kỳ nên không còn khái niệm phạm vi: bù đúng những lớp
+        // của kỳ chưa có bài.
+        scopeType: 'all',
+        scopeId: null,
         startTime: toIso(addSchedule.startTime),
         endTime: toIso(addSchedule.endTime),
       });
@@ -629,8 +755,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
               onClick={() => {
                 setCreateError(null);
                 setCreateSurveyName('');
-                setCreateScopeType('all');
-                setCreateScopeId('');
                 setCreateTemplateId(templates.length === 1 ? String(templates[0].surveyTemplateId) : '');
                 setCreateSchedule(defaultSchedule());
                 setIsCreateOpen(true);
@@ -697,15 +821,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
       {semesterId && !loading && semesterSurveys.map((survey) => {
         const sections = sectionSurveys[survey.semesterSurveyId] ?? [];
         const isExpanded = expanded[survey.semesterSurveyId] ?? false;
-        const totalPages = Math.max(1, Math.ceil(sections.length / sectionPageSize));
-        const page = Math.min(sectionPages[survey.semesterSurveyId] ?? 1, totalPages);
-        const firstIndex = (page - 1) * sectionPageSize;
-        const visibleSections = sections.slice(firstIndex, firstIndex + sectionPageSize);
-        const changePage = (nextPage: number) =>
-          setSectionPages((prev) => ({
-            ...prev,
-            [survey.semesterSurveyId]: Math.min(Math.max(1, nextPage), totalPages),
-          }));
 
         return (
           <section className="semester-survey-card" key={survey.semesterSurveyId}>
@@ -766,7 +881,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                     ) : (
                       <>
                         <Plus className="operation-icon" aria-hidden="true" />
-                        Thêm phạm vi
+                        Thêm lớp mới
                       </>
                     )}
                   </button>
@@ -800,6 +915,18 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                     Chỉnh sửa
                   </button>
                 )}
+                {/* Hình thức phiếu khoá từ giờ mở: đang thu phiếu mà đổi màu đổi chữ
+                    thì sinh viên làm dở thấy phiếu biến hình. */}
+                {canManageCampaign && new Date(survey.startTime) > new Date() && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setDesignerTarget(survey)}
+                  >
+                    <Palette className="operation-icon" aria-hidden="true" />
+                    Hình thức phiếu
+                  </button>
+                )}
                 {canManageCampaign && (
                   <button
                     type="button"
@@ -814,26 +941,35 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
             </header>
 
             {isExpanded && (
+              <CampaignSectionsView sections={sections} surveyName={survey.surveyName}>
+                {({ visibleSections, filteredCount, filterHeader }) => (
               <div className="campaign-table-scroll" id={`semester-survey-${survey.semesterSurveyId}`}>
                 <table className="campaign-table">
                   <thead>
                     {/* Bề rộng theo phần trăm để tỷ lệ cột giữ nguyên ở mọi cỡ màn hình. */}
                     <tr>
-                      <th style={{ width: '12%' }}>Khoa / Viện</th>
-                      <th style={{ width: '11%' }}>Bộ môn</th>
-                      <th style={{ width: '18%' }}>Lớp học phần</th>
-                      <th style={{ width: '14%' }}>Giảng viên</th>
-                      <th style={{ width: '4%' }}>Sĩ số</th>
+                      <th style={{ width: '12%' }}>{filterHeader('facultyName', 'Khoa / Viện')}</th>
+                      <th style={{ width: '11%' }}>{filterHeader('departmentName', 'Bộ môn')}</th>
+                      <th style={{ width: '20%' }}>{filterHeader('sectionName', 'Lớp học phần')}</th>
+                      <th style={{ width: '15%' }}>{filterHeader('lecturerName', 'Giảng viên')}</th>
+                      <th style={{ width: '4%' }}>{filterHeader('classSize', 'Sĩ số')}</th>
                       <th style={{ width: '16%' }}>Đường dẫn riêng</th>
-                      <th style={{ width: '12%' }}>Thời gian mở</th>
-                      <th style={{ width: '5%' }}>Lượt trả lời</th>
-                      <th style={{ width: '8%' }}>Thao tác</th>
+                      <th style={{ width: '10%' }}>{filterHeader('startTime', 'Thời gian mở')}</th>
+                      <th style={{ width: '6%' }}>{filterHeader('responseCount', 'Lượt trả lời')}</th>
+                      <th style={{ width: '6%' }}>Ảnh QR</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sections.length === 0 && (
                       <tr>
                         <td colSpan={9}>Đang tải danh sách lớp...</td>
+                      </tr>
+                    )}
+                    {sections.length > 0 && filteredCount === 0 && (
+                      <tr>
+                        <td colSpan={9} className="campaign-filter-empty">
+                          Không có lớp học phần nào phù hợp với tìm kiếm và bộ lọc.
+                        </td>
                       </tr>
                     )}
                     {visibleSections.map((section) => (
@@ -875,7 +1011,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                         <td className="campaign-schedule-cell">
                           <div className="campaign-date">
                             <CalendarDays className="operation-icon" aria-hidden="true" />
-                            <span>{formatRange(section.startTime, section.endTime)}</span>
+                            <span>{formatDateRange(section.startTime, section.endTime)}</span>
                           </div>
                         </td>
                         <td className="campaign-number-cell">
@@ -895,18 +1031,8 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                             </button>
                           )}
                         </td>
-                        <td>
+                        <td className="campaign-qr-cell">
                           <div className="campaign-row-actions">
-                            {canViewReports && (
-                              <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => openSurveyReport(section.courseSectionSurveyId)}
-                              >
-                                <ClipboardList className="operation-icon" aria-hidden="true" />
-                                Kết quả
-                              </button>
-                            )}
                             {/* Mã QR và đường dẫn thì giữ cho mọi vai trò: giảng viên
                                 chính là người đưa cho sinh viên, câu H-d. */}
                             <button
@@ -917,23 +1043,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                               <QrCode className="operation-icon" aria-hidden="true" />
                               QR
                             </button>
-                            {canManageCampaign && (
-                              <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => {
-                                  setEditingSection(section);
-                                  setEditError(null);
-                                  setEditSchedule({
-                                    startTime: toLocalInput(section.startTime),
-                                    endTime: toLocalInput(section.endTime),
-                                  });
-                                }}
-                              >
-                                <Pencil className="operation-icon" aria-hidden="true" />
-                                Sửa lịch
-                              </button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -941,18 +1050,8 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                   </tbody>
                 </table>
               </div>
-            )}
-
-            {isExpanded && sections.length > 0 && (
-              <div className="section-survey-pagination">
-                <TablePagination
-                  page={page}
-                  pageSize={sectionPageSize}
-                  totalItems={sections.length}
-                  itemLabel="lớp học phần"
-                  onPageChange={changePage}
-                />
-              </div>
+                )}
+              </CampaignSectionsView>
             )}
           </section>
         );
@@ -1005,15 +1104,31 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
             />
           </div>
 
-          <SurveyScopePicker
-            semesterId={semesterId ? Number(semesterId) : null}
-            scopeType={createScopeType}
-            onScopeTypeChange={setCreateScopeType}
-            scopeId={createScopeId}
-            onScopeIdChange={setCreateScopeId}
-            idPrefix="create-survey"
-            disabled={creating}
-          />
+          {/* Hình thức phiếu soạn trong một hộp thoại riêng: bản dựng phiếu không nhét
+              vừa biểu mẫu tạo đợt. */}
+          <div className="survey-form-picker">
+            <div>
+              <strong>Mẫu phiếu: {templateNameOf(createFormConfig)}</strong>
+              <br />
+              <span>
+                {canDesignCreateForm
+                  ? 'Bỏ qua thì phiếu dùng mẫu mặc định của hệ thống.'
+                  : 'Đặt tên bài khảo sát và chọn bộ câu hỏi trước, để xem trước đúng phiếu thật.'}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={creating || !canDesignCreateForm}
+              title={canDesignCreateForm
+                ? undefined
+                : 'Đặt tên bài khảo sát và chọn bộ câu hỏi trước'}
+              onClick={() => setDesignerTarget('create')}
+            >
+              <Palette className="operation-icon" aria-hidden="true" />
+              {createFormConfig.templateId ? 'Sửa hình thức phiếu' : 'Chọn mẫu phiếu'}
+            </button>
+          </div>
 
           <div className="catalog-form-grid catalog-form-grid--2">
             <div className="form-group">
@@ -1193,82 +1308,22 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
         </form>
       </Modal>
 
-      <Modal
-        isOpen={editingSection !== null}
-        onClose={() => {
-          if (savingSchedule) return;
-          setEditingSection(null);
-          setEditError(null);
+      <SurveyFormDesigner
+        isOpen={designerTarget !== null}
+        value={designerValue}
+        saving={savingFormConfig}
+        data={designerData}
+        onClose={() => setDesignerTarget(null)}
+        onSave={(config) => {
+          if (designerTarget === 'create') {
+            // Đợt chưa tồn tại nên chỉ giữ trong biểu mẫu, gửi kèm lúc bấm Tạo.
+            setCreateFormConfig(config);
+            setDesignerTarget(null);
+            return;
+          }
+          if (designerTarget) void saveFormConfig(designerTarget, config);
         }}
-        title={
-          editingSection
-            ? `Thời gian mở khảo sát lớp ${editingSection.sectionName}`
-            : 'Thời gian mở khảo sát'
-        }
-      >
-        <form className="catalog-form" onSubmit={(event) => void handleSaveSchedule(event)}>
-          {editError && <div className="catalog-validation-error" role="alert">{editError}</div>}
-
-          {editingSectionParent && (
-            <div className="catalog-context-band">
-              Lịch tổng của đợt: <strong>{formatRange(
-                editingSectionParent.startTime,
-                editingSectionParent.endTime
-              )}</strong>. Lịch lớp phải nằm trọn trong khoảng này.
-            </div>
-          )}
-
-          <div className="catalog-form-grid catalog-form-grid--2">
-            <div className="form-group">
-              <label htmlFor="edit-survey-start">Thời gian mở</label>
-              <input
-                id="edit-survey-start"
-                type="datetime-local"
-                value={editSchedule.startTime}
-                min={editingSectionParent ? toLocalInput(editingSectionParent.startTime) : undefined}
-                max={editingSectionParent ? toLocalInput(editingSectionParent.endTime) : undefined}
-                onChange={(event) =>
-                  setEditSchedule((prev) => ({ ...prev, startTime: event.target.value }))
-                }
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="edit-survey-end">Thời gian đóng</label>
-              <input
-                id="edit-survey-end"
-                type="datetime-local"
-                value={editSchedule.endTime}
-                min={editingSectionParent ? toLocalInput(editingSectionParent.startTime) : undefined}
-                max={editingSectionParent ? toLocalInput(editingSectionParent.endTime) : undefined}
-                onChange={(event) =>
-                  setEditSchedule((prev) => ({ ...prev, endTime: event.target.value }))
-                }
-                required
-              />
-            </div>
-          </div>
-
-          <div className="modal-footer catalog-form-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setEditingSection(null)}
-              disabled={savingSchedule}
-            >
-              Hủy
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={savingSchedule}>
-              {savingSchedule ? (
-                <LoaderCircle className="auth-spin" aria-hidden="true" size={16} />
-              ) : (
-                <Save aria-hidden="true" size={16} />
-              )}
-              Lưu lịch
-            </button>
-          </div>
-        </form>
-      </Modal>
+      />
 
       <QRCodeModal
         isOpen={qrTarget !== null}
@@ -1303,7 +1358,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
       <Modal
         isOpen={addTarget !== null}
         onClose={() => setAddTarget(null)}
-        title="Thêm phạm vi vào đợt khảo sát"
+        title="Thêm lớp mới vào đợt khảo sát"
       >
         <form className="catalog-form" onSubmit={(event) => void handleAddSections(event)}>
           {addError && (
@@ -1323,18 +1378,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
               </>
             )}
           </div>
-
-          <SurveyScopePicker
-            semesterId={addTarget?.semesterId ?? null}
-            scopeType={addScopeType}
-            onScopeTypeChange={setAddScopeType}
-            scopeId={addScopeId}
-            onScopeIdChange={setAddScopeId}
-            semesterSurveyId={addTarget?.semesterSurveyId}
-            idPrefix="add-sections"
-            disabled={addingId !== null}
-            departmentScoped={roleCode === ROLE_CODES.departmentManager}
-          />
 
           <div className="catalog-form-grid catalog-form-grid--2">
             <div className="form-group">

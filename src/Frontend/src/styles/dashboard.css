@@ -477,8 +477,10 @@
 .executive-dashboard {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 0 0 16px;
+  /* Khe giữa các khối: 16px làm nền xám hở ra thành từng dải to giữa thanh công cụ,
+     dải nhắc ngưỡng và dải điểm tin — mà ba thứ đó đều chỉ cao một dòng chữ. */
+  gap: 8px;
+  padding: 0 0 12px;
   background: #f5f7f8;
   color: #000000;
 }
@@ -885,8 +887,9 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px 18px;
-  padding: 9px 16px;
+  gap: 4px 18px;
+  /* Cũng chỉ một dòng: hạ padding để các thẻ số liệu bên dưới lên cao hơn. */
+  padding: 4px 12px;
   background: #f0f9ff;
   border: 1px solid #bae6fd;
   border-left: 3px solid #0284c7;
@@ -1440,4 +1443,13 @@
   padding: 16px;
   color: #000000;
   font-size: 13px;
+}
+
+/*
+  Các khối con của bảng điều khiển đã có khe 8px của flex, nên bỏ lề dưới riêng của
+  chúng — cộng hai thứ lại thì nền xám hở ra gần 20px giữa mấy dải chỉ cao một dòng.
+*/
+.executive-dashboard .statistics-toolbar,
+.executive-dashboard .scoring-config-note {
+  margin-bottom: 0;
 }

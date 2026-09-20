@@ -38,8 +38,8 @@ const messageFrom = (error: unknown): string =>
  * Một dòng của bảng chi tiết.
  *
  * Ba cấp dùng chung một bộ cột, nhưng backend trả về ba kiểu dữ liệu khác nhau:
- * cấp bộ môn có sĩ số lẫn phiếu thu, cấp học phần chỉ có điểm, cấp lớp có sĩ số
- * mà không có phiếu thu. Chỗ này san phẳng cả ba về cùng một hình dạng rồi mới
+ * cấp bộ môn có tổng số phiếu phải thu lẫn phiếu đã thu, cấp học phần chỉ có điểm, cấp lớp có tổng số phiếu phải thu
+ * mà không có phiếu đã thu. Chỗ này san phẳng cả ba về cùng một hình dạng rồi mới
  * dựng bảng, nhờ vậy chỉ cần viết một bảng và chỉ ẩn những cột mà cấp đó thật sự
  * không có số liệu — thay vì mỗi cấp một bộ cột riêng như trước.
  */
@@ -56,7 +56,7 @@ interface ScopeDetailRow {
   classSize?: number;
   responseCount?: number;
   validResponseCount?: number;
-  /** Phiếu hợp lệ chia phiếu thu, theo phần trăm. */
+  /** Phiếu hợp lệ chia phiếu đã thu, theo phần trăm. */
   validRate?: number | null;
   averageScore: number | null;
   /** Bấm vào tên để mở cấp dưới; thiếu thì dòng đứng yên. */
@@ -256,24 +256,24 @@ const ScopeRowsTable: React.FC<{
               )}
               {showsClassSize && (
                 <th scope="col" style={{ width: widthOf('classSize') }}>
-                  {filters.filterHeader('classSize', 'Sĩ số')}
+                  {filters.filterHeader('classSize', 'Tổng số phiếu phải thu')}
                 </th>
               )}
               {showsResponses && (
                 <th scope="col" style={{ width: widthOf('responseCount') }}>
-                  {filters.filterHeader('responseCount', 'Phiếu thu')}
+                  {filters.filterHeader('responseCount', 'Số phiếu đã thu')}
                 </th>
               )}
               {showsValidResponses && (
                 <th scope="col" style={{ width: widthOf('validResponseCount') }}>
-                  {filters.filterHeader('validResponseCount', 'Phiếu hợp lệ')}
+                  {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
                 </th>
               )}
               {showsValidRate && (
                 <th
                   scope="col"
                   style={{ width: widthOf('validRate') }}
-                  title="Số phiếu hợp lệ chia số phiếu thu, theo phần trăm"
+                  title="Số phiếu hợp lệ chia số phiếu đã thu, theo phần trăm"
                 >
                   {filters.filterHeader('validRate', 'Tỷ lệ phiếu hợp lệ')}
                 </th>
@@ -429,8 +429,8 @@ export const ScopeAnalysisDetail: React.FC<{
         'Đợt khảo sát': data.templateName,
         'Học kỳ': `${data.semesterName} (${data.academicYearName})`,
         'Số lớp học phần': data.sectionCount,
-        'Tổng sĩ số': data.totalClassSize.toLocaleString('vi-VN'),
-        'Phiếu hợp lệ': data.responseCount.toLocaleString('vi-VN'),
+        'Tổng số phiếu phải thu': data.totalClassSize.toLocaleString('vi-VN'),
+        'Số phiếu hợp lệ': data.responseCount.toLocaleString('vi-VN'),
         'Điểm trung bình': `${data.averageScore.toFixed(2)} / 5.0`,
       },
     };
@@ -485,7 +485,7 @@ export const ScopeAnalysisDetail: React.FC<{
           </p>
         </div>
         <div className="section-responses-stats">
-          <span>{data.sectionCount} lớp · tổng sĩ số {data.totalClassSize.toLocaleString('vi-VN')}</span>
+          <span>{data.sectionCount} lớp · tổng số phiếu phải thu {data.totalClassSize.toLocaleString('vi-VN')}</span>
           <span title="Mốc để tính cột Chênh lệch ở bảng bên dưới">
             Điểm trung bình {data.averageScore.toFixed(2)}
           </span>

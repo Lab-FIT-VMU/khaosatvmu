@@ -13,6 +13,11 @@ import { surveyApi } from '../services/surveyApi';
 import type { SemesterSurvey } from '../types';
 import { ExportDropdown } from '../components/ExportDropdown';
 import { MarqueeText } from '../components/MarqueeText';
+import {
+  getActiveSemesterSurveyId,
+  selectAvailableSemesterSurveyId,
+  setActiveSemesterSurveyId,
+} from '../utils/surveySelection';
 import '../styles/dashboard.css';
 
 interface LecturerDashboardPageProps {
@@ -70,7 +75,9 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
 }) => {
   const { activeSemesterId, activeSemesterLabel } = useSemester();
   const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
-  const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
+  const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(
+    Number(getActiveSemesterSurveyId()) || null,
+  );
   const [metrics, setMetrics] = useState<LecturerMetrics | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -94,13 +101,10 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
         // Thiếu dòng này thì danh sách đợt luôn rỗng: ô chọn đợt không bao giờ hiện
         // ra và dòng mô tả báo "chưa có đợt nào" ngay cả khi số liệu bên dưới đã có.
         setSemesterSurveys(surveys);
-        let chosenSurveyId: number | null = null;
-        setSelectedSurveyId((current) => {
-          chosenSurveyId = current && surveys.some((s) => s.semesterSurveyId === current)
-            ? current
-            : surveys[0]?.semesterSurveyId ?? null;
-          return chosenSurveyId;
-        });
+        const chosenSurveyId = Number(
+          selectAvailableSemesterSurveyId(surveys, getActiveSemesterSurveyId()),
+        ) || null;
+        setSelectedSurveyId(chosenSurveyId);
 
         const sectionSurveys = chosenSurveyId
           ? await surveyApi.courseSectionSurveys(chosenSurveyId)
@@ -131,6 +135,7 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
 
   const handleSelectSurvey = async (surveyId: number | null) => {
     setSelectedSurveyId(surveyId);
+    setActiveSemesterSurveyId(surveyId);
     if (!activeSemesterId) return;
     setLoading(true);
     try {
@@ -271,7 +276,7 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
                     metricValue: `${metrics.surveyedCount} lớp`,
                   },
                   {
-                    metricName: 'Tổng số phiếu khảo sát đã thu / Tổng sĩ số',
+                    metricName: 'Số phiếu đã thu / Tổng số phiếu phải thu',
                     metricValue: `${metrics.responseCount} / ${metrics.targetCount} phiếu`,
                   },
                   {

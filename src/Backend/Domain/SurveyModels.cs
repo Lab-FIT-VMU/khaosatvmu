@@ -161,6 +161,18 @@ public sealed class SemesterSurvey : ISoftDeletable
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
 
+    /// <summary>
+    /// Hình thức phiếu của đợt: màu, ảnh, các đoạn chữ lưu ý và cảnh báo. Lưu nguyên
+    /// khối JSON vì chỉ đọc ra để vẽ phiếu, không bao giờ phải lọc hay gộp theo nó.
+    ///
+    /// NULL nghĩa là dùng mẫu mặc định của hệ thống — mọi đợt tạo trước khi có tính
+    /// năng này đều rơi vào nhánh đó và hiển thị y như cũ.
+    ///
+    /// Chỉ ghi MỘT LẦN lúc tạo đợt. Đợt đã tạo thì không sửa: phiếu đang phát cho
+    /// sinh viên mà đổi hình thức giữa chừng là một kiểu hỏng khó lần ra.
+    /// </summary>
+    public string? FormConfigJson { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }

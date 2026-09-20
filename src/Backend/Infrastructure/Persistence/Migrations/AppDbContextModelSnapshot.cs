@@ -1129,6 +1129,9 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("FormConfigJson")
+                        .HasColumnType("jsonb");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 

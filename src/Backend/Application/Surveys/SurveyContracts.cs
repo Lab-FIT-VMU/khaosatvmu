@@ -118,7 +118,12 @@ public sealed record SemesterSurveyDto(
     /// tạo đợt; bù bằng <see cref="ISurveyService.AddSectionsToSemesterSurveyAsync"/>
     /// với đúng phạm vi của đợt.
     /// </summary>
-    int MissingSectionCount);
+    int MissingSectionCount,
+    /// <summary>
+    /// Hình thức phiếu của đợt; null là dùng mẫu mặc định. Giao diện cần nó để mở lại
+    /// màn soạn phiếu trên đúng cấu hình đang lưu.
+    /// </summary>
+    SurveyFormConfigDto? FormConfig = null);
 
 // ------------------------------------------- Sheet 1: chuẩn hoá điểm (Z-score)
 
@@ -591,7 +596,9 @@ public sealed record CourseSectionSurveyDto(
     /// <summary>Số phiếu qua được bộ lọc — phần duy nhất được tính vào tiến độ.</summary>
     int ValidResponseCount,
     /// <summary>Số phiếu bị bộ lọc loại. Bằng ResponseCount trừ ValidResponseCount.</summary>
-    int InvalidResponseCount);
+    int InvalidResponseCount,
+    /// <summary>Số phiếu có nội dung trong ô “Ý kiến khác”.</summary>
+    int OpenCommentCount);
 
 /// <summary>
 /// Phạm vi lớp được phát phiếu. Dùng chung cho lúc tạo đợt và lúc bổ sung thêm
@@ -631,7 +638,13 @@ public sealed record CreateSemesterSurveyCommand(
     /// <summary>Một trong <see cref="SurveyScopeTypes"/>. Mặc định phát cho cả kỳ.</summary>
     string ScopeType = SurveyScopeTypes.All,
     /// <summary>Mã khoa / bộ môn / lớp học phần tuỳ theo <paramref name="ScopeType"/>.</summary>
-    int? ScopeId = null);
+    int? ScopeId = null,
+    /// <summary>
+    /// Hình thức phiếu của đợt. Chỉ nhận ở đây, lúc tạo — đợt đã tạo thì không sửa
+    /// được nữa, nên lệnh cập nhật đợt không có trường này.
+    /// Null là dùng mẫu mặc định của hệ thống.
+    /// </summary>
+    SurveyFormConfigDto? FormConfig = null);
 
 /// <summary>Chỉnh sửa thông tin chung của đợt; không thay đổi học kỳ hoặc bộ câu hỏi.</summary>
 public sealed record UpdateSemesterSurveyCommand(
@@ -732,7 +745,18 @@ public sealed record PublicSurveyDto(
     /// Tên ĐỢT khảo sát do quản trị đặt lúc tạo ("SemesterSurveys"."SurveyName").
     /// Đây mới là tiêu đề sinh viên thấy; tên bộ câu hỏi là chuyện nội bộ.
     /// </summary>
-    string SurveyName = "");
+    string SurveyName = "",
+    /// <summary>
+    /// Hình thức phiếu do quản trị đặt. Null là dùng mẫu mặc định — đợt cũ và đợt
+    /// không tuỳ biến đều rơi vào nhánh này.
+    /// </summary>
+    SurveyFormConfigDto? FormConfig = null,
+    /// <summary>Số tín chỉ của học phần; 0 khi chưa nhập.</summary>
+    int Credits = 0,
+    /// <summary>Tên khoa của học phần, rỗng khi học phần chưa gắn khoa.</summary>
+    string FacultyName = "",
+    /// <summary>Tên bộ môn của học phần, rỗng khi học phần chưa gắn bộ môn.</summary>
+    string DepartmentName = "");
 
 /// <summary>
 /// <paramref name="AnswerValue"/> là số mức đã chọn ("1".."5") với câu thang
@@ -866,6 +890,15 @@ public interface ISurveyService
         UpdateSemesterSurveyCommand command,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Đổi hình thức phiếu của một đợt. Chỉ làm được trước giờ mở đợt; đợt đã bắt đầu
+    /// thu phiếu thì trả <see cref="SurveyErrorCodes.FormConfigLocked"/>.
+    /// </summary>
+    Task<SurveyOperationResult<SurveyFormConfigDto?>> SaveSemesterSurveyFormConfigAsync(
+        int semesterSurveyId,
+        SurveyFormConfigDto? config,
+        CancellationToken cancellationToken = default);
+
     Task<SurveyOperationResult<bool>> DeleteSemesterSurveyAsync(
         int semesterSurveyId,
         CancellationToken cancellationToken = default);
@@ -995,12 +1028,7 @@ public interface ISurveyService
         int responseId,
         CancellationToken cancellationToken = default);
 
-    Task<SurveyOperationResult<CourseSectionSurveyDto>> UpdateCourseSectionSurveyScheduleAsync(
-        int courseSectionSurveyId,
-        SaveSurveyScheduleCommand command,
-        CancellationToken cancellationToken = default);
 
-    /// <summary>Đọc phiếu khảo sát theo LinkToken, không cần đăng nhập.</summary>
     Task<SurveyOperationResult<PublicSurveyDto>> GetPublicSurveyAsync(
         string linkToken,
         CancellationToken cancellationToken = default);
@@ -1093,6 +1121,27 @@ public static class SurveyErrorCodes
 
     /// <summary>Chưa hết thời gian thu phiếu nên chưa phát hành kết quả được.</summary>
     public const string SurveyNotEnded = "SURVEY_NOT_ENDED";
+
+    /// <summary>Mã màu của cấu hình phiếu không phải dạng hex 6 ký tự.</summary>
+    public const string FormConfigColorInvalid = "SURVEY_FORM_CONFIG_COLOR_INVALID";
+
+    /// <summary>Một đoạn chữ hoặc đường dẫn ảnh của cấu hình phiếu quá dài.</summary>
+    public const string FormConfigTextTooLong = "SURVEY_FORM_CONFIG_TEXT_TOO_LONG";
+
+    /// <summary>Ảnh tải lên vượt quá dung lượng cho phép, hoặc tệp rỗng.</summary>
+    public const string FormAssetTooLarge = "SURVEY_FORM_ASSET_TOO_LARGE";
+
+    /// <summary>Tệp tải lên không phải ảnh PNG, JPG hay WEBP.</summary>
+    public const string FormAssetTypeNotAllowed = "SURVEY_FORM_ASSET_TYPE_NOT_ALLOWED";
+
+    /// <summary>Phông, cỡ chữ hoặc canh chữ của tiêu đề không nằm trong danh sách cho phép.</summary>
+    public const string FormConfigFontInvalid = "SURVEY_FORM_CONFIG_FONT_INVALID";
+
+    /// <summary>Mã thông tin cho ẩn trên phiếu không có thật.</summary>
+    public const string FormConfigFieldInvalid = "SURVEY_FORM_CONFIG_FIELD_INVALID";
+
+    /// <summary>Đợt đã tới giờ mở nên không sửa được hình thức phiếu nữa.</summary>
+    public const string FormConfigLocked = "SURVEY_FORM_CONFIG_LOCKED";
 
     /// <summary>
     /// Kết quả của đợt chưa được quản trị phát hành. Trưởng bộ môn và giảng viên nhận

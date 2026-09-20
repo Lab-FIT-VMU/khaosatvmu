@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, CircleAlert, LoaderCircle, RefreshCw } from 'lucide-react';
+import { Check, ChevronDown, CircleAlert, LoaderCircle } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -28,6 +28,11 @@ import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
 import '../styles/survey-dashboard.css';
+import {
+  getActiveSemesterSurveyId,
+  selectAvailableSemesterSurveyId,
+  setActiveSemesterSurveyId,
+} from '../utils/surveySelection';
 
 function messageFrom(error: unknown): string {
   return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
@@ -258,7 +263,7 @@ export const SurveyDashboardPage: React.FC = () => {
   }, [activeSemesterId]);
 
   const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
-  const [semesterSurveyId, setSemesterSurveyId] = useState<string>('');
+  const [semesterSurveyId, setSemesterSurveyId] = useState<string>(getActiveSemesterSurveyId);
   const [data, setData] = useState<SemesterSurveyDashboard | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -275,7 +280,7 @@ export const SurveyDashboardPage: React.FC = () => {
         const next = await surveyApi.semesterSurveys(Number(semesterId));
         if (cancelled) return;
         setSemesterSurveys(next);
-        setSemesterSurveyId(next.length > 0 ? String(next[0].semesterSurveyId) : '');
+        setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(next, current));
         setLoadError(null);
       } catch (error) {
         if (!cancelled) setLoadError(messageFrom(error));
@@ -341,7 +346,10 @@ export const SurveyDashboardPage: React.FC = () => {
           <CampaignSelect
             id="dashboard-campaign-select"
             value={semesterSurveyId}
-            onChange={setSemesterSurveyId}
+            onChange={(value) => {
+              setSemesterSurveyId(value);
+              setActiveSemesterSurveyId(value);
+            }}
             disabled={semesterSurveys.length === 0}
             placeholder={semesterSurveys.length === 0 ? 'Chưa có đợt nào' : 'Chọn đợt khảo sát'}
             options={semesterSurveys.map((survey) => ({
@@ -369,7 +377,7 @@ export const SurveyDashboardPage: React.FC = () => {
                     'Bộ câu hỏi': data.templateName,
                     'Học kỳ': `${data.semesterName} · ${data.academicYearName}`,
                     'Số lớp học phần': data.sectionCount,
-                    'Tổng sĩ số': data.totalClassSize,
+                    'Tổng số phiếu phải thu': data.totalClassSize,
                     'Số phiếu đã thu': data.totalResponseCount,
                     'Số phiếu hợp lệ': data.validResponseCount,
                     'Tỷ lệ phản hồi': `${data.responseRate.toFixed(1)}%`,
@@ -388,15 +396,6 @@ export const SurveyDashboardPage: React.FC = () => {
               }}
             />
           )}
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => void loadData()}
-            disabled={!semesterSurveyId || loading}
-          >
-            <RefreshCw aria-hidden="true" size={16} />
-            Tải lại
-          </button>
         </div>
       </section>
 
@@ -458,7 +457,7 @@ const DashboardReport: React.FC<{ data: SemesterSurveyDashboard }> = ({ data }) 
       <QuestionChart questions={data.questions} overallScore={data.overallScore} />
     </div>
 
-    <WeakestQuestions rows={data.weakestQuestions} />
+    <WeakestQuestions rows={data.questions} />
 
     <div className="dashboard-report-grid">
       <CourseReview data={data} />
@@ -471,9 +470,9 @@ const DashboardReport: React.FC<{ data: SemesterSurveyDashboard }> = ({ data }) 
 
 /*
   Sáu chỉ số, dùng đúng bộ từ vựng của các trang còn lại: "Số phiếu đã thu" tách hẳn
-  khỏi "Số phiếu hợp lệ", và tỷ lệ là TỶ LỆ PHẢN HỒI (đã thu / sĩ số) — cùng công
+  khỏi "Số phiếu hợp lệ", và tỷ lệ là TỶ LỆ PHẢN HỒI (đã thu / tổng số phiếu phải thu) — cùng công
   thức với vế thứ nhất của ngưỡng tính điểm. "Tỷ lệ hoàn thành" cũ lấy phiếu hợp lệ
-  chia sĩ số nên đứng cạnh hai dòng phiếu ở trên là đọc ra một con số thứ ba không
+  chia tổng số phiếu phải thu nên đứng cạnh hai dòng phiếu ở trên là đọc ra một con số thứ ba không
   suy được từ đâu.
 */
 const MainIndicators: React.FC<{ data: SemesterSurveyDashboard }> = ({ data }) => (
@@ -485,7 +484,7 @@ const MainIndicators: React.FC<{ data: SemesterSurveyDashboard }> = ({ data }) =
         <dd>{data.sectionCount.toLocaleString('vi-VN')}</dd>
       </div>
       <div className="dashboard-kpi">
-        <dt>Tổng sĩ số</dt>
+        <dt>Tổng số phiếu phải thu</dt>
         <dd>{data.totalClassSize.toLocaleString('vi-VN')}</dd>
       </div>
       <div className="dashboard-kpi">
@@ -593,13 +592,57 @@ const QuestionChart: React.FC<{
   </section>
 );
 
-// ------------------------------------------------ Năm tiêu chí yếu nhất
+// ----------------------------------------------- Tiêu chí theo số lớp cảnh báo
 
 // Bảng dùng đúng theme .catalog-table, giống bảng phân bố ở màn phân tích.
-const WeakestQuestions: React.FC<{ rows: DashboardQuestionScore[] }> = ({ rows }) => (
+const WeakestQuestions: React.FC<{ rows: DashboardQuestionScore[] }> = ({ rows }) => {
+  const [classCount, setClassCount] = useState('');
+  const [direction, setDirection] = useState<'gte' | 'lte'>('gte');
+  const threshold = classCount === '' ? null : Math.max(0, Number(classCount) || 0);
+  const visibleRows = useMemo(() => {
+    if (threshold === null) {
+      return [...rows].sort((left, right) => left.averageScore - right.averageScore).slice(0, 5);
+    }
+    return rows
+      .filter((row) => direction === 'gte'
+        ? row.sectionsBelowThreshold >= threshold
+        : row.sectionsBelowThreshold <= threshold)
+      .sort((left, right) => direction === 'gte'
+        ? right.sectionsBelowThreshold - left.sectionsBelowThreshold || left.averageScore - right.averageScore
+        : left.sectionsBelowThreshold - right.sectionsBelowThreshold || left.averageScore - right.averageScore);
+  }, [direction, rows, threshold]);
+
+  return (
   <section className="dashboard-report-block">
-    <h3 className="dashboard-report-title">5 tiêu chí yếu nhất toàn trường</h3>
-    {rows.length === 0 ? (
+    <div className="dashboard-report-heading">
+      <h3 className="dashboard-report-title">
+        {threshold === null
+          ? '5 tiêu chí yếu nhất toàn trường'
+          : `Tiêu chí có số lớp cảnh báo ${direction === 'gte' ? 'từ' : 'đến'} ${threshold}`}
+      </h3>
+      <div className="dashboard-warning-filter" aria-label="Lọc theo số lớp cảnh báo">
+        <label>
+          <span>Số lớp cảnh báo</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            placeholder="Để trống"
+            value={classCount}
+            onChange={(event) => setClassCount(event.target.value.replace(/[^0-9]/g, ''))}
+          />
+        </label>
+        <label>
+          <span>Chiều lọc</span>
+          <select value={direction} onChange={(event) => setDirection(event.target.value as 'gte' | 'lte')}>
+            <option value="gte">Từ số lượng này trở lên</option>
+            <option value="lte">Từ số lượng này trở xuống</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    {visibleRows.length === 0 ? (
       <p className="dashboard-report-note">Chưa có phiếu hợp lệ nào để xếp hạng tiêu chí.</p>
     ) : (
       <div className="catalog-table-scroll" tabIndex={0} aria-label="Tiêu chí yếu nhất">
@@ -619,7 +662,7 @@ const WeakestQuestions: React.FC<{ rows: DashboardQuestionScore[] }> = ({ rows }
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {visibleRows.map((row) => (
               <tr key={row.questionOrder}>
                 <td className="catalog-table__index">C{row.questionOrder}</td>
                 <td>
@@ -636,7 +679,8 @@ const WeakestQuestions: React.FC<{ rows: DashboardQuestionScore[] }> = ({ rows }
       </div>
     )}
   </section>
-);
+  );
+};
 
 // -------------------------------------- Học phần cần rà soát ở cấp học phần
 

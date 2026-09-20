@@ -91,7 +91,7 @@ export function Sidebar({
         { id: 'progress', label: 'Tiến độ thu phiếu', icon: ChartColumn },
         { id: 'survey-statistics', label: 'Bảng dữ liệu khảo sát', icon: Table2 },
         { id: 'reports', label: 'Thống kê & Báo cáo', icon: BarChart3 },
-        { id: 'survey-analysis', label: 'Thống kê chi tiết', icon: Sigma },
+        { id: 'survey-analysis', label: 'Phân tích chuyên sâu', icon: Sigma },
         { id: 'graduation-analytics', label: 'Thống kê tốt nghiệp', icon: GraduationCap },
       ],
     },

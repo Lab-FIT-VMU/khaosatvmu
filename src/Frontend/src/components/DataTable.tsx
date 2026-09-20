@@ -74,6 +74,8 @@ interface DataTableProps<T> {
   /** Bật tính năng xuất file .xlsx, .docx, .pdf. Mặc định: true */
   enableExport?: boolean;
   exportConfig?: DataTableExportConfig<T>;
+  /** Nhận sự kiện bấm vào dòng dữ liệu */
+  onRowClick?: (item: T) => void;
 }
 
 export function DataTable<T>({
@@ -98,6 +100,7 @@ export function DataTable<T>({
   onSortChange,
   enableExport = true,
   exportConfig,
+  onRowClick,
 }: DataTableProps<T>) {
   const resolvedAddLabel = addNewLabel.replace(/^\+\s*/, '');
 
@@ -419,7 +422,19 @@ export function DataTable<T>({
               </tr>
             ) : (
               visibleRows.map((item, index) => (
-                <tr key={keyExtractor(item)}>
+                <tr
+                  key={keyExtractor(item)}
+                  onClick={
+                    onRowClick
+                      ? (e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.closest('button, a, input, select, textarea')) return;
+                          onRowClick(item);
+                        }
+                      : undefined
+                  }
+                  style={onRowClick ? { cursor: 'pointer' } : undefined}
+                >
                   {showIndex && (
                     <td className="catalog-table__index">{firstIndex + index + 1}</td>
                   )}
