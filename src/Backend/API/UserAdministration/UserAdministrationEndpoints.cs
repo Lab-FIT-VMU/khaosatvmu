@@ -187,8 +187,8 @@ public static class UserAdministrationEndpoints
             var grants = request.Grants?
                 .Select(g => new Application.UserAdministration.RolePermissionGrantDto(g.PermissionId, g.IsGranted))
                 .ToList() ?? [];
-            await service.UpdateRolePermissionsAsync(roleId, grants, cancellationToken);
-            return Results.NoContent();
+            var result = await service.UpdateRolePermissionsAsync(roleId, grants, cancellationToken);
+            return result.Succeeded ? Results.NoContent() : ToResult(result);
         }).AddEndpointFilter<RequireAntiforgeryFilter>();
 
         group.MapGet("/change-audit-logs", async (
@@ -220,6 +220,7 @@ public static class UserAdministrationEndpoints
             UserAdministrationErrorCodes.ProfileAssignmentExists => StatusCodes.Status409Conflict,
             UserAdministrationErrorCodes.CannotDisableSelf => StatusCodes.Status409Conflict,
             UserAdministrationErrorCodes.CannotModifyActiveProfile => StatusCodes.Status409Conflict,
+            UserAdministrationErrorCodes.CannotRevokeRequiredPermission => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
         return Results.Json(new { errorCode = result.ErrorCode }, statusCode: statusCode);

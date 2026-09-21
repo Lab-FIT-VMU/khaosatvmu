@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { roleDisplayName } from '../auth/roles';
 import { Modal } from './Modal';
 import { adminApi } from '../services/adminApi';
+import { ApiError } from '../services/apiClient';
 import type { AdminRole, RolePermissionMatrix } from '../types';
 import '../styles/auth-admin.css';
 
@@ -12,6 +13,9 @@ interface RolePermissionEditorProps {
 }
 
 function messageFromError(error: unknown): string {
+  if (error instanceof ApiError && error.errorCode === 'ADMIN_CANNOT_REVOKE_REQUIRED_PERMISSION') {
+    return 'Quyền Người dùng & phân quyền là bắt buộc đối với Quản trị hệ thống và không thể tắt.';
+  }
   return error instanceof Error ? error.message : 'Không thể tải danh sách quyền';
 }
 
@@ -68,6 +72,16 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
 
   const handleToggle = (permissionId: string) => {
     if (!roleData || !selectedRoleId) return;
+    const permission = roleData.permissions.find((item) => item.permissionId === permissionId);
+    const isRequired = roleData.roleCode === 'ADMIN'
+      && permission?.permissionCode === 'USER_ADMIN_ACCESS';
+    if (isRequired) {
+      toast.warning('Không thể tắt quyền bắt buộc', {
+        description: 'Quản trị hệ thống luôn phải có quyền Người dùng & phân quyền.',
+      });
+      return;
+    }
+
     setRoleDataById((current) => ({
       ...current,
       [selectedRoleId]: {
@@ -269,14 +283,20 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
             <ul className="perm-group__list">
               {group.items.map((perm) => {
                 const inputId = `perm-toggle-${perm.permissionId}`;
+                const isRequired = roleData?.roleCode === 'ADMIN'
+                  && perm.permissionCode === 'USER_ADMIN_ACCESS';
                 return (
                   <li key={perm.permissionId} className="perm-row">
-                    <div className="perm-row__name">{perm.permissionName}</div>
+                    <div className="perm-row__name">
+                      {perm.permissionName}{isRequired ? ' (Bắt buộc)' : ''}
+                    </div>
                     <span className="perm-toggle">
                       <input
                         id={inputId}
                         type="checkbox"
                         checked={perm.isGranted}
+                        aria-disabled={isRequired}
+                        title={isRequired ? 'Quản trị hệ thống luôn phải có quyền này.' : undefined}
                         onChange={() => handleToggle(perm.permissionId)}
                       />
                       <label htmlFor={inputId} aria-label={perm.permissionName}>

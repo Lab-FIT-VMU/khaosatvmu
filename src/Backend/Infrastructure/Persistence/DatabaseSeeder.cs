@@ -205,11 +205,11 @@ public static class DatabaseSeeder
         {
             var role = roles[definition.RoleCode];
             var permission = permissions[definition.PermissionCode];
-            var exists = await db.RolePermissions.AnyAsync(x =>
+            var existing = await db.RolePermissions.SingleOrDefaultAsync(x =>
                 x.RoleId == role.Id && x.PermissionId == permission.Id,
                 cancellationToken);
 
-            if (!exists)
+            if (existing is null)
             {
                 db.RolePermissions.Add(new RolePermission
                 {
@@ -219,6 +219,12 @@ public static class DatabaseSeeder
                     IsGranted = true,
                     CreatedAt = DateTime.UtcNow
                 });
+            }
+            else if (RequiredRolePermissions.IsRequired(definition.RoleCode, definition.PermissionCode))
+            {
+                // Tự phục hồi dữ liệu đã bị tắt trước khi có ràng buộc này. Nếu không,
+                // admin sẽ bị khóa ngoài màn hình duy nhất có thể cấp lại quyền.
+                existing.IsGranted = true;
             }
         }
 
