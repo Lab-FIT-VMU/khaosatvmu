@@ -213,6 +213,8 @@ export const catalogApi = {
 
 export interface SaveAcademicYearPayload {
   academicYearName: string;
+  /** ISO yyyy-MM-dd. Ngày kết thúc do máy chủ tự tính, không gửi lên. */
+  startDate: string;
 }
 
 export interface SaveCourseSectionPayload {
@@ -281,6 +283,7 @@ export const catalogErrorMessages: Record<string, string> = {
   CATALOG_POSITION_NOT_FOUND: 'Không tìm thấy chức vụ.',
   CATALOG_POSITION_NAME_REQUIRED: 'Thiếu tên chức vụ.',
   CATALOG_POSITION_NAME_EXISTS: 'Tên chức vụ đã tồn tại.',
+  CATALOG_ACADEMIC_YEAR_START_DATE_REQUIRED: 'Vui lòng chọn ngày bắt đầu năm học.',
   CATALOG_MAJOR_NOT_FOUND: 'Không tìm thấy ngành đào tạo.',
   CATALOG_MAJOR_CODE_REQUIRED: 'Thiếu mã ngành.',
   CATALOG_MAJOR_CODE_EXISTS: 'Mã ngành đã tồn tại trong hệ thống.',

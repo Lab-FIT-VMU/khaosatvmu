@@ -1,4 +1,4 @@
-using Domain;
+﻿using Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Persistence;
@@ -36,12 +36,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<SurveyResponseAnswer> SurveyResponseAnswers => Set<SurveyResponseAnswer>();
     public DbSet<SurveyScoringSetting> SurveyScoringSettings => Set<SurveyScoringSetting>();
     public DbSet<SurveyScoringChangeLog> SurveyScoringChangeLogs => Set<SurveyScoringChangeLog>();
-    public DbSet<GraduationAnalyticsDataset> GraduationAnalyticsDatasets =>
-        Set<GraduationAnalyticsDataset>();
-    public DbSet<GraduationAnalyticsRow> GraduationAnalyticsRows => Set<GraduationAnalyticsRow>();
     public DbSet<GraduationPeriod> GraduationPeriods => Set<GraduationPeriod>();
     public DbSet<GraduationImportRevision> GraduationImportRevisions => Set<GraduationImportRevision>();
     public DbSet<GraduationAggregateRow> GraduationAggregateRows => Set<GraduationAggregateRow>();
+    public DbSet<Cohort> Cohorts => Set<Cohort>();
+    public DbSet<CohortMajor> CohortMajors => Set<CohortMajor>();
+    public DbSet<GraduationRound> GraduationRounds => Set<GraduationRound>();
+    public DbSet<CohortMajorGraduation> CohortMajorGraduations => Set<CohortMajorGraduation>();
     public DbSet<ChangeAuditLog> ChangeAuditLogs => Set<ChangeAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -72,6 +73,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         // hai chục chỗ truy vấn.
         modelBuilder.Entity<SurveyResponse>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<GraduationPeriod>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<Cohort>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<CohortMajor>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<CohortMajorGraduation>().HasQueryFilter(e => !e.IsDeleted);
         // Câu trả lời không có cột IsDeleted riêng mà bám theo phiếu cha. Bắt buộc
         // phải khai bộ lọc khớp: answer là đầu BẮT BUỘC của quan hệ, thiếu bộ lọc
         // thì EF cảnh báo đọc ra answer mà navigation phiếu cha lại null.
@@ -247,6 +251,103 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // Khoá học và khoá ngành đào tạo. Mã lớp trong file danh sách sinh viên tốt
+        // nghiệp (vd 'CNT63CL') quy về đúng một dòng "CohortMajors", nên ở đây dùng
+        // khoá ngoại cứng chứ không dò tên như module thống kê tốt nghiệp cũ.
+        modelBuilder.Entity<Cohort>(entity =>
+        {
+            entity.ToTable("Cohorts");
+            entity.HasKey(x => x.CohortId);
+            entity.Property(x => x.CohortCode).HasMaxLength(10).IsRequired();
+            entity.Property(x => x.CohortName).HasMaxLength(50).IsRequired();
+            entity.HasIndex(x => x.AcademicYearId);
+            entity.HasIndex(x => x.CohortCode)
+                .IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
+            entity.HasOne<AcademicYear>()
+                .WithMany()
+                .HasForeignKey(x => x.AcademicYearId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CohortMajor>(entity =>
+        {
+            entity.ToTable("CohortMajors", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_CohortMajors_Counts",
+                    "\"StudentCount\" >= 0 AND \"GraduatedCount\" >= 0 AND \"NotGraduatedCount\" >= 0 "
+                    + "AND \"ExcellentCount\" >= 0 AND \"VeryGoodCount\" >= 0 AND \"GoodCount\" >= 0 "
+                    + "AND \"AverageCount\" >= 0 AND \"WorkStudyCount\" >= 0 "
+                    + "AND \"OnTimeGraduatedCount\" >= 0");
+            });
+            entity.HasKey(x => x.CohortMajorId);
+            entity.Property(x => x.CohortMajorCode).HasMaxLength(30).IsRequired();
+            entity.HasIndex(x => x.CohortId);
+            entity.HasIndex(x => x.MajorId);
+            entity.HasIndex(x => new { x.CohortId, x.CohortMajorCode })
+                .IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
+            entity.HasIndex(x => new { x.CohortId, x.MajorId })
+                .IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
+            entity.HasOne<Cohort>()
+                .WithMany()
+                .HasForeignKey(x => x.CohortId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Major>()
+                .WithMany()
+                .HasForeignKey(x => x.MajorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GraduationRound>(entity =>
+        {
+            entity.ToTable("GraduationRounds", table =>
+            {
+                table.HasCheckConstraint("CK_GraduationRounds_RoundNumber", "\"RoundNumber\" > 0");
+                table.HasCheckConstraint(
+                    "CK_GraduationRounds_ReviewDate",
+                    "(\"ReviewMonth\" IS NULL AND \"ReviewYear\" IS NULL) OR "
+                    + "(\"ReviewMonth\" BETWEEN 1 AND 12 AND \"ReviewYear\" BETWEEN 1900 AND 2200)");
+            });
+            entity.HasKey(x => x.GraduationRoundId);
+            entity.HasIndex(x => new { x.AcademicYearId, x.RoundNumber }).IsUnique();
+            entity.HasOne<AcademicYear>()
+                .WithMany()
+                .HasForeignKey(x => x.AcademicYearId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CohortMajorGraduation>(entity =>
+        {
+            entity.ToTable("CohortMajorGraduations", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_CohortMajorGraduations_Counts",
+                    "\"GraduatedCount\" >= 0 AND \"ExcellentCount\" >= 0 AND \"VeryGoodCount\" >= 0 "
+                    + "AND \"GoodCount\" >= 0 AND \"AverageCount\" >= 0 AND \"WorkStudyCount\" >= 0");
+                // Bốn cột xếp loại phải cộng đúng bằng tổng. Hệ vừa học vừa làm là
+                // chiều cắt ngang nên đứng ngoài phép cộng này.
+                table.HasCheckConstraint(
+                    "CK_CohortMajorGraduations_RankSum",
+                    "\"GraduatedCount\" = \"ExcellentCount\" + \"VeryGoodCount\" + \"GoodCount\" + \"AverageCount\"");
+            });
+            entity.HasKey(x => x.CohortMajorGraduationId);
+            entity.HasIndex(x => x.CohortMajorId);
+            entity.HasIndex(x => new { x.GraduationRoundId, x.CohortMajorId })
+                .IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
+            entity.HasOne<GraduationRound>()
+                .WithMany()
+                .HasForeignKey(x => x.GraduationRoundId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CohortMajor>()
+                .WithMany()
+                .HasForeignKey(x => x.CohortMajorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // Bảng cấu hình một dòng: cặp ngưỡng lọc lớp được tính điểm, và ba cờ bật
         // tắt từng luật của bộ lọc nhiễu.
         modelBuilder.Entity<SurveyScoringSetting>(entity =>
@@ -280,6 +381,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.ToTable("AcademicYears");
             entity.HasKey(x => x.AcademicYearId);
             entity.Property(x => x.AcademicYearName).IsRequired();
+            entity.Property(x => x.StartDate).HasColumnType("date");
+            entity.Property(x => x.EndDate).HasColumnType("date");
             entity.HasIndex(x => x.AcademicYearName).IsUnique();
         });
 
@@ -550,57 +653,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         // Module thống kê tốt nghiệp độc lập: chỉ liên hệ giữa hai bảng mới, không nối FK vào
         // danh mục/khảo sát hiện tại để giữ nguyên snapshot của file nguồn.
-        modelBuilder.Entity<GraduationAnalyticsDataset>(entity =>
-        {
-            entity.ToTable("GraduationAnalyticsDatasets", table =>
-            {
-                table.HasCheckConstraint(
-                    "CK_GraduationAnalyticsDatasets_ReviewMonth",
-                    "\"ReviewMonth\" BETWEEN 1 AND 12");
-                table.HasCheckConstraint(
-                    "CK_GraduationAnalyticsDatasets_ReviewYear",
-                    "\"ReviewYear\" BETWEEN 1900 AND 2200");
-            });
-            entity.HasKey(x => x.DatasetId);
-            entity.Property(x => x.DatasetName).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.ReviewPeriodText).HasMaxLength(100).IsRequired();
-            entity.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
-            entity.Property(x => x.ContentHash).HasMaxLength(64).IsFixedLength().IsRequired();
-            entity.Property(x => x.ImportedByName).HasMaxLength(320).IsRequired();
-            entity.HasIndex(x => x.ContentHash).IsUnique();
-            entity.HasIndex(x => x.ImportedAtUtc);
-            entity.HasIndex(x => new { x.ReviewYear, x.ReviewMonth })
-                .IsUnique()
-                .IsDescending();
-        });
-
-        modelBuilder.Entity<GraduationAnalyticsRow>(entity =>
-        {
-            entity.ToTable("GraduationAnalyticsRows");
-            entity.HasKey(x => x.RowId);
-            entity.Property(x => x.SourceSheetName).HasMaxLength(100).IsRequired();
-            entity.Property(x => x.FacultyName).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.ProgramCode).HasMaxLength(100);
-            entity.Property(x => x.ProgramName).HasMaxLength(300).IsRequired();
-            entity.Property(x => x.Cohort).HasMaxLength(50).IsRequired();
-            entity.Property(x => x.ReviewPeriodText).HasMaxLength(100).IsRequired();
-            entity.Property(x => x.OnTimeGraduateRate).HasColumnType("numeric(9,4)");
-            entity.Property(x => x.ExcellentRate).HasColumnType("numeric(9,4)");
-            entity.Property(x => x.VeryGoodRate).HasColumnType("numeric(9,4)");
-            entity.Property(x => x.GoodRate).HasColumnType("numeric(9,4)");
-            entity.Property(x => x.AverageRate).HasColumnType("numeric(9,4)");
-            entity.Property(x => x.WorkStudyTransferRate).HasColumnType("numeric(9,4)");
-            entity.HasIndex(x => new { x.DatasetId, x.SourceSheetName, x.SourceRowNumber }).IsUnique();
-            entity.HasIndex(x => new { x.DatasetId, x.FacultyName });
-            entity.HasIndex(x => new { x.DatasetId, x.ProgramCode, x.ProgramName });
-            entity.HasIndex(x => new { x.DatasetId, x.Cohort });
-            entity.HasIndex(x => new { x.DatasetId, x.ReviewYear, x.ReviewMonth });
-            entity.HasOne<GraduationAnalyticsDataset>()
-                .WithMany()
-                .HasForeignKey(x => x.DatasetId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
         modelBuilder.Entity<GraduationPeriod>(entity =>
         {
             entity.ToTable("GraduationPeriods", table =>

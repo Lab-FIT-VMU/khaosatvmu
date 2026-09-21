@@ -28,6 +28,8 @@ public static class AuthPolicies
     public const string SurveyStatisticsAccess = "PERMISSION_SURVEY_STATISTICS_ACCESS";
     public const string SurveyAnalysisAccess = "PERMISSION_SURVEY_ANALYSIS_ACCESS";
     public const string GraduationAnalyticsAccess = "PERMISSION_GRADUATION_ANALYTICS_ACCESS";
+    public const string GraduationAnalytics2Access = "PERMISSION_GRADUATION_ANALYTICS_2_ACCESS";
+    public const string CohortMajorsAccess = "PERMISSION_COHORT_MAJORS_ACCESS";
     /// <summary>Bất kỳ quyền nào trong nhóm Báo cáo, cho các endpoint dùng chung.</summary>
     public const string ReportingRead = "PERMISSION_REPORTING_READ";
     public const string SurveyOperationalRead = "PERMISSION_SURVEY_OPERATIONAL_READ";

@@ -1,4 +1,4 @@
-namespace UnitTests.ApplicationTests;
+﻿namespace UnitTests.ApplicationTests;
 
 using Application.Catalog;
 using FluentAssertions;
@@ -51,10 +51,11 @@ public class CatalogValidationTests
     }
 
     [Fact]
-    public void SaveAcademicYearCommand_ShouldCarryOnlyTheName()
+    public void SaveAcademicYearCommand_ShouldCarryTheNameAndStartDate()
     {
-        var command = new SaveAcademicYearCommand("2025-2026");
+        var command = new SaveAcademicYearCommand("2025-2026", new DateOnly(2025, 9, 1));
 
         command.AcademicYearName.Should().Be("2025-2026");
+        command.StartDate.Should().Be(new DateOnly(2025, 9, 1));
     }
 }

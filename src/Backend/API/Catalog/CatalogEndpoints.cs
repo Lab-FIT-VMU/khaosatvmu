@@ -1,4 +1,4 @@
-using API.Auth;
+﻿using API.Auth;
 using Application.Catalog;
 
 namespace API.Catalog;
@@ -584,9 +584,9 @@ public static class CatalogEndpoints
         string MajorName,
         string? FacultyName);
 
-    public sealed record SaveAcademicYearRequest(string AcademicYearName)
+    public sealed record SaveAcademicYearRequest(string AcademicYearName, DateOnly? StartDate)
     {
-        public SaveAcademicYearCommand ToCommand() => new(AcademicYearName);
+        public SaveAcademicYearCommand ToCommand() => new(AcademicYearName, StartDate);
     }
 
     public sealed record SaveSemesterRequest(string SemesterName, int AcademicYearId);

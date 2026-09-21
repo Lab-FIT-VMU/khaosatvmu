@@ -33,6 +33,7 @@ const FacultiesPage = lazy(() => import('./pages/FacultiesPage').then(m => ({ de
 const DepartmentsPage = lazy(() => import('./pages/DepartmentsPage').then(m => ({ default: m.DepartmentsPage })));
 const LecturersPage = lazy(() => import('./pages/LecturersPage').then(m => ({ default: m.LecturersPage })));
 const MajorsPage = lazy(() => import('./pages/MajorsPage').then(m => ({ default: m.MajorsPage })));
+const CohortMajorsPage = lazy(() => import('./pages/CohortMajorsPage').then(m => ({ default: m.CohortMajorsPage })));
 const CoursesPage = lazy(() => import('./pages/CoursesPage').then(m => ({ default: m.CoursesPage })));
 const ClassesPage = lazy(() => import('./pages/ClassesPage').then(m => ({ default: m.ClassesPage })));
 const CriteriaPage = lazy(() => import('./pages/CriteriaPage').then(m => ({ default: m.CriteriaPage })));
@@ -46,6 +47,7 @@ const SurveyStatisticsPage = lazy(() => import('./pages/SurveyStatisticsPage').t
 const SurveyAnalysisPage = lazy(() => import('./pages/SurveyAnalysisPage').then(m => ({ default: m.SurveyAnalysisPage })));
 const SurveyDashboardPage = lazy(() => import('./pages/SurveyDashboardPage').then(m => ({ default: m.SurveyDashboardPage })));
 const GraduationAnalyticsPage = lazy(() => import('./pages/GraduationAnalyticsPage').then(m => ({ default: m.GraduationAnalyticsPage })));
+const GraduationAnalytics2Page = lazy(() => import('./pages/GraduationAnalytics2Page').then(m => ({ default: m.GraduationAnalytics2Page })));
 const StudentSurveyView = lazy(() => import('./pages/StudentSurveyView').then(m => ({ default: m.StudentSurveyView })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const ProfileSelectionPage = lazy(() => import('./pages/ProfileSelectionPage').then(m => ({ default: m.ProfileSelectionPage })));
@@ -132,7 +134,7 @@ function DashboardApp() {
   ].some((moduleId) => canAccessModule(permissions, moduleId));
   const canLoadDepartments = ['faculties', 'departments', 'lecturers', 'courses', 'classes']
     .some((moduleId) => canAccessModule(permissions, moduleId));
-  const canLoadMajors = ['faculties', 'majors']
+  const canLoadMajors = ['faculties', 'majors', 'cohort-majors']
     .some((moduleId) => canAccessModule(permissions, moduleId));
   const canLoadCourses = ['departments', 'courses', 'classes']
     .some((moduleId) => canAccessModule(permissions, moduleId));
@@ -672,6 +674,10 @@ function DashboardApp() {
               <GraduationAnalyticsPage />
             )}
 
+            {currentTab === 'graduation-analytics-2' && (
+              <GraduationAnalytics2Page />
+            )}
+
             {currentTab === 'faculties' && (
               <FacultiesPage
                 faculties={faculties}
@@ -713,6 +719,10 @@ function DashboardApp() {
                 onDeleteMajor={handleDeleteMajor}
                 onImportMajors={handleImportMajors}
               />
+            )}
+
+            {currentTab === 'cohort-majors' && (
+              <CohortMajorsPage majors={majors} />
             )}
 
             {currentTab === 'courses' && (

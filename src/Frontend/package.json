@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test:graduation": "node --test tests/graduationImportExcel.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

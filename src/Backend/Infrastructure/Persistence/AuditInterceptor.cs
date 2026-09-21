@@ -16,9 +16,6 @@ internal sealed class AuditInterceptor(ICurrentUserAccessor currentUser) : SaveC
         typeof(AuthSession),
         typeof(SurveyResponse),
         typeof(SurveyResponseAnswer),
-        // Module này có metadata import riêng và phải tách khỏi ChangeAuditLogs của project chính.
-        typeof(GraduationAnalyticsDataset),
-        typeof(GraduationAnalyticsRow),
     ];
 
     private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };

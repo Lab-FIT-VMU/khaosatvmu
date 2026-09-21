@@ -867,3 +867,42 @@
   .graduation-year-trends__chart { height: 370px; }
   .graduation-year-volume__chart { height: 410px; }
 }
+
+/* Bảng dòng lỗi khi import: giữ nguyên nội dung từng ô của tệp nguồn để người
+   dùng dò thẳng trong file, nên phải cuộn được cả hai chiều. */
+.graduation-import__errors {
+  overflow: auto;
+  max-height: 320px;
+  margin-top: 10px;
+  border: 1px solid #e3b4b1;
+  background: #fff;
+}
+
+.graduation-import__errors table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.graduation-import__errors th,
+.graduation-import__errors td {
+  padding: 6px 9px;
+  border-right: 1px solid #edf0f2;
+  border-bottom: 1px solid #edf0f2;
+  text-align: left;
+}
+
+.graduation-import__errors th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fdf2f1;
+  color: #000;
+  font-weight: 650;
+}
+
+.graduation-import__errors-reason {
+  color: #b52d2d;
+  font-weight: 600;
+}

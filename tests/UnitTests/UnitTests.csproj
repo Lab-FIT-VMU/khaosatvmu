@@ -20,6 +20,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="TestData\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Backend\Domain\Domain.csproj" />
     <ProjectReference Include="..\..\src\Backend\Application\Application.csproj" />
     <ProjectReference Include="..\..\src\Backend\Infrastructure\Infrastructure.csproj" />

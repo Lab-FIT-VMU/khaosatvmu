@@ -1,4 +1,4 @@
-namespace Application.Catalog;
+﻿namespace Application.Catalog;
 
 public sealed record FacultyDto(int FacultyId, string FacultyName);
 
@@ -12,6 +12,8 @@ public sealed record PositionDto(int PositionId, string PositionName);
 public sealed record AcademicYearDto(
     int AcademicYearId,
     string AcademicYearName,
+    DateOnly StartDate,
+    DateOnly EndDate,
     IReadOnlyList<SemesterDto> Semesters);
 
 public sealed record SemesterDto(int SemesterId, string SemesterName, int AcademicYearId);
@@ -36,7 +38,13 @@ public sealed record CourseSectionDto(
     string? LecturerName = null,
     string? LecturerEmail = null);
 
-public sealed record SaveAcademicYearCommand(string AcademicYearName);
+/// <summary>
+/// Chỉ nhận ngày bắt đầu; ngày kết thúc luôn là ngày liền trước mốc đó của năm sau
+/// nên không cho gửi lên, tránh hai nguồn số liệu lệch nhau.
+/// </summary>
+public sealed record SaveAcademicYearCommand(
+    string AcademicYearName,
+    DateOnly? StartDate = null);
 
 public sealed record SaveSemesterCommand(string SemesterName, int AcademicYearId);
 
@@ -499,6 +507,7 @@ public static class CatalogErrorCodes
     public const string MajorExists = "CATALOG_MAJOR_EXISTS";
 
     public const string AcademicYearNotFound = "CATALOG_ACADEMIC_YEAR_NOT_FOUND";
+    public const string AcademicYearStartDateRequired = "CATALOG_ACADEMIC_YEAR_START_DATE_REQUIRED";
     public const string AcademicYearNameRequired = "CATALOG_ACADEMIC_YEAR_NAME_REQUIRED";
     public const string AcademicYearNameExists = "CATALOG_ACADEMIC_YEAR_NAME_EXISTS";
     public const string AcademicYearNameInvalid = "CATALOG_ACADEMIC_YEAR_NAME_INVALID";

@@ -2646,3 +2646,17 @@
   font-size: 13px;
   font-weight: 600;
 }
+
+/* ---------------------------------------------- Khoá ngành đào tạo */
+
+.catalog-cell-secondary {
+  color: #6b7780;
+  font-size: 12px;
+}
+
+.form-hint {
+  display: block;
+  margin-top: 4px;
+  color: #6b7780;
+  font-size: 12px;
+}
