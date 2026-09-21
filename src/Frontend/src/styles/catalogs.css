@@ -1888,7 +1888,10 @@
 
 .searchable-select__list--portal {
   position: fixed;
-  z-index: 1200;
+  /* Danh sách được portal ra body. Modal danh mục dùng z-index 1300, vì vậy
+     lớp này phải cao hơn backdrop; nếu không dropdown vẫn mở nhưng bị lớp
+     phủ của modal che tối và không thể tương tác. */
+  z-index: 1400;
   right: auto;
   bottom: auto;
   margin: 0;
@@ -1922,7 +1925,8 @@
 */
 .searchable-select__hovered-label {
   position: fixed;
-  z-index: 1000;
+  /* Luôn nổi trên cả danh sách portal và backdrop của modal. */
+  z-index: 1401;
   padding: 6px 9px;
   border: 1px solid #d7dee2;
   border-radius: 4px;

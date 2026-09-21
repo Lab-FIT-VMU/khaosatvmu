@@ -52,9 +52,7 @@ const defaultReview = (academicYearStart: number) => {
 };
 
 const monthLabel = (month: number) => `Tháng ${String(month).padStart(2, '0')}`;
-const reviewMonthsFor = (year: number, academicYearStart: number) => year === academicYearStart
-  ? [8, 9, 10, 11, 12]
-  : [1, 2, 3, 4, 5, 6, 7];
+const reviewMonths = Array.from({ length: 12 }, (_, index) => index + 1);
 
 export function GraduationImportDialog({
   isOpen,
@@ -128,11 +126,6 @@ export function GraduationImportDialog({
       setError(`Bạn cần xác nhận file thuộc năm học ${target.academicYearStart}–${target.academicYearStart + 1}.`);
       return;
     }
-    const expectedStart = reviewMonth >= 8 ? reviewYear : reviewYear - 1;
-    if (expectedStart !== target.academicYearStart) {
-      setError(`Tháng ${reviewMonth}/${reviewYear} không thuộc năm học ${target.academicYearStart}–${target.academicYearStart + 1}.`);
-      return;
-    }
     if (target.period && !replaceReason.trim()) {
       setError('Phải nhập lý do khi import lại một đợt đã có dữ liệu.');
       return;
@@ -162,11 +155,6 @@ export function GraduationImportDialog({
 
   const requestConfirmation = () => {
     if (!target || !file || !preview) return;
-    const expectedStart = reviewMonth >= 8 ? reviewYear : reviewYear - 1;
-    if (expectedStart !== target.academicYearStart) {
-      setError(`Tháng ${reviewMonth}/${reviewYear} không thuộc năm học ${target.academicYearStart}–${target.academicYearStart + 1}.`);
-      return;
-    }
     if (target.period && !replaceReason.trim()) {
       setError('Phải nhập lý do khi import lại một đợt đã có dữ liệu.');
       return;
@@ -180,14 +168,11 @@ export function GraduationImportDialog({
   if (!target) return null;
   const isReplace = Boolean(target.period);
   const reviewYears = [target.academicYearStart, target.academicYearStart + 1];
-  const reviewMonths = reviewMonthsFor(reviewYear, target.academicYearStart);
 
   const changeReviewYear = (year: number) => {
     setReviewYear(year);
     setConfirmationVisible(false);
     setAcademicYearConfirmed(false);
-    const nextMonths = reviewMonthsFor(year, target.academicYearStart);
-    if (!nextMonths.includes(reviewMonth)) setReviewMonth(nextMonths[0]);
   };
 
   const changeReviewMonth = (month: number) => {

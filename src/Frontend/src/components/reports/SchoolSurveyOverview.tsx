@@ -217,7 +217,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
         'Số phiếu đã thu': `${formatNumber(data.totalSubmittedResponses)} lượt`,
         'Số phiếu hợp lệ': `${formatNumber(data.totalResponses)} phiếu`,
         'Tỷ lệ phản hồi': `${data.responseRate.toFixed(1)}%`,
-        'Điểm trung bình': `${data.overallAverageScore.toFixed(2)} / 5.0`,
+        'Điểm trung bình': `${data.overallAverageScore.toFixed(3)} / 5.0`,
         'Lớp đủ điều kiện tính điểm':
           `${formatNumber(data.scoredSectionCount)} / ${formatNumber(data.totalSections)} lớp`,
         'Số phiếu hợp lệ dùng để tính điểm': formatNumber(data.scoredValidResponseCount),
@@ -405,14 +405,16 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
               <div className="reports-overview-kpis" role="region" aria-label="Kết quả đánh giá và tính điểm">
                 <div
                   className="reports-overview-kpi-card"
-                  title="Điểm trung bình, chỉ gộp phiếu hợp lệ của lớp đủ điều kiện"
+                  title="Điểm trung bình chỉ tính từ phiếu hợp lệ của các lớp đạt đủ hai tiêu chí"
                 >
                   <span className="reports-overview-kpi-label">Điểm trung bình</span>
                   <div className="reports-overview-kpi-value">
-                    <strong className="reports-overview-kpi-num">{data.overallAverageScore.toFixed(2)}</strong>
+                    <strong className="reports-overview-kpi-num">{data.overallAverageScore.toFixed(3)}</strong>
                     <span className="reports-overview-kpi-scale">/ 5.0</span>
                   </div>
-                  <span className="reports-overview-kpi-sub">Chỉ tính lớp đủ điều kiện</span>
+                  <span className="reports-overview-kpi-sub">
+                    Chỉ tính các phiếu hợp lệ thuộc các lớp đủ 2 tiêu chí
+                  </span>
                 </div>
 
                 <div
@@ -590,7 +592,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
                     : 'tiêu chí — toàn trường'}
                 </h3>
                 <span className="reports-exec-card-note">
-                  Đường nét đứt = điểm TB toàn trường ({data.overallAverageScore.toFixed(2)})
+                  Đường nét đứt = điểm TB toàn trường ({data.overallAverageScore.toFixed(3)})
                 </span>
               </div>
               <div className="reports-exec-actions">
@@ -598,7 +600,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
                   <ul className="dashboard-notes" style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
                     <li>Trục hoành hiển thị các tiêu chí đánh giá từ C1 đến C{criteriaQuestions?.length || 24}.</li>
                     <li>Trục tung biểu thị điểm trung bình đánh giá theo thang điểm từ 0 đến 5.</li>
-                    <li>Đường nét đứt ngang thể hiện điểm trung bình chung toàn trường ({data.overallAverageScore.toFixed(2)}).</li>
+                    <li>Đường nét đứt ngang thể hiện điểm trung bình chung toàn trường ({data.overallAverageScore.toFixed(3)}).</li>
                     <li>Màu sắc cột: Xanh lá (≥ 3.8), Vàng (3.5 – 3.79), Cam (3.2 – 3.49), Đỏ (&lt; 3.2).</li>
                     <li>Số lượt đánh giá của từng tiêu chí được tính dựa trên số phiếu dùng để tính điểm (phiếu hợp lệ của các lớp đủ điều kiện).</li>
                   </ul>

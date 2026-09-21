@@ -1600,7 +1600,7 @@ public sealed class EfReportService(
         // vào mặt bằng chung, kéo lệch con số so với chính bảng xếp hạng khoa ngay
         // bên trên nó.
         decimal overallAvg = schoolScoredResponses > 0
-            ? Math.Round(schoolScoredScoreSum / schoolScoredResponses, 2)
+            ? Math.Round(schoolScoredScoreSum / schoolScoredResponses, 3)
             : 0;
 
         var scoreDistribution = new List<ScoreBandDto>();
