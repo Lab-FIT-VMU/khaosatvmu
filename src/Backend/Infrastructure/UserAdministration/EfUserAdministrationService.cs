@@ -547,11 +547,41 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         );
     }
 
-    public async Task UpdateRolePermissionsAsync(
+    public async Task<AdminOperationResult<bool>> UpdateRolePermissionsAsync(
         Guid roleId,
         IReadOnlyList<RolePermissionGrantDto> grants,
         CancellationToken cancellationToken = default)
     {
+        var roleCode = await db.Roles
+            .AsNoTracking()
+            .Where(x => x.Id == roleId)
+            .Select(x => x.Code)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (roleCode is null)
+        {
+            return Failure<bool>(UserAdministrationErrorCodes.RoleNotFound);
+        }
+
+        var deniedPermissionIds = grants
+            .Where(x => !x.IsGranted)
+            .Select(x => x.PermissionId)
+            .ToHashSet();
+        if (deniedPermissionIds.Count > 0)
+        {
+            var deniedPermissionCodes = await db.Permissions
+                .AsNoTracking()
+                .Where(x => deniedPermissionIds.Contains(x.Id))
+                .Select(x => x.Code)
+                .ToListAsync(cancellationToken);
+
+            if (deniedPermissionCodes.Any(permissionCode =>
+                    RequiredRolePermissions.IsRequired(roleCode, permissionCode)))
+            {
+                return Failure<bool>(UserAdministrationErrorCodes.CannotRevokeRequiredPermission);
+            }
+        }
+
         var existing = await db.RolePermissions
             .Where(x => x.RoleId == roleId)
             .ToListAsync(cancellationToken);
@@ -580,6 +610,7 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        return Success(true);
     }
 
     public async Task<AdminPage<ChangeAuditLogDto>> GetChangeAuditLogsAsync(

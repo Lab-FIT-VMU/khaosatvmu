@@ -1,4 +1,4 @@
-namespace Domain;
+﻿namespace Domain;
 
 /// <summary>Bảng "Faculties".</summary>
 public sealed class Faculty : ISoftDeletable
@@ -71,6 +71,12 @@ public sealed class AcademicYear : ISoftDeletable
 
     /// <summary>UNIQUE, vd '2025-2026'.</summary>
     public string AcademicYearName { get; set; } = string.Empty;
+
+    /// <summary>Ngày 25/7 của năm đầu, suy ra từ <see cref="AcademicYearName"/>.</summary>
+    public DateOnly StartDate { get; set; }
+
+    /// <summary>Ngày 24/7 của năm sau, liền ngay trước năm học kế tiếp.</summary>
+    public DateOnly EndDate { get; set; }
 
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }

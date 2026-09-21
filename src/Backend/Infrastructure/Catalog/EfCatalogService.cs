@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Application.Auth;
@@ -571,6 +571,14 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
     /// <summary>Ba học kỳ được sinh tự động cho mỗi năm học mới.</summary>
     private static readonly string[] DefaultSemesterNames = ["Học kỳ phụ", "Học kỳ 1", "Học kỳ 2"];
 
+    /// <summary>
+    /// Năm học kết thúc vào ngày liền trước mốc bắt đầu của năm sau, nên hai năm
+    /// học liên tiếp khít nhau và không chồng lấn. Ngày 29/2 lùi về 28/2 rồi mới
+    /// trừ một ngày, theo đúng cách <see cref="DateOnly.AddYears"/> xử lý.
+    /// </summary>
+    private static DateOnly AcademicYearEndDate(DateOnly startDate) =>
+        startDate.AddYears(1).AddDays(-1);
+
     public async Task<IReadOnlyList<AcademicYearDto>> GetAcademicYearsAsync(
         CancellationToken cancellationToken = default)
     {
@@ -585,6 +593,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .Select(year => new AcademicYearDto(
                 year.AcademicYearId,
                 year.AcademicYearName,
+                year.StartDate,
+                year.EndDate,
                 semesters
                     .Where(semester => semester.AcademicYearId == year.AcademicYearId)
                     .Select(ToDto)
@@ -612,9 +622,14 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<AcademicYearDto>(validation);
         }
 
+        var academicYearName = command.AcademicYearName.Trim();
+        var startDate = command.StartDate!.Value;
+        var endDate = AcademicYearEndDate(startDate);
         var year = new AcademicYear
         {
-            AcademicYearName = command.AcademicYearName.Trim()
+            AcademicYearName = academicYearName,
+            StartDate = startDate,
+            EndDate = endDate,
         };
         db.AcademicYears.Add(year);
         await db.SaveChangesAsync(cancellationToken);
@@ -628,6 +643,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         return Succeeded(new AcademicYearDto(
             year.AcademicYearId,
             year.AcademicYearName,
+            year.StartDate,
+            year.EndDate,
             semesters.Select(ToDto).ToList()));
     }
 
@@ -656,6 +673,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         }
 
         year.AcademicYearName = command.AcademicYearName.Trim();
+        year.StartDate = command.StartDate!.Value;
+        year.EndDate = AcademicYearEndDate(year.StartDate);
         await db.SaveChangesAsync(cancellationToken);
 
         var semesters = await db.Semesters
@@ -666,6 +685,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         return Succeeded(new AcademicYearDto(
             year.AcademicYearId,
             year.AcademicYearName,
+            year.StartDate,
+            year.EndDate,
             semesters.Select(ToDto).ToList()));
     }
 
@@ -2522,6 +2543,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         if (name.Length == 0) return CatalogErrorCodes.AcademicYearNameRequired;
         if (!IsAcademicYearNameWellFormed(name)) return CatalogErrorCodes.AcademicYearNameInvalid;
 
+        if (command.StartDate is null) return CatalogErrorCodes.AcademicYearStartDateRequired;
+
         var normalized = NormalizeKey(name);
         var exists = await db.AcademicYears
             .Where(x => academicYearId == null || x.AcademicYearId != academicYearId)
@@ -2817,6 +2840,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .ToListAsync(cancellationToken);
         return Succeeded(new AcademicYearDto(
             year.AcademicYearId, year.AcademicYearName,
+            year.StartDate, year.EndDate,
             semesters.Select(ToDto).ToList()));
     }
 

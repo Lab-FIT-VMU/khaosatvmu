@@ -54,6 +54,8 @@ interface ClassesPageProps {
 
 interface YearForm {
   academicYearName: string;
+  startDate: string;
+  endDate: string;
 }
 
 interface SectionForm {
@@ -65,6 +67,24 @@ interface SectionForm {
 
 const emptyYearForm: YearForm = {
   academicYearName: '',
+  startDate: '',
+  endDate: '',
+};
+
+/**
+ * Năm học kết thúc vào ngày liền trước mốc bắt đầu của năm sau, để hai năm liên
+ * tiếp khít nhau. Ngày 29/2 lùi về 28/2 trước khi trừ một ngày, khớp cách
+ * DateOnly.AddYears của máy chủ làm tròn.
+ */
+const endDateFromStart = (startDate: string) => {
+  const [year, month, day] = startDate.split('-').map(Number);
+  if (!year || !month || !day) return '';
+
+  const nextYear = year + 1;
+  const daysInMonth = new Date(Date.UTC(nextYear, month, 0)).getUTCDate();
+  const anniversary = new Date(Date.UTC(nextYear, month - 1, Math.min(day, daysInMonth)));
+  anniversary.setUTCDate(anniversary.getUTCDate() - 1);
+  return anniversary.toISOString().slice(0, 10);
 };
 
 /**
@@ -349,7 +369,11 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
 
   const openEditYear = (year: AcademicYear) => {
     setEditingYear(year);
-    setYearForm({ academicYearName: year.academicYearName });
+    setYearForm({
+      academicYearName: year.academicYearName,
+      startDate: year.startDate,
+      endDate: year.endDate,
+    });
     setYearError('');
     setIsYearModalOpen(true);
   };
@@ -362,8 +386,15 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
       setYearError('Vui lòng nhập tên năm học.');
       return;
     }
+    if (!yearForm.startDate) {
+      setYearError('Vui lòng chọn ngày bắt đầu năm học.');
+      return;
+    }
 
-    const payload: SaveAcademicYearPayload = { academicYearName: name };
+    const payload: SaveAcademicYearPayload = {
+      academicYearName: name,
+      startDate: yearForm.startDate,
+    };
 
     setSavingYear(true);
     try {
@@ -1033,6 +1064,35 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
                 </option>
               ))}
             </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="year-start-date">Ngày bắt đầu</label>
+            <input
+              id="year-start-date"
+              type="date"
+              value={yearForm.startDate}
+              onChange={(event) =>
+                setYearForm((prev) => ({
+                  ...prev,
+                  startDate: event.target.value,
+                  endDate: endDateFromStart(event.target.value),
+                }))
+              }
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="year-end-date">Ngày kết thúc</label>
+            <input
+              id="year-end-date"
+              type="date"
+              value={yearForm.endDate}
+              readOnly
+              disabled
+            />
+            <small className="form-hint">
+              Tự tính theo ngày bắt đầu: ngày liền trước mốc đó của năm sau.
+            </small>
           </div>
           {!editingYear && (
             <div className="catalog-context-band">

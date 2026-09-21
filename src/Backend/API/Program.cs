@@ -1,13 +1,16 @@
-using API.Auth;
+﻿using API.Auth;
 using API.Catalog;
+using API.Cohorts;
 using API.Configuration;
 using API.GraduationAnalytics;
+using API.GraduationAnalytics2;
 using API.Middleware;
 using API.Reports;
 using API.Surveys;
 using API.UserAdministration;
 using Application.Auth;
 using Application.Catalog;
+using Application.Cohorts;
 using Application.Common.Interfaces;
 using Application.GraduationAnalytics;
 using Application.Reports;
@@ -15,6 +18,7 @@ using Application.Surveys;
 using Application.UserAdministration;
 using Infrastructure.Auth;
 using Infrastructure.Catalog;
+using Infrastructure.Cohorts;
 using Infrastructure.GraduationAnalytics;
 using Infrastructure.Persistence;
 using Infrastructure.Reports;
@@ -133,6 +137,8 @@ builder.Services.AddAuthorization(options =>
     AddPermissionPolicy(AuthPolicies.SurveyStatisticsAccess, "SURVEY_STATISTICS_ACCESS");
     AddPermissionPolicy(AuthPolicies.SurveyAnalysisAccess, "SURVEY_ANALYSIS_ACCESS");
     AddPermissionPolicy(AuthPolicies.GraduationAnalyticsAccess, "GRADUATION_ANALYTICS_ACCESS");
+    AddPermissionPolicy(AuthPolicies.GraduationAnalytics2Access, "GRADUATION_ANALYTICS_2_ACCESS");
+    AddPermissionPolicy(AuthPolicies.CohortMajorsAccess, "COHORT_MAJORS_ACCESS");
     AddAnyPermissionPolicy(AuthPolicies.ReportingRead,
         "REPORTS_ACCESS", "SURVEY_DASHBOARD_ACCESS", "SURVEY_STATISTICS_ACCESS",
         "SURVEY_ANALYSIS_ACCESS");
@@ -171,6 +177,7 @@ builder.Services.AddScoped<IAuthService, EfAuthService>();
 builder.Services.AddScoped<IAuthSessionService, EfAuthSessionService>();
 builder.Services.AddScoped<IUserAdministrationService, EfUserAdministrationService>();
 builder.Services.AddScoped<ICatalogService, EfCatalogService>();
+builder.Services.AddScoped<ICohortService, EfCohortService>();
 builder.Services.AddScoped<ISurveyService, EfSurveyService>();
 builder.Services.AddScoped<ICourseSurveyQrExporter, ClosedXmlCourseSurveyQrExporter>();
 builder.Services.AddScoped<IScoringThresholdProvider, EfScoringThresholdProvider>();
@@ -193,10 +200,20 @@ builder.Services.AddSingleton(_ =>
 // request huỷ phiếu tăng nó là mọi request khác đọc ngay số mới.
 builder.Services.AddSingleton<SchoolOverviewCacheVersion>();
 builder.Services.AddScoped<IReportService, EfReportService>();
-builder.Services.AddScoped<IGraduationAnalyticsService, EfGraduationAnalyticsService>();
 builder.Services.AddScoped<IGraduationImportParser, ClosedXmlGraduationImportParser>();
 builder.Services.AddScoped<IGraduationImportCatalogResolver, EfGraduationImportCatalogResolver>();
 builder.Services.AddScoped<IGraduationAnalyticsV3Service, EfGraduationAnalyticsV3Service>();
+// Bản dựng lại của module thống kê tốt nghiệp. Cùng tên kiểu nhưng khác namespace
+// nên phải ghi đủ đường dẫn; V3 gốc ở trên giữ nguyên, không đụng tới.
+builder.Services.AddScoped<
+    Application.GraduationAnalytics2.IGraduationImportParser,
+    Infrastructure.GraduationAnalytics2.ClosedXmlGraduationImportParser>();
+builder.Services.AddScoped<
+    Application.GraduationAnalytics2.IGraduationImportCatalogResolver,
+    Infrastructure.GraduationAnalytics2.EfGraduationImportCatalogResolver>();
+builder.Services.AddScoped<
+    Application.GraduationAnalytics2.IGraduationAnalyticsV3Service,
+    Infrastructure.GraduationAnalytics2.EfGraduationAnalyticsV3Service>();
 builder.Services.AddScoped<ApplicationCookieEvents>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
@@ -233,9 +250,11 @@ app.MapGet("/", () => Results.Ok(new
 app.MapAuthEndpoints();
 app.MapUserAdministrationEndpoints();
 app.MapCatalogEndpoints();
+app.MapCohortEndpoints();
 app.MapSurveyEndpoints();
 app.MapReportEndpoints();
 app.MapGraduationAnalyticsEndpoints();
+app.MapGraduationAnalytics2Endpoints();
 
 app.MapHealthChecks("/healthz");
 app.MapHealthChecks("/api/health");

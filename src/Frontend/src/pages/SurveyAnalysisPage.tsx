@@ -856,9 +856,6 @@ export const SurveyAnalysisPage: React.FC = () => {
     if (tab === 'normalization' && normalization) {
       const data = normalization;
       const rows = shownRows('normalization', data.groups);
-      const classSize = data.groups.reduce((sum, row) => sum + row.totalClassSize, 0);
-      const responses = data.groups.reduce((sum, row) => sum + row.responseCount, 0);
-      const validResponses = data.groups.reduce((sum, row) => sum + row.validResponseCount, 0);
 
       return {
         fileName: `phan-tich-theo-khoa-vien-${fileSuffix}`,
@@ -869,9 +866,7 @@ export const SurveyAnalysisPage: React.FC = () => {
             'Số lớp có phiếu': data.schoolSectionCount,
             'Số khoa/viện': data.groups.length,
           },
-          notesFor('normalization', rows.length, data.groups.length, [
-            'Dòng TOÀN TRƯỜNG cộng từ tất cả các khoa/viện; Số giảng viên để trống vì giảng viên dạy lớp của nhiều khoa sẽ bị đếm trùng.',
-          ]),
+          notesFor('normalization', rows.length, data.groups.length),
         ),
         sheets: [
           {
@@ -890,20 +885,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               scoreColumn('standardDeviation', 'Độ lệch chuẩn', 3),
               zColumn('meanZScore', 'Z-Score so với toàn trường'),
             ],
-            data: [
-              ...rows,
-              {
-                facultyName: 'TOÀN TRƯỜNG',
-                sectionCount: data.schoolSectionCount,
-                totalClassSize: classSize,
-                responseCount: responses,
-                validResponseCount: validResponses,
-                responseRate: percentOf(responses, classSize),
-                validResponseRate: percentOf(validResponses, responses),
-                averageScore: data.schoolAverageScore,
-                standardDeviation: data.schoolStandardDeviation,
-              },
-            ],
+            data: rows,
           },
         ],
       };
@@ -970,9 +952,6 @@ export const SurveyAnalysisPage: React.FC = () => {
     if (tab === 'departments' && departments) {
       const data = departments;
       const rows = shownRows('departments', data.rows);
-      const classSize = data.rows.reduce((sum, row) => sum + row.totalClassSize, 0);
-      const rowResponses = data.rows.reduce((sum, row) => sum + row.responseCount, 0);
-      const validResponses = data.rows.reduce((sum, row) => sum + row.validResponseCount, 0);
       const isScoped = data.rows.length < data.schoolDepartmentCount;
 
       return {
@@ -989,14 +968,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               ? `${data.schoolWarningCount} lớp thấp hơn trung bình toàn trường từ 1 độ lệch chuẩn trở lên`
               : undefined,
           },
-          notesFor(
-            'departments',
-            rows.length,
-            data.rows.length,
-            isScoped
-              ? ['Dòng Toàn trường: Số lớp, Số phiếu đã thu và Điểm trung bình tính trên toàn trường; Tổng số phiếu phải thu, Số phiếu hợp lệ và hai tỷ lệ cộng từ các bộ môn trong bảng.']
-              : [],
-          ),
+          notesFor('departments', rows.length, data.rows.length),
         ),
         sheets: [
           {
@@ -1017,20 +989,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               zColumn('meanZScore', 'Z-Score so với toàn trường'),
               zColumn('facultyMeanZScore', 'Z-Score so với khoa'),
             ],
-            data: [
-              ...rows,
-              {
-                facultyName: 'Toàn trường',
-                departmentName: `${data.schoolDepartmentCount} bộ môn`,
-                sectionCount: data.schoolSectionCount,
-                totalClassSize: classSize,
-                responseCount: data.schoolResponseCount,
-                validResponseCount: validResponses,
-                responseRate: percentOf(rowResponses, classSize),
-                validResponseRate: percentOf(validResponses, rowResponses),
-                averageScore: data.schoolAverageScore,
-              },
-            ],
+            data: rows,
           },
         ],
       };
@@ -1182,20 +1141,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               scoreColumn('minScore', 'Lớp thấp nhất'),
               scoreColumn('maxScore', 'Lớp cao nhất'),
             ],
-            data: [
-              ...rows,
-              {
-                facultyName: 'Toàn trường',
-                fullName: `${lecturers.length} giảng viên`,
-                sectionCount: totalSections,
-                totalClassSize: classSize,
-                responseCount: responses,
-                validResponseCount: validResponses,
-                responseRate,
-                validResponseRate: validRate,
-                averageScore: overallScore,
-              },
-            ],
+            data: rows,
           },
         ],
       };
@@ -1305,7 +1251,9 @@ export const SurveyAnalysisPage: React.FC = () => {
         </div>
       </div>
 
-      <ScoringConfigNote />
+      <ScoringConfigNote>
+        Chỉ sử dụng dữ liệu của các lớp, bộ môn và khoa/viện hợp lệ.
+      </ScoringConfigNote>
 
       <nav className="analysis-tabs" aria-label="Các góc nhìn phân tích">
         {visibleTabs.map((item) => (
@@ -1488,12 +1436,6 @@ const NormalizationGroupTab: React.FC<{
     onVisibleRowsChange?.(groupFilters.visibleRows);
   }, [groupFilters.visibleRows, onVisibleRowsChange]);
 
-  // Dòng TOÀN TRƯỜNG cộng từ tất cả các khoa chứ không phải từ trang đang xem.
-  // Riêng Số giảng viên để trống: một giảng viên dạy lớp của hai khoa sẽ bị đếm hai lần.
-  const schoolClassSize = groups.reduce((sum, row) => sum + row.totalClassSize, 0);
-  const schoolResponses = groups.reduce((sum, row) => sum + row.responseCount, 0);
-  const schoolValidResponses = groups.reduce((sum, row) => sum + row.validResponseCount, 0);
-
   if (!data || data.sections.length === 0) {
     return emptyWithNote(note, 'Đợt này chưa có lớp nào thu được phiếu hợp lệ.');
   }
@@ -1595,33 +1537,6 @@ const NormalizationGroupTab: React.FC<{
                 </tr>
               );
             })}
-            <tr>
-              <th scope="row">TOÀN TRƯỜNG</th>
-              <td className="num is-sum">{data.schoolSectionCount}</td>
-              {/* Số giảng viên để trống: cộng số của từng khoa sẽ đếm trùng người dạy liên khoa. */}
-              <td />
-              <td className="num is-sum">{schoolClassSize}</td>
-              <td className="num is-sum">{schoolResponses}</td>
-              <td className="num is-sum">{schoolValidResponses}</td>
-              <td className="num is-mean">
-                {schoolClassSize === 0
-                  ? '—'
-                  : `${((schoolResponses / schoolClassSize) * 100).toFixed(1)}%`}
-              </td>
-              <td className="num is-mean">
-                {schoolResponses === 0
-                  ? '—'
-                  : `${((schoolValidResponses / schoolResponses) * 100).toFixed(1)}%`}
-              </td>
-              <td className="num is-mean">{data.schoolAverageScore.toFixed(3)}</td>
-              <td className="num is-mean">
-                {data.schoolStandardDeviation === null
-                  ? '—'
-                  : data.schoolStandardDeviation.toFixed(3)}
-              </td>
-              {/* Toàn trường là chính mốc so, nên Z của nó luôn bằng 0 — để trống. */}
-              <td />
-            </tr>
           </tbody>
         </table>
         <TablePagination
@@ -1930,17 +1845,9 @@ const DepartmentTab: React.FC<{
     return emptyWithNote(note, 'Đợt này chưa có bộ môn nào thu được phiếu hợp lệ.');
   }
 
-  // Dòng tổng lấy thẳng số toàn trường từ backend chứ không cộng lại từ `rows`.
-  // Trưởng bộ môn chỉ nhận đúng dòng bộ môn mình, cộng lại thì mất mặt bằng để so.
   const totalSections = data.schoolSectionCount;
   const totalResponses = data.schoolResponseCount;
   const totalWarnings = data.schoolWarningCount;
-  const overallScore = data.schoolAverageScore;
-  // Dòng tổng cộng từ các dòng đang hiện. Trưởng bộ môn chỉ thấy dòng của mình
-  // nên các số này là của bộ môn đó, khác các số toàn trường ở trên.
-  const totalClassSize = rows.reduce((sum, row) => sum + row.totalClassSize, 0);
-  const totalRowResponses = rows.reduce((sum, row) => sum + row.responseCount, 0);
-  const totalValidResponses = rows.reduce((sum, row) => sum + row.validResponseCount, 0);
   const isScoped = data.rows.length < data.schoolDepartmentCount;
 
   return (
@@ -2070,41 +1977,8 @@ const DepartmentTab: React.FC<{
                 </td>
               </tr>
             ))}
-            {/* Ô đệm nuốt chỗ thừa để dòng tổng kết luôn nằm sát đáy khung. */}
-            <tr className="table-spacer" aria-hidden="true">
-              <td colSpan={13} />
-            </tr>
           </tbody>
 
-          <tfoot>
-            <tr>
-              <th scope="row">Toàn trường</th>
-              <td>{data.schoolDepartmentCount} bộ môn</td>
-              <td className="num is-sum">{totalSections}</td>
-              <td />
-              <td className="num is-sum">{totalClassSize}</td>
-              <td className="num is-sum">{totalResponses}</td>
-              <td className="num is-sum">{totalValidResponses}</td>
-              <td className="num is-mean">
-                {totalClassSize === 0
-                  ? '—'
-                  : `${((totalRowResponses / totalClassSize) * 100).toFixed(1)}%`}
-              </td>
-              <td className="num is-mean">
-                {totalRowResponses === 0
-                  ? '—'
-                  : `${((totalValidResponses / totalRowResponses) * 100).toFixed(1)}%`}
-              </td>
-              <td className="num is-mean is-total">
-                {overallScore === null ? '—' : overallScore.toFixed(2)}
-              </td>
-              {/* Độ lệch chuẩn và hai cột Z-Score của dòng tổng để trống: toàn trường
-                  chính là mốc so, Z của nó luôn bằng 0; toàn trường không thuộc khoa nào. */}
-              <td />
-              <td />
-              <td />
-            </tr>
-          </tfoot>
         </table>
         <TablePagination
           page={pagination.page}
@@ -2424,9 +2298,6 @@ const LecturerTab: React.FC<{
   }, [filters.visibleRows, onVisibleRowsChange]);
 
   const totalSections = useMemo(() => lecturers.reduce((sum, r) => sum + r.sectionCount, 0), [lecturers]);
-  const totalClassSize = useMemo(() => lecturers.reduce((sum, r) => sum + (r.totalClassSize ?? 0), 0), [lecturers]);
-  const totalResponses = useMemo(() => lecturers.reduce((sum, r) => sum + (r.responseCount ?? 0), 0), [lecturers]);
-  const totalValidResponses = useMemo(() => lecturers.reduce((sum, r) => sum + (r.validResponseCount ?? 0), 0), [lecturers]);
   const totalWarnings = useMemo(() => lecturers.reduce((sum, r) => sum + (r.warningSectionCount ?? 0), 0), [lecturers]);
   const lecturersWithWarning = useMemo(() => lecturers.filter((r) => r.warningSectionCount > 0).length, [lecturers]);
   const overallAvgScore = useMemo(() => {
@@ -2576,37 +2447,8 @@ const LecturerTab: React.FC<{
                 </td>
               </tr>
             ))}
-            <tr className="table-spacer" aria-hidden="true">
-              <td colSpan={12} />
-            </tr>
           </tbody>
 
-          <tfoot>
-            <tr>
-              <th scope="row">Toàn trường</th>
-              <td />
-              <td>{lecturers.length} giảng viên</td>
-              <td className="num is-sum">{totalSections}</td>
-              <td className="num is-sum">{totalClassSize}</td>
-              <td className="num is-sum">{totalResponses}</td>
-              <td className="num is-sum">{totalValidResponses}</td>
-              <td className="num is-mean">
-                {totalClassSize === 0
-                  ? '—'
-                  : `${((totalResponses / totalClassSize) * 100).toFixed(1)}%`}
-              </td>
-              <td className="num is-mean">
-                {totalResponses === 0
-                  ? '—'
-                  : `${((totalValidResponses / totalResponses) * 100).toFixed(1)}%`}
-              </td>
-              <td className="num is-mean is-total">
-                {overallAvgScore === null ? '—' : overallAvgScore.toFixed(2)}
-              </td>
-              <td />
-              <td />
-            </tr>
-          </tfoot>
         </table>
         <TablePagination
           page={pagination.page}

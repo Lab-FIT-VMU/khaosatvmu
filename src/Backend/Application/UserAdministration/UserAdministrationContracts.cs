@@ -63,6 +63,17 @@ public sealed record UpdateRolePermissionsCommand(
 
 public sealed record RolePermissionGrantDto(Guid PermissionId, bool IsGranted);
 
+/// <summary>Các quyền tối thiểu giúp vai trò hệ thống không tự khóa mất chức năng quản trị.</summary>
+public static class RequiredRolePermissions
+{
+    public const string AdminRoleCode = "ADMIN";
+    public const string UserAdminPermissionCode = "USER_ADMIN_ACCESS";
+
+    public static bool IsRequired(string roleCode, string permissionCode) =>
+        string.Equals(roleCode, AdminRoleCode, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(permissionCode, UserAdminPermissionCode, StringComparison.OrdinalIgnoreCase);
+}
+
 
 public sealed record AdminAuditLogDto(
     Guid Id,
@@ -257,7 +268,7 @@ public interface IUserAdministrationService
         CancellationToken cancellationToken = default);
 
     /// <summary>Cập nhật danh sách permissions của một role.</summary>
-    Task UpdateRolePermissionsAsync(
+    Task<AdminOperationResult<bool>> UpdateRolePermissionsAsync(
         Guid roleId,
         IReadOnlyList<RolePermissionGrantDto> grants,
         CancellationToken cancellationToken = default);
@@ -295,4 +306,5 @@ public static class UserAdministrationErrorCodes
     /// <summary>Không có tài khoản nào cần cấp hồ sơ.</summary>
     public const string NoProfilesToCreate = "ADMIN_NO_PROFILES_TO_CREATE";
     public const string CannotModifyActiveProfile = "ADMIN_CANNOT_MODIFY_ACTIVE_PROFILE";
+    public const string CannotRevokeRequiredPermission = "ADMIN_CANNOT_REVOKE_REQUIRED_PERMISSION";
 }

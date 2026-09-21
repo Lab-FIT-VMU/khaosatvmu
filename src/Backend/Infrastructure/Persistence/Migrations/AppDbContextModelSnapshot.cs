@@ -39,8 +39,14 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
 
                     b.HasKey("AcademicYearId");
 
@@ -236,6 +242,170 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasIndex("TableName", "RecordId");
 
                     b.ToTable("ChangeAuditLogs", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Cohort", b =>
+                {
+                    b.Property<int>("CohortId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("CohortId"));
+
+                    b.Property<int>("AcademicYearId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CohortCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("CohortName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("CohortId");
+
+                    b.HasIndex("AcademicYearId");
+
+                    b.HasIndex("CohortCode")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("Cohorts", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.CohortMajor", b =>
+                {
+                    b.Property<int>("CohortMajorId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("CohortMajorId"));
+
+                    b.Property<int>("AverageCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CohortId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CohortMajorCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ExcellentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GoodCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GraduatedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MajorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NotGraduatedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("OnTimeGraduatedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StudentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VeryGoodCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("WorkStudyCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CohortMajorId");
+
+                    b.HasIndex("CohortId");
+
+                    b.HasIndex("MajorId");
+
+                    b.HasIndex("CohortId", "CohortMajorCode")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.HasIndex("CohortId", "MajorId")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("CohortMajors", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CohortMajors_Counts", "\"StudentCount\" >= 0 AND \"GraduatedCount\" >= 0 AND \"NotGraduatedCount\" >= 0 AND \"ExcellentCount\" >= 0 AND \"VeryGoodCount\" >= 0 AND \"GoodCount\" >= 0 AND \"AverageCount\" >= 0 AND \"WorkStudyCount\" >= 0 AND \"OnTimeGraduatedCount\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.CohortMajorGraduation", b =>
+                {
+                    b.Property<long>("CohortMajorGraduationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("CohortMajorGraduationId"));
+
+                    b.Property<int>("AverageCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CohortMajorId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ExcellentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GoodCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GraduatedCount")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("GraduationRoundId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("VeryGoodCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("WorkStudyCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CohortMajorGraduationId");
+
+                    b.HasIndex("CohortMajorId");
+
+                    b.HasIndex("GraduationRoundId", "CohortMajorId")
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
+
+                    b.ToTable("CohortMajorGraduations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CohortMajorGraduations_Counts", "\"GraduatedCount\" >= 0 AND \"ExcellentCount\" >= 0 AND \"VeryGoodCount\" >= 0 AND \"GoodCount\" >= 0 AND \"AverageCount\" >= 0 AND \"WorkStudyCount\" >= 0");
+
+                            t.HasCheckConstraint("CK_CohortMajorGraduations_RankSum", "\"GraduatedCount\" = \"ExcellentCount\" + \"VeryGoodCount\" + \"GoodCount\" + \"AverageCount\"");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Course", b =>
@@ -586,187 +756,6 @@ namespace Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Domain.GraduationAnalyticsDataset", b =>
-                {
-                    b.Property<long>("DatasetId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("DatasetId"));
-
-                    b.Property<string>("ContentHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character(64)")
-                        .IsFixedLength();
-
-                    b.Property<string>("DatasetName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("ImportedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ImportedByName")
-                        .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)");
-
-                    b.Property<Guid>("ImportedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateOnly?>("MaximumReviewDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("MinimumReviewDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("OriginalFileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.Property<int>("ReviewMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ReviewPeriodText")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("ReviewYear")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RowCount")
-                        .HasColumnType("integer");
-
-                    b.HasKey("DatasetId");
-
-                    b.HasIndex("ContentHash")
-                        .IsUnique();
-
-                    b.HasIndex("ImportedAtUtc");
-
-                    b.HasIndex("ReviewYear", "ReviewMonth")
-                        .IsUnique()
-                        .IsDescending();
-
-                    b.ToTable("GraduationAnalyticsDatasets", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_GraduationAnalyticsDatasets_ReviewMonth", "\"ReviewMonth\" BETWEEN 1 AND 12");
-
-                            t.HasCheckConstraint("CK_GraduationAnalyticsDatasets_ReviewYear", "\"ReviewYear\" BETWEEN 1900 AND 2200");
-                        });
-                });
-
-            modelBuilder.Entity("Domain.GraduationAnalyticsRow", b =>
-                {
-                    b.Property<long>("RowId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("RowId"));
-
-                    b.Property<int?>("AverageCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("AverageRate")
-                        .HasColumnType("numeric(9,4)");
-
-                    b.Property<string>("Cohort")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<long>("DatasetId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int?>("EligibleGraduateCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ExcellentCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("ExcellentRate")
-                        .HasColumnType("numeric(9,4)");
-
-                    b.Property<string>("FacultyName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<int?>("GoodCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("GoodRate")
-                        .HasColumnType("numeric(9,4)");
-
-                    b.Property<int?>("InitialEnrollmentCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("OnTimeGraduateCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("OnTimeGraduateRate")
-                        .HasColumnType("numeric(9,4)");
-
-                    b.Property<string>("ProgramCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("ProgramName")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
-
-                    b.Property<int?>("ReviewMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ReviewPeriodText")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int?>("ReviewYear")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SourceRowNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("SourceSheetName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int?>("VeryGoodCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("VeryGoodRate")
-                        .HasColumnType("numeric(9,4)");
-
-                    b.Property<int?>("WorkStudyTransferCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("WorkStudyTransferRate")
-                        .HasColumnType("numeric(9,4)");
-
-                    b.HasKey("RowId");
-
-                    b.HasIndex("DatasetId", "Cohort");
-
-                    b.HasIndex("DatasetId", "FacultyName");
-
-                    b.HasIndex("DatasetId", "ProgramCode", "ProgramName");
-
-                    b.HasIndex("DatasetId", "ReviewYear", "ReviewMonth");
-
-                    b.HasIndex("DatasetId", "SourceSheetName", "SourceRowNumber")
-                        .IsUnique();
-
-                    b.ToTable("GraduationAnalyticsRows", (string)null);
-                });
-
             modelBuilder.Entity("Domain.GraduationImportRevision", b =>
                 {
                     b.Property<long>("RevisionId")
@@ -921,6 +910,41 @@ namespace Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_GraduationPeriods_ReviewYear", "\"ReviewYear\" BETWEEN 1900 AND 2200");
 
                             t.HasCheckConstraint("CK_GraduationPeriods_RoundNumber", "\"RoundNumber\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.GraduationRound", b =>
+                {
+                    b.Property<long>("GraduationRoundId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("GraduationRoundId"));
+
+                    b.Property<int>("AcademicYearId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ReviewMonth")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ReviewYear")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer");
+
+                    b.HasKey("GraduationRoundId");
+
+                    b.HasIndex("AcademicYearId", "RoundNumber")
+                        .IsUnique();
+
+                    b.ToTable("GraduationRounds", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_GraduationRounds_ReviewDate", "(\"ReviewMonth\" IS NULL AND \"ReviewYear\" IS NULL) OR (\"ReviewMonth\" BETWEEN 1 AND 12 AND \"ReviewYear\" BETWEEN 1900 AND 2200)");
+                            t.HasCheckConstraint("CK_GraduationRounds_RoundNumber", "\"RoundNumber\" > 0");
                         });
                 });
 
@@ -1648,6 +1672,45 @@ namespace Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 
+            modelBuilder.Entity("Domain.Cohort", b =>
+                {
+                    b.HasOne("Domain.AcademicYear", null)
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.CohortMajor", b =>
+                {
+                    b.HasOne("Domain.Cohort", null)
+                        .WithMany()
+                        .HasForeignKey("CohortId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Major", null)
+                        .WithMany()
+                        .HasForeignKey("MajorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.CohortMajorGraduation", b =>
+                {
+                    b.HasOne("Domain.CohortMajor", null)
+                        .WithMany()
+                        .HasForeignKey("CohortMajorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.GraduationRound", null)
+                        .WithMany()
+                        .HasForeignKey("GraduationRoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.Course", b =>
                 {
                     b.HasOne("Domain.Department", null)
@@ -1752,15 +1815,6 @@ namespace Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.GraduationAnalyticsRow", b =>
-                {
-                    b.HasOne("Domain.GraduationAnalyticsDataset", null)
-                        .WithMany()
-                        .HasForeignKey("DatasetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Domain.GraduationImportRevision", b =>
                 {
                     b.HasOne("Domain.GraduationPeriod", null)
@@ -1781,6 +1835,15 @@ namespace Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ActiveRevisionId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.GraduationRound", b =>
+                {
+                    b.HasOne("Domain.AcademicYear", null)
+                        .WithMany()
+                        .HasForeignKey("AcademicYearId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Lecturer", b =>

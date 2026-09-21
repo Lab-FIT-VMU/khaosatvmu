@@ -93,6 +93,7 @@ export function Sidebar({
         { id: 'reports', label: 'Thống kê & Báo cáo', icon: BarChart3 },
         { id: 'survey-analysis', label: 'Phân tích chuyên sâu', icon: Sigma },
         { id: 'graduation-analytics', label: 'Thống kê tốt nghiệp', icon: GraduationCap },
+        { id: 'graduation-analytics-2', label: 'Thống kê tốt nghiệp 2', icon: GraduationCap },
       ],
     },
     {
@@ -102,6 +103,7 @@ export function Sidebar({
         { id: 'departments', label: 'Bộ môn', icon: Network },
         { id: 'lecturers', label: 'Giảng viên', icon: Presentation },
         { id: 'majors', label: 'Ngành đào tạo', icon: GraduationCap },
+        { id: 'cohort-majors', label: 'Khoá ngành đào tạo', icon: UsersRound },
         { id: 'courses', label: 'Học phần', icon: BookOpen },
         { id: 'classes', label: 'Lớp học phần', icon: UsersRound },
       ],

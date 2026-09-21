@@ -88,6 +88,10 @@ export interface Semester {
 export interface AcademicYear {
   academicYearId: number;
   academicYearName: string;
+  /** ISO yyyy-MM-dd. Mặc định 25/7 của năm đầu. */
+  startDate: string;
+  /** ISO yyyy-MM-dd. Mặc định 24/7 của năm sau. */
+  endDate: string;
   semesters: Semester[];
 }
 

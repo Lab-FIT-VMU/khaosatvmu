@@ -483,16 +483,6 @@ public sealed class EfGraduationAnalyticsV3Service(
                 GraduationAnalyticsErrorCodes.InvalidImport,
                 "Tháng/năm xét tốt nghiệp không hợp lệ.");
         }
-        var expectedAcademicYearStart = command.ReviewMonth >= 8
-            ? command.ReviewYear
-            : command.ReviewYear - 1;
-        if (expectedAcademicYearStart != command.AcademicYearStart)
-        {
-            throw new GraduationAnalyticsException(
-                GraduationAnalyticsErrorCodes.InvalidImport,
-                $"Tháng {command.ReviewMonth}/{command.ReviewYear} không thuộc năm học " +
-                $"{command.AcademicYearStart}–{command.AcademicYearStart + 1}.");
-        }
     }
 
     private static void ValidateParsedImport(ParsedGraduationImport parsed)

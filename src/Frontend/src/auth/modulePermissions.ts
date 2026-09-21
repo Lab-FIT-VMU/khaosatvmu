@@ -7,11 +7,13 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   // Chỉ quản trị: vai trò lọc thêm ở Sidebar và App, backend chặn thật. Lấy quyền
   // mà cả ADMIN lẫn SURVEY_ADMIN đang có sẵn để khỏi phải cấp thêm quyền mới.
   'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
+  'graduation-analytics-2': 'GRADUATION_ANALYTICS_2_ACCESS',
   'survey-dashboard': 'SURVEY_DASHBOARD_ACCESS',
   faculties: 'FACULTIES_ACCESS',
   departments: 'DEPARTMENTS_ACCESS',
   lecturers: 'LECTURERS_ACCESS',
   majors: 'MAJORS_ACCESS',
+  'cohort-majors': 'COHORT_MAJORS_ACCESS',
   courses: 'COURSES_ACCESS',
   classes: 'COURSE_SECTIONS_ACCESS',
   'course-question-sets': 'COURSE_QUESTION_SETS_ACCESS',

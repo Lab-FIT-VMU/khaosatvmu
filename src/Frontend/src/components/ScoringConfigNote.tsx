@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import { Info } from 'lucide-react';
 import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole } from '../auth/roles';
@@ -16,7 +16,11 @@ import '../styles/scoring-config-note.css';
  *
  * Tạm thời chỉ hiện cho admin hệ thống và admin khảo sát.
  */
-export const ScoringConfigNote: React.FC = () => {
+type ScoringConfigNoteProps = {
+  children?: ReactNode;
+};
+
+export const ScoringConfigNote: React.FC<ScoringConfigNoteProps> = ({ children }) => {
   const { activeProfile } = useAuth();
   const thresholds = useScoringThresholds();
 
@@ -26,10 +30,14 @@ export const ScoringConfigNote: React.FC = () => {
     <p className="scoring-config-note">
       <Info aria-hidden="true" />
       <span>
-        Số liệu chỉ gộp lớp qua cả hai tiêu chí: tỷ lệ phản hồi ≥{' '}
-        <strong>{thresholds.minimumResponseRate}%</strong> và tỷ lệ phiếu hợp lệ ≥{' '}
-        <strong>{thresholds.minimumValidRate}%</strong>. Cấu hình này đổi được ở nút Cập
-        nhật điểm.
+        {children ?? (
+          <>
+            Số liệu chỉ gộp lớp qua cả hai tiêu chí: tỷ lệ phản hồi ≥{' '}
+            <strong>{thresholds.minimumResponseRate}%</strong> và tỷ lệ phiếu hợp lệ ≥{' '}
+            <strong>{thresholds.minimumValidRate}%</strong>. Cấu hình này đổi được ở nút Cập
+            nhật điểm.
+          </>
+        )}
       </span>
     </p>
   );

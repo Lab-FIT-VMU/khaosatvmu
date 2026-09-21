@@ -1,0 +1,219 @@
+{
+  "sourceFileCount": 11,
+  "sourceRowCount": 6698,
+  "cohortCount": 9,
+  "importRowCount": 227,
+  "conflictCount": 13,
+  "duplicateMajorMappingCount": 0,
+  "unresolvedRowCount": 1,
+  "conflicts": [
+    {
+      "cohortCode": "K60",
+      "classCode": "KTN60CL",
+      "majorName": null,
+      "studentCount": 25,
+      "sourceMajorNames": [
+        "Kinh tế ngoại thương (CLC)",
+        "Kinh tế ngoại thương (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Kinh tế ngoại thương (CLC)": 12,
+        "Kinh tế ngoại thương (NC)": 13
+      }
+    },
+    {
+      "cohortCode": "K61",
+      "classCode": "KTN61CL",
+      "majorName": null,
+      "studentCount": 58,
+      "sourceMajorNames": [
+        "Kinh tế ngoại thương (CLC)",
+        "Kinh tế ngoại thương (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Kinh tế ngoại thương (CLC)": 48,
+        "Kinh tế ngoại thương (NC)": 10
+      }
+    },
+    {
+      "cohortCode": "K60",
+      "classCode": "ĐTĐ60CL",
+      "majorName": null,
+      "studentCount": 12,
+      "sourceMajorNames": [
+        "Điện tự động công nghiệp (CLC)",
+        "Điện tự động công nghiệp (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Điện tự động công nghiệp (CLC)": 7,
+        "Điện tự động công nghiệp (NC)": 5
+      }
+    },
+    {
+      "cohortCode": "K60",
+      "classCode": "KTB60CL",
+      "majorName": null,
+      "studentCount": 24,
+      "sourceMajorNames": [
+        "Kinh tế vận tải biển (CLC)",
+        "Kinh tế vận tải biển (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Kinh tế vận tải biển (CLC)": 12,
+        "Kinh tế vận tải biển (NC)": 12
+      }
+    },
+    {
+      "cohortCode": "K61",
+      "classCode": "KTB61CL",
+      "majorName": null,
+      "studentCount": 57,
+      "sourceMajorNames": [
+        "Kinh tế vận tải biển (CLC)",
+        "Kinh tế vận tải biển (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Kinh tế vận tải biển (CLC)": 40,
+        "Kinh tế vận tải biển (NC)": 17
+      }
+    },
+    {
+      "cohortCode": "K60",
+      "classCode": "CNT60CL",
+      "majorName": null,
+      "studentCount": 20,
+      "sourceMajorNames": [
+        "Công nghệ thông tin (CLC)",
+        "Công nghệ thông tin (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Công nghệ thông tin (CLC)": 16,
+        "Công nghệ thông tin (NC)": 4
+      }
+    },
+    {
+      "cohortCode": "K61",
+      "classCode": "ĐTĐ61CL",
+      "majorName": null,
+      "studentCount": 10,
+      "sourceMajorNames": [
+        "Điện tự động công nghiệp (CLC)",
+        "Điện tự động công nghiệp (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Điện tự động công nghiệp (CLC)": 6,
+        "Điện tự động công nghiệp (NC)": 4
+      }
+    },
+    {
+      "cohortCode": "K61",
+      "classCode": "CNT61CL",
+      "majorName": null,
+      "studentCount": 23,
+      "sourceMajorNames": [
+        "Công nghệ thông tin (CLC)",
+        "Công nghệ thông tin (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Công nghệ thông tin (CLC)": 12,
+        "Công nghệ thông tin (NC)": 11
+      }
+    },
+    {
+      "cohortCode": "K62",
+      "classCode": "CNT62CL",
+      "majorName": null,
+      "studentCount": 56,
+      "sourceMajorNames": [
+        "Công nghệ thông tin (CLC)",
+        "Công nghệ thông tin (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Công nghệ thông tin (CLC)": 23,
+        "Công nghệ thông tin (NC)": 33
+      }
+    },
+    {
+      "cohortCode": "K59",
+      "classCode": "ĐTĐ59CL",
+      "majorName": null,
+      "studentCount": 2,
+      "sourceMajorNames": [
+        "Điện tự động công nghiệp (CLC)",
+        "Điện tự động công nghiệp (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Điện tự động công nghiệp (CLC)": 1,
+        "Điện tự động công nghiệp (NC)": 1
+      }
+    },
+    {
+      "cohortCode": "K62",
+      "classCode": "KTB62CL",
+      "majorName": null,
+      "studentCount": 131,
+      "sourceMajorNames": [
+        "Kinh tế vận tải biển (CLC)",
+        "Kinh tế vận tải biển (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Kinh tế vận tải biển (CLC)": 95,
+        "Kinh tế vận tải biển (NC)": 36
+      }
+    },
+    {
+      "cohortCode": "K62",
+      "classCode": "KTN62CL",
+      "majorName": null,
+      "studentCount": 120,
+      "sourceMajorNames": [
+        "Kinh tế ngoại thương (CLC)",
+        "Kinh tế ngoại thương (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Kinh tế ngoại thương (CLC)": 99,
+        "Kinh tế ngoại thương (NC)": 21
+      }
+    },
+    {
+      "cohortCode": "K62",
+      "classCode": "ĐTĐ62CL",
+      "majorName": null,
+      "studentCount": 45,
+      "sourceMajorNames": [
+        "Điện tự động công nghiệp (CLC)",
+        "Điện tự động công nghiệp (NC)"
+      ],
+      "status": "Mâu thuẫn ngành — cần xác minh, chưa đưa vào import",
+      "counts": {
+        "Điện tự động công nghiệp (CLC)": 16,
+        "Điện tự động công nghiệp (NC)": 29
+      }
+    }
+  ],
+  "duplicateMajorMappings": [],
+  "unresolved": [
+    {
+      "fileName": "24.25.đợt 3. 555 SV Tổng hợp danh sách tốt nghiệp - năm học 2024-2025 - đọt 3.xlsx",
+      "rowNumber": 547,
+      "studentCode": "61884",
+      "classCode": "IBL05",
+      "cohortCode": null,
+      "majorName": "Kinh doanh quốc tế và logistics",
+      "facultyName": "Viện đào tạo Quốc tế",
+      "reason": "Không tách được khóa từ mã lớp"
+    }
+  ]
+}

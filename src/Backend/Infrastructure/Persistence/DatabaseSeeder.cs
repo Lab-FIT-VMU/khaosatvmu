@@ -1,4 +1,4 @@
-using Application.UserAdministration;
+﻿using Application.UserAdministration;
 using Domain;
 using Infrastructure.Catalog;
 using Microsoft.EntityFrameworkCore;
@@ -96,10 +96,12 @@ public static class DatabaseSeeder
             (Code: "SURVEY_STATISTICS_ACCESS",    Name: "Bảng dữ liệu khảo sát",             Description: "Truy cập module bảng dữ liệu khảo sát",                 Category: "Tổng quan"),
             (Code: "SURVEY_ANALYSIS_ACCESS",      Name: "Thống kê chi tiết",                 Description: "Truy cập module thống kê chi tiết",                    Category: "Tổng quan"),
             (Code: "GRADUATION_ANALYTICS_ACCESS", Name: "Thống kê tốt nghiệp",               Description: "Truy cập module thống kê sinh viên tốt nghiệp đúng hạn", Category: "Tổng quan"),
+            (Code: "GRADUATION_ANALYTICS_2_ACCESS", Name: "Thống kê tốt nghiệp 2",            Description: "Truy cập module thống kê tốt nghiệp bản dựng lại",      Category: "Tổng quan"),
             (Code: "FACULTIES_ACCESS",            Name: "Khoa / Viện",                       Description: "Truy cập module quản lý khoa và viện",                  Category: "Danh mục đào tạo"),
             (Code: "DEPARTMENTS_ACCESS",          Name: "Bộ môn",                            Description: "Truy cập module quản lý bộ môn",                        Category: "Danh mục đào tạo"),
             (Code: "LECTURERS_ACCESS",            Name: "Giảng viên",                        Description: "Truy cập module quản lý giảng viên và chức vụ",         Category: "Danh mục đào tạo"),
             (Code: "MAJORS_ACCESS",               Name: "Ngành đào tạo",                     Description: "Truy cập module quản lý ngành đào tạo",                 Category: "Danh mục đào tạo"),
+            (Code: "COHORT_MAJORS_ACCESS",        Name: "Khoá ngành đào tạo",                Description: "Truy cập module quản lý khoá học và khoá ngành đào tạo", Category: "Danh mục đào tạo"),
             (Code: "COURSES_ACCESS",              Name: "Học phần",                          Description: "Truy cập module quản lý học phần",                      Category: "Danh mục đào tạo"),
             (Code: "COURSE_SECTIONS_ACCESS",      Name: "Lớp học phần",                      Description: "Truy cập module quản lý lớp học phần, năm học và học kỳ", Category: "Danh mục đào tạo"),
             (Code: "COURSE_QUESTION_SETS_ACCESS", Name: "Danh sách bộ khảo sát",             Description: "Truy cập module bộ câu hỏi khảo sát học phần",         Category: "Khảo sát học phần"),
@@ -157,10 +159,12 @@ public static class DatabaseSeeder
             (RoleCode: "ADMIN", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "GRADUATION_ANALYTICS_2_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "LECTURERS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "MAJORS_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "COHORT_MAJORS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSES_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_SECTIONS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_QUESTION_SETS_ACCESS"),
@@ -176,10 +180,12 @@ public static class DatabaseSeeder
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
+            (RoleCode: "SURVEY_ADMIN", PermissionCode: "GRADUATION_ANALYTICS_2_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "LECTURERS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "MAJORS_ACCESS"),
+            (RoleCode: "SURVEY_ADMIN", PermissionCode: "COHORT_MAJORS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSES_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_SECTIONS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_QUESTION_SETS_ACCESS"),
@@ -199,11 +205,11 @@ public static class DatabaseSeeder
         {
             var role = roles[definition.RoleCode];
             var permission = permissions[definition.PermissionCode];
-            var exists = await db.RolePermissions.AnyAsync(x =>
+            var existing = await db.RolePermissions.SingleOrDefaultAsync(x =>
                 x.RoleId == role.Id && x.PermissionId == permission.Id,
                 cancellationToken);
 
-            if (!exists)
+            if (existing is null)
             {
                 db.RolePermissions.Add(new RolePermission
                 {
@@ -213,6 +219,12 @@ public static class DatabaseSeeder
                     IsGranted = true,
                     CreatedAt = DateTime.UtcNow
                 });
+            }
+            else if (RequiredRolePermissions.IsRequired(definition.RoleCode, definition.PermissionCode))
+            {
+                // Tự phục hồi dữ liệu đã bị tắt trước khi có ràng buộc này. Nếu không,
+                // admin sẽ bị khóa ngoài màn hình duy nhất có thể cấp lại quyền.
+                existing.IsGranted = true;
             }
         }
 
