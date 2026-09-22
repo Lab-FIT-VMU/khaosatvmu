@@ -17,6 +17,7 @@ import {
   School,
   Sigma,
   Table2,
+  Upload,
   UserCog,
   UsersRound,
   X,
@@ -92,8 +93,13 @@ export function Sidebar({
         { id: 'survey-statistics', label: 'Bảng dữ liệu khảo sát', icon: Table2 },
         { id: 'reports', label: 'Thống kê & Báo cáo', icon: BarChart3 },
         { id: 'survey-analysis', label: 'Phân tích chuyên sâu', icon: Sigma },
-        { id: 'graduation-analytics', label: 'Thống kê tốt nghiệp', icon: GraduationCap },
-        { id: 'graduation-analytics-2', label: 'Thống kê tốt nghiệp 2', icon: GraduationCap },
+      ],
+    },
+    {
+      section: 'THỐNG KÊ TỐT NGHIỆP',
+      items: [
+        { id: 'graduation-data-upload', label: 'Tải lên dữ liệu', icon: Upload },
+        { id: 'graduation-statistics', label: 'Thống kê chi tiết', icon: BarChart3 },
       ],
     },
     {

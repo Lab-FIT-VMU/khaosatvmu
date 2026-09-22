@@ -8,8 +8,8 @@ public static class GraduationAnalytics2Endpoints
 {
     public static IEndpointRouteBuilder MapGraduationAnalytics2Endpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/v1/graduation-analytics-2")
-            .RequireAuthorization(AuthPolicies.GraduationAnalytics2Access);
+        var group = app.MapGroup("/api/v1/graduation-analytics")
+            .RequireAuthorization(AuthPolicies.GraduationAnalyticsAccess);
 
         group.MapGet("/academic-years", async (
             [FromServices] IGraduationAnalyticsV3Service service,
@@ -42,12 +42,13 @@ public static class GraduationAnalytics2Endpoints
 
         group.MapDelete("/managed-periods/{periodId:long}", async (
             long periodId,
+            [FromBody] DeleteGraduationPeriodRequest request,
             [FromServices] IGraduationAnalyticsV3Service service,
             CancellationToken ct) =>
         {
             try
             {
-                await service.DeletePeriodAsync(periodId, ct);
+                await service.DeletePeriodAsync(periodId, request.Reason ?? string.Empty, ct);
                 return Results.NoContent();
             }
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
@@ -85,6 +86,7 @@ public static class GraduationAnalytics2Endpoints
                 var reviewMonth = RequiredInt(form, "reviewMonth");
                 var reviewYear = RequiredInt(form, "reviewYear");
                 var expectedRevisionId = OptionalLong(form, "expectedActiveRevisionId");
+                var replaceReason = form["replaceReason"].FirstOrDefault();
                 var previewFileHash = RequiredText(form, "previewFileHash");
                 await using var stream = file.OpenReadStream();
                 var parsed = await catalogResolver.ResolveAsync(
@@ -101,6 +103,7 @@ public static class GraduationAnalytics2Endpoints
                     reviewMonth,
                     reviewYear,
                     expectedRevisionId,
+                    replaceReason,
                     parsed), ct);
                 return Results.Ok(result);
             }
@@ -225,4 +228,6 @@ public static class GraduationAnalytics2Endpoints
         IReadOnlyList<string>? Cohorts = null,
         IReadOnlyList<string>? FacultyKeys = null,
         IReadOnlyList<string>? ProgramKeys = null);
+
+    public sealed record DeleteGraduationPeriodRequest(string? Reason);
 }

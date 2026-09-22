@@ -44,11 +44,10 @@ import type {
 } from '../types/graduationAnalytics2';
 import '../styles/graduation-analytics.css';
 
-type View = 'explore' | 'manage';
+export type GraduationAnalyticsView = 'explore' | 'manage';
 type ExploreChartMetric = 'graduated' | 'onTime' | 'workStudy' | 'excellent' | 'veryGood' | 'good' | 'average';
 type ExploreChartDimension = 'period' | 'faculty' | 'program' | 'cohort';
 type ExploreChartSeries = Exclude<ExploreChartDimension, 'period'> | '';
-type ExploreChartSort = 'name' | 'value-asc' | 'value-desc';
 const PROGRAM_SELECTION_SEPARATOR = '\u001f';
 const programSelectionValue = (facultyKey: string | null, programKey: string) =>
   `${facultyKey ?? ''}${PROGRAM_SELECTION_SEPARATOR}${programKey}`;
@@ -228,8 +227,7 @@ const timelineMetricValues = (
   return values[metric];
 };
 
-export function GraduationAnalytics2Page() {
-  const [view, setView] = useState<View>('manage');
+export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsView }) {
   const [periods, setPeriods] = useState<GraduationManagedPeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -239,10 +237,9 @@ export function GraduationAnalytics2Page() {
   const [chartMetric, setChartMetric] = useState<ExploreChartMetric>('graduated');
   const [chartGroupBy, setChartGroupBy] = useState<ExploreChartDimension>('cohort');
   const [chartSeriesBy, setChartSeriesBy] = useState<ExploreChartSeries>('');
-  const [chartSort, setChartSort] = useState<ExploreChartSort>('name');
-  const [chartTopInput, setChartTopInput] = useState('');
   const [chartType, setChartType] = useState<GraduationChartType>('bar');
   const [showChartLabels, setShowChartLabels] = useState(true);
+  const [chartZoomPercent, setChartZoomPercent] = useState(100);
   const [selectedCohorts, setSelectedCohorts] = useState<string[]>([]);
   const [selectedFacultyKeys, setSelectedFacultyKeys] = useState<string[]>([]);
   const [selectedProgramKeys, setSelectedProgramKeys] = useState<string[]>([]);
@@ -453,11 +450,8 @@ export function GraduationAnalytics2Page() {
   const displayedCohorts = explore?.scope.cohorts ?? selectedCohorts;
   const selectedChartMetric = chartMetrics.find((item) => item.id === displayedChartMetric) ?? chartMetrics[0];
   const selectedChartDimension = chartDimensions.find((item) => item.id === displayedChartGroup) ?? chartDimensions[0];
-  const isRequestedCumulativeTimeline = mode === 'cohortCumulative' && chartGroupBy === 'period';
   const isDisplayedCumulativeTimeline = displayedChartMode === 'cohortCumulative' && displayedChartGroup === 'period';
   const isDisplayedCumulativeCombo = isDisplayedCumulativeTimeline && !displayedChartSeries;
-  const chartTopIsValid = chartTopInput === '' || (/^\d+$/.test(chartTopInput) && Number(chartTopInput) >= 1 && Number(chartTopInput) <= 100);
-  const chartTop = chartTopIsValid && chartTopInput ? Number(chartTopInput) : 0;
   const chartModel = useMemo(() => {
     if (explore && isDisplayedCumulativeCombo) {
       return {
@@ -513,17 +507,13 @@ export function GraduationAnalytics2Page() {
       return row;
     });
     if (!isDisplayedCumulativeTimeline) {
-      data.sort((a, b) => {
-        if (chartSort === 'name') return String(a.name).localeCompare(String(b.name), 'vi');
-        const difference = Number(a.total) - Number(b.total);
-        return chartSort === 'value-asc' ? difference : -difference;
-      });
+      data.sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
     }
     return {
-      data: !isDisplayedCumulativeTimeline && chartTop > 0 ? data.slice(0, chartTop) : data,
+      data,
       series,
     };
-  }, [chartSort, chartTop, displayedChartGroup, displayedChartMetric, displayedChartMode, displayedChartSeries, explore, isDisplayedCumulativeCombo, isDisplayedCumulativeTimeline, selectedChartMetric.label]);
+  }, [displayedChartGroup, displayedChartMetric, displayedChartMode, displayedChartSeries, explore, isDisplayedCumulativeCombo, isDisplayedCumulativeTimeline, selectedChartMetric.label]);
   const availableChartTypes = useMemo(() => {
     if (isDisplayedCumulativeCombo) return ['combo' as GraduationChartType];
     if (isDisplayedCumulativeTimeline) return ['line' as GraduationChartType];
@@ -687,13 +677,8 @@ export function GraduationAnalytics2Page() {
   return <div className="graduation-page">
     {error && <div className="graduation-alert" role="alert">{error}</div>}
 
-    <nav className="graduation-view-switch" aria-label="Màn hình thống kê tốt nghiệp">
-      <button type="button" className={view === 'manage' ? 'is-selected' : ''} onClick={() => setView('manage')}>Tải lên dữ liệu</button>
-      <button type="button" className={view === 'explore' ? 'is-selected' : ''} onClick={() => setView('explore')}>Khám phá chi tiết</button>
-    </nav>
-
     {view === 'explore' && <section className="graduation-tab-panel">
-      {periods.length === 0 ? <div className="graduation-empty"><FileSpreadsheet size={42} /><h2>Chưa có dữ liệu</h2><p>Chuyển sang tab Tải lên dữ liệu để tải danh sách sinh viên tốt nghiệp đầu tiên.</p><button className="btn btn-primary" type="button" onClick={() => setView('manage')}>Tải lên dữ liệu</button></div> : <>
+      {periods.length === 0 ? <div className="graduation-empty"><FileSpreadsheet size={42} /><h2>Chưa có dữ liệu</h2><p>Hãy mở mục Tải lên dữ liệu trong nhóm Thống kê tốt nghiệp để tải danh sách sinh viên tốt nghiệp đầu tiên.</p></div> : <>
         {exploreError && <div className="graduation-alert" role="alert">{exploreError}</div>}
         {!explore && <>{renderExploreControls()}{exploreLoading && <div className="graduation-overview-status"><LoaderCircle className="spin" /> Đang tính số liệu...</div>}</>}
         {explore && <>
@@ -756,17 +741,12 @@ export function GraduationAnalytics2Page() {
               <label>So sánh theo<select value={chartGroupBy} onChange={(event) => { const next = event.target.value as ExploreChartDimension; setChartGroupBy(next); if (chartSeriesBy === next || (next === 'program' && chartSeriesBy === 'faculty')) setChartSeriesBy(''); }}>{chartDimensions.map((item) => <option key={item.id} value={item.id} disabled={!availableChartGroups.has(item.id)}>{item.label}</option>)}</select></label>
               <label>Phân chuỗi<select value={chartSeriesBy} onChange={(event) => setChartSeriesBy(event.target.value as ExploreChartSeries)}><option value="">Không phân chuỗi</option>{chartSeriesDimensions.map((item) => <option key={item.id} value={item.id} disabled={!isChartSeriesAvailable(item.id)}>{item.label}</option>)}</select></label>
               {allChartDimensionsFixed && <p className="graduation-builder__error">Tất cả chiều so sánh đã bị cố định. Hãy bỏ bớt bộ lọc để biểu đồ có nhiều nhóm.</p>}
-              <div className="graduation-builder__advanced">
-                <label className={isRequestedCumulativeTimeline ? 'is-disabled' : ''}>Sắp xếp<select disabled={isRequestedCumulativeTimeline} value={chartSort} onChange={(event) => setChartSort(event.target.value as ExploreChartSort)} title={isRequestedCumulativeTimeline ? 'Dữ liệu tích lũy luôn được sắp theo thời gian' : undefined}><option value="name">Tên A–Z</option><option value="value-asc">Giá trị tăng dần</option><option value="value-desc">Giá trị giảm dần</option></select></label>
-                <label className={isRequestedCumulativeTimeline ? 'is-disabled' : ''}>Top<input disabled={isRequestedCumulativeTimeline} type="number" min="1" max="100" inputMode="numeric" value={chartTopInput} onChange={(event) => setChartTopInput(event.target.value)} placeholder={isRequestedCumulativeTimeline ? 'Không áp dụng' : 'Tất cả'} aria-invalid={!isRequestedCumulativeTimeline && !chartTopIsValid} title={isRequestedCumulativeTimeline ? 'Không giới hạn mốc thời gian trong biểu đồ tích lũy' : undefined} /></label>
-              </div>
-              {!isRequestedCumulativeTimeline && !chartTopIsValid && <p className="graduation-builder__error">Top phải là số nguyên từ 1 đến 100.</p>}
               <fieldset><legend>Loại biểu đồ</legend><div className="graduation-chart-types">{chartOptions.map((item) => { const Icon = item.icon; const enabled = availableChartTypes.includes(item.id); return <button key={item.id} type="button" disabled={!enabled} className={chartType === item.id ? 'is-selected' : ''} onClick={() => setChartType(item.id)} aria-pressed={chartType === item.id}><Icon aria-hidden="true" /><span>{item.label}</span></button>; })}</div></fieldset>
               <label className="graduation-builder__check"><input type="checkbox" checked={showChartLabels} onChange={(event) => setShowChartLabels(event.target.checked)} /> Hiển thị nhãn giá trị</label>
             </aside>
             <article className="graduation-chart-panel">
-              <header><div><h2>{selectedChartMetric.label} theo {selectedChartDimension.label.toLocaleLowerCase('vi-VN')}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không phân chuỗi'}</p></div><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span></header>
-              {chartModel.data.length > 0 ? <div className="graduation-chart"><GraduationEChart type={chartType} data={chartModel.data} series={chartModel.series} unit="count" showLabels={showChartLabels} /></div> : <div className="graduation-chart-empty">{Array.isArray(explore.chartPoints) ? 'Không có dữ liệu phù hợp với cấu hình hiện tại.' : 'Backend API đang dùng phiên bản cũ. Hãy khởi động lại API để sử dụng cấu hình này.'}</div>}
+              <header><div><h2>{selectedChartMetric.label} theo {selectedChartDimension.label.toLocaleLowerCase('vi-VN')}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không phân chuỗi'}</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span>}</div></header>
+              {chartModel.data.length > 0 ? <div className="graduation-chart"><GraduationEChart type={chartType} data={chartModel.data} series={chartModel.series} unit="count" showLabels={showChartLabels} onZoomChange={setChartZoomPercent} /></div> : <div className="graduation-chart-empty">{Array.isArray(explore.chartPoints) ? 'Không có dữ liệu phù hợp với cấu hình hiện tại.' : 'Backend API đang dùng phiên bản cũ. Hãy khởi động lại API để sử dụng cấu hình này.'}</div>}
             </article>
           </div>
           <GraduationSummaryTable
@@ -815,7 +795,7 @@ export function GraduationAnalytics2Page() {
         </table>
       </div>
       <div className="graduation-add-round"><button type="button" onClick={addRound}><Plus size={16} /> Thêm Đợt {visibleRoundCount + 1}</button></div>
-      {historyPeriodId && <div className="graduation-history"><h3>Lịch sử cập nhật</h3>{historyLoading ? <div className="graduation-state"><LoaderCircle className="spin" /> Đang tải...</div> : <table><thead><tr><th>Lần cập nhật</th><th>File</th><th>Thời gian</th><th>Người tải lên</th><th>Số sinh viên</th><th>Dòng bỏ</th></tr></thead><tbody>{revisions.map((revision) => <tr key={revision.revisionId}><td>Lần {revision.revisionNumber}</td><td>{revision.originalFileName}</td><td>{new Date(revision.importedAtUtc).toLocaleString('vi-VN')}</td><td>{revision.importedByName}</td><td>{formatNumber(revision.importedRowCount)}</td><td>{revision.skippedRowCount}</td></tr>)}</tbody></table>}</div>}
+      {historyPeriodId && <div className="graduation-history"><h3>Lịch sử cập nhật</h3>{historyLoading ? <div className="graduation-state"><LoaderCircle className="spin" /> Đang tải...</div> : <table><thead><tr><th>Lần cập nhật</th><th>File</th><th>Thời gian</th><th>Người tải lên</th><th>Số sinh viên</th><th>Dòng bỏ</th><th>Lý do thay thế</th></tr></thead><tbody>{revisions.map((revision) => <tr key={revision.revisionId}><td>Lần {revision.revisionNumber}</td><td>{revision.originalFileName}</td><td>{new Date(revision.importedAtUtc).toLocaleString('vi-VN')}</td><td>{revision.importedByName}</td><td>{formatNumber(revision.importedRowCount)}</td><td>{revision.skippedRowCount}</td><td>{revision.replaceReason ?? 'Tải lên lần đầu'}</td></tr>)}</tbody></table>}</div>}
     </section>}
 
     <GraduationImportDialog isOpen={Boolean(importTarget)} target={importTarget} onClose={() => setImportTarget(null)} onCommitted={handleCommitted} />

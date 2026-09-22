@@ -52,6 +52,7 @@ const errorMessage = (error: unknown) => {
     GRADUATION_IMPORT_INVALID: 'File hoặc metadata import không hợp lệ.',
     GRADUATION_IMPORT_TOO_LARGE: 'File có quá nhiều dòng dữ liệu.',
     GRADUATION_V3_CONCURRENT_REPLACE: 'Đợt đã được người khác cập nhật. Hãy đóng cửa sổ và tải lại.',
+    GRADUATION_V3_REPLACE_REASON_REQUIRED: 'Phải nhập lý do khi import lại.',
   };
   return messages[error.errorCode] ?? 'Không thể xử lý file. Vui lòng kiểm tra lại dữ liệu.';
 };
@@ -104,6 +105,7 @@ export function GraduationImportDialog({
   const [reviewYear, setReviewYear] = useState(new Date().getFullYear());
   const [confirmationVisible, setConfirmationVisible] = useState(false);
   const [academicYearConfirmed, setAcademicYearConfirmed] = useState(false);
+  const [replaceReason, setReplaceReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorRows, setErrorRows] = useState<{ columns: string[]; rows: ImportRowError[] }>(
@@ -112,6 +114,12 @@ export function GraduationImportDialog({
   const setErrorDetail = (caught: unknown) => {
     setError(errorMessage(caught));
     setErrorRows(rowErrorsOf(caught));
+  };
+
+  const needsCohortMajorCatalog = error?.includes('Danh mục đào tạo → Khoá ngành đào tạo') === true;
+  const openCohortMajorCatalog = () => {
+    onClose();
+    window.location.hash = 'cohort-majors';
   };
 
   useEffect(() => {
@@ -123,6 +131,7 @@ export function GraduationImportDialog({
     setPreview(null);
     setConfirmationVisible(false);
     setAcademicYearConfirmed(false);
+    setReplaceReason('');
     setError(null);
     setErrorRows({ columns: [], rows: [] });
     if (inputRef.current) inputRef.current.value = '';
@@ -166,6 +175,10 @@ export function GraduationImportDialog({
 
   const commit = async () => {
     if (!target || !file || !preview) return;
+    if (target.period && !replaceReason.trim()) {
+      setError('Phải nhập lý do khi import lại một đợt đã có dữ liệu.');
+      return;
+    }
     if (!academicYearConfirmed) {
       setError(`Bạn cần xác nhận file thuộc năm học ${target.academicYearStart}–${target.academicYearStart + 1}.`);
       return;
@@ -182,6 +195,7 @@ export function GraduationImportDialog({
         reviewYear,
         previewFileHash: preview.fileHash,
         expectedActiveRevisionId: target.period?.activeRevisionId,
+        replaceReason,
       });
       await onCommitted(result);
       onClose();
@@ -194,6 +208,10 @@ export function GraduationImportDialog({
 
   const requestConfirmation = () => {
     if (!target || !file || !preview) return;
+    if (target.period && !replaceReason.trim()) {
+      setError('Phải nhập lý do khi import lại một đợt đã có dữ liệu.');
+      return;
+    }
     setError(null);
     setErrorRows({ columns: [], rows: [] });
     setAcademicYearConfirmed(false);
@@ -240,8 +258,11 @@ export function GraduationImportDialog({
         <input ref={inputRef} id={inputId} type="file" accept=".xlsx" disabled={busy} onChange={(event) => void chooseFile(event.target.files?.[0])} />
       </div>
 
+      {isReplace && <label className="graduation-import__reason">Lý do import lại <span aria-hidden="true">*</span><input value={replaceReason} maxLength={1000} onChange={(event) => setReplaceReason(event.target.value)} placeholder="Ví dụ: sửa danh sách bị thiếu sinh viên" disabled={busy} /></label>}
+
       {busy && !preview && <div className="graduation-state"><LoaderCircle className="spin" /> Đang bóc tách dữ liệu...</div>}
       {error && <div className="graduation-alert" role="alert">{error}</div>}
+      {needsCohortMajorCatalog && <button type="button" className="btn btn-secondary" onClick={openCohortMajorCatalog}>Mở danh mục Khoá ngành đào tạo</button>}
       {errorRows.rows.length > 0 && (
         <div className="graduation-import__errors">
           <table>
@@ -312,6 +333,7 @@ export function GraduationImportDialog({
           <span>Tôi xác nhận file này thuộc năm học <strong>{target.academicYearStart}–{target.academicYearStart + 1}</strong>.</span>
         </label>
         {error && <div className="graduation-alert" role="alert">{error}</div>}
+        {needsCohortMajorCatalog && <button type="button" className="btn btn-secondary" onClick={openCohortMajorCatalog}>Mở danh mục Khoá ngành đào tạo</button>}
       {errorRows.rows.length > 0 && (
         <div className="graduation-import__errors">
           <table>

@@ -68,7 +68,7 @@ public sealed class CohortMajor : ISoftDeletable
 }
 
 /// <summary>Bảng "GraduationRounds". Đợt xét tốt nghiệp trong một năm học.</summary>
-public sealed class GraduationRound
+public sealed class GraduationRound : ISoftDeletable
 {
     public long GraduationRoundId { get; set; }
 
@@ -85,6 +85,57 @@ public sealed class GraduationRound
 
     /// <summary>NOT NULL, ON DELETE RESTRICT.</summary>
     public int AcademicYearId { get; set; }
+
+    /// <summary>Revision đang được dùng để dựng số liệu hiện hành của đợt.</summary>
+    public long? ActiveRevisionId { get; set; }
+
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+    public string? DeletedByName { get; set; }
+    public string? DeleteReason { get; set; }
+}
+
+/// <summary>Snapshot bất biến của một lần tải lên hoặc tải lên lại ở thống kê tốt nghiệp 2.</summary>
+public sealed class GraduationRoundImportRevision
+{
+    public long RevisionId { get; set; }
+    public long GraduationRoundId { get; set; }
+    public int RevisionNumber { get; set; }
+    public int ReviewMonth { get; set; }
+    public int ReviewYear { get; set; }
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string SourceSheetName { get; set; } = string.Empty;
+    public string FileHash { get; set; } = string.Empty;
+    public string AggregateHash { get; set; } = string.Empty;
+    public int SourceRowCount { get; set; }
+    public int ImportedRowCount { get; set; }
+    public int SkippedRowCount { get; set; }
+    public string WarningsJson { get; set; } = "[]";
+    public DateTime ImportedAtUtc { get; set; }
+    public Guid ImportedByUserId { get; set; }
+    public string ImportedByName { get; set; } = string.Empty;
+    public string? ReplaceReason { get; set; }
+    public long? ReplacedRevisionId { get; set; }
+}
+
+/// <summary>Dòng tổng hợp thuộc một revision; dùng để xem lại chính xác snapshot đã tải lên.</summary>
+public sealed class GraduationRoundRevisionAggregate
+{
+    public long AggregateId { get; set; }
+    public long RevisionId { get; set; }
+    public int CohortMajorId { get; set; }
+    public int? FacultyId { get; set; }
+    public int? MajorId { get; set; }
+    public string FacultyNameRaw { get; set; } = string.Empty;
+    public string FacultyKey { get; set; } = string.Empty;
+    public string ProgramNameRaw { get; set; } = string.Empty;
+    public string ProgramKey { get; set; } = string.Empty;
+    public string? DerivedProgramCode { get; set; }
+    public string CohortCode { get; set; } = string.Empty;
+    public GraduationRank GraduationRank { get; set; }
+    public bool IsWorkStudy { get; set; }
+    public int StudentCount { get; set; }
 }
 
 /// <summary>

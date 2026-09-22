@@ -54,6 +54,8 @@ export interface GraduationRevisionV3 {
   warnings: GraduationImportWarningV3[];
   importedAtUtc: string;
   importedByName: string;
+  replaceReason: string | null;
+  replacedRevisionId: number | null;
 }
 
 export interface GraduationManagedPeriod {

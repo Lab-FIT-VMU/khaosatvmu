@@ -88,11 +88,11 @@ const endDateFromStart = (startDate: string) => {
 };
 
 /**
- * Dải năm học sinh sẵn trong danh sách chọn, tính từ năm hiện tại: 5 năm đã qua
+ * Dải năm học sinh sẵn trong danh sách chọn, tính từ năm hiện tại: 20 năm đã qua
  * để nhập bù dữ liệu cũ, 10 năm sắp tới để mở trước. Dải trượt theo năm hiện tại
  * nên không có mốc cứng nào phải sửa lại về sau.
  */
-const YEARS_BEFORE = 5;
+const YEARS_BEFORE = 20;
 const YEARS_AFTER = 10;
 
 /**
