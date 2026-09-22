@@ -88,6 +88,15 @@ public sealed record GraduationExploreCell(
     bool IsWorkStudy,
     int StudentCount);
 
+/// <summary>Quy mô nhập học ban đầu của một khóa ngành, dùng làm mẫu số thống kê.</summary>
+public sealed record GraduationPopulationCell(
+    string FacultyName,
+    string FacultyKey,
+    string ProgramName,
+    string ProgramKey,
+    string CohortCode,
+    int StudentCount);
+
 public sealed record GraduationKpiDto(
     string Id,
     string Label,
@@ -98,7 +107,9 @@ public sealed record GraduationRankSummaryV3Dto(
     GraduationRank Rank,
     string Label,
     int Count,
-    decimal Rate);
+    decimal Rate,
+    int WorkStudyCount,
+    decimal WorkStudyRate);
 
 public sealed record GraduationTimelinePointV3Dto(
     long PeriodId,
@@ -124,7 +135,9 @@ public sealed record GraduationBreakdownV3Dto(
     string ProgramName,
     string ProgramKey,
     string CohortCode,
+    int StudentCount,
     int Graduated,
+    int NotGraduated,
     int OnTime,
     int WorkStudy,
     int Excellent,
@@ -137,7 +150,9 @@ public sealed record GraduationChartPointV3Dto(
     string GroupLabel,
     string? SeriesKey,
     string? SeriesLabel,
-    int Value);
+    decimal Value,
+    int Count,
+    int Total);
 
 public sealed record GraduationFacetOptionDto(string Value, string Label, string? ParentValue = null);
 

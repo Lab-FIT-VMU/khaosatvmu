@@ -76,6 +76,8 @@ interface DataTableProps<T> {
   exportConfig?: DataTableExportConfig<T>;
   /** Nhận sự kiện bấm vào dòng dữ liệu */
   onRowClick?: (item: T) => void;
+  /** Dòng tổng kết ở cuối bảng, nhận toàn bộ dữ liệu sau tìm kiếm/lọc cột. */
+  renderFooter?: (rows: T[]) => ReactNode;
 }
 
 export function DataTable<T>({
@@ -101,6 +103,7 @@ export function DataTable<T>({
   enableExport = true,
   exportConfig,
   onRowClick,
+  renderFooter,
 }: DataTableProps<T>) {
   const resolvedAddLabel = addNewLabel.replace(/^\+\s*/, '');
 
@@ -451,6 +454,9 @@ export function DataTable<T>({
               ))
             )}
           </tbody>
+          {renderFooter && filteredData.length > 0 && (
+            <tfoot>{renderFooter(filteredData)}</tfoot>
+          )}
         </table>
       </div>
 

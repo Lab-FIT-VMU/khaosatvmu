@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart, PieChart } from 'echarts/charts';
 import {
@@ -53,6 +53,10 @@ interface GraduationEChartProps {
   onZoomChange?: (percent: number) => void;
 }
 
+export interface GraduationEChartHandle {
+  getPngDataUrl: () => string | null;
+}
+
 const colors = ['#0788b8', '#e07a2d', '#5b8f3c', '#7557a5', '#c24f6d', '#526d82', '#38a3a5', '#d49b28'];
 
 const formatValue = (value: unknown, unit?: 'count' | 'percent') => {
@@ -69,7 +73,7 @@ const escapeHtml = (value: unknown) => String(value).replace(/[&<>"']/g, (charac
   "'": '&#39;',
 })[character] ?? character);
 
-export function GraduationEChart({
+export const GraduationEChart = forwardRef<GraduationEChartHandle, GraduationEChartProps>(function GraduationEChart({
   type,
   data,
   series,
@@ -82,9 +86,17 @@ export function GraduationEChart({
   xAxisName,
   yAxisName,
   onZoomChange,
-}: GraduationEChartProps) {
+}, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null);
+  useImperativeHandle(ref, () => ({
+    getPngDataUrl: () => chartRef.current?.getDataURL({
+      type: 'png',
+      pixelRatio: 2,
+      backgroundColor: '#ffffff',
+      excludeComponents: ['dataZoom', 'toolbox'],
+    }) ?? null,
+  }), []);
   const option = useMemo<EChartsOption>(() => {
     const palette = customColors?.length ? customColors : colors;
     const categories = data.map((row) => String(row.name ?? ''));
@@ -161,7 +173,21 @@ export function GraduationEChart({
         aria: { enabled: true },
         tooltip: {
           trigger: 'item',
-          valueFormatter: (value) => formatValue(value, unit),
+          formatter: (rawParams: CallbackDataParams | CallbackDataParams[]) => {
+            const params = Array.isArray(rawParams) ? rawParams[0] : rawParams;
+            if (!params) return '';
+            const row = data[params.dataIndex];
+            const count = selected?.tooltipCountKey ? row?.[selected.tooltipCountKey] : null;
+            const total = selected?.tooltipTotalKey ? row?.[selected.tooltipTotalKey] : null;
+            const details = [
+              `<strong>${escapeHtml(params.name)}</strong>`,
+              `${typeof params.marker === 'string' ? params.marker : ''}${escapeHtml(selected?.label ?? '')}: <strong>${escapeHtml(formatValue(params.value, unit))}</strong>`,
+            ];
+            if (unit === 'percent' && typeof count === 'number' && typeof total === 'number') {
+              details.push(`Số lượng: ${escapeHtml(formatValue(count))}/${escapeHtml(formatValue(total))} sinh viên`);
+            }
+            return details.join('<br/>');
+          },
         },
         legend: { type: 'scroll', orient: 'vertical', right: 8, top: 'middle', bottom: 8 },
         series: [{
@@ -291,7 +317,22 @@ export function GraduationEChart({
         : {
           trigger: 'axis',
           axisPointer: { type: isLineChart || isCombo ? 'line' : 'shadow' },
-          valueFormatter: (value) => formatValue(value, unit),
+          formatter: (rawParams: CallbackDataParams | CallbackDataParams[]) => {
+            const params = Array.isArray(rawParams) ? rawParams : [rawParams];
+            if (params.length === 0) return '';
+            const details = [`<strong>${escapeHtml(params[0].name)}</strong>`];
+            params.forEach((item) => {
+              const configuredSeries = typeof item.seriesIndex === 'number' ? series[item.seriesIndex] : undefined;
+              const row = data[item.dataIndex];
+              const count = configuredSeries?.tooltipCountKey ? row?.[configuredSeries.tooltipCountKey] : null;
+              const total = configuredSeries?.tooltipTotalKey ? row?.[configuredSeries.tooltipTotalKey] : null;
+              details.push(`${typeof item.marker === 'string' ? item.marker : ''}${escapeHtml(configuredSeries?.label ?? item.seriesName ?? '')}: <strong>${escapeHtml(formatValue(item.value, unit))}</strong>`);
+              if (unit === 'percent' && typeof count === 'number' && typeof total === 'number') {
+                details.push(`Số lượng: ${escapeHtml(formatValue(count))}/${escapeHtml(formatValue(total))} sinh viên`);
+              }
+            });
+            return details.join('<br/>');
+          },
         },
       legend: { show: showLegend && series.length > 1, type: 'scroll', top: 0 },
       dataZoom: [...categoryDataZoom, ...valueDataZoom],
@@ -408,4 +449,4 @@ export function GraduationEChart({
   }, [tooltipTrigger]);
 
   return <div ref={hostRef} className="graduation-echart" title="Giữ Ctrl và cuộn chuột để thu phóng biểu đồ" />;
-}
+});

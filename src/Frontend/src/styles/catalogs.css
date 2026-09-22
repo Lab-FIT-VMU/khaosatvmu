@@ -288,6 +288,30 @@
   background: #f7fafb;
 }
 
+.catalog-table tfoot td {
+  height: 38px;
+  padding: 6px 10px;
+  border-top: 2px solid #b8c5cc;
+  border-right: 1px solid #dce3e7;
+  background: #eef4f6;
+  color: #173f4d;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.catalog-table tfoot td:last-child {
+  border-right: 0;
+}
+
+.catalog-table tfoot .catalog-table-total__label {
+  color: #075d79;
+}
+
+.catalog-table tfoot .catalog-table-total__context {
+  color: #52616b;
+  font-weight: 600;
+}
+
 .catalog-table__index {
   width: 48px;
   color: #000000;

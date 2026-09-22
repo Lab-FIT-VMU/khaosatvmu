@@ -229,6 +229,41 @@
 .graduation-panel-actions { display: flex; align-items: center; gap: 8px; }
 .graduation-panel-actions > span { color: #000000; font-size: 13px; white-space: nowrap; }
 .graduation-panel-actions .graduation-chart-zoom { padding-left: 8px; border-left: 1px solid #cfd9df; color: #52616b; font-weight: 700; }
+.graduation-report-export { position: relative; display: inline-flex; }
+.graduation-report-export .export-dropdown-trigger { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.graduation-report-export .export-dropdown-trigger svg { width: 15px; height: 15px; }
+.graduation-report-export .export-dropdown-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  display: flex;
+  min-width: 245px;
+  padding: 4px;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid #d7e0e5;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgb(15 23 42 / 14%);
+}
+.graduation-report-export .export-menu-item {
+  display: flex;
+  width: 100%;
+  padding: 9px 10px;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.graduation-report-export .export-menu-item:hover,
+.graduation-report-export .export-menu-item:focus-visible { background: #f1f5f9; outline: none; }
 .graduation-chart { height: 390px; margin-top: 12px; }
 .graduation-echart { width: 100%; height: 100%; min-width: 0; }
 .graduation-chart-empty { display: grid; min-height: 390px; place-items: center; color: #000000; }
@@ -482,6 +517,12 @@
 .graduation-filter-reset:hover { border-color: #0788b8; background: #e8f6fa; color: #034b64; }
 .graduation-filter-reset:active { background: #dff1f6; box-shadow: none; transform: translateY(1px); }
 .graduation-filter-reset:focus-visible { outline: 2px solid #0788b8; outline-offset: 2px; }
+.graduation-scope-toolbar { display: flex; width: 100%; align-items: stretch; gap: 1%; margin-top: 8px; }
+.graduation-scope-toolbar .graduation-scope-note { min-width: 0; margin-top: 0; flex: 1 1 82%; }
+.graduation-scope-export { display: flex; min-width: 0; flex: 0 1 17%; }
+.graduation-scope-export .graduation-report-export,
+.graduation-scope-export .export-dropdown-trigger { width: 100%; }
+.graduation-scope-export .export-dropdown-trigger { justify-content: center; }
 .graduation-scope-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding: 9px 12px; border: 1px solid #c8dce4; background: #f3fafc; font-size: 13px; }
 .graduation-scope-note span { color: #000000; }
 
@@ -490,16 +531,20 @@
 .graduation-result-summary > header span { color: #52616b; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .graduation-result-summary > header h2 { margin: 3px 0 0; color: #20262c; font-size: 15px; }
 .graduation-result-summary > header p { margin: 0; color: #68737d; font-size: 12px; white-space: nowrap; }
-.graduation-result-summary__kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #f7f9fa; }
+.graduation-result-summary__kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: #f7f9fa; }
 .graduation-result-summary__kpis > div { position: relative; display: grid; min-height: 92px; align-content: center; gap: 3px; padding: 12px 16px 12px 19px; border-right: 1px solid #dfe4e8; }
 .graduation-result-summary__kpis > div::before { position: absolute; top: 15px; bottom: 15px; left: 0; width: 3px; background: #0788b8; content: ''; }
 .graduation-result-summary__kpis > div:nth-child(2)::before { background: #21884a; }
 .graduation-result-summary__kpis > div:nth-child(3)::before { background: #b86216; }
+.graduation-result-summary__kpis > div:nth-child(4)::before { background: #7557a5; }
+.graduation-result-summary__kpis > div:nth-child(5)::before { background: #526d82; }
 .graduation-result-summary__kpis > div:last-child { border-right: 0; }
 .graduation-result-summary__kpis span { color: #4d5962; font-size: 12px; }
 .graduation-result-summary__kpis strong { color: #075d79; font-size: 25px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .graduation-result-summary__kpis > div:nth-child(2) strong { color: #137b3b; }
 .graduation-result-summary__kpis > div:nth-child(3) strong { color: #9a5511; }
+.graduation-result-summary__kpis > div:nth-child(4) strong { color: #65499a; }
+.graduation-result-summary__kpis > div:nth-child(5) strong { color: #40596c; }
 .graduation-result-summary__kpis small { color: #68737d; font-size: 11px; }
 .graduation-result-summary__ranks { padding: 12px 14px 0; border-top: 1px solid #dfe4e8; }
 .graduation-result-summary__section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -698,6 +743,8 @@
   .graduation-import__reason { grid-column: 1 / -1; }
   .graduation-import__submit { grid-column: 3; }
   .graduation-scope-note { align-items: flex-start; flex-direction: column; }
+  .graduation-scope-toolbar .graduation-scope-note { flex-basis: 70%; }
+  .graduation-scope-export { flex-basis: 29%; }
   .graduation-import-heading { align-items: flex-start; flex-direction: column; }
   .graduation-import-heading__summary { width: 100%; }
   .graduation-import-heading__summary span:first-child { padding-left: 0; border-left: 0; }
@@ -705,6 +752,9 @@
 }
 
 @media (max-width: 560px) {
+  .graduation-scope-toolbar .graduation-scope-note { flex-basis: 60%; }
+  .graduation-scope-export { flex-basis: 39%; }
+  .graduation-scope-export .export-dropdown-trigger { padding-inline: 5%; font-size: 12px; }
   .graduation-filters { grid-template-columns: 1fr; }
   .graduation-view-switch { display: flex; width: 100%; box-sizing: border-box; }
   .graduation-view-switch button { min-width: 0; flex: 1 1 50%; padding-inline: 8px; }

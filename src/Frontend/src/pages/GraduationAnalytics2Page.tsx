@@ -21,7 +21,8 @@ import {
   Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { GraduationEChart } from '../components/graduation2/GraduationEChart';
+import { GraduationEChart, type GraduationEChartHandle } from '../components/graduation2/GraduationEChart';
+import { GraduationReportExport } from '../components/graduation2/GraduationReportExport';
 import { GraduationSummaryTable } from '../components/graduation2/GraduationSummaryTable';
 import { GraduationSavedPreviewDialog } from '../components/graduation2/GraduationSavedPreviewDialog';
 import { GraduationDeletePeriodDialog } from '../components/graduation2/GraduationDeletePeriodDialog';
@@ -42,10 +43,11 @@ import type {
   GraduationManagedPeriod,
   GraduationRevisionV3,
 } from '../types/graduationAnalytics2';
+import { formatCohortCode } from '../utils/formatCohortCode';
 import '../styles/graduation-analytics.css';
 
 export type GraduationAnalyticsView = 'explore' | 'manage';
-type ExploreChartMetric = 'graduated' | 'onTime' | 'workStudy' | 'excellent' | 'veryGood' | 'good' | 'average';
+type ExploreChartMetric = 'studentTotal' | 'graduated' | 'notGraduated' | 'onTime' | 'workStudy' | 'excellent' | 'veryGood' | 'good' | 'average';
 type ExploreChartDimension = 'period' | 'faculty' | 'program' | 'cohort';
 type ExploreChartSeries = Exclude<ExploreChartDimension, 'period'> | '';
 const PROGRAM_SELECTION_SEPARATOR = '\u001f';
@@ -122,7 +124,9 @@ const chartOptions: Array<{ id: GraduationChartType; label: string; icon: typeof
 ];
 
 const chartMetrics: Array<{ id: ExploreChartMetric; label: string }> = [
+  { id: 'studentTotal', label: 'Số sinh viên nhập học' },
   { id: 'graduated', label: 'Đã tốt nghiệp' },
+  { id: 'notGraduated', label: 'Chưa tốt nghiệp' },
   { id: 'onTime', label: 'Tốt nghiệp đúng hạn' },
   { id: 'workStudy', label: 'Hệ VLVH' },
   { id: 'excellent', label: 'Xuất sắc' },
@@ -144,6 +148,28 @@ const chartSeriesDimensions: Array<{ id: Exclude<ExploreChartDimension, 'period'
   { id: 'cohort', label: 'Khóa' },
 ];
 
+const chartMetricTitle: Record<ExploreChartMetric, string> = {
+  studentTotal: 'sinh viên nhập học',
+  graduated: 'sinh viên tốt nghiệp',
+  notGraduated: 'sinh viên chưa tốt nghiệp',
+  onTime: 'sinh viên tốt nghiệp đúng hạn',
+  workStudy: 'sinh viên hệ vừa làm vừa học',
+  excellent: 'sinh viên tốt nghiệp loại xuất sắc',
+  veryGood: 'sinh viên tốt nghiệp loại giỏi',
+  good: 'sinh viên tốt nghiệp loại khá',
+  average: 'sinh viên tốt nghiệp loại trung bình',
+};
+
+const chartDimensionTitle: Record<ExploreChartDimension, string> = {
+  period: 'đợt',
+  faculty: 'khoa/viện',
+  program: 'chuyên ngành',
+  cohort: 'khóa',
+};
+
+const graduationChartTitle = (metric: ExploreChartMetric, dimension: ExploreChartDimension) =>
+  `Thống kê ${chartMetricTitle[metric]} theo ${chartDimensionTitle[dimension]}`;
+
 const currentAcademicYearStart = () => {
   const now = new Date();
   return now.getMonth() + 1 >= 8 ? now.getFullYear() : now.getFullYear() - 1;
@@ -151,6 +177,8 @@ const currentAcademicYearStart = () => {
 
 const formatNumber = (value: number) => value.toLocaleString('vi-VN');
 const formatRate = (value: number) => `${value.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}%`;
+const usesGraduatedDenominator = (metric: ExploreChartMetric) =>
+  ['onTime', 'workStudy', 'excellent', 'veryGood', 'good', 'average'].includes(metric);
 const reviewDateLabel = (reviewMonth: number | null, reviewYear: number | null) =>
   reviewMonth !== null && reviewYear !== null
     ? `${String(reviewMonth).padStart(2, '0')}/${reviewYear}`
@@ -171,7 +199,9 @@ const compatibleChartPoints = (
     if (seriesBy) return [];
     return result.timeline.map((point) => {
       const values: Record<ExploreChartMetric, number | undefined> = {
+        studentTotal: undefined,
         graduated: mode === 'cohortCumulative' ? point.cumulativeGraduated : point.graduated,
+        notGraduated: undefined,
         onTime: mode === 'cohortCumulative' ? point.cumulativeOnTime : point.onTime,
         workStudy: mode === 'cohortCumulative' ? point.cumulativeWorkStudy : point.workStudy,
         excellent: mode === 'cohortCumulative' ? point.cumulativeExcellent : point.excellent,
@@ -185,6 +215,8 @@ const compatibleChartPoints = (
         seriesKey: null,
         seriesLabel: null,
         value: values[metric] ?? 0,
+        count: values[metric] ?? 0,
+        total: values[metric] ?? 0,
       };
     });
   }
@@ -192,7 +224,7 @@ const compatibleChartPoints = (
   const dimension = (row: GraduationExploreResultV3['breakdown'][number], id: Exclude<ExploreChartDimension, 'period'>) => {
     if (id === 'faculty') return { key: row.facultyKey, label: row.facultyName };
     if (id === 'program') return { key: `${row.facultyKey}|${row.programKey}`, label: row.programName };
-    return { key: row.cohortCode, label: row.cohortCode };
+    return { key: row.cohortCode, label: formatCohortCode(row.cohortCode) };
   };
   const points = new Map<string, GraduationExploreResultV3['chartPoints'][number]>();
   result.breakdown.forEach((row) => {
@@ -200,15 +232,21 @@ const compatibleChartPoints = (
     const series = seriesBy ? dimension(row, seriesBy) : null;
     const mapKey = `${group.key}\u001f${series?.key ?? ''}`;
     const current = points.get(mapKey);
+    const metricValue = metric === 'studentTotal' ? row.studentCount : row[metric];
     points.set(mapKey, {
       groupKey: group.key,
       groupLabel: group.label,
       seriesKey: series?.key ?? null,
       seriesLabel: series?.label ?? null,
-      value: (current?.value ?? 0) + row[metric],
+      value: (current?.value ?? 0) + metricValue,
+      count: (current?.count ?? 0) + metricValue,
+      total: (current?.total ?? 0) + row.studentCount,
     });
   });
-  return [...points.values()];
+  return [...points.values()].map((point) => ({
+    ...point,
+    value: point.total > 0 ? point.count * 100 / point.total : 0,
+  }));
 };
 
 const timelineMetricValues = (
@@ -216,7 +254,9 @@ const timelineMetricValues = (
   metric: ExploreChartMetric,
 ) => {
   const values: Record<ExploreChartMetric, { period: number; cumulative: number }> = {
+    studentTotal: { period: 0, cumulative: 0 },
     graduated: { period: point.graduated, cumulative: point.cumulativeGraduated },
+    notGraduated: { period: 0, cumulative: 0 },
     onTime: { period: point.onTime, cumulative: point.cumulativeOnTime },
     workStudy: { period: point.workStudy, cumulative: point.cumulativeWorkStudy },
     excellent: { period: point.excellent, cumulative: point.cumulativeExcellent },
@@ -233,13 +273,14 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
   const [error, setError] = useState<string | null>(null);
   const [startPeriodId, setStartPeriodId] = useState<number | null>(null);
   const [cutoffPeriodId, setCutoffPeriodId] = useState<number | null>(null);
-  const [mode, setMode] = useState<GraduationExploreModeV3>('period');
+  const [mode, setMode] = useState<GraduationExploreModeV3>('cohortCumulative');
   const [chartMetric, setChartMetric] = useState<ExploreChartMetric>('graduated');
-  const [chartGroupBy, setChartGroupBy] = useState<ExploreChartDimension>('cohort');
-  const [chartSeriesBy, setChartSeriesBy] = useState<ExploreChartSeries>('');
+  const [chartGroupBy, setChartGroupBy] = useState<ExploreChartDimension>('period');
+  const [chartSeriesBy, setChartSeriesBy] = useState<ExploreChartSeries>('cohort');
   const [chartType, setChartType] = useState<GraduationChartType>('bar');
   const [showChartLabels, setShowChartLabels] = useState(true);
   const [chartZoomPercent, setChartZoomPercent] = useState(100);
+  const graduationChartRef = useRef<GraduationEChartHandle>(null);
   const [selectedCohorts, setSelectedCohorts] = useState<string[]>([]);
   const [selectedFacultyKeys, setSelectedFacultyKeys] = useState<string[]>([]);
   const [selectedProgramKeys, setSelectedProgramKeys] = useState<string[]>([]);
@@ -450,23 +491,35 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
   const displayedCohorts = explore?.scope.cohorts ?? selectedCohorts;
   const selectedChartMetric = chartMetrics.find((item) => item.id === displayedChartMetric) ?? chartMetrics[0];
   const selectedChartDimension = chartDimensions.find((item) => item.id === displayedChartGroup) ?? chartDimensions[0];
+  const selectedGraduationChartTitle = graduationChartTitle(displayedChartMetric, displayedChartGroup);
   const isDisplayedCumulativeTimeline = displayedChartMode === 'cohortCumulative' && displayedChartGroup === 'period';
-  const isDisplayedCumulativeCombo = isDisplayedCumulativeTimeline && !displayedChartSeries;
+  const isDisplayedCumulativeCombo = isDisplayedCumulativeTimeline
+    && !displayedChartSeries
+    && displayedChartMetric !== 'studentTotal'
+    && displayedChartMetric !== 'notGraduated';
   const chartModel = useMemo(() => {
     if (explore && isDisplayedCumulativeCombo) {
+      const pointByPeriod = new Map(explore.chartPoints.map((point) => [point.groupKey, point]));
       return {
         data: explore.timeline.map((point) => {
           const values = timelineMetricValues(point, displayedChartMetric);
+          const chartPoint = pointByPeriod.get(String(point.periodId));
+          const total = chartPoint?.total ?? 0;
+          const periodTotal = usesGraduatedDenominator(displayedChartMetric) ? point.graduated : total;
           return {
             name: point.periodLabel,
-            periodValue: values.period,
-            cumulativeValue: values.cumulative,
-            total: values.cumulative,
+            periodValue: periodTotal > 0 ? values.period * 100 / periodTotal : 0,
+            periodCount: values.period,
+            periodTotal,
+            cumulativeValue: chartPoint?.value ?? 0,
+            cumulativeCount: chartPoint?.count ?? values.cumulative,
+            cumulativeTotal: total,
+            total: chartPoint?.value ?? 0,
           };
         }),
         series: [
-          { key: 'periodValue', label: 'Riêng đợt', chartType: 'bar' as const },
-          { key: 'cumulativeValue', label: 'Tổng tích lũy', chartType: 'line' as const },
+          { key: 'periodValue', label: 'Riêng đợt', chartType: 'bar' as const, tooltipCountKey: 'periodCount', tooltipTotalKey: 'periodTotal' },
+          { key: 'cumulativeValue', label: 'Tổng tích lũy', chartType: 'line' as const, tooltipCountKey: 'cumulativeCount', tooltipTotalKey: 'cumulativeTotal' },
         ],
       };
     }
@@ -479,31 +532,44 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
         displayedChartMode,
       )
       : [];
+    const displayPointLabel = (label: string, dimension: ExploreChartDimension | ExploreChartSeries) =>
+      dimension === 'cohort' ? formatCohortCode(label) : label;
     const seriesOptions = [...new Map(points
       .filter((point) => point.seriesKey && point.seriesLabel)
-      .map((point) => [point.seriesKey!, point.seriesLabel!])).entries()]
+      .map((point) => [point.seriesKey!, displayPointLabel(point.seriesLabel!, displayedChartSeries)])).entries()]
       .sort((a, b) => a[1].localeCompare(b[1], 'vi'));
     const seriesKeyById = new Map(seriesOptions.map(([id], index) => [id, `series_${index}`]));
     const series = displayedChartSeries
-      ? seriesOptions.map(([id, label]) => ({ key: seriesKeyById.get(id)!, label }))
-      : [{ key: 'value', label: selectedChartMetric.label }];
-    const groups = new Map<string, { name: string; total: number; values: Map<string, number> }>();
+      ? seriesOptions.map(([id, label]) => {
+        const key = seriesKeyById.get(id)!;
+        return { key, label, tooltipCountKey: `${key}_count`, tooltipTotalKey: `${key}_total` };
+      })
+      : [{ key: 'value', label: selectedChartMetric.label, tooltipCountKey: 'value_count', tooltipTotalKey: 'value_total' }];
+    const groups = new Map<string, { name: string; total: number; values: Map<string, number>; counts: Map<string, number>; totals: Map<string, number> }>();
     points.forEach((point) => {
       const group = groups.get(point.groupKey) ?? {
-        name: point.groupLabel,
+        name: displayPointLabel(point.groupLabel, displayedChartGroup),
         total: 0,
         values: new Map<string, number>(),
+        counts: new Map<string, number>(),
+        totals: new Map<string, number>(),
       };
       const valueKey = displayedChartSeries && point.seriesKey
         ? seriesKeyById.get(point.seriesKey) ?? 'value'
         : 'value';
       group.values.set(valueKey, (group.values.get(valueKey) ?? 0) + point.value);
+      group.counts.set(valueKey, (group.counts.get(valueKey) ?? 0) + point.count);
+      group.totals.set(valueKey, (group.totals.get(valueKey) ?? 0) + point.total);
       group.total += point.value;
       groups.set(point.groupKey, group);
     });
     const data = [...groups.values()].map((group) => {
       const row: Record<string, string | number | null> = { name: group.name, total: group.total };
-      series.forEach((item) => { row[item.key] = group.values.get(item.key) ?? 0; });
+      series.forEach((item) => {
+        row[item.key] = group.values.get(item.key) ?? 0;
+        row[item.tooltipCountKey] = group.counts.get(item.key) ?? 0;
+        row[item.tooltipTotalKey] = group.totals.get(item.key) ?? 0;
+      });
       return row;
     });
     if (!isDisplayedCumulativeTimeline) {
@@ -532,6 +598,77 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
       setChartType(isDisplayedCumulativeCombo ? 'combo' : isDisplayedCumulativeTimeline ? 'line' : 'bar');
     }
   }, [availableChartTypes, chartType, isDisplayedCumulativeCombo, isDisplayedCumulativeTimeline]);
+
+  const getGraduationReportOptions = () => {
+    if (!explore) return null;
+    const chartDataUrl = graduationChartRef.current?.getPngDataUrl();
+    if (!chartDataUrl) {
+      toast.error('Biểu đồ chưa sẵn sàng để xuất. Vui lòng thử lại.');
+      return null;
+    }
+    const cohortLabel = displayedCohorts.length > 0
+      ? displayedCohorts.map(formatCohortCode).join(', ')
+      : 'Tất cả khóa';
+    const facultyLabel = selectedFacultyKeys.length > 0
+      ? selectedFacultyKeys.map((key) => facultyLabelByKey.get(key) ?? key).join(', ')
+      : 'Tất cả khoa';
+    const programLabelByValue = new Map(programOptions.map((option) => [option.value, option.label]));
+    const programLabel = selectedProgramKeys.length > 0
+      ? selectedProgramKeys.map((key) => programLabelByValue.get(key) ?? key).join(', ')
+      : 'Tất cả chuyên ngành';
+    const periodLabel = explore.scope.startPeriodId === explore.scope.cutoffPeriodId
+      ? explore.scope.cutoffPeriodLabel
+      : `${explore.scope.startPeriodLabel} → ${explore.scope.cutoffPeriodLabel}`;
+    const chartDescription = `${isDisplayedCumulativeCombo
+      ? 'Cột: riêng từng đợt · Đường: tổng tích lũy'
+      : displayedChartSeries
+        ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}`
+        : 'Không phân chuỗi'} · Tỷ lệ trên ${usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}`;
+    const kpiInfo = Object.fromEntries(explore.kpis.map((kpi) => [
+      kpi.label,
+      kpi.id === 'studentTotal'
+        ? formatNumber(kpi.count)
+        : `${formatNumber(kpi.count)} (${formatRate(kpi.rate)})`,
+    ]));
+    const hasSeriesColumn = Boolean(displayedChartSeries) || chartModel.series.length > 1;
+    const tableColumns = [
+      { key: 'group', header: selectedChartDimension.label },
+      ...(hasSeriesColumn ? [{ key: 'series', header: 'Phân chuỗi' }] : []),
+      { key: 'rate', header: 'Tỷ lệ (%)', numeric: true },
+      { key: 'count', header: 'Số lượng', numeric: true },
+      { key: 'denominator', header: 'Mẫu số', numeric: true },
+    ];
+    const tableRows = chartModel.data.flatMap((row) => {
+      const values = row as Record<string, string | number | null>;
+      return chartModel.series.map((series) => ({
+        group: String(values.name ?? ''),
+        ...(hasSeriesColumn ? { series: series.label } : {}),
+        rate: Math.round(Number(values[series.key] ?? 0) * 100) / 100,
+        count: Number(values[series.tooltipCountKey] ?? 0),
+        denominator: Number(values[series.tooltipTotalKey] ?? 0),
+      }));
+    });
+    return {
+      fileName: `thong-ke-tot-nghiep-${new Date().toISOString().slice(0, 10)}`,
+      title: 'Báo cáo thống kê tốt nghiệp',
+      subtitle: 'Kết quả tốt nghiệp, cơ cấu xếp loại và số liệu tổng hợp',
+      chartTitle: selectedGraduationChartTitle,
+      chartDescription,
+      chartDataUrl,
+      tableTitle: `Dữ liệu ${selectedGraduationChartTitle.toLocaleLowerCase('vi-VN')}`,
+      tableColumns,
+      tableRows,
+      info: {
+        'Phạm vi': explore.scope.mode === 'cohortCumulative' ? 'Tích lũy qua các đợt' : 'Riêng một đợt',
+        'Mốc dữ liệu': periodLabel,
+        'Khóa': cohortLabel,
+        'Khoa': facultyLabel,
+        'Chuyên ngành': programLabel,
+        'Số nhóm dữ liệu': chartModel.data.length,
+        ...kpiInfo,
+      },
+    };
+  };
 
   const handleModeChange = (next: GraduationExploreModeV3) => {
     setMode(next);
@@ -666,7 +803,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
       <label>Từ đợt<select value={startPeriodId ?? ''} onChange={(event) => handleStartPeriodChange(Number(event.target.value))}>{periodsByAcademicYear.map(([academicYearLabel, yearPeriods]) => <optgroup key={academicYearLabel} label={academicYearLabel}>{yearPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodOptionLabel(period)}</option>)}</optgroup>)}</select></label>
       <label>Đến đợt<select value={cutoffPeriodId ?? ''} onChange={(event) => handleCutoffPeriodChange(Number(event.target.value))}>{periodsByAcademicYear.map(([academicYearLabel, yearPeriods]) => <optgroup key={academicYearLabel} label={academicYearLabel}>{yearPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodOptionLabel(period)}</option>)}</optgroup>)}</select></label>
     </> : <label>Mốc dữ liệu<select value={cutoffPeriodId ?? ''} onChange={(event) => { setCutoffPeriodId(Number(event.target.value)); setSelectedFacultyKeys([]); setSelectedProgramKeys([]); setSelectedCohorts([]); setChartGroupBy(recommendedChartGroup(mode, '', '', '')); setChartSeriesBy(''); }}>{periodsByAcademicYear.map(([academicYearLabel, yearPeriods]) => <optgroup key={academicYearLabel} label={academicYearLabel}>{yearPeriods.map((period) => <option key={period.periodId} value={period.periodId}>{periodOptionLabel(period)}</option>)}</optgroup>)}</select></label>}
-    <div className="graduation-filter-field"><span>Khóa</span><GraduationFilterMultiSelect options={(facets?.cohorts ?? []).map((item) => ({ value: item, label: item }))} value={selectedCohorts} onChange={handleCohortChange} allLabel="Tất cả khóa" selectedLabel={(count) => `${count} khóa đã chọn`} searchPlaceholder="Tìm khóa..." searchAriaLabel="Tìm khóa" dialogAriaLabel="Chọn các khóa cần thống kê" emptyMessage="Không tìm thấy khóa phù hợp." /></div>
+    <div className="graduation-filter-field"><span>Khóa</span><GraduationFilterMultiSelect options={(facets?.cohorts ?? []).map((item) => ({ value: item, label: formatCohortCode(item) }))} value={selectedCohorts} onChange={handleCohortChange} allLabel="Tất cả khóa" selectedLabel={(count) => `${count} khóa đã chọn`} searchPlaceholder="Tìm khóa..." searchAriaLabel="Tìm khóa" dialogAriaLabel="Chọn các khóa cần thống kê" emptyMessage="Không tìm thấy khóa phù hợp." /></div>
     <div className="graduation-filter-field"><span>Khoa</span><GraduationFilterMultiSelect options={facultyOptions} value={selectedFacultyKeys} onChange={handleFacultyChange} allLabel="Tất cả khoa" selectedLabel={(count) => `${count} khoa đã chọn`} searchPlaceholder="Tìm khoa..." searchAriaLabel="Tìm khoa" dialogAriaLabel="Chọn các khoa cần thống kê" emptyMessage="Không tìm thấy khoa phù hợp." /></div>
     <div className="graduation-filter-field"><span>Chuyên ngành</span><GraduationFilterMultiSelect options={programOptions} value={selectedProgramKeys} onChange={handleProgramChange} allLabel="Tất cả chuyên ngành" selectedLabel={(count) => `${count} chuyên ngành đã chọn`} searchPlaceholder="Tìm chuyên ngành..." searchAriaLabel="Tìm chuyên ngành" dialogAriaLabel="Chọn các chuyên ngành cần thống kê" emptyMessage="Không tìm thấy chuyên ngành phù hợp." /></div>
     <button type="button" className="btn graduation-filter-reset" onClick={resetFilters}><RotateCcw aria-hidden="true" />Đặt lại</button>
@@ -688,19 +825,21 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
                 <span>TỔNG QUAN KẾT QUẢ</span>
                 <h2>Kết quả tốt nghiệp và cơ cấu xếp loại</h2>
               </div>
-              <p>{displayedCohorts.length === 0 ? 'Tất cả khóa' : displayedCohorts.length === 1 ? `Khóa ${displayedCohorts[0]}` : `${displayedCohorts.length} khóa đã chọn`}</p>
+              <p>{displayedCohorts.length === 0 ? 'Tất cả khóa' : displayedCohorts.length === 1 ? `Khóa ${formatCohortCode(displayedCohorts[0])}` : `${displayedCohorts.length} khóa đã chọn`}</p>
             </header>
             <section className="graduation-result-summary__kpis" aria-label="Các chỉ số tốt nghiệp chính">
               {explore.kpis.map((kpi) => <div key={kpi.id} data-kpi={kpi.id}>
                 <span>{kpi.label}</span>
                 <strong>{formatNumber(kpi.count)}</strong>
-                <small>{formatRate(kpi.rate)} tổng số sinh viên</small>
+                <small>{kpi.id === 'studentTotal'
+                  ? 'Từ danh mục Khóa ngành đào tạo'
+                  : `${formatRate(kpi.rate)} ${kpi.id === 'graduated' || kpi.id === 'notGraduated' ? 'số sinh viên nhập học' : 'số sinh viên đã tốt nghiệp'}`}</small>
               </div>)}
             </section>
             <section className="graduation-result-summary__ranks" aria-labelledby="graduation-rank-heading">
               <div className="graduation-result-summary__section-heading">
                 <h3 id="graduation-rank-heading">Xếp loại tốt nghiệp</h3>
-                <span>Tỷ trọng trên tổng số sinh viên</span>
+                <span>Tỷ trọng trên số sinh viên đã tốt nghiệp</span>
               </div>
               <div className="graduation-result-summary__distribution" role="img" aria-label="Tỷ trọng các mức xếp loại tốt nghiệp">
                 {explore.ranks.map((rank) => <span key={rank.rank} style={{ width: `${rank.rate}%` }} title={`${rank.label}: ${formatRate(rank.rate)}`} />)}
@@ -715,7 +854,10 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
             </section>
           </article>
           {renderExploreControls()}
-          <div className="graduation-scope-note"><strong>{explore.scope.mode === 'cohortCumulative' ? (displayedCohorts.length > 0 ? `Tích lũy ${displayedCohorts.join(', ')}` : 'Tích lũy tất cả khóa') : 'Riêng đợt được chọn'}</strong><span>{explore.scope.startPeriodLabel}{explore.scope.startPeriodId !== explore.scope.cutoffPeriodId ? ` → ${explore.scope.cutoffPeriodLabel}` : ''} · {explore.scope.includedPeriodCount} đợt</span></div>
+          <div className="graduation-scope-toolbar">
+            <div className="graduation-scope-note"><strong>{explore.scope.mode === 'cohortCumulative' ? (displayedCohorts.length > 0 ? `Tích lũy ${displayedCohorts.map(formatCohortCode).join(', ')}` : 'Tích lũy tất cả khóa') : 'Riêng đợt được chọn'}</strong><span>{explore.scope.startPeriodLabel}{explore.scope.startPeriodId !== explore.scope.cutoffPeriodId ? ` → ${explore.scope.cutoffPeriodLabel}` : ''} · {explore.scope.includedPeriodCount} đợt</span></div>
+            <div className="graduation-scope-export"><GraduationReportExport getOptions={getGraduationReportOptions} disabled={exploreLoading || chartModel.data.length === 0} /></div>
+          </div>
           <div className="graduation-workspace graduation-explore-chart-workspace">
             <aside className="graduation-builder">
               <div className="graduation-builder__heading">
@@ -745,8 +887,8 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
               <label className="graduation-builder__check"><input type="checkbox" checked={showChartLabels} onChange={(event) => setShowChartLabels(event.target.checked)} /> Hiển thị nhãn giá trị</label>
             </aside>
             <article className="graduation-chart-panel">
-              <header><div><h2>{selectedChartMetric.label} theo {selectedChartDimension.label.toLocaleLowerCase('vi-VN')}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không phân chuỗi'}</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span>}</div></header>
-              {chartModel.data.length > 0 ? <div className="graduation-chart"><GraduationEChart type={chartType} data={chartModel.data} series={chartModel.series} unit="count" showLabels={showChartLabels} onZoomChange={setChartZoomPercent} /></div> : <div className="graduation-chart-empty">{Array.isArray(explore.chartPoints) ? 'Không có dữ liệu phù hợp với cấu hình hiện tại.' : 'Backend API đang dùng phiên bản cũ. Hãy khởi động lại API để sử dụng cấu hình này.'}</div>}
+              <header><div><h2>{selectedGraduationChartTitle}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không phân chuỗi'} · Tỷ lệ trên {usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}; số lượng hiển thị trong tooltip</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span>}</div></header>
+              {chartModel.data.length > 0 ? <div className="graduation-chart"><GraduationEChart ref={graduationChartRef} type={chartType} data={chartModel.data} series={chartModel.series} unit="percent" showLabels={showChartLabels} onZoomChange={setChartZoomPercent} /></div> : <div className="graduation-chart-empty">{Array.isArray(explore.chartPoints) ? 'Không có dữ liệu phù hợp với cấu hình hiện tại.' : 'Backend API đang dùng phiên bản cũ. Hãy khởi động lại API để sử dụng cấu hình này.'}</div>}
             </article>
           </div>
           <GraduationSummaryTable

@@ -7,17 +7,10 @@ import type {
   GraduationManagedPeriod,
 } from '../../types/graduationAnalytics2';
 
-/** Năm học 2018-2019 ứng với khoá 59, mỗi năm sau tăng một khoá. */
 const BASE_ACADEMIC_YEAR_START = 2018;
 const BASE_COHORT_NUMBER = 59;
-
-/** Chương trình chuẩn 4 năm. */
 const STANDARD_PROGRAM_YEARS = 4;
 
-/**
- * Đúng hạn xét theo khoá học chứ không theo hệ đào tạo: khoá 62 nhập năm học
- * 2021-2022 thì chỉ đợt của năm học 2024-2025 mới là đúng hạn.
- */
 const isOnTime = (cohortCode: string, academicYearStart: number) => {
   const digits = (cohortCode ?? '').replace(/\D/g, '');
   if (!digits) return false;

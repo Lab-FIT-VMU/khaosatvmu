@@ -100,7 +100,14 @@ export interface GraduationExploreResultV3 {
     includedPeriodCount: number;
   };
   kpis: Array<{ id: string; label: string; count: number; rate: number }>;
-  ranks: Array<{ rank: GraduationRankV3; label: string; count: number; rate: number }>;
+  ranks: Array<{
+    rank: GraduationRankV3;
+    label: string;
+    count: number;
+    rate: number;
+    workStudyCount: number;
+    workStudyRate: number;
+  }>;
   timeline: Array<{
     periodId: number;
     periodLabel: string;
@@ -125,7 +132,9 @@ export interface GraduationExploreResultV3 {
     programName: string;
     programKey: string;
     cohortCode: string;
+    studentCount: number;
     graduated: number;
+    notGraduated: number;
     onTime: number;
     workStudy: number;
     excellent: number;
@@ -139,6 +148,8 @@ export interface GraduationExploreResultV3 {
     seriesKey: string | null;
     seriesLabel: string | null;
     value: number;
+    count: number;
+    total: number;
   }>;
   facets: {
     faculties: GraduationFacetOptionV3[];

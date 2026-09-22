@@ -284,6 +284,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
       key: 'studentCount',
       header: 'Số lượng sinh viên',
       width: '11%',
+      numeric: true,
       filterValue: (item) => String(item.studentCount),
       render: (item) => item.studentCount,
     },
@@ -291,6 +292,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
       key: 'graduatedCount',
       header: 'Đã tốt nghiệp',
       width: '11%',
+      numeric: true,
       filterValue: (item) => String(item.graduatedCount),
       render: (item) => item.graduatedCount,
     },
@@ -298,6 +300,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
       key: 'notGraduatedCount',
       header: 'Chưa tốt nghiệp',
       width: '11%',
+      numeric: true,
       filterValue: (item) => String(item.notGraduatedCount),
       render: (item) => item.notGraduatedCount,
     },
@@ -305,6 +308,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
       key: 'onTimeGraduatedCount',
       header: 'Tốt nghiệp đúng hạn',
       width: '13%',
+      numeric: true,
       filterValue: (item) => String(item.onTimeGraduatedCount),
       render: (item) => item.onTimeGraduatedCount,
     },
@@ -470,6 +474,31 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
             emptyMessage="Chưa có khoá ngành đào tạo nào."
             keyExtractor={(item) => String(item.cohortMajorId)}
             pageSize={20}
+            renderFooter={(rows) => {
+              const totals = rows.reduce((sum, item) => ({
+                studentCount: sum.studentCount + item.studentCount,
+                graduatedCount: sum.graduatedCount + item.graduatedCount,
+                notGraduatedCount: sum.notGraduatedCount + item.notGraduatedCount,
+                onTimeGraduatedCount: sum.onTimeGraduatedCount + item.onTimeGraduatedCount,
+              }), {
+                studentCount: 0,
+                graduatedCount: 0,
+                notGraduatedCount: 0,
+                onTimeGraduatedCount: 0,
+              });
+              return (
+                <tr className="catalog-table-total">
+                  <td className="catalog-table__index" aria-hidden="true" />
+                  <td className="catalog-table-total__label">Tổng cộng</td>
+                  <td className="catalog-table-total__context">{rows.length.toLocaleString('vi-VN')} khóa ngành</td>
+                  <td className="catalog-cell-numeric">{totals.studentCount.toLocaleString('vi-VN')}</td>
+                  <td className="catalog-cell-numeric">{totals.graduatedCount.toLocaleString('vi-VN')}</td>
+                  <td className="catalog-cell-numeric">{totals.notGraduatedCount.toLocaleString('vi-VN')}</td>
+                  <td className="catalog-cell-numeric">{totals.onTimeGraduatedCount.toLocaleString('vi-VN')}</td>
+                  <td aria-hidden="true" />
+                </tr>
+              );
+            }}
           />
         </section>
       </div>
