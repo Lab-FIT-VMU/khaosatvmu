@@ -42,6 +42,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Cohort> Cohorts => Set<Cohort>();
     public DbSet<CohortMajor> CohortMajors => Set<CohortMajor>();
     public DbSet<GraduationRound> GraduationRounds => Set<GraduationRound>();
+    public DbSet<GraduationRoundImportRevision> GraduationRoundImportRevisions => Set<GraduationRoundImportRevision>();
+    public DbSet<GraduationRoundRevisionAggregate> GraduationRoundRevisionAggregates => Set<GraduationRoundRevisionAggregate>();
     public DbSet<CohortMajorGraduation> CohortMajorGraduations => Set<CohortMajorGraduation>();
     public DbSet<ChangeAuditLog> ChangeAuditLogs => Set<ChangeAuditLog>();
 
@@ -75,6 +77,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<GraduationPeriod>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<Cohort>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<CohortMajor>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<GraduationRound>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<CohortMajorGraduation>().HasQueryFilter(e => !e.IsDeleted);
         // Câu trả lời không có cột IsDeleted riêng mà bám theo phiếu cha. Bắt buộc
         // phải khai bộ lọc khớp: answer là đầu BẮT BUỘC của quan hệ, thiếu bộ lọc
@@ -312,12 +315,89 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                     + "(\"ReviewMonth\" BETWEEN 1 AND 12 AND \"ReviewYear\" BETWEEN 1900 AND 2200)");
             });
             entity.HasKey(x => x.GraduationRoundId);
+            entity.Property(x => x.DeletedByName).HasMaxLength(320);
+            entity.Property(x => x.DeleteReason).HasMaxLength(1000);
             entity.HasIndex(x => new { x.AcademicYearId, x.RoundNumber }).IsUnique();
             entity.HasOne<AcademicYear>()
                 .WithMany()
                 .HasForeignKey(x => x.AcademicYearId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        modelBuilder.Entity<GraduationRoundImportRevision>(entity =>
+        {
+            entity.ToTable("GraduationRoundImportRevisions", table =>
+            {
+                table.HasCheckConstraint("CK_GraduationRoundImportRevisions_RevisionNumber", "\"RevisionNumber\" > 0");
+                table.HasCheckConstraint(
+                    "CK_GraduationRoundImportRevisions_RowCounts",
+                    "\"SourceRowCount\" = \"ImportedRowCount\" + \"SkippedRowCount\" AND \"ImportedRowCount\" > 0 AND \"SkippedRowCount\" >= 0");
+            });
+            entity.HasKey(x => x.RevisionId);
+            entity.Property(x => x.OriginalFileName).HasMaxLength(255).IsRequired();
+            entity.Property(x => x.SourceSheetName).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.FileHash).HasMaxLength(64).IsFixedLength().IsRequired();
+            entity.Property(x => x.AggregateHash).HasMaxLength(64).IsFixedLength().IsRequired();
+            entity.Property(x => x.WarningsJson).HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.ImportedByName).HasMaxLength(320).IsRequired();
+            entity.Property(x => x.ReplaceReason).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.GraduationRoundId, x.RevisionNumber }).IsUnique();
+            entity.HasIndex(x => x.FileHash);
+            entity.HasOne<GraduationRound>()
+                .WithMany()
+                .HasForeignKey(x => x.GraduationRoundId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<GraduationRoundImportRevision>()
+                .WithMany()
+                .HasForeignKey(x => x.ReplacedRevisionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GraduationRoundRevisionAggregate>(entity =>
+        {
+            entity.ToTable("GraduationRoundRevisionAggregates", table =>
+                table.HasCheckConstraint("CK_GraduationRoundRevisionAggregates_StudentCount", "\"StudentCount\" > 0"));
+            entity.HasKey(x => x.AggregateId);
+            entity.Property(x => x.FacultyNameRaw).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.FacultyKey).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.ProgramNameRaw).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.ProgramKey).HasMaxLength(300).IsRequired();
+            entity.Property(x => x.DerivedProgramCode).HasMaxLength(50);
+            entity.Property(x => x.CohortCode).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.GraduationRank).HasConversion<string>().HasMaxLength(20).IsRequired();
+            entity.HasIndex(x => new
+            {
+                x.RevisionId,
+                x.FacultyKey,
+                x.ProgramKey,
+                x.CohortCode,
+                x.GraduationRank,
+                x.IsWorkStudy,
+            }).IsUnique();
+            entity.HasIndex(x => new { x.RevisionId, x.CohortCode });
+            entity.HasOne<GraduationRoundImportRevision>()
+                .WithMany()
+                .HasForeignKey(x => x.RevisionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<CohortMajor>()
+                .WithMany()
+                .HasForeignKey(x => x.CohortMajorId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Faculty>()
+                .WithMany()
+                .HasForeignKey(x => x.FacultyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Major>()
+                .WithMany()
+                .HasForeignKey(x => x.MajorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GraduationRound>()
+            .HasOne<GraduationRoundImportRevision>()
+            .WithMany()
+            .HasForeignKey(x => x.ActiveRevisionId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<CohortMajorGraduation>(entity =>
         {

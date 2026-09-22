@@ -50,6 +50,7 @@ interface GraduationEChartProps {
   referenceLine?: { value: number; label: string };
   xAxisName?: string;
   yAxisName?: string;
+  onZoomChange?: (percent: number) => void;
 }
 
 const colors = ['#0788b8', '#e07a2d', '#5b8f3c', '#7557a5', '#c24f6d', '#526d82', '#38a3a5', '#d49b28'];
@@ -80,6 +81,7 @@ export function GraduationEChart({
   referenceLine,
   xAxisName,
   yAxisName,
+  onZoomChange,
 }: GraduationEChartProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null);
@@ -93,23 +95,16 @@ export function GraduationEChart({
     const isCombo = type === 'combo';
     const hasStackLabels = series.some((item) => Boolean(item.stackLabel || item.stackLabelKey));
     const visibleCategoryCount = isHorizontal ? 9 : 8;
-    // Hai loại zoom giải quyết hai vấn đề khác nhau: nhiều nhóm thì cuộn theo trục
-    // danh mục; nhiều chuỗi hoặc ít nhóm thì zoom trục giá trị để tách các đường/cột
-    // đang nằm sát nhau. Với biểu đồ dọc, zoom giá trị chính là thanh dọc bên phải.
+    // Chỉ khai báo slider cho ECharts. Wheel được xử lý trực tiếp ở host phía
+    // dưới để cuộn thường luôn đi tới trang và chỉ Ctrl + cuộn mới zoom biểu đồ.
     const needsCategoryZoom = categories.length > visibleCategoryCount;
     const needsValueZoom = unit === 'percent'
       || series.length > 1
       || (categories.length > 1 && !needsCategoryZoom);
-    const categoryZoomEnd = Math.min(100, (visibleCategoryCount / categories.length) * 100);
-    const maximumPercentValue = Math.max(
-      referenceLine?.value ?? 0,
-      ...data.map((row) => isStacked
-        ? series.reduce((sum, item) => sum + (typeof row[item.key] === 'number' ? Number(row[item.key]) : 0), 0)
-        : Math.max(0, ...series.map((item) => typeof row[item.key] === 'number' ? Number(row[item.key]) : 0))),
-    );
-    const valueZoomEnd = unit === 'percent' && !isStacked
-      ? Math.min(100, Math.max(10, Math.ceil(maximumPercentValue * 1.2 / 5) * 5))
-      : 100;
+    // Luôn hiển thị toàn bộ dữ liệu ở lần render đầu tiên. Việc thu hẹp phạm vi
+    // chỉ xảy ra sau thao tác chủ động của người dùng.
+    const categoryZoomEnd = 100;
+    const valueZoomEnd = 100;
     const valueAxis = {
       type: 'value' as const,
       min: 0,
@@ -134,8 +129,6 @@ export function GraduationEChart({
         fontSize: 13,
         interval: 0,
         rotate: !isHorizontal && categories.length > 6 ? 28 : 0,
-        width: isHorizontal ? 170 : 115,
-        overflow: 'truncate' as const,
         hideOverlap: true,
         formatter: (value: string) => {
           const limit = isHorizontal ? 28 : 22;
@@ -254,14 +247,14 @@ export function GraduationEChart({
       };
     });
     const categoryDataZoom = !needsCategoryZoom ? [] : isHorizontal ? [
-      { type: 'inside' as const, yAxisIndex: 0, start: 0, end: categoryZoomEnd },
       {
+        id: 'graduation-category-zoom',
         type: 'slider' as const, yAxisIndex: 0, start: 0, end: categoryZoomEnd,
         right: 5, top: 44, bottom: 24, width: 14, showDetail: false, brushSelect: false,
       },
     ] : [
-      { type: 'inside' as const, xAxisIndex: 0, start: 0, end: categoryZoomEnd },
       {
+        id: 'graduation-category-zoom',
         type: 'slider' as const, xAxisIndex: 0, start: 0, end: categoryZoomEnd,
         left: 52, right: needsValueZoom ? 48 : 24, bottom: 4, height: 18,
         showDetail: false, brushSelect: false,
@@ -269,20 +262,14 @@ export function GraduationEChart({
     ];
     const valueDataZoom = !needsValueZoom ? [] : isHorizontal ? [
       {
-        type: 'inside' as const, xAxisIndex: 0, start: 0, end: valueZoomEnd,
-        filterMode: 'none' as const,
-      },
-      {
+        id: 'graduation-value-zoom',
         type: 'slider' as const, xAxisIndex: 0, start: 0, end: valueZoomEnd,
-        filterMode: 'none' as const, left: 184, right: 24, bottom: 4, height: 18,
+        filterMode: 'none' as const, left: '3%', right: '2%', bottom: 4, height: 18,
         showDetail: true, brushSelect: false,
       },
     ] : [
       {
-        type: 'inside' as const, yAxisIndex: 0, start: 0, end: valueZoomEnd,
-        filterMode: 'none' as const,
-      },
-      {
+        id: 'graduation-value-zoom',
         type: 'slider' as const, yAxisIndex: 0, start: 0, end: valueZoomEnd,
         filterMode: 'none' as const, right: 4, top: 48, bottom: 48, width: 14,
         showDetail: true, brushSelect: false,
@@ -310,16 +297,16 @@ export function GraduationEChart({
       dataZoom: [...categoryDataZoom, ...valueDataZoom],
       grid: {
         top: showLegend && series.length > 1 ? 46 : hasStackLabels ? 48 : 20,
-        left: isHorizontal ? 184 : yAxisName ? 68 : 52,
+        left: isHorizontal ? '1%' : yAxisName ? '4%' : '2%',
         right: !isHorizontal && needsValueZoom
-          ? showLabels ? 86 : 48
-          : isHorizontal && needsCategoryZoom ? 34 : showLabels ? 70 : 24,
+          ? showLabels ? '6%' : '4%'
+          : isHorizontal && needsCategoryZoom ? '3%' : showLabels ? '5%' : '2%',
         bottom: !isHorizontal && needsCategoryZoom
           ? 108
           : !isHorizontal && categories.length > 6
             ? 94
             : xAxisName ? 66 : 54,
-        containLabel: false,
+        containLabel: true,
       },
       xAxis: isHorizontal ? valueAxis : categoryAxis,
       yAxis: isHorizontal ? categoryAxis : valueAxis,
@@ -333,8 +320,35 @@ export function GraduationEChart({
     const chart = echarts.init(host, undefined, { renderer: 'canvas' });
     chartRef.current = chart;
     const observer = new ResizeObserver(() => chart.resize());
+    const handleWheel = (event: WheelEvent) => {
+      // Không chạm vào wheel thường: trình duyệt phải tiếp tục cuộn trang.
+      if (!event.ctrlKey || event.deltaY === 0) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const currentOption = chart.getOption() as {
+        dataZoom?: Array<{ id?: string; start?: number; end?: number }>;
+      };
+      for (const [dataZoomIndex, zoom] of (currentOption.dataZoom ?? []).entries()) {
+        const start = zoom.start ?? 0;
+        const end = zoom.end ?? 100;
+        const currentSpan = Math.max(1, end - start);
+        const nextSpan = Math.min(100, Math.max(5, currentSpan * (event.deltaY < 0 ? .85 : 1.18)));
+        const center = (start + end) / 2;
+        const nextStart = Math.max(0, Math.min(100 - nextSpan, center - nextSpan / 2));
+        chart.dispatchAction({
+          type: 'dataZoom',
+          dataZoomIndex,
+          start: nextStart,
+          end: nextStart + nextSpan,
+        });
+      }
+    };
     observer.observe(host);
+    host.addEventListener('wheel', handleWheel, { capture: true, passive: false });
     return () => {
+      host.removeEventListener('wheel', handleWheel, { capture: true });
       observer.disconnect();
       chart.dispose();
       chartRef.current = null;
@@ -342,8 +356,29 @@ export function GraduationEChart({
   }, []);
 
   useEffect(() => {
+    onZoomChange?.(100);
     chartRef.current?.setOption(option, { notMerge: true, lazyUpdate: true });
-  }, [option]);
+  }, [onZoomChange, option]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    const updateZoomPercent = (rawEvent: unknown) => {
+      const event = rawEvent as {
+        start?: number;
+        end?: number;
+        batch?: Array<{ start?: number; end?: number }>;
+      };
+      const ranges = event.batch?.length ? event.batch : [event];
+      const visibleRange = Math.min(...ranges.map((range) =>
+        Math.max(1, (range.end ?? 100) - (range.start ?? 0))));
+      onZoomChange?.(Math.round(10000 / visibleRange));
+    };
+
+    chart.on('datazoom', updateZoomPercent);
+    return () => { chart.off('datazoom', updateZoomPercent); };
+  }, [onZoomChange]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -372,5 +407,5 @@ export function GraduationEChart({
     };
   }, [tooltipTrigger]);
 
-  return <div ref={hostRef} className="graduation-echart" />;
+  return <div ref={hostRef} className="graduation-echart" title="Giữ Ctrl và cuộn chuột để thu phóng biểu đồ" />;
 }

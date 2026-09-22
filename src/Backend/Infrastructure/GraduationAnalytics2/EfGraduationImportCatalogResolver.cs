@@ -49,7 +49,7 @@ public sealed partial class EfGraduationImportCatalogResolver(AppDbContext db)
         if (entries.Count == 0)
         {
             throw InvalidCatalog(
-                "Danh mục Khoá ngành đào tạo chưa có dữ liệu. Hãy nhập danh mục trước.");
+                "Danh mục Khoá ngành đào tạo chưa có dữ liệu. Hãy vào Danh mục đào tạo → Khoá ngành đào tạo để hoàn thiện danh mục trước khi tải lên.");
         }
 
         // Tên khoá ngành chỉ duy nhất trong phạm vi một khoá, nên một mã trùng ở
@@ -76,13 +76,13 @@ public sealed partial class EfGraduationImportCatalogResolver(AppDbContext db)
             if (!byClassKey.TryGetValue(classKey, out var candidates))
             {
                 reasonByClassKey[classKey] =
-                    $"Mã lớp '{aggregate.ProgramNameRaw}' chưa có trong danh mục Khoá ngành đào tạo";
+                    $"Mã lớp '{aggregate.ProgramNameRaw}' chưa có trong danh mục Khoá ngành đào tạo. Hãy vào Danh mục đào tạo → Khoá ngành đào tạo để bổ sung";
                 continue;
             }
             if (candidates.Count > 1)
             {
                 reasonByClassKey[classKey] =
-                    $"Mã lớp '{aggregate.ProgramNameRaw}' trùng ở nhiều khoá";
+                    $"Mã lớp '{aggregate.ProgramNameRaw}' trùng ở nhiều khoá. Hãy vào Danh mục đào tạo → Khoá ngành đào tạo để chỉnh lại mã lớp";
                 continue;
             }
 
@@ -114,7 +114,7 @@ public sealed partial class EfGraduationImportCatalogResolver(AppDbContext db)
 
             throw new GraduationAnalyticsException(
                 GraduationAnalyticsErrorCodes.InvalidImport,
-                $"Có {rowErrors.Count} dòng không đối chiếu được với danh mục Khoá ngành đào tạo.")
+                $"Có {rowErrors.Count} dòng không đối chiếu được với danh mục. Hãy vào Danh mục đào tạo → Khoá ngành đào tạo để hoàn thiện các mã lớp được liệt kê bên dưới, sau đó tải lại tệp.")
             {
                 SourceColumns = parsedImport.SourceColumns ?? [],
                 RowErrors = rowErrors,

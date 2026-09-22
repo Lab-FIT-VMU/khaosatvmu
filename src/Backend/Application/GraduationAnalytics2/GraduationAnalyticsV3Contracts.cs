@@ -6,6 +6,7 @@ public static class GraduationAnalyticsV3ErrorCodes
 {
     public const string PeriodNotFound = "GRADUATION_V3_PERIOD_NOT_FOUND";
     public const string ConcurrentReplace = "GRADUATION_V3_CONCURRENT_REPLACE";
+    public const string ReplaceReasonRequired = "GRADUATION_V3_REPLACE_REASON_REQUIRED";
 }
 
 public sealed record ImportGraduationRevisionCommand(
@@ -14,6 +15,7 @@ public sealed record ImportGraduationRevisionCommand(
     int ReviewMonth,
     int ReviewYear,
     long? ExpectedActiveRevisionId,
+    string? ReplaceReason,
     ParsedGraduationImport ParsedImport);
 
 public sealed record GraduationRevisionDto(
@@ -27,7 +29,9 @@ public sealed record GraduationRevisionDto(
     int SkippedRowCount,
     IReadOnlyList<GraduationImportWarning> Warnings,
     DateTime ImportedAtUtc,
-    string ImportedByName);
+    string ImportedByName,
+    string? ReplaceReason,
+    long? ReplacedRevisionId);
 
 public sealed record GraduationPeriodV3Dto(
     long PeriodId,
@@ -184,6 +188,7 @@ public interface IGraduationAnalyticsV3Service
 
     Task DeletePeriodAsync(
         long periodId,
+        string reason,
         CancellationToken cancellationToken);
 
     Task<GraduationExploreResultV3Dto> ExploreAsync(
