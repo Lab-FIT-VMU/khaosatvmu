@@ -1,0 +1,20 @@
+# Chạy khaosatvmu-sentiment.service theo lịch.
+#
+# Cài đặt: xem deploy/systemd/README.md
+[Unit]
+Description=Chạy phân tích cảm xúc ý kiến mở theo lịch
+Documentation=file:///opt/khaosatvmu/deploy/systemd/README.md
+
+[Timer]
+# Ngoài giờ hành chính: máy chủ 2 vCPU không nên suy luận model trong lúc sinh viên đang nộp phiếu.
+OnCalendar=*-*-* 02:00:00
+# Lỡ khung giờ (máy tắt, đang bảo trì) thì chạy bù ngay khi có thể, thay vì im lặng bỏ qua.
+Persistent=true
+# Xê dịch để không trùng đúng lúc PostgreSQL checkpoint hoặc job backup.
+RandomizedDelaySec=10min
+# Không chồng hai lượt lên nhau: hai worker cùng lúc là hai bản model trong RAM, và máy này không
+# đủ chỗ cho việc đó.
+Unit=khaosatvmu-sentiment.service
+
+[Install]
+WantedBy=timers.target

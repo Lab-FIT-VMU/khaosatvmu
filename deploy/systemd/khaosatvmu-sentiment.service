@@ -1,0 +1,29 @@
+# Chạy phân tích cảm xúc ý kiến mở MỘT lượt rồi thoát.
+#
+# Vì sao không phải một tiến trình thường trực: model ONNX chiếm khoảng 1,0 GB RAM thường trú
+# (WorkingSet 1.051.168.768 byte đã đo) và một nhân CPU khi suy luận. Trên máy chủ 2 vCPU / 4 GB
+# RAM dùng chung với API, để nó thường trực là lấy mất một nhân và một phần tư bộ nhớ của cả hệ
+# thống cho một tính năng phụ. Chạy theo lịch thì phần bộ nhớ đó được trả lại cho hệ điều hành
+# ngay khi tiến trình thoát.
+#
+# Cài đặt: xem deploy/systemd/README.md
+[Unit]
+Description=Phân tích cảm xúc ý kiến mở của khảo sát (một lượt)
+Documentation=file:///opt/khaosatvmu/deploy/systemd/README.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Sửa đường dẫn này nếu repo không nằm ở /opt/khaosatvmu. Docker Compose đọc tệp .env trong thư
+# mục làm việc, nên đây cũng là chỗ phải có .env chứa secret thật.
+WorkingDirectory=/opt/khaosatvmu
+# CỐ Ý không có --watch: xem chú thích ở đầu tệp.
+ExecStart=/usr/bin/docker compose --profile sentiment run --rm sentiment-worker
+# Mã thoát của worker là tín hiệu sức khoẻ: 0 xong việc, 2 không nạp được model, 3 có lô thất bại.
+# Mọi mã khác 0 làm unit này thất bại, và đó chính là điều ta muốn — `systemctl --failed` phải
+# hiện lên. Đừng thêm dấu "-" vào ExecStart hay SuccessExitStatus ở đây.
+# Một lượt đầy đủ 490 ý kiến đo được 87,5 giây, nhưng đợt khảo sát lớn hơn thì lâu hơn, nên trần
+# đặt rộng tay.
+TimeoutStartSec=3600

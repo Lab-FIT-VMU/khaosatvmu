@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\Backend\Domain\Domain.csproj" />
     <ProjectReference Include="..\..\src\Backend\Application\Application.csproj" />
     <ProjectReference Include="..\..\src\Backend\Infrastructure\Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Backend\SentimentWorker\SentimentWorker.csproj" />
     <ProjectReference Include="..\..\src\Backend\API\API.csproj" />
   </ItemGroup>
 

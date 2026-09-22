@@ -45,6 +45,8 @@ public sealed class ReportQueryOptimizationTests
             join semesterSurvey in db.SemesterSurveys.AsNoTracking()
                 on sectionSurvey.SemesterSurveyId equals semesterSurvey.SemesterSurveyId
             where semesterSurvey.SemesterId == semesterId
+                // Đúng như bước xếp hạng đầu của service: chỉ lớp ĐÃ CHỐT ĐIỂM.
+                && sectionSurvey.AverageScore != null
             group score by score.QuestionId into grouped
             select new
             {
@@ -55,6 +57,7 @@ public sealed class ReportQueryOptimizationTests
             .Where(x => x.TotalAnswers >= 10)
             .OrderBy(x => x.WeightedScore / x.TotalAnswers)
             .ThenByDescending(x => x.TotalAnswers)
+            .ThenBy(x => x.QuestionId)
             .Select(x => x.QuestionId)
             .Take(5)
             .ToListAsync();
@@ -68,6 +71,9 @@ public sealed class ReportQueryOptimizationTests
         var overview = await service.GetSchoolSurveyOverviewAsync(semesterId, semesterId);
 
         overview.Should().NotBeNull();
+        // Thứ tự phải là thứ tự của bảng điểm ĐÃ CHỐT (bước xếp hạng đầu), không phải thứ tự
+        // xếp lại theo điểm trung bình làm tròn của phiếu sống — xếp lại thì ba câu 114/115/116
+        // bằng điểm nhau ở mức 2 chữ số và thứ tự tuỳ vào SQL.
         overview!.WeakestQuestions.Select(x => x.QuestionId)
             .Should().Equal(expectedQuestionIds);
     }

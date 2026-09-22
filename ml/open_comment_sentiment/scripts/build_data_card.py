@@ -5,9 +5,14 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import sys
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from sentiment_baseline.console import force_utf8_output  # noqa: E402
+
 SOURCE_CONFIG = PROJECT_ROOT / "config" / "data-sources.json"
 AUDIT_FILES = {
     "uit_vsfc": PROJECT_ROOT / "artifacts" / "dataset-audit.json",
@@ -235,6 +240,7 @@ def render_markdown(card: dict[str, object]) -> str:
 
 
 def main() -> int:
+    force_utf8_output()
     args = parse_args()
     card = build_card()
     output_dir = args.output_dir.resolve()

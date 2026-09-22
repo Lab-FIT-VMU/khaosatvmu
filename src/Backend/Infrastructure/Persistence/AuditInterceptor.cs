@@ -16,6 +16,10 @@ internal sealed class AuditInterceptor(ICurrentUserAccessor currentUser) : SaveC
         typeof(AuthSession),
         typeof(SurveyResponse),
         typeof(SurveyResponseAnswer),
+        // Kết quả phân loại cảm xúc do worker nền ghi hàng nghìn dòng mỗi lượt quét; ghi
+        // ChangeAuditLog cho từng dòng sẽ phình nhật ký mà không ai đọc. Việc hiệu chỉnh
+        // thủ công và chạy lại model mới là thao tác cần vết, và hai chỗ đó tự ghi nhật ký.
+        typeof(OpenCommentAnalysisResult),
         // Module này có metadata import riêng và phải tách khỏi ChangeAuditLogs của project chính.
         typeof(GraduationAnalyticsDataset),
         typeof(GraduationAnalyticsRow),

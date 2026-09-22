@@ -1,0 +1,25 @@
+{
+  "url": "http://localhost:5115",
+  "email": "bvhoang0609@gmail.com",
+  "concurrency": 16,
+  "duration_seconds": 40.0,
+  "wall_seconds": 40.11,
+  "steps": {
+    "/api/v1/reports/open-comments": {
+      "requests": 3046,
+      "ok": 3046,
+      "failed": 0,
+      "wall_seconds": 40.11,
+      "requests_per_second": 75.9,
+      "latency_ms": {
+        "min": 50.5,
+        "p50": 155.4,
+        "p90": 415.4,
+        "p95": 502.4,
+        "p99": 753.5,
+        "max": 1326.3,
+        "mean": 210.4
+      }
+    }
+  }
+}

@@ -1,6 +1,5 @@
 using API.Auth;
 using API.Catalog;
-using API.Configuration;
 using API.GraduationAnalytics;
 using API.Middleware;
 using API.Reports;
@@ -15,9 +14,11 @@ using Application.Surveys;
 using Application.UserAdministration;
 using Infrastructure.Auth;
 using Infrastructure.Catalog;
+using Infrastructure.Configuration;
 using Infrastructure.GraduationAnalytics;
 using Infrastructure.Persistence;
 using Infrastructure.Reports;
+using Infrastructure.Sentiment;
 using Infrastructure.Services;
 using Infrastructure.Surveys;
 using Infrastructure.UserAdministration;
@@ -28,7 +29,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Threading.RateLimiting;
 
-DevelopmentEnvironment.LoadNearestEnvFile();
+LocalEnvironmentFile.LoadNearest();
 
 // High-Concurrency ThreadPool Warmup for 1,000+ Concurrent Requests
 ThreadPool.SetMinThreads(300, 300);
@@ -43,6 +44,9 @@ builder.Services.AddOpenApi();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddPersistence(builder.Configuration);
+// Chỉ đọc/ghi bảng kết quả cảm xúc. Model ONNX và phần suy luận nằm ở tiến trình RIÊNG
+// (project SentimentWorker) để API không phải trả RAM cho model hơn 500 MB.
+builder.Services.AddOpenCommentSentimentReporting(builder.Configuration);
 
 // Health Checks with Database Readiness
 builder.Services.AddHealthChecks()
@@ -133,6 +137,8 @@ builder.Services.AddAuthorization(options =>
     AddPermissionPolicy(AuthPolicies.SurveyStatisticsAccess, "SURVEY_STATISTICS_ACCESS");
     AddPermissionPolicy(AuthPolicies.SurveyAnalysisAccess, "SURVEY_ANALYSIS_ACCESS");
     AddPermissionPolicy(AuthPolicies.GraduationAnalyticsAccess, "GRADUATION_ANALYTICS_ACCESS");
+    AddPermissionPolicy(AuthPolicies.OpenCommentSentimentReview, "OPEN_COMMENT_SENTIMENT_REVIEW");
+    AddPermissionPolicy(AuthPolicies.OpenCommentModelAdmin, "OPEN_COMMENT_MODEL_ADMIN");
     AddAnyPermissionPolicy(AuthPolicies.ReportingRead,
         "REPORTS_ACCESS", "SURVEY_DASHBOARD_ACCESS", "SURVEY_STATISTICS_ACCESS",
         "SURVEY_ANALYSIS_ACCESS");

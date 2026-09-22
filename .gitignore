@@ -162,3 +162,9 @@ ml/**/*.pyc
 
 # Ảnh của phiếu khảo sát do quản trị tải lên: dữ liệu vận hành, không phải mã nguồn.
 src/Backend/API/App_Data/
+
+# ==========================================
+# 10. Model ONNX và tokenizer cho suy luận cảm xúc
+#     Hơn 500 MB, phải tạo lại bằng scripts/prepare_backend_model.py.
+# ==========================================
+models/

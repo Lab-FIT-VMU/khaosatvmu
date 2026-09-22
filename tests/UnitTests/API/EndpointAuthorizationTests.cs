@@ -63,6 +63,9 @@ public sealed class EndpointAuthorizationTests
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton(Mock.Of<IUserAdministrationService>());
         builder.Services.AddSingleton(Mock.Of<IReportService>());
+        // Endpoint tối thiểu suy ra tham số là dịch vụ hay body dựa vào DI lúc dựng route, nên
+        // mọi dịch vụ mà nhóm endpoint tham chiếu đều phải đăng ký ở đây.
+        builder.Services.AddSingleton(Mock.Of<IOpenCommentAnalysisService>());
         builder.Services.AddSingleton(Mock.Of<IGraduationAnalyticsService>());
         var app = builder.Build();
         app.MapUserAdministrationEndpoints();
@@ -178,5 +181,45 @@ public sealed class EndpointAuthorizationTests
 
         endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()
             .Should().Contain(data => data.Policy == expectedPolicy);
+    }
+
+    /// <summary>
+    /// Hai thao tác ghi của tính năng phân loại cảm xúc phải có thêm quyền riêng, không chỉ
+    /// dựa vào quyền xem báo cáo. Thiếu bài này thì một trưởng bộ môn chỉ có REPORTS_ACCESS
+    /// vẫn sửa được nhãn model — đúng thứ kế hoạch cấm.
+    /// </summary>
+    [Theory]
+    [InlineData("/api/v1/reports/open-comments/model-status", "GET", AuthPolicies.OpenCommentModelAdmin)]
+    [InlineData("/api/v1/reports/open-comments/reanalyze", "POST", AuthPolicies.OpenCommentModelAdmin)]
+    [InlineData(
+        "/api/v1/reports/open-comments/{responseId:int}/sentiment",
+        "PATCH",
+        AuthPolicies.OpenCommentSentimentReview)]
+    public void SentimentAdminEndpoints_RequireTheirOwnPermissionOnTopOfReportAccess(
+        string route,
+        string method,
+        string expectedPolicy)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddAuthorization();
+        builder.Services.AddSingleton(Mock.Of<IReportService>());
+        builder.Services.AddSingleton(Mock.Of<IOpenCommentAnalysisService>());
+        var app = builder.Build();
+        app.MapReportEndpoints();
+
+        var endpoint = ((IEndpointRouteBuilder)app).DataSources
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Single(candidate => candidate.RoutePattern.RawText == route
+                && candidate.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods.Contains(method) == true);
+
+        var policies = endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()
+            .Select(data => data.Policy)
+            .ToList();
+
+        policies.Should().Contain(expectedPolicy);
+        // Quyền module của nhóm báo cáo vẫn phải còn, nếu không thì chỉ cần một quyền AI là
+        // đọc được mọi số liệu khảo sát.
+        policies.Should().Contain(AuthPolicies.ReportsAccess);
     }
 }

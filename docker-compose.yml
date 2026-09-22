@@ -1,8 +1,22 @@
+# Ngân sách tài nguyên của máy chủ đích: 2 vCPU / 4 GB RAM.
+#
+# Trần tài nguyên được khai cho TỪNG service, cộng lại là 3,0 GB — cố ý chừa khoảng 1 GB cho
+# hệ điều hành và Docker. Để tổng trần vượt RAM thật thì khi hết bộ nhớ, kernel giết tiến trình
+# theo thứ tự khó đoán; khai trần thì tiến trình vượt trần của mình là tiến trình bị giết, và mã
+# thoát 137 nói thẳng đó là lỗi bộ nhớ chứ không phải lỗi nghiệp vụ.
+#
+# `cpus` là trần chứ không phải chỗ dành riêng, nên ba service cùng khai 1,0 không có nghĩa là
+# máy cần 3 nhân: ý nghĩa là không tiến trình nào một mình chiếm được cả máy. Riêng
+# sentiment-worker bị chặn ở 1,0 nhân là để API luôn còn nhân phục vụ trong lúc worker suy luận.
+#
+# Máy chủ khác dung lượng thì đổi bằng biến môi trường trong .env, xem .env.example.
 services:
   db:
     image: postgres:15-alpine
     container_name: khaosatvmu_db
     restart: always
+    cpus: ${DB_CPU_LIMIT:-1.0}
+    mem_limit: ${DB_MEM_LIMIT:-640m}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-khaosatvmu@123}
@@ -42,6 +56,10 @@ services:
       dockerfile: API/Dockerfile
     container_name: khaosatvmu_api
     restart: on-failure
+    # API đo được ~142 MB RSS khi rảnh; 768 MB là trần có chỗ thở cho lúc cao điểm, và vẫn
+    # nằm trong ngân sách RAM của máy 4 GB.
+    cpus: ${API_CPU_LIMIT:-1.0}
+    mem_limit: ${API_MEM_LIMIT:-768m}
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-khaosatvmu};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-khaosatvmu@123}
@@ -50,6 +68,10 @@ services:
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:?can-i-please-have-a-google-client-secret}
       AllowedHosts: ${ALLOWED_HOSTS:-localhost}
       SurveyTicket__SigningKey: ${SurveyTicket__SigningKey:?can-i-please-have-a-signing-key}
+      # PHẢI trùng với biến của sentiment-worker. API không nạp model nhưng dùng phiên bản này
+      # để tính "còn bao nhiêu ý kiến chưa phân tích"; lệch nhau thì mọi ý kiến đều bị coi là
+      # còn nợ và số liệu trên màn quản trị sẽ sai.
+      OpenCommentSentiment__ModelVersion: ${OPEN_COMMENT_MODEL_VERSION:-phobert-neu-esc-v1}
       # Ảnh của phiếu khảo sát lưu ra đĩa, không vào cơ sở dữ liệu. Phải trỏ vào ổ gắn
       # ngoài, để dựng lại container không mất logo và ảnh bìa của các đợt đã tạo.
       SurveyFormAssets__Path: /app/App_Data/survey-form-assets
@@ -69,10 +91,58 @@ services:
         VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL:-kdcldhhh@vimaru.edu.vn}
     container_name: khaosatvmu_frontend
     restart: on-failure
+    # nginx chỉ phục vụ tệp tĩnh và proxy ngược; không cần nhiều hơn thế.
+    cpus: ${FRONTEND_CPU_LIMIT:-0.5}
+    mem_limit: ${FRONTEND_MEM_LIMIT:-128m}
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       - api
+
+  # Tiến trình RIÊNG chạy model ONNX. Cố ý không nằm trong nhóm khởi động mặc định: model chiếm
+  # khoảng 1,0 GB RAM thường trú (WorkingSet 1.051.168.768 byte đã đo) và một nhân CPU, trên máy
+  # chủ 1–2 vCPU mà để nó thường trực thì API bị bóp. Chạy khi cần bằng:
+  #
+  #   docker compose --profile sentiment run --rm sentiment-worker
+  #
+  # Chạy theo lịch là mô hình vận hành khuyến nghị: xem deploy/systemd/, worker chạy một lượt
+  # rồi thoát nên nó hợp với timer/cron hơn là với một tiến trình thường trực.
+  #
+  # KHÔNG truyền --watch trên máy 1–2 vCPU. `--watch` giữ model thường trực trong bộ nhớ suốt
+  # thời gian chạy và giữ một nhân CPU không nhả.
+  #
+  # Không khai `restart` và không khai `profiles` khác: chạy một lượt rồi thoát, mã thoát 0 là
+  # xong việc, 2 là không nạp được model, 3 là có lô thất bại.
+  sentiment-worker:
+    build:
+      context: ./src/Backend
+      dockerfile: SentimentWorker/Dockerfile
+    container_name: khaosatvmu_sentiment_worker
+    profiles: ["sentiment"]
+    # Trần cứng của cgroup, khác với `InferenceThreads` của ONNX Runtime (đã bị ép bằng mã).
+    # Cái này chặn cả những phần không do ONNX quản lý: nạp tệp model, tokenizer, mã hoá.
+    cpus: ${SENTIMENT_CPU_LIMIT:-1.0}
+    # Model ~1,0 GB RSS khi đã nạp; 1,5 GB chừa chỗ cho tokenizer, lô 16 ý kiến × 256 token và
+    # phần bộ nhớ không do GC quản lý của ONNX Runtime.
+    mem_limit: ${SENTIMENT_MEM_LIMIT:-1536m}
+    environment:
+      DOTNET_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-khaosatvmu};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-khaosatvmu@123}
+      # Model nằm ngoài ảnh, gắn chỉ đọc: ảnh không phình thêm 515 MB và mỗi lần lên model mới
+      # chỉ việc thay thư mục, không phải dựng lại ảnh.
+      OpenCommentSentiment__ModelDirectory: /models
+      OpenCommentSentiment__ModelVersion: ${OPEN_COMMENT_MODEL_VERSION:-phobert-neu-esc-v1}
+      # Một luồng là mặc định có chủ đích: xem chú thích trong OpenCommentSentimentOptions.
+      OpenCommentSentiment__InferenceThreads: ${OPEN_COMMENT_INFERENCE_THREADS:-1}
+      # Chỉ có tác dụng khi chạy nền (truyền --watch). Khoảng quét chính là độ trễ từ lúc phiếu
+      # được nộp tới lúc số liệu đổi; trả model sau khi rảnh là để tiến trình ở lại mà không giữ 1 GB.
+      OpenCommentSentiment__ScanIntervalSeconds: ${OPEN_COMMENT_SCAN_INTERVAL_SECONDS:-120}
+      OpenCommentSentiment__IdleUnloadSeconds: ${OPEN_COMMENT_IDLE_UNLOAD_SECONDS:-120}
+    volumes:
+      - ./models/open-comment-sentiment:/models:ro
+    depends_on:
+      db:
+        condition: service_healthy
 
   pgadmin:
     image: dpage/pgadmin4:latest

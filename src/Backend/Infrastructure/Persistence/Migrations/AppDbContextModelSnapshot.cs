@@ -959,6 +959,72 @@ namespace Infrastructure.Persistence.Migrations
                     b.ToTable("Majors", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.OpenCommentAnalysisResult", b =>
+                {
+                    b.Property<int>("SurveyResponseId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("AnalyzedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Confidence")
+                        .HasColumnType("numeric(6,5)");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ManualSentiment")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("ModelVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal>("NegativeScore")
+                        .HasColumnType("numeric(6,5)");
+
+                    b.Property<decimal>("NeutralScore")
+                        .HasColumnType("numeric(6,5)");
+
+                    b.Property<decimal>("PositiveScore")
+                        .HasColumnType("numeric(6,5)");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RuleVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Sentiment")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("TopicCodesJson")
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("SurveyResponseId");
+
+                    b.HasIndex("AnalyzedAt");
+
+                    b.HasIndex("ModelVersion");
+
+                    b.HasIndex("ReviewedByUserId");
+
+                    b.HasIndex("Sentiment");
+
+                    b.ToTable("OpenCommentAnalysisResults", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Permission", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1708,6 +1774,20 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasOne("Domain.Faculty", null)
                         .WithMany()
                         .HasForeignKey("FacultyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.OpenCommentAnalysisResult", b =>
+                {
+                    b.HasOne("Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.SurveyResponse", null)
+                        .WithMany()
+                        .HasForeignKey("SurveyResponseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

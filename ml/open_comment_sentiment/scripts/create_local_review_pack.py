@@ -31,10 +31,39 @@ def write_annotation_sheet(path: Path, rows: list[dict[str, str]], seed: int) ->
             writer.writerow({field: row.get(field, "") if field not in {"Sentiment", "NeedsAdjudication", "AnnotatorNotes"} else "" for field in fields})
 
 
+TRUTHY = {"t", "true", "1", "yes", "y"}
+
+
+def assign_splits(
+    rows: list[dict[str, str]], seed: int, calibration_ratio: float
+) -> dict[str, str]:
+    """Stratified by length bucket so calibration and test keep a similar shape.
+
+    The assignment is kept out of the annotation sheets on purpose: an annotator
+    who knows which items are the frozen test set can bias the labels.
+    """
+    rng = random.Random(seed)
+    buckets: dict[str, list[str]] = {}
+    for row in rows:
+        buckets.setdefault(row.get("LengthBucket", "unknown"), []).append(row["SampleId"])
+    assignment: dict[str, str] = {}
+    for bucket in sorted(buckets):
+        ids = sorted(buckets[bucket])
+        rng.shuffle(ids)
+        cut = round(len(ids) * calibration_ratio)
+        for index, sample_id in enumerate(ids):
+            assignment[sample_id] = "calibration" if index < cut else "test"
+    return assignment
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create blinded annotation sheets and separate model screening.")
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--split-seed", type=int, default=7)
+    parser.add_argument(
+        "--calibration-ratio", type=float, default=0.5, help="Share of items reserved for calibration instead of the frozen test"
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -51,6 +80,7 @@ def main() -> int:
         output_dir / "annotator-b.csv",
         output_dir / "model-screening.csv",
         output_dir / "review-pack-summary.json",
+        output_dir / "split-assignment.csv",
     ]
     if not args.overwrite and any(path.exists() for path in expected_outputs):
         raise FileExistsError("Review pack already exists. Use --overwrite explicitly to replace it.")
@@ -58,6 +88,22 @@ def main() -> int:
     write_annotation_sheet(expected_outputs[0], rows, seed=101)
     write_annotation_sheet(expected_outputs[1], rows, seed=202)
 
+    if not 0.0 < args.calibration_ratio < 1.0:
+        raise ValueError("--calibration-ratio must be between 0 and 1")
+    assignment = assign_splits(rows, seed=args.split_seed, calibration_ratio=args.calibration_ratio)
+    length_bucket_by_id = {row["SampleId"]: row.get("LengthBucket", "") for row in rows}
+    with expected_outputs[4].open("w", encoding="utf-8-sig", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=["SampleId", "Split", "LengthBucket"])
+        writer.writeheader()
+        for sample_id in sorted(assignment):
+            writer.writerow(
+                {
+                    "SampleId": sample_id,
+                    "Split": assignment[sample_id],
+                    "LengthBucket": length_bucket_by_id[sample_id],
+                }
+            )
+    split_counts = dict(sorted(Counter(assignment.values()).items()))
     texts = [row["Text"] for row in rows]
     artifact_paths = sorted((PROJECT_ROOT / "artifacts").glob("*.joblib"))
     if not artifact_paths:
@@ -95,6 +141,18 @@ def main() -> int:
             name: dict(sorted(Counter(predictions[name]).items())) for name in model_names
         },
         "annotation_sheets_blinded_to_model_predictions": True,
+        "annotation_sheets_do_not_contain_split_assignment": True,
+        "split": {
+            **split_counts,
+            "seed": args.split_seed,
+            "calibration_ratio": args.calibration_ratio,
+            "stratified_by": "LengthBucket",
+            "rule": (
+                "The calibration split may be used to choose the confidence threshold and tune the "
+                "Mixed/Uncertain rules. The test split is frozen: never used for training, threshold "
+                "selection, prompt tuning or rule changes."
+            ),
+        },
         "gold_status": "pending-two-human-annotators-and-adjudication",
         "sample_size_warning": (
             "Only 117 unique local comments exist, below the 200-400 target; a separate frozen test split is not possible."
