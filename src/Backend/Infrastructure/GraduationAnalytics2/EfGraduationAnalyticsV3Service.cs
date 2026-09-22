@@ -31,19 +31,6 @@ public sealed partial class EfGraduationAnalyticsV3Service(
         int? ReviewMonth,
         int? ReviewYear);
 
-    private sealed record FactRow(
-        long GraduationRoundId,
-        int CohortMajorId,
-        string CohortCode,
-        string MajorName,
-        string FacultyName,
-        int GraduatedCount,
-        int ExcellentCount,
-        int VeryGoodCount,
-        int GoodCount,
-        int AverageCount,
-        int WorkStudyCount);
-
     // -------------------------------------------------------- Danh sách năm học
 
     public async Task<IReadOnlyList<int>> GetAcademicYearStartsAsync(
@@ -401,7 +388,8 @@ public sealed partial class EfGraduationAnalyticsV3Service(
 
         var yearStartById = await LoadAcademicYearStartsAsync(cancellationToken);
         var rounds = await LoadRoundsAsync(cancellationToken);
-        var roundsWithData = await db.CohortMajorGraduations.AsNoTracking()
+        var roundsWithData = await db.GraduationRounds.AsNoTracking()
+            .Where(x => x.ActiveRevisionId != null)
             .Select(x => x.GraduationRoundId)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -443,23 +431,26 @@ public sealed partial class EfGraduationAnalyticsV3Service(
 
         var scopedRounds = ordered.GetRange(startIndex, cutoffIndex - startIndex + 1);
         var scopedRoundIds = scopedRounds.Select(x => x.GraduationRoundId).ToList();
-        var cells = (await LoadFactsAsync(scopedRoundIds, cancellationToken))
-            .SelectMany(ToCells)
-            .ToList();
+        // Snapshot của revision đang hoạt động giữ nguyên giao VLVH × xếp loại từ
+        // file nguồn; không dựng lại giao này từ bảng projection tổng hợp.
+        var cells = await LoadActiveRevisionCellsAsync(scopedRoundIds, cancellationToken);
+        var population = await LoadPopulationAsync(
+            cells.Select(x => x.CohortCode).Distinct(StringComparer.Ordinal).ToList(),
+            cancellationToken);
 
         var facets = new GraduationExploreFacetsV3Dto(
-            cells.GroupBy(x => x.FacultyKey)
+            population.GroupBy(x => x.FacultyKey)
                 .Select(x => new GraduationFacetOptionDto(x.Key, FirstLabel(x.Select(y => y.FacultyName))))
                 .OrderBy(x => x.Label, StringComparer.CurrentCulture)
                 .ToList(),
-            cells.GroupBy(x => new { x.ProgramKey, x.FacultyKey })
+            population.GroupBy(x => new { x.ProgramKey, x.FacultyKey })
                 .Select(x => new GraduationFacetOptionDto(
                     x.Key.ProgramKey,
                     FirstLabel(x.Select(y => y.ProgramName)),
                     x.Key.FacultyKey))
                 .OrderBy(x => x.Label, StringComparer.CurrentCulture)
                 .ToList(),
-            cells.Select(x => x.CohortCode).Distinct().Order(StringComparer.Ordinal).ToList());
+            population.Select(x => x.CohortCode).Distinct().Order(StringComparer.Ordinal).ToList());
 
         var selectedCohorts = Normalize(query.Cohorts);
         var selectedFacultyKeys = Normalize(query.FacultyKeys);
@@ -489,6 +480,13 @@ public sealed partial class EfGraduationAnalyticsV3Service(
                 x.IsWorkStudy,
                 x.StudentCount))
             .ToList();
+        var filteredPopulation = population
+            .Where(x => selectedCohorts.Count == 0 || selectedCohorts.Contains(x.CohortCode))
+            .Where(x => selectedFacultyKeys.Count == 0 || selectedFacultyKeys.Contains(x.FacultyKey))
+            .Where(x => (selectedProgramPairs.Count == 0 && selectedLegacyProgramKeys.Count == 0)
+                || selectedProgramPairs.Contains(x.FacultyKey + programSelectionSeparator + x.ProgramKey)
+                || selectedLegacyProgramKeys.Contains(x.ProgramKey))
+            .ToList();
 
         var periods = scopedRounds
             .Select(x => new GraduationExplorePeriod(
@@ -504,6 +502,7 @@ public sealed partial class EfGraduationAnalyticsV3Service(
             selectedCohorts.Count == 0 ? null : string.Join(", ", selectedCohorts),
             periods,
             filtered,
+            filteredPopulation,
             facets,
             query.MetricId,
             query.GroupBy,
@@ -524,77 +523,75 @@ public sealed partial class EfGraduationAnalyticsV3Service(
         bool IsWorkStudy,
         int StudentCount);
 
-    /// <summary>
-    /// Bảng mới lưu số VLVH tách rời bốn xếp loại, không lưu chéo giữa hai chiều.
-    /// Bộ tính toán lại cần mỗi sinh viên nằm đúng một ô (xếp loại × VLVH), nên ở
-    /// đây rải số VLVH lần lượt từ Xuất sắc xuống Trung bình. Cách rải là cố định
-    /// nên kết quả không đổi giữa các lần chạy, và mọi con số giao diện hiển thị
-    /// — tổng từng xếp loại và tổng VLVH — đều giữ nguyên.
-    /// </summary>
-    private static IEnumerable<Cell> ToCells(FactRow fact)
-    {
-        var facultyKey = NormalizeKey(fact.FacultyName);
-        var programKey = NormalizeKey(fact.MajorName);
-        var remainingWorkStudy = fact.WorkStudyCount;
-
-        var ranks = new (GraduationRank Rank, int Count)[]
-        {
-            (GraduationRank.Excellent, fact.ExcellentCount),
-            (GraduationRank.VeryGood, fact.VeryGoodCount),
-            (GraduationRank.Good, fact.GoodCount),
-            (GraduationRank.Average, fact.AverageCount),
-        };
-
-        foreach (var (rank, count) in ranks)
-        {
-            if (count <= 0)
-            {
-                continue;
-            }
-            var workStudy = Math.Min(remainingWorkStudy, count);
-            remainingWorkStudy -= workStudy;
-
-            if (workStudy > 0)
-            {
-                yield return new Cell(
-                    fact.GraduationRoundId, fact.FacultyName, facultyKey, fact.MajorName,
-                    programKey, fact.CohortCode, rank, true, workStudy);
-            }
-            if (count - workStudy > 0)
-            {
-                yield return new Cell(
-                    fact.GraduationRoundId, fact.FacultyName, facultyKey, fact.MajorName,
-                    programKey, fact.CohortCode, rank, false, count - workStudy);
-            }
-        }
-    }
-
-    private async Task<List<FactRow>> LoadFactsAsync(
+    private async Task<List<Cell>> LoadActiveRevisionCellsAsync(
         IReadOnlyList<long> roundIds,
-        CancellationToken cancellationToken) => await (
-            from graduation in db.CohortMajorGraduations.AsNoTracking()
-            where roundIds.Contains(graduation.GraduationRoundId)
+        CancellationToken cancellationToken)
+    {
+        var rows = await (
+            from round in db.GraduationRounds.AsNoTracking()
+            where roundIds.Contains(round.GraduationRoundId) && round.ActiveRevisionId != null
+            join aggregate in db.GraduationRoundRevisionAggregates.AsNoTracking()
+                on round.ActiveRevisionId equals aggregate.RevisionId
             join cohortMajor in db.CohortMajors.AsNoTracking()
-                on graduation.CohortMajorId equals cohortMajor.CohortMajorId
+                on aggregate.CohortMajorId equals cohortMajor.CohortMajorId
             join cohort in db.Cohorts.AsNoTracking()
                 on cohortMajor.CohortId equals cohort.CohortId
             join major in db.Majors.AsNoTracking()
                 on cohortMajor.MajorId equals major.MajorId
             join faculty in db.Faculties.AsNoTracking()
                 on major.FacultyId equals faculty.FacultyId
-            select new FactRow(
-                graduation.GraduationRoundId,
-                cohortMajor.CohortMajorId,
-                cohort.CohortCode,
-                major.MajorName,
+            select new
+            {
+                round.GraduationRoundId,
                 faculty.FacultyName,
-                graduation.GraduatedCount,
-                graduation.ExcellentCount,
-                graduation.VeryGoodCount,
-                graduation.GoodCount,
-                graduation.AverageCount,
-                graduation.WorkStudyCount))
+                major.MajorName,
+                cohort.CohortCode,
+                aggregate.GraduationRank,
+                aggregate.IsWorkStudy,
+                aggregate.StudentCount,
+            })
             .ToListAsync(cancellationToken);
+        return rows.Select(x => new Cell(
+            x.GraduationRoundId,
+            x.FacultyName,
+            NormalizeKey(x.FacultyName),
+            x.MajorName,
+            NormalizeKey(x.MajorName),
+            x.CohortCode,
+            x.GraduationRank,
+            x.IsWorkStudy,
+            x.StudentCount)).ToList();
+    }
+
+    private async Task<List<GraduationPopulationCell>> LoadPopulationAsync(
+        IReadOnlyList<string> cohortCodes,
+        CancellationToken cancellationToken)
+    {
+        var rows = await (
+            from cohortMajor in db.CohortMajors.AsNoTracking()
+            join cohort in db.Cohorts.AsNoTracking()
+                on cohortMajor.CohortId equals cohort.CohortId
+            where cohortCodes.Contains(cohort.CohortCode)
+            join major in db.Majors.AsNoTracking()
+                on cohortMajor.MajorId equals major.MajorId
+            join faculty in db.Faculties.AsNoTracking()
+                on major.FacultyId equals faculty.FacultyId
+            select new
+            {
+                faculty.FacultyName,
+                major.MajorName,
+                cohort.CohortCode,
+                cohortMajor.StudentCount,
+            })
+            .ToListAsync(cancellationToken);
+        return rows.Select(x => new GraduationPopulationCell(
+            x.FacultyName,
+            NormalizeKey(x.FacultyName),
+            x.MajorName,
+            NormalizeKey(x.MajorName),
+            x.CohortCode,
+            x.StudentCount)).ToList();
+    }
 
     private async Task<List<RoundRow>> LoadRoundsAsync(CancellationToken cancellationToken) =>
         await db.GraduationRounds.AsNoTracking()
@@ -629,13 +626,9 @@ public sealed partial class EfGraduationAnalyticsV3Service(
         return map;
     }
 
-    /// <summary>Chương trình chuẩn 4 năm, xem <see cref="IsOnTimeRound"/>.</summary>
+    /// <summary>Chương trình chuẩn kéo dài bốn năm học.</summary>
     private const int StandardProgramYears = 4;
 
-    /// <summary>
-    /// Đúng hạn là tốt nghiệp trong năm học thứ tư kể từ khi nhập học: khoá 62
-    /// nhập năm học 2021-2022 thì chỉ đợt của năm học 2024-2025 mới tính đúng hạn.
-    /// </summary>
     private static bool IsOnTimeRound(int roundAcademicYearStart, string cohortCode)
     {
         var digits = new string((cohortCode ?? string.Empty).Where(char.IsDigit).ToArray());

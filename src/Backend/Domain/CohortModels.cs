@@ -47,7 +47,7 @@ public sealed class CohortMajor : ISoftDeletable
 
     /// <summary>
     /// Tốt nghiệp đúng hạn, cộng dồn qua mọi đợt. Đúng hạn là tốt nghiệp trong
-    /// năm học thứ tư kể từ khi nhập học: khoá 62 nhập năm học 2021-2022 thì đợt
+    /// năm học thứ tư kể từ khi nhập học: khóa 62 nhập năm học 2021-2022 thì đợt
     /// của năm học 2024-2025 mới tính là đúng hạn.
     /// </summary>
     public int OnTimeGraduatedCount { get; set; }

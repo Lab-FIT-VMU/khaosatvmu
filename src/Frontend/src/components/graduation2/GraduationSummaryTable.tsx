@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp } from 'lucide-react';
 import { ColumnFilterMenu } from '../ColumnFilterMenu';
 import { ExportDropdown } from '../ExportDropdown';
 import type { GraduationExploreResultV3 } from '../../types/graduationAnalytics2';
+import { formatCohortCode } from '../../utils/formatCohortCode';
 
 type SummaryRow = GraduationExploreResultV3['breakdown'][number];
 type SortKey = keyof Pick<
@@ -10,7 +11,9 @@ type SortKey = keyof Pick<
   | 'facultyName'
   | 'programName'
   | 'cohortCode'
+  | 'studentCount'
   | 'graduated'
+  | 'notGraduated'
   | 'onTime'
   | 'workStudy'
   | 'excellent'
@@ -30,7 +33,9 @@ const columns: Array<{ key: SortKey; label: string }> = [
   { key: 'facultyName', label: 'Khoa' },
   { key: 'programName', label: 'Chuyên ngành' },
   { key: 'cohortCode', label: 'Khóa' },
+  { key: 'studentCount', label: 'Số SV nhập học' },
   { key: 'graduated', label: 'Đã tốt nghiệp' },
+  { key: 'notGraduated', label: 'Chưa tốt nghiệp' },
   { key: 'onTime', label: 'Đúng hạn' },
   { key: 'workStudy', label: 'VLVH' },
   { key: 'excellent', label: 'Xuất sắc' },
@@ -44,7 +49,9 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [columnFilters, setColumnFilters] = useState<Partial<Record<SortKey, string[]>>>({});
 
-  const valueOf = (row: SummaryRow, key: SortKey) => String(row[key]);
+  const valueOf = (row: SummaryRow, key: SortKey) => key === 'cohortCode'
+    ? formatCohortCode(row.cohortCode)
+    : String(row[key]);
 
   const filteredRows = useMemo(() => rows.filter((row) => columns.every((column) => {
     const selected = columnFilters[column.key];
@@ -123,7 +130,9 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
                 { key: 'facultyName', header: 'Khoa', width: 24 },
                 { key: 'programName', header: 'Chuyên ngành', width: 28 },
                 { key: 'cohortCode', header: 'Khóa', width: 10 },
+                { key: 'studentCount', header: 'Số SV nhập học', type: 'number', width: 14 },
                 { key: 'graduated', header: 'Đã tốt nghiệp', type: 'number', width: 14 },
+                { key: 'notGraduated', header: 'Chưa tốt nghiệp', type: 'number', width: 16 },
                 { key: 'onTime', header: 'Đúng hạn', type: 'number', width: 12 },
                 { key: 'workStudy', header: 'VLVH', type: 'number', width: 10 },
                 { key: 'excellent', header: 'Xuất sắc', type: 'number', width: 10 },
@@ -131,7 +140,10 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
                 { key: 'good', header: 'Khá', type: 'number', width: 10 },
                 { key: 'average', header: 'Trung bình', type: 'number', width: 12 },
               ],
-              data: sortedRows,
+              data: sortedRows.map((row) => ({
+                ...row,
+                cohortCode: formatCohortCode(row.cohortCode),
+              })),
             }}
           />
         )}
@@ -170,8 +182,10 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
               <tr key={`${row.facultyKey}-${row.programKey}-${row.cohortCode}`}>
                 <td>{row.facultyName}</td>
                 <td>{row.programName}</td>
-                <td>{row.cohortCode}</td>
+                <td>{formatCohortCode(row.cohortCode)}</td>
+                <td>{row.studentCount}</td>
                 <td>{row.graduated}</td>
+                <td>{row.notGraduated}</td>
                 <td>{row.onTime}</td>
                 <td>{row.workStudy}</td>
                 <td>{row.excellent}</td>
