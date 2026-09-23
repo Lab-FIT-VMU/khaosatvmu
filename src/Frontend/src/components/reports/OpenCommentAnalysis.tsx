@@ -232,7 +232,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'submittedAt',
         header: 'Thời gian',
-        width: '120px',
+        width: '90px',
         sortValue: (item) => new Date(item.submittedAt).getTime(),
         render: (item) => (
           <span className="operations-code" style={{ fontSize: '12px' }}>
@@ -243,7 +243,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'facultyName',
         header: 'Khoa / Viện',
-        width: '145px',
+        width: '95px',
         sortValue: (item) => item.facultyName,
         filterValue: (item) => item.facultyName,
         render: (item) => <span className="operations-primary-text">{item.facultyName}</span>,
@@ -251,7 +251,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'departmentName',
         header: 'Bộ môn',
-        width: '135px',
+        width: '80px',
         sortValue: (item) => item.departmentName,
         filterValue: (item) => item.departmentName,
         render: (item) => <span>{item.departmentName}</span>,
@@ -259,7 +259,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'courseName',
         header: 'Lớp học phần',
-        width: '190px',
+        width: '150px',
         sortValue: (item) => `${item.courseCode} ${item.courseName} ${item.sectionName}`,
         filterValue: (item) => `${item.courseCode} - ${item.courseName} (${item.sectionName})`,
         render: (item) => (
@@ -281,24 +281,14 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
               }}
             >
               <strong style={{ display: 'block', lineHeight: 1.35, color: '#0788b8', fontWeight: 650 }}>
-                {item.courseName}
+                {item.courseName} {item.sectionName}
               </strong>
-              <div style={{ fontSize: '12px', color: '#0284c7', marginTop: '2px', fontWeight: 500 }}>
-                <span>{item.courseCode}</span>
-                {' · '}
-                <span>Lớp {item.sectionName}</span>
-              </div>
             </button>
           ) : (
             <div>
               <strong className="operations-primary-text" style={{ display: 'block', lineHeight: 1.35 }}>
-                {item.courseName}
+                {item.courseName} {item.sectionName}
               </strong>
-              <div style={{ fontSize: '12px', color: '#68737d', marginTop: '2px' }}>
-                <span className="operations-code">{item.courseCode}</span>
-                {' · '}
-                <span>Lớp {item.sectionName}</span>
-              </div>
             </div>
           )
         ),
@@ -306,7 +296,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'lecturerName',
         header: 'Giảng viên',
-        width: '140px',
+        width: '105px',
         sortValue: (item) => item.lecturerName,
         filterValue: (item) => item.lecturerName,
         render: (item) => {
@@ -359,7 +349,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'score',
         header: 'Điểm của phiếu khảo sát',
-        width: '135px',
+        width: '90px',
         align: 'center',
         numeric: true,
         sortValue: (item) => item.score,
@@ -370,22 +360,11 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         ),
       },
       {
-        key: 'isValid',
-        header: 'Trạng thái',
-        width: '85px',
-        align: 'center',
-        sortValue: (item) => (item.isValid ? 1 : 0),
-        filterValue: (item) => (item.isValid ? 'Hợp lệ' : 'Bị lọc'),
-        render: (item) => (
-          <span className={`response-validity${item.isValid ? '' : ' is-rejected'}`}>
-            {item.isValid ? 'Hợp lệ' : 'Bị lọc'}
-          </span>
-        ),
-      },
-      {
         key: 'sentiment',
         header: 'Phân loại cảm xúc',
-        width: '165px',
+        headerHint:
+          'Phần trăm cho biết hệ thống chắc chắn đến mức nào khi nhận định một ý kiến là tích cực, tiêu cực, trung tính hoặc vừa khen vừa chê. Ví dụ: 91% nghĩa là hệ thống khá chắc với nhận định đang hiển thị. Kết quả này chỉ để tham khảo, có thể chưa chính xác và người có quyền có thể sửa lại sau khi đọc nội dung góp ý.',
+        width: '130px',
         // Lọc kiểu Excel theo NHÃN (đúng yêu cầu nghiệp vụ) nhưng sắp xếp theo ĐỘ TIN CẬY:
         // việc cần làm nhiều nhất trên bảng này là tìm ra những câu model đoán chưa chắc để
         // người có chuyên môn xem lại. Ô chưa phân tích nhận giá trị -1 nên luôn xếp cuối.
@@ -410,27 +389,12 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         header: 'Nội dung ý kiến đóng góp',
         render: (item) => (
           <div
-            style={{ padding: '3px 0' }}
+            className="open-comment-content"
             title="Bấm vào dòng để xem chi tiết phiếu khảo sát"
           >
-            <div
-              className="response-comment"
-              style={{
-                lineHeight: 1.5,
-                color: '#1a1f24',
-                fontSize: '13px',
-                maxHeight: '48px',
-                WebkitLineClamp: 2,
-                fontStyle: 'normal',
-              }}
-            >
+            <div className="response-comment">
               "{item.additionalComments}"
             </div>
-            {item.additionalComments.length > 90 && (
-              <span style={{ fontSize: '11px', color: '#0788b8', fontWeight: 500, display: 'inline-block', marginTop: '2px' }}>
-                Xem chi tiết phiếu...
-              </span>
-            )}
           </div>
         ),
       },

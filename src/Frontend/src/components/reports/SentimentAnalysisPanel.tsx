@@ -16,6 +16,15 @@ const SENTIMENT_ORDER: OpenCommentSentiment[] = [
   'Uncertain',
 ];
 
+/** Nhãn hiển thị luôn dùng tiếng Việt, không phụ thuộc chuỗi nhãn từ API. */
+const SENTIMENT_LABEL: Record<OpenCommentSentiment, string> = {
+  Positive: 'Tích cực',
+  Negative: 'Tiêu cực',
+  Neutral: 'Trung tính',
+  Mixed: 'Hỗn hợp',
+  Uncertain: 'Chưa chắc chắn',
+};
+
 /** Dòng phụ của thẻ chỉ số: nói nhãn này nghĩa là gì, không lặp lại con số. */
 const SENTIMENT_MEANING: Record<OpenCommentSentiment, string> = {
   Positive: 'Khen, hài lòng',
@@ -76,7 +85,7 @@ export const SentimentAnalysisPanel: React.FC<SentimentAnalysisPanelProps> = ({ 
                   : 'Số ý kiến được phân loại vào nhãn này trong phạm vi đang xem.'
               }
             >
-              <span className="reports-overview-kpi-label">{bucket?.label ?? sentiment}</span>
+              <span className="reports-overview-kpi-label">{SENTIMENT_LABEL[sentiment]}</span>
               <div className="reports-overview-kpi-value">
                 <strong className="reports-overview-kpi-num">
                   {count.toLocaleString('vi-VN')}

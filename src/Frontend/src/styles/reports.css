@@ -2452,6 +2452,31 @@
   gap: 12px;
 }
 
+/* Thu gọn các cột thông tin ở cấu hình bảng để toàn bộ phần chiều ngang còn lại
+   được dành cho nội dung góp ý. Chỉ giữ sàn đủ để bảng vẫn dễ đọc. */
+.reports-comments-workspace .reports-table-section .catalog-table {
+  min-width: 1120px;
+}
+
+.reports-comments-workspace .open-comment-content {
+  padding: 3px 0;
+}
+
+.reports-comments-workspace .open-comment-content .response-comment {
+  display: -webkit-box;
+  max-height: 48px;
+  overflow: hidden;
+  color: #1a1f24;
+  font-size: 13px;
+  font-style: normal;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
 .reports-cell-link {
   border: 0;
   background: transparent;

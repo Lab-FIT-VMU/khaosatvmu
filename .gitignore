@@ -168,3 +168,6 @@ src/Backend/API/App_Data/
 #     Hơn 500 MB, phải tạo lại bằng scripts/prepare_backend_model.py.
 # ==========================================
 models/
+
+# Báo cáo bài tập lớn sinh cục bộ (Word/PDF và tài nguyên đi kèm).
+baitaplon/
