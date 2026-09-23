@@ -9,16 +9,16 @@
 # Cài đặt: xem deploy/systemd/README.md
 [Unit]
 Description=Phân tích cảm xúc ý kiến mở của khảo sát (một lượt)
-Documentation=file:///opt/khaosatvmu/deploy/systemd/README.md
+Documentation=file:///home/khaosatvmu/deploy/systemd/README.md
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-# Sửa đường dẫn này nếu repo không nằm ở /opt/khaosatvmu. Docker Compose đọc tệp .env trong thư
+# Sửa đường dẫn này nếu repo không nằm ở /home/khaosatvmu. Docker Compose đọc tệp .env trong thư
 # mục làm việc, nên đây cũng là chỗ phải có .env chứa secret thật.
-WorkingDirectory=/opt/khaosatvmu
+WorkingDirectory=/home/khaosatvmu
 # CỐ Ý không có --watch: xem chú thích ở đầu tệp.
 ExecStart=/usr/bin/docker compose --profile sentiment run --rm sentiment-worker
 # Mã thoát của worker là tín hiệu sức khoẻ: 0 xong việc, 2 không nạp được model, 3 có lô thất bại.

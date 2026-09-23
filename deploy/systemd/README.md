@@ -32,7 +32,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now khaosatvmu-sentiment.timer
 ```
 
-Không đặt repo ở `/opt/khaosatvmu` thì dùng drop-in thay vì sửa thẳng unit đã cài:
+Không đặt repo ở `/home/khaosatvmu` thì dùng drop-in thay vì sửa thẳng unit đã cài:
 
 ```bash
 sudo systemctl edit khaosatvmu-sentiment.service
@@ -48,7 +48,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now khaosatvmu-sentiment-daemon.service
 ```
 
-Không đặt repo ở `/opt/khaosatvmu` thì dùng drop-in thay vì sửa thẳng unit đã cài:
+Không đặt repo ở `/home/khaosatvmu` thì dùng drop-in thay vì sửa thẳng unit đã cài:
 
 ```bash
 sudo systemctl edit khaosatvmu-sentiment-daemon.service
@@ -77,7 +77,7 @@ Khi chạy `--watch` trên máy từ 2 nhân trở xuống, worker tự ghi mộ
 ## Điều kiện trước khi cài
 
 1. Máy chủ có `docker` và `docker compose` (v2) tại `/usr/bin/docker`.
-2. Repo nằm ở `/opt/khaosatvmu` (đổi lại trong unit nếu khác) và có tệp `.env` với secret thật,
+2. Repo nằm ở `/home/khaosatvmu` (đổi lại trong unit nếu khác) và có tệp `.env` với secret thật,
    quyền `600`. Docker Compose đọc `.env` từ thư mục làm việc.
 3. **`models/open-comment-sentiment/` phải có đủ tệp model.** Thư mục này bị `.gitignore`, nên nó
    không đi theo `git clone`: cần chép tay.
