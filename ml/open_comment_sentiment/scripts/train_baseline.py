@@ -25,6 +25,7 @@ from sentiment_baseline.corpus import (  # noqa: E402
     SOURCES,
     UIT_VSFC_SOURCE,
     build_corpus,
+    parse_source_spec,
 )
 from sentiment_baseline.data import LABEL_NAMES, DatasetUnavailableError  # noqa: E402
 
@@ -119,7 +120,9 @@ def models() -> dict[str, Pipeline]:
     }
 
 
-def evaluate(model: Pipeline, name: str, texts: list[str], labels: list[str]) -> dict[str, object]:
+def evaluate(
+    model: Pipeline, name: str, relation: str, texts: list[str], labels: list[str]
+) -> dict[str, object]:
     started = time.perf_counter()
     predictions = model.predict(texts)
     elapsed = time.perf_counter() - started
@@ -132,6 +135,7 @@ def evaluate(model: Pipeline, name: str, texts: list[str], labels: list[str]) ->
     )
     return {
         "evaluation_set": name,
+        "relation": relation,
         "rows": len(texts),
         "label_distribution": {
             label: sum(1 for value in labels if value == label) for label in LABEL_NAMES
@@ -146,16 +150,23 @@ def evaluate(model: Pipeline, name: str, texts: list[str], labels: list[str]) ->
     }
 
 
-def evaluation_targets(corpus_splits: dict[str, object], sources: tuple[str, ...]) -> list[tuple[str, object]]:
-    """Return `(label, split)` pairs: one per source test split plus the merged test split."""
-    targets: list[tuple[str, object]] = []
-    test_split = corpus_splits["test"]
-    for source in sources:
-        subset = test_split.subset(source)  # type: ignore[attr-defined]
-        if subset.rows:
-            targets.append((f"test:{source}", subset))
-    if len(sources) > 1:
-        targets.append(("test:merged", test_split))
+def evaluation_targets(
+    reference_test: object, evaluation_sources: tuple[str, ...], training_sources: tuple[str, ...]
+) -> list[tuple[str, str, object]]:
+    """Return `(label, relation, split)` for every available test source.
+
+    A model is always measured on all sources, including the ones it never trained
+    on, so cross-domain degradation cannot hide behind a merged score.
+    """
+    targets: list[tuple[str, str, object]] = []
+    for source in evaluation_sources:
+        subset = reference_test.subset(source)  # type: ignore[attr-defined]
+        if not subset.rows:
+            continue
+        relation = "in-domain" if source in training_sources else "cross-domain"
+        targets.append((f"test:{source}", relation, subset))
+    if len(evaluation_sources) > 1:
+        targets.append(("test:merged", "merged", reference_test))
     return targets
 
 
@@ -171,8 +182,8 @@ def render_markdown(report: dict[str, object]) -> str:
         "",
         "## Thí nghiệm đối chứng theo nguồn dữ liệu",
         "",
-        "| Thí nghiệm (tập train) | Mô hình | Tập đánh giá | Macro F1 | Accuracy | Recall Negative | F1 Neutral |",
-        "|---|---|---|---:|---:|---:|---:|",
+        "| Thí nghiệm (tập train) | Mô hình | Tập đánh giá | Quan hệ | Macro F1 | Accuracy | Recall Negative | F1 Neutral |",
+        "|---|---|---|---|---:|---:|---:|---:|",
     ]
     for experiment, payload in experiments.items():
         for model_name, result in payload["models"].items():
@@ -180,7 +191,7 @@ def render_markdown(report: dict[str, object]) -> str:
                 classification = evaluation["classification_report"]
                 lines.append(
                     f"| `{experiment}` | {model_name} | {evaluation['evaluation_set']} | "
-                    f"{evaluation['macro_f1']:.4f} | {evaluation['accuracy']:.4f} | "
+                    f"{evaluation['relation']} | {evaluation['macro_f1']:.4f} | {evaluation['accuracy']:.4f} | "
                     f"{evaluation['negative_recall']:.4f} | {classification['Neutral']['f1-score']:.4f} |"
                 )
 
@@ -240,18 +251,30 @@ def main() -> int:
 
     # Build every corpus before training so a missing source fails atomically
     # instead of leaving a half-written ablation in artifacts/.
+    specs = experiment_specs(args.source)
     corpora: dict[str, object] = {}
-    for spec in experiment_specs(args.source):
-        try:
+    try:
+        for spec in specs:
             corpora[spec] = build_corpus(
                 spec,
                 uit_root=args.uit_dir,
                 neu_root=args.neu_esc_dir,
                 drop_train_duplicates_from_eval=drop_overlap,
             )
-        except DatasetUnavailableError as error:
-            print(error.args[0], file=sys.stderr)
-            return 2
+        evaluation_sources = tuple(
+            dict.fromkeys(source for spec in specs for source in parse_source_spec(spec))
+        )
+        reference_test = build_corpus(
+            "+".join(evaluation_sources),
+            uit_root=args.uit_dir,
+            neu_root=args.neu_esc_dir,
+            drop_train_duplicates_from_eval=drop_overlap,
+        ).splits["test"]
+    except DatasetUnavailableError as error:
+        print(error.args[0], file=sys.stderr)
+        return 2
+
+    report["evaluation_sources"] = list(evaluation_sources)
 
     for spec, corpus in corpora.items():
         experiment: dict[str, object] = {
@@ -268,8 +291,10 @@ def main() -> int:
             training_seconds = time.perf_counter() - started
 
             evaluations = [
-                evaluate(model, label, target.texts, target.labels)
-                for label, target in evaluation_targets(corpus.splits, corpus.sources)
+                evaluate(model, label, relation, target.texts, target.labels)
+                for label, relation, target in evaluation_targets(
+                    reference_test, evaluation_sources, corpus.sources
+                )
             ]
             experiment["models"][name] = {
                 "training_seconds": training_seconds,

@@ -10,7 +10,7 @@ import type {
   SurveyResultDetail,
   OpenCommentAnalysisReport,
 } from '../types';
-import { apiRequest } from './apiClient';
+import { apiRequest, csrfRequest } from './apiClient';
 
 export const reportApi = {
   operationalProgress: (semesterId: number) =>
@@ -145,4 +145,17 @@ export const reportApi = {
       queryString ? `/api/v1/reports/open-comments?${queryString}` : '/api/v1/reports/open-comments',
     );
   },
+
+  /**
+   * Hiệu chỉnh nhãn cảm xúc của một ý kiến mở.
+   *
+   * Truyền chuỗi rỗng để bỏ hiệu chỉnh và quay về nhãn của model. Backend kiểm tra quyền và
+   * phạm vi dữ liệu, giao diện chỉ ẩn nút chứ không phải cơ chế bảo vệ.
+   */
+  reviewOpenCommentSentiment: (responseId: number, sentiment: string) =>
+    csrfRequest<void>(
+      `/api/v1/reports/open-comments/${responseId}/sentiment`,
+      'PATCH',
+      { sentiment },
+    ),
 };

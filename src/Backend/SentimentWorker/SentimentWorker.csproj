@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tiến trình RIÊNG với API. Cố ý không dùng chung ảnh với API: model ONNX và ONNX Runtime
+    chỉ nằm ở đây, nên tiến trình API không thể vô tình nạp model và không phải trả RAM cho nó.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SentimentWorker</RootNamespace>
+    <AssemblyName>SentimentWorker</AssemblyName>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Infrastructure dùng đủ kiểu của ASP.NET Core (IHttpContextAccessor trong lớp truy cập người
+      dùng hiện tại, IHostEnvironment cho đường dẫn model), nên ảnh runtime phải là aspnet.
+      Khai báo tường minh ở đây thay vì dựa vào lan truyền từ project khác.
+    -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Application\Application.csproj" />
+    <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

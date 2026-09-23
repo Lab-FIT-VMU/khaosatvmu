@@ -157,6 +157,56 @@ khaosatvmu/
    - PostgreSQL chỉ bind vào loopback tại port `5432`; mật khẩu lấy từ `.env`.
    - pgAdmin chỉ chạy khi dùng `docker compose --profile tools up -d`.
 
+4. **Phân tích cảm xúc ý kiến mở (chạy khi cần)**:
+
+   Phân loại cảm xúc dùng model ONNX hơn 500 MB và giữ khoảng **1 GB RAM** khi chạy, nên **không**
+   nằm trong tiến trình API và không thuộc nhóm dịch vụ khởi động mặc định. API chỉ đọc kết quả đã
+   có; chưa chạy worker thì cột cảm xúc trống và màn báo cáo vẫn hoạt động bình thường.
+
+   ```bash
+   # Đặt model vào ./models/open-comment-sentiment (xem ml/open_comment_sentiment/README.md)
+   docker compose --profile sentiment run --rm sentiment-worker
+   ```
+
+   Chạy một lượt rồi thoát. Mã thoát: `0` xong, `2` không nạp được model, `3` có lô thất bại.
+
+   **Trên máy dev, nếu muốn số liệu tự lên trong ~15 giây sau khi có phiếu mới:** chạy
+   `scripts\start-sentiment-daemon.cmd` (Windows) và **để cửa sổ đó mở**. Tiến trình nền quét mỗi 15 giây
+   và tự trả model cho hệ điều hành sau 2 phút rảnh, nên RAM lúc rảnh chỉ ~130 MB.
+
+   ```powershell
+   # chạy một lượt ngay (dừng tiến trình nền trước, nếu không sẽ báo lỗi khoá tệp DLL)
+   dotnet run --project src/Backend/SentimentWorker
+
+   # xem/dừng tiến trình nền
+   Get-Process -Name SentimentWorker
+   Stop-Process -Name SentimentWorker
+   ```
+
+   Trên máy chủ thật **đừng chạy `--watch` thường trực**: model giữ khoảng 1 GB RAM và một nhân CPU
+   của API suốt thời gian chạy. Muốn tự động hoá thì dùng systemd timer trong `deploy/systemd/` —
+   worker chạy một lượt theo lịch rồi trả tài nguyên lại cho hệ thống.
+
+   **Lưu ý về màn quản trị**: hai endpoint `GET /api/v1/reports/open-comments/model-status` và
+   `POST /api/v1/reports/open-comments/reanalyze` (quyền `OPEN_COMMENT_MODEL_ADMIN`) **chưa có màn
+   hình nào gọi** — hiện phải gọi bằng tay qua API. `reanalyze` chỉ **xếp hàng**, không chạy model:
+   vẫn phải chạy lệnh trên thì kết quả mới đổi. Chế độ ép buộc không xoá nhãn do người chấm tay.
+
+   **Cơ chế, thuật toán và triển khai**: `docs/phan-loai-cam-xuc-y-kien-mo.md` — đọc file này trước
+   khi sửa bất cứ thứ gì liên quan tới phân loại cảm xúc.
+
+   **Thuật toán và quá trình huấn luyện mô hình** (dữ liệu, tokenizer, hàm mất mát, siêu tham số,
+   cân chỉnh ngưỡng, xuất ONNX, mã giả quy tắc 5 nhãn, cách đo chất lượng):
+   `docs/thuat-toan-va-huan-luyen-mo-hinh-cam-xuc.md`.
+
+   **Giải thích cho người không kỹ thuật** (dùng khi trình bày với khoa/phòng ban):
+   `docs/giai-thich-phan-loai-cam-xuc.md`. Số liệu ví dụ trong đó là **số đo thật**, sinh lại được
+   bằng `ml/open_comment_sentiment/scripts/explain_examples.py`; mọi con số chất lượng đều ghi rõ
+   nguồn và giới hạn để không bị trích dẫn sai.
+
+   **Pilot đo chất lượng thật**: xem `docs/plans/phan-loai-y-kien-mo-theo-cam-xuc.md` mục Giai
+   đoạn 5 và `ml/open_comment_sentiment/README.md` mục "Gói pilot (chấm mù)".
+
 ---
 
 ### 2. Khởi chạy môi trường Local Development

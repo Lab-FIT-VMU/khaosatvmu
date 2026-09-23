@@ -110,8 +110,12 @@ public class LecturerAccountProvisioningTests
     {
         await RunInRollbackAsync(async (db, service) =>
         {
+            // Tra chức vụ KHÔNG phân biệt hoa thường. Đây là danh mục do người dùng đặt tên,
+            // và chính production cũng nhận diện chức vụ bằng khoá bỏ dấu
+            // (EfCatalogService.IsDepartmentManagerPosition) chứ không so chuỗi thô.
+            // So khớp chặt như trước khiến test đỏ ở nơi danh mục ghi "Trưởng bộ môn".
             var positionId = await db.Positions
-                .Where(x => x.PositionName == positionName)
+                .Where(x => x.PositionName.ToLower() == positionName.ToLower())
                 .Select(x => x.PositionId)
                 .SingleAsync();
             var command = NewLecturer($"quanly-{Guid.NewGuid():N}@vimaru.edu.vn") with
