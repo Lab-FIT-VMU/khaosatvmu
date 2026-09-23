@@ -16,6 +16,7 @@ import { useSemester } from '../context/semesterContext';
 import { NoteModalButton } from '../components/NoteModalButton';
 import { ExportDropdown } from '../components/ExportDropdown';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
+import { useSemesterSurveys } from '../hooks/useSemesterSurveys';
 import { ApiError } from '../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import type {
@@ -23,12 +24,13 @@ import type {
   DashboardQuestionScore,
   SemesterSurveyDashboard,
 } from '../services/surveyApi';
-import type { SemesterSurvey } from '../types';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
 import '../styles/survey-dashboard.css';
+import { formatDecimal, formatDecimalOrDash, formatPercent } from '../utils/formatNumber';
 import {
+  campaignPlaceholder,
   getActiveSemesterSurveyId,
   selectAvailableSemesterSurveyId,
   setActiveSemesterSurveyId,
@@ -48,10 +50,12 @@ function messageFrom(error: unknown): string {
   bên ngoài thì lần đầu vào trang ô chọn bung ra không còn hình hài gì.
 */
 const campaignSelectCss = `
-.campaign-select { position: relative; flex: 0 0 460px; min-width: 0; }
+/* Co lại được: cố định 460px thì khi phóng to trình duyệt, thanh công cụ hết chỗ
+   và nút Cập nhật điểm bị đẩy xuống dòng thứ hai. */
+.campaign-select { position: relative; flex: 0 1 380px; min-width: 200px; }
 .campaign-select__trigger {
   width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #000000;
+  padding: 6px 10px; border: 1px solid var(--field-border); background: #fff; color: #000000;
   font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .campaign-select__trigger:disabled { background: #f4f6f8; color: #8c969f; cursor: not-allowed; }
@@ -60,7 +64,7 @@ const campaignSelectCss = `
 .campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #000000; }
 .campaign-select__list {
   position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none;
-  overflow-y: auto; border: 1px solid #d7dee2; background: #fff;
+  overflow-y: auto; border: 1px solid var(--field-border); background: #fff;
   box-shadow: 0 8px 24px rgba(15,30,45,.16);
 }
 .campaign-select__option {
@@ -82,7 +86,7 @@ const campaignSelectCss = `
 }
 .campaign-select__empty { padding: 10px 12px; color: #000000; font-size: 13px; text-align: center; }
 .campaign-select__hint {
-  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid #d7dee2;
+  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid var(--field-border);
   background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #000000;
   font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: none;
 }
@@ -262,35 +266,23 @@ export const SurveyDashboardPage: React.FC = () => {
     if (activeSemesterId) setSemesterId(String(activeSemesterId));
   }, [activeSemesterId]);
 
-  const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
+  const {
+    semesterSurveys,
+    loading: campaignsLoading,
+    error: campaignsError,
+  } = useSemesterSurveys(semesterId);
   const [semesterSurveyId, setSemesterSurveyId] = useState<string>(getActiveSemesterSurveyId);
   const [data, setData] = useState<SemesterSurveyDashboard | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      if (!semesterId) {
-        setSemesterSurveys([]);
-        setSemesterSurveyId('');
-        return;
-      }
-      try {
-        const next = await surveyApi.semesterSurveys(Number(semesterId));
-        if (cancelled) return;
-        setSemesterSurveys(next);
-        setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(next, current));
-        setLoadError(null);
-      } catch (error) {
-        if (!cancelled) setLoadError(messageFrom(error));
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [semesterId]);
+    setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(semesterSurveys, current));
+  }, [semesterSurveys]);
+
+  useEffect(() => {
+    if (campaignsError) setLoadError(messageFrom(campaignsError));
+  }, [campaignsError]);
 
   const loadData = useCallback(async () => {
     if (!semesterSurveyId) {
@@ -351,7 +343,7 @@ export const SurveyDashboardPage: React.FC = () => {
               setActiveSemesterSurveyId(value);
             }}
             disabled={semesterSurveys.length === 0}
-            placeholder={semesterSurveys.length === 0 ? 'Chưa có đợt nào' : 'Chọn đợt khảo sát'}
+            placeholder={campaignPlaceholder(campaignsLoading, semesterSurveys.length)}
             options={semesterSurveys.map((survey) => ({
               value: String(survey.semesterSurveyId),
               label: `${survey.surveyName} · ${survey.sectionSurveyCount} lớp`,
@@ -380,8 +372,8 @@ export const SurveyDashboardPage: React.FC = () => {
                     'Tổng số phiếu phải thu': data.totalClassSize,
                     'Số phiếu đã thu': data.totalResponseCount,
                     'Số phiếu hợp lệ': data.validResponseCount,
-                    'Tỷ lệ phản hồi': `${data.responseRate.toFixed(1)}%`,
-                    'Điểm trung bình toàn trường': data.overallScore !== null ? data.overallScore.toFixed(2) : '—',
+                    'Tỷ lệ phản hồi': `${formatPercent(data.responseRate, 3)}`,
+                    'Điểm trung bình toàn trường': formatDecimalOrDash(data.overallScore, 3),
                   },
                   summaryNotes: [
                     'Số liệu tính toán từ kết quả các phiếu khảo sát hợp lệ qua bộ lọc.',
@@ -389,7 +381,7 @@ export const SurveyDashboardPage: React.FC = () => {
                 },
                 columns: [
                   { key: 'facultyName', header: 'Khoa / Viện', width: 28 },
-                  { key: 'averageScore', header: 'Điểm TB', width: 14, type: 'number' as const, align: 'right' as const, format: (v: any) => Number(v).toFixed(2) },
+                  { key: 'averageScore', header: 'Điểm TB', width: 14, type: 'number' as const, align: 'right' as const, format: (v: any) => formatDecimal(Number(v), 3) },
                   { key: 'sectionsBelowThreshold', header: 'Số lớp dưới ngưỡng', width: 18, type: 'number' as const, align: 'right' as const },
                 ],
                 data: data.faculties,
@@ -497,11 +489,11 @@ const MainIndicators: React.FC<{ data: SemesterSurveyDashboard }> = ({ data }) =
       </div>
       <div className="dashboard-kpi">
         <dt>Tỷ lệ phản hồi</dt>
-        <dd>{data.responseRate.toFixed(1)}%</dd>
+        <dd>{formatPercent(data.responseRate, 3)}</dd>
       </div>
       <div className="dashboard-kpi">
         <dt>Điểm tổng hợp toàn trường</dt>
-        <dd>{data.overallScore === null ? '—' : data.overallScore.toFixed(2)}</dd>
+        <dd>{formatDecimalOrDash(data.overallScore, 3)}</dd>
       </div>
     </dl>
   </section>
@@ -524,7 +516,7 @@ const QuestionTooltip: React.FC<{ active?: boolean; payload?: ChartTooltipItem[]
       <strong>C{item.questionOrder}</strong>
       <span>{item.questionText}</span>
       <span style={{ color: barColor(item.averageScore) }}>
-        Điểm TB: {item.averageScore.toFixed(2)} / 5.0
+        Điểm TB: {formatDecimal(item.averageScore, 3)} / 5,0
       </span>
       <span>
         {item.sectionsBelowThreshold} lớp chấm câu này thấp hơn trung bình của chính câu đó từ 1
@@ -573,7 +565,7 @@ const QuestionChart: React.FC<{
               stroke="#68737d"
               strokeDasharray="4 4"
               label={{
-                value: `Toàn trường ${overallScore.toFixed(2)}`,
+                value: `Toàn trường ${formatDecimal(overallScore, 3)}`,
                 position: 'insideTopRight',
                 fill: '#68737d',
                 fontSize: 13,
@@ -668,7 +660,7 @@ const WeakestQuestions: React.FC<{ rows: DashboardQuestionScore[] }> = ({ rows }
                 <td>
                   <span className="catalog-cell-primary">{row.questionText}</span>
                 </td>
-                <td className="num">{row.averageScore.toFixed(2)}</td>
+                <td className="num">{formatDecimal(row.averageScore, 3)}</td>
                 <td className={row.sectionsBelowThreshold > 0 ? 'num is-flagged' : 'num'}>
                   {row.sectionsBelowThreshold}
                 </td>
@@ -716,7 +708,7 @@ const FacultyTooltip: React.FC<{ active?: boolean; payload?: FacultyTooltipItem[
     <div className="dashboard-chart-tooltip">
       <strong>{item.facultyName}</strong>
       <span style={{ color: barColor(item.averageScore) }}>
-        Điểm TB: {item.averageScore.toFixed(2)} / 5.0
+        Điểm TB: {formatDecimal(item.averageScore, 3)} / 5,0
       </span>
       <span>{item.sectionCount} lớp có phiếu hợp lệ</span>
     </div>

@@ -1323,7 +1323,7 @@
   flex-direction: column;
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--ops-border-strong);
+  border: 1px solid var(--grid-line-strong);
   border-top: 0;
   background: var(--ops-surface);
 }
@@ -1341,7 +1341,7 @@
   min-height: 34px;
   gap: 8px;
   padding: 6px 10px;
-  border-color: var(--ops-border-strong);
+  border-color: var(--field-border);
   border-radius: 3px !important;
   background: var(--ops-surface);
 }
@@ -1451,8 +1451,8 @@
   z-index: 1;
   height: 38px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--ops-border-strong);
-  border-right: 1px solid #edf0f2;
+  border-bottom: 1px solid var(--grid-line-strong);
+  border-right: 1px solid var(--grid-line);
   background: var(--ops-muted-surface);
   color: #000000;
   font-size: 13px;
@@ -1469,8 +1469,8 @@
 .admin-users-page .vmu-table td {
   height: 48px;
   padding: 8px 12px;
-  border-bottom: 1px solid #e8ecef;
-  border-right: 1px solid #f0f2f4;
+  border-bottom: 1px solid var(--grid-line);
+  border-right: 1px solid var(--grid-line);
   color: #000000;
   vertical-align: middle;
 }
@@ -1484,7 +1484,7 @@
 }
 
 .admin-users-page .admin-users-table {
-  min-width: 940px;
+  min-width: 1180px;
   table-layout: fixed;
 }
 
@@ -1493,12 +1493,19 @@
   padding: 6px 10px;
 }
 
-.admin-users-table th:nth-child(1) { width: 20%; }
-.admin-users-table th:nth-child(2) { width: 24%; }
-.admin-users-table th:nth-child(3) { width: 12%; }
-.admin-users-table th:nth-child(4) { width: 21%; }
-.admin-users-table th:nth-child(5) { width: 16%; }
-.admin-users-table th:nth-child(6) { width: 7%; }
+/* Tám cột theo đúng thứ tự trên bảng: Giảng viên, Bộ môn, Khoa / Viện, Email, Trạng
+   thái, Hồ sơ và vai trò, Đăng nhập gần nhất, Thao tác. Bảng để table-layout: fixed
+   nên thiếu một dòng ở đây là cột đó chia phần thừa theo ý trình duyệt. */
+.admin-users-table th:nth-child(1) { width: 13%; }
+.admin-users-table th:nth-child(2) { width: 13%; }
+.admin-users-table th:nth-child(3) { width: 13%; }
+.admin-users-table th:nth-child(4) { width: 15%; }
+.admin-users-table th:nth-child(5) { width: 7%; }
+.admin-users-table th:nth-child(6) { width: 22%; }
+.admin-users-table th:nth-child(7) { width: 10%; }
+/* Cột Thao tác giờ có tiêu đề chữ nên phải đủ rộng cho hai từ, không co về bề ngang
+   của mỗi cái nút nữa. */
+.admin-users-table th:nth-child(8) { width: 7%; }
 
 .admin-users-table strong,
 .admin-account-summary strong {
@@ -1672,7 +1679,9 @@
   white-space: nowrap;
 }
 
-.admin-action-cell {
+/* Nút căn giữa ô, và tiêu đề "Thao tác" căn giữa theo cho thẳng cột. */
+.admin-action-cell,
+.admin-users-table th:last-child {
   text-align: center !important;
 }
 
@@ -1904,7 +1913,7 @@
 .admin-users-page .form-group select {
   min-height: 42px;
   padding: 8px 11px;
-  border-color: var(--ops-border-strong);
+  border-color: var(--field-border);
   border-radius: 3px !important;
   color: #000000;
   font-size: 14px;
@@ -2119,8 +2128,8 @@
 .admin-import-table-scroll th,
 .admin-import-table-scroll td {
   padding: 7px 9px;
-  border-right: 1px solid var(--ops-border);
-  border-bottom: 1px solid var(--ops-border);
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
 }
 
 .admin-import-table-scroll th {
@@ -2330,7 +2339,7 @@
   width: 100%;
   padding: 8px 10px;
   margin-bottom: 8px;
-  border: 1px solid var(--ops-border-strong);
+  border: 1px solid var(--field-border);
   border-radius: 4px;
   font-size: 13px;
   color: #000000;
@@ -2395,7 +2404,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border: 1px solid var(--ops-border-strong);
+  border: 1px solid var(--field-border);
   border-radius: 4px;
   flex: 1;
   max-width: 320px;

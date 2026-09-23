@@ -45,6 +45,7 @@ import type {
 } from '../types/graduationAnalytics2';
 import { formatCohortCode } from '../utils/formatCohortCode';
 import '../styles/graduation-analytics.css';
+import { formatNumber, formatPercent } from '../utils/formatNumber';
 
 export type GraduationAnalyticsView = 'explore' | 'manage';
 type ExploreChartMetric = 'studentTotal' | 'graduated' | 'notGraduated' | 'onTime' | 'workStudy' | 'excellent' | 'veryGood' | 'good' | 'average';
@@ -175,8 +176,8 @@ const currentAcademicYearStart = () => {
   return now.getMonth() + 1 >= 8 ? now.getFullYear() : now.getFullYear() - 1;
 };
 
-const formatNumber = (value: number) => value.toLocaleString('vi-VN');
-const formatRate = (value: number) => `${value.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}%`;
+/** Tỷ lệ tốt nghiệp cũng ba chữ số thập phân như mọi tỷ lệ khác trong hệ thống. */
+const formatRate = (value: number) => formatPercent(value);
 const usesGraduatedDenominator = (metric: ExploreChartMetric) =>
   ['onTime', 'workStudy', 'excellent', 'veryGood', 'good', 'average'].includes(metric);
 const reviewDateLabel = (reviewMonth: number | null, reviewYear: number | null) =>
@@ -626,9 +627,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
         : 'Không phân chuỗi'} · Tỷ lệ trên ${usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}`;
     const kpiInfo = Object.fromEntries(explore.kpis.map((kpi) => [
       kpi.label,
-      kpi.id === 'studentTotal'
-        ? formatNumber(kpi.count)
-        : `${formatNumber(kpi.count)} (${formatRate(kpi.rate)})`,
+      `${formatNumber(kpi.count)} (${formatRate(kpi.rate)})`,
     ]));
     const hasSeriesColumn = Boolean(displayedChartSeries) || chartModel.series.length > 1;
     const tableColumns = [
@@ -831,9 +830,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
               {explore.kpis.map((kpi) => <div key={kpi.id} data-kpi={kpi.id}>
                 <span>{kpi.label}</span>
                 <strong>{formatNumber(kpi.count)}</strong>
-                <small>{kpi.id === 'studentTotal'
-                  ? 'Từ danh mục Khóa ngành đào tạo'
-                  : `${formatRate(kpi.rate)} ${kpi.id === 'graduated' || kpi.id === 'notGraduated' ? 'số sinh viên nhập học' : 'số sinh viên đã tốt nghiệp'}`}</small>
+                <small>{`${formatRate(kpi.rate)} ${kpi.id === 'graduated' ? 'số sinh viên nhập học' : 'số sinh viên đã tốt nghiệp'}`}</small>
               </div>)}
             </section>
             <section className="graduation-result-summary__ranks" aria-labelledby="graduation-rank-heading">

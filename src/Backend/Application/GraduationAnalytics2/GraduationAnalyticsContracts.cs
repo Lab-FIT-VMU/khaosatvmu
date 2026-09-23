@@ -6,6 +6,9 @@ public static class GraduationAnalyticsErrorCodes
     public const string TooManyRows = "GRADUATION_IMPORT_TOO_LARGE";
     public const string LegacyStructureUnsupported = "LEGACY_STRUCTURE_UNSUPPORTED";
     public const string InvalidQuery = "GRADUATION_QUERY_INVALID";
+
+    /// <summary>Vai trò chỉ đọc (Ban Giám hiệu) gọi vào một thao tác ghi.</summary>
+    public const string OutOfScope = "GRADUATION_OUT_OF_SCOPE";
 }
 
 /// <summary>Một dòng hỏng của tệp nguồn, kèm nguyên nội dung để người dùng dò lại.</summary>

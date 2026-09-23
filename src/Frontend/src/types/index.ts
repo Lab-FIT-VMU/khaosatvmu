@@ -541,6 +541,10 @@ export interface AdminUser {
   profiles: AdminProfile[];
   /** Hồ sơ giảng viên gắn với tài khoản; null với tài khoản quản trị thuần. */
   lecturerId: number | null;
+  /** Đọc từ hồ sơ giảng viên gắn với tài khoản; null với tài khoản quản trị thuần. */
+  lecturerFullName: string | null;
+  departmentName: string | null;
+  facultyName: string | null;
 }
 
 export interface ImportAdminUserRow {

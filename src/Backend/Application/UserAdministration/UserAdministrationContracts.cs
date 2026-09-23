@@ -29,7 +29,15 @@ public sealed record AdminUserDto(
     /// Hồ sơ giảng viên gắn với tài khoản ("Users"."LecturerId"); null với tài khoản
     /// quản trị thuần. Màn cấp hồ sơ dùng nó để sinh mã hồ sơ 6 chữ số.
     /// </summary>
-    int? LecturerId = null);
+    int? LecturerId = null,
+    /// <summary>
+    /// Ba trường dưới đọc từ hồ sơ giảng viên gắn với tài khoản, để bảng tài khoản
+    /// hiện được khoa/viện, bộ môn và tên giảng viên. Null với tài khoản quản trị
+    /// thuần hoặc khi hồ sơ giảng viên chưa gắn đơn vị.
+    /// </summary>
+    string? LecturerFullName = null,
+    string? DepartmentName = null,
+    string? FacultyName = null);
 
 public sealed record AdminRoleDto(Guid Id, string Code, string Name, string? Description);
 
@@ -109,7 +117,9 @@ public static class ProfileNaming
         new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
         {
             ["ADMIN"] = ("Quản trị hệ thống", "AD"),
+            ["BOARD_OF_DIRECTORS"] = ("Ban Giám hiệu", "GH"),
             ["DEPARTMENT_MANAGER"] = ("Trưởng bộ môn", "BM"),
+            ["FACULTY_MANAGER"] = ("Trưởng khoa/viện", "KV"),
             ["LECTURER"] = ("Giảng viên", "GV"),
             ["SURVEY_ADMIN"] = ("Quản trị khảo sát", "QT"),
         };

@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { LoaderCircle } from 'lucide-react';
 import type { QuestionRating } from '../../types';
+import { formatDecimal } from './theme';
 
 interface SchoolCriteriaChartProps {
   questions: QuestionRating[];
@@ -57,7 +58,7 @@ const CriteriaTooltip: React.FC<CustomTooltipProps> = ({
     <div className="reports-chart-tooltip">
       <strong>{item.label}: {item.questionText}</strong>
       <span style={{ color: getBarColor(item.averageScore), fontWeight: 700 }}>
-        Điểm TB: {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'} / 5.0
+        Điểm TB: {item.averageScore > 0 ? formatDecimal(item.averageScore) : '—'} / 5,0
       </span>
       {item.totalAnswers > 0 && (
         <span style={{ color: '#68737d', fontSize: '12px' }}>
@@ -139,7 +140,7 @@ export const SchoolCriteriaChart: React.FC<SchoolCriteriaChartProps> = ({
                 stroke="#68737d"
                 strokeDasharray="4 4"
                 label={{
-                  value: `Toàn trường: ${schoolAverage.toFixed(2)}`,
+                  value: `Toàn trường: ${formatDecimal(schoolAverage)}`,
                   position: 'insideTopRight',
                   fill: '#68737d',
                   fontSize: 13,

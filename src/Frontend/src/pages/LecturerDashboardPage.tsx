@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useSemester } from '../context/semesterContext';
 import { catalogApi } from '../services/catalogApi';
+import { writeSemesterSurveysCache } from '../hooks/useSemesterSurveys';
 import { surveyApi } from '../services/surveyApi';
 import type { SemesterSurvey } from '../types';
 import { ExportDropdown } from '../components/ExportDropdown';
@@ -19,6 +20,7 @@ import {
   setActiveSemesterSurveyId,
 } from '../utils/surveySelection';
 import '../styles/dashboard.css';
+import { formatPercent } from '../utils/formatNumber';
 
 interface LecturerDashboardPageProps {
   onNavigateTab: (tab: string) => void;
@@ -100,6 +102,8 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
         if (cancelled) return;
         // Thiếu dòng này thì danh sách đợt luôn rỗng: ô chọn đợt không bao giờ hiện
         // ra và dòng mô tả báo "chưa có đợt nào" ngay cả khi số liệu bên dưới đã có.
+        // Ghi vào cache dùng chung để ô chọn Đợt ở các trang khác mở lên là có ngay.
+        writeSemesterSurveysCache(activeSemesterId, surveys);
         setSemesterSurveys(surveys);
         const chosenSurveyId = Number(
           selectAvailableSemesterSurveyId(surveys, getActiveSemesterSurveyId()),
@@ -229,7 +233,7 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
                     padding: '0 8px',
                     fontSize: '13px',
                     color: '#000000',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid var(--field-border)',
                     borderRadius: '3px',
                     textOverflow: 'ellipsis',
                   }}
@@ -259,7 +263,7 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
                     'Đợt khảo sát': selectedSurvey?.surveyName || '—',
                     'Tổng số lớp giảng dạy': metrics.sectionCount,
                     'Số lớp đã phát phiếu': metrics.surveyedCount,
-                    'Tiến độ thu phiếu': completionRate !== null ? `${completionRate.toFixed(1)}%` : '—',
+                    'Tiến độ thu phiếu': completionRate !== null ? `${formatPercent(completionRate, 3)}` : '—',
                   },
                 },
                 columns: [
@@ -281,7 +285,7 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
                   },
                   {
                     metricName: 'Tỷ lệ hoàn thành thu phiếu',
-                    metricValue: completionRate !== null ? `${completionRate.toFixed(1)}%` : '—',
+                    metricValue: completionRate !== null ? `${formatPercent(completionRate, 3)}` : '—',
                   },
                 ],
               }}
@@ -310,7 +314,7 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
             <div className="department-metric">
               <span className="department-metric__label">Tiến độ thu phiếu</span>
               <strong className="department-metric__value">
-                {completionRate === null ? '—' : `${completionRate.toFixed(1)}%`}
+                {completionRate === null ? '—' : `${formatPercent(completionRate, 3)}`}
               </strong>
               <span className="department-metric__compare">
                 {metrics

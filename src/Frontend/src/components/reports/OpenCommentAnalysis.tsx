@@ -19,6 +19,7 @@ import type {
   SurveyResponseDetail,
 } from '../../types';
 import { foldVietnamese } from '../../utils/vietnamese';
+import { formatDecimal } from '../../utils/formatNumber';
 
 interface OpenCommentAnalysisProps {
   semesterId: number;
@@ -278,7 +279,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         sortValue: (item) => item.score,
         render: (item) => (
           <span style={{ fontWeight: 650, color: item.score >= 4 ? '#0f6b47' : item.score >= 3 ? '#b54708' : '#b42318' }}>
-            {item.score > 0 ? item.score.toFixed(1) : '—'}
+            {item.score > 0 ? formatDecimal(item.score, 3) : '—'}
           </span>
         ),
       },
@@ -355,7 +356,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         { key: 'courseName', header: 'Tên học phần', width: 28 },
         { key: 'sectionName', header: 'Lớp học phần', width: 14, align: 'center' as const },
         { key: 'lecturerName', header: 'Giảng viên', width: 24 },
-        { key: 'score', header: 'Điểm của phiếu khảo sát', width: 18, type: 'number' as const, align: 'right' as const, format: (val: unknown) => Number(Number(val || 0).toFixed(2)) },
+        { key: 'score', header: 'Điểm của phiếu khảo sát', width: 18, type: 'number' as const, align: 'right' as const, format: (val: unknown) => Number(Number(val || 0).toFixed(3)) },
         { key: 'isValid', header: 'Tính hợp lệ', width: 14, align: 'center' as const, format: (val: unknown) => (val ? 'Hợp lệ' : 'Bị bộ lọc loại') },
         { key: 'additionalComments', header: 'Nội dung ý kiến đóng góp', width: 45 },
       ],
@@ -374,7 +375,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         <span className="reports-kpi-item" title="Tỷ lệ phiếu có ý kiến trên tổng số lượt nộp">
           Tỷ lệ phiếu có ý kiến
           <strong>
-            {loading ? '...' : (report && report.totalComments > 0 && report.commentRate === 0 ? '< 0.1%' : `${report?.commentRate ?? 0}%`)}
+            {loading ? '...' : (report && report.totalComments > 0 && report.commentRate === 0 ? '< 0,1%' : `${report?.commentRate ?? 0}%`)}
           </strong>
         </span>
         <span className="reports-kpi-item" title="Số lớp học phần nhận được ý kiến phản hồi mở">
@@ -476,7 +477,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
                           : '#b42318',
                     }}
                   >
-                    {activeModalComment.score > 0 ? activeModalComment.score.toFixed(1) : '—'} / 5.0
+                    {activeModalComment.score > 0 ? formatDecimal(activeModalComment.score, 3) : '—'} / 5,0
                   </strong>{' '}
                   <span
                     className={`response-validity${activeModalComment.isValid ? '' : ' is-rejected'}`}

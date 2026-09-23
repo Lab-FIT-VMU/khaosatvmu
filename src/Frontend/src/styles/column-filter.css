@@ -119,7 +119,7 @@
   width: 100%;
   height: 26px;
   padding: 0 26px 0 8px;
-  border: 1px solid #c4ccd2;
+  border: 1px solid var(--field-border);
   border-radius: 2px;
   background: #ffffff;
   color: #000000;

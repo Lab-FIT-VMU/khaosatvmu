@@ -30,6 +30,7 @@ import '../styles/reports.css';
 import { foldVietnamese, toVietnameseFileSlug } from '../utils/vietnamese';
 import { hasEnoughResponsesToScore } from '../utils/reportThresholds';
 import type { QuestionAnalysisExportMetadata } from '../services/exportQuestionAnalysisService';
+import { formatDecimal, formatDecimalOrDash } from '../utils/formatNumber';
 
 interface SectionSurveyResponsesPageProps {
   courseSectionSurveyId: number;
@@ -222,8 +223,8 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
       width: '72px',
       numeric: true,
       sortValue: (item) => item.score,
-      filterValue: (item) => item.score.toFixed(2),
-      render: (item) => <span className="response-score">{item.score.toFixed(2)}</span>,
+      filterValue: (item) => formatDecimal(item.score, 3),
+      render: (item) => <span className="response-score">{formatDecimal(item.score, 3)}</span>,
     },
     {
       key: 'isValid',
@@ -315,7 +316,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
       'Đơn vị': sectionSurvey ? `${sectionSurvey.departmentName || ''} · ${sectionSurvey.facultyName || ''}` : undefined,
       'Tổng số phiếu phải thu': sectionSurvey?.classSize,
       'Số phiếu hợp lệ': analysis?.responseCount ?? sectionSurvey?.validResponseCount,
-      'Điểm trung bình': analysis?.averageScore ? `${analysis.averageScore.toFixed(2)} / 5.0` : undefined,
+      'Điểm trung bình': analysis?.averageScore ? `${formatDecimal(analysis.averageScore, 3)} / 5,0` : undefined,
     },
   }), [sectionSurvey, analysis, courseSectionSurveyId]);
 
@@ -354,7 +355,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
             <span>{validResponses.length} phiếu hợp lệ</span>
             <span>
               Điểm trung bình{' '}
-              {displayAverageScore !== null ? displayAverageScore.toFixed(2) : '—'}
+              {formatDecimalOrDash(displayAverageScore, 3)}
             </span>
             <span>{commentedCount} phiếu hợp lệ có ý kiến</span>
             <span className={invalidCount > 0 ? 'section-responses-stat--warning' : undefined}>
@@ -489,7 +490,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
             'Số phiếu đã thu': responses.length,
             'Số phiếu hợp lệ': validResponses.length,
             'Điểm trung bình': displayAverageScore !== null && displayAverageScore > 0
-              ? displayAverageScore.toFixed(2)
+              ? formatDecimal(displayAverageScore, 3)
               : '—',
           },
           summaryNotes: [
@@ -499,7 +500,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
           columns: [
             { key: 'responseId', header: 'Mã phiếu', width: 12, align: 'center' as const },
             { key: 'submittedAt', header: 'Thời gian nộp', width: 18, format: (val: any) => formatDateTime(val) },
-            { key: 'score', header: 'Điểm', width: 10, type: 'number' as const, align: 'right' as const, format: (val: any) => Number(val).toFixed(2) },
+            { key: 'score', header: 'Điểm', width: 10, type: 'number' as const, align: 'right' as const, format: (val: any) => Number(val).toFixed(3) },
             { key: 'isValid', header: 'Trạng thái', width: 12, align: 'center' as const, format: (val: any) => (val ? 'Hợp lệ' : 'Không hợp lệ') },
             { key: 'rejectionReasons', header: 'Mô tả', width: 20, format: (_: any, item: any) => rejectionReasonTexts(item.rejectionReasons).join('; ') || '—' },
             { key: 'additionalComments', header: 'Ý kiến đóng góp', width: 35, format: (val: any) => val || '—' },
@@ -528,7 +529,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
               </span>
               <span>
                 Nộp lúc {formatDateTime(detail.submittedAt)} · Điểm trung bình{' '}
-                <strong>{detail.score.toFixed(2)}</strong>
+                <strong>{formatDecimal(detail.score, 3)}</strong>
               </span>
             </div>
 

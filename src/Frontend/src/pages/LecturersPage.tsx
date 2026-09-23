@@ -16,7 +16,7 @@ import {
 import type { ImportLecturerRow } from '../utils/lecturerImportExcel';
 import type { Department, Faculty, Lecturer, Position } from '../types';
 import { useAuth } from '../auth/authContext';
-import { canCreateOrDeleteCatalog, isUnrestrictedRole } from '../auth/roles';
+import { canCreateOrDeleteCatalog, isReadOnlyRole, isUnrestrictedRole } from '../auth/roles';
 import { foldVietnamese } from '../utils/vietnamese';
 
 interface LecturersPageProps {
@@ -74,8 +74,10 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
   // chỉ dành cho quản trị thì ẩn nút đi cho gọn. Chặn thật nằm ở backend.
   const { activeProfile } = useAuth();
   const canManageAll = isUnrestrictedRole(activeProfile?.roleCode);
-  // Thêm và xoá là việc của quản trị; trưởng bộ môn chỉ xem và sửa.
+  // Thêm và xoá là việc của quản trị; trưởng đơn vị chỉ xem và sửa.
   const canManageCatalog = canCreateOrDeleteCatalog(activeProfile?.roleCode);
+  // Ban Giám hiệu xem toàn trường nhưng không sửa được gì, nên giấu cả cột Thao tác.
+  const readOnly = isReadOnlyRole(activeProfile?.roleCode);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -313,7 +315,11 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
       width: '10%',
       render: (row) => row.phoneNumber ?? '—',
     },
-    {
+  ];
+
+  // Bỏ hẳn cả cột cho vai trò chỉ đọc, không để lại một cột trống — giống trang Học phần.
+  if (!readOnly) {
+    columns.push({
       key: 'actions',
       header: 'Thao tác',
       width: '7%',
@@ -341,8 +347,8 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
           )}
         </div>
       ),
-    },
-  ];
+    });
+  }
 
   return (
     <div className="catalog-page">

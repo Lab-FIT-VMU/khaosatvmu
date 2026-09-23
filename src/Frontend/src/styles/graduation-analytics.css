@@ -40,7 +40,7 @@
 .graduation-import__summary input,
 .graduation-table-section input {
   height: 36px;
-  border: 1px solid #cfd6db;
+  border: 1px solid var(--field-border);
   border-radius: 3px;
   background: #fff;
   color: #000000;
@@ -62,7 +62,7 @@
   background: #f7f9fa;
 }
 .graduation-filters label { display: grid; gap: 5px; color: #000000; font-size: 13px; font-weight: 600; }
-.graduation-filters select { width: 100%; height: 36px; border: 1px solid #cfd6db; border-radius: 3px; background: #fff; color: #000000; padding: 0 9px; font: inherit; }
+.graduation-filters select { width: 100%; height: 36px; border: 1px solid var(--field-border); border-radius: 3px; background: #fff; color: #000000; padding: 0 9px; font: inherit; }
 .graduation-filters button { height: 36px; }
 
 .graduation-view-switch {
@@ -242,7 +242,7 @@
   padding: 4px;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid #d7e0e5;
+  border: 1px solid var(--grid-line-strong);
   border-radius: 6px;
   background: #ffffff;
   box-shadow: 0 10px 24px rgb(15 23 42 / 14%);
@@ -272,12 +272,12 @@
 .graduation-chart-data summary { padding: 9px 0 4px; color: #075d79; font-size: 13px; font-weight: 600; cursor: pointer; }
 .graduation-chart-data > div { max-height: 240px; overflow: auto; }
 .graduation-chart-data table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.graduation-chart-data th, .graduation-chart-data td { padding: 6px 8px; border: 1px solid #edf0f2; text-align: right; }
+.graduation-chart-data th, .graduation-chart-data td { padding: 6px 8px; border: 1px solid var(--grid-line); text-align: right; }
 .graduation-chart-data th:first-child, .graduation-chart-data td:first-child { position: sticky; left: 0; background: #fff; text-align: left; }
 .graduation-chart-data th { background: #f7f9fa; color: #000000; }
 
-.graduation-table-section { margin-top: 12px; border: 1px solid #dfe4e8; background: #fff; }
-.graduation-table-section > header { padding: 10px 12px; border-bottom: 1px solid #dfe4e8; }
+.graduation-table-section { margin-top: 12px; border: 1px solid var(--grid-line-strong); background: #fff; }
+.graduation-table-section > header { padding: 10px 12px; border-bottom: 1px solid var(--grid-line-strong); }
 .graduation-table-section > header > div { display: flex; align-items: baseline; gap: 8px; }
 .graduation-table-section > header span { color: #000000; font-size: 13px; }
 .graduation-table-section > header input { width: min(340px, 42vw); }
@@ -285,7 +285,7 @@
 .graduation-source-table { max-height: 520px; }
 .graduation-source-table table, .graduation-preview table { min-width: 1900px; width: 100%; border-collapse: collapse; font-size: 13px; }
 .graduation-source-table th, .graduation-source-table td,
-.graduation-preview th, .graduation-preview td { height: 40px; padding: 6px 8px; border-right: 1px solid #edf0f2; border-bottom: 1px solid #edf0f2; text-align: left; white-space: nowrap; }
+.graduation-preview th, .graduation-preview td { height: 40px; padding: 6px 8px; border-right: 1px solid var(--grid-line); border-bottom: 1px solid var(--grid-line); text-align: left; white-space: nowrap; }
 .graduation-source-table th, .graduation-preview th { position: sticky; top: 0; z-index: 1; background: #f7f9fa; color: #000000; font-weight: 700; }
 .graduation-source-table td:nth-child(n+6), .graduation-preview td:nth-child(n+6) { text-align: right; font-variant-numeric: tabular-nums; }
 .graduation-table-section > footer { padding: 8px 12px; color: #000000; font-size: 13px; }
@@ -380,7 +380,7 @@
   gap: 10px;
 }
 .graduation-import__metadata label { display: grid; gap: 5px; color: #000000; font-size: 13px; font-weight: 700; }
-.graduation-import__metadata input, .graduation-import__metadata select { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid #cfd7dc; border-radius: 3px; background: #fff; color: #000000; font: inherit; }
+.graduation-import__metadata input, .graduation-import__metadata select { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid var(--field-border); border-radius: 3px; background: #fff; color: #000000; font: inherit; }
 .graduation-import__reason { grid-column: 1 / 4; }
 .graduation-import__submit { grid-column: 4; grid-row: 1; min-height: 36px; padding: 6px 14px; font-size: 13px; white-space: nowrap; }
 .graduation-import__year-confirmation {
@@ -416,7 +416,7 @@
 .graduation-delete-dialog > label { display: grid; gap: 6px; color: #20262c; font-size: 13px; font-weight: 700; }
 .graduation-delete-dialog__label-text { display: inline-flex; align-items: baseline; gap: 3px; width: max-content; }
 .graduation-delete-dialog__label-text > span { color: #b52d2d; }
-.graduation-delete-dialog textarea { box-sizing: border-box; width: 100%; min-height: 82px; resize: vertical; padding: 9px 10px; border: 1px solid #cfd7dc; border-radius: 3px; background: #fff; color: #20262c; font: inherit; font-weight: 400; line-height: 1.4; }
+.graduation-delete-dialog textarea { box-sizing: border-box; width: 100%; min-height: 82px; resize: vertical; padding: 9px 10px; border: 1px solid var(--field-border); border-radius: 3px; background: #fff; color: #20262c; font: inherit; font-weight: 400; line-height: 1.4; }
 .graduation-delete-dialog textarea:focus { border-color: #0788b8; outline: 2px solid rgb(7 136 184 / 14%); }
 .graduation-delete-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid #e4e8eb; }
 .graduation-delete-dialog__submit { border: 1px solid #a92727; background: #b52d2d; color: #fff; }
@@ -444,7 +444,7 @@
 }
 .graduation-v3-controls.is-range { grid-template-columns: .8fr 1.1fr 1.1fr .65fr 1fr 1fr .45fr; }
 .graduation-v3-controls label, .graduation-filter-field, .graduation-year-picker label { display: grid; gap: 5px; color: #000000; font-size: 13px; font-weight: 700; }
-.graduation-v3-controls select, .graduation-year-picker select { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid #cfd7dc; background: #fff; color: #000000; font: inherit; }
+.graduation-v3-controls select, .graduation-year-picker select { min-width: 0; height: 36px; padding: 0 9px; border: 1px solid var(--field-border); background: #fff; color: #000000; font: inherit; }
 .graduation-cohort-select { min-width: 0; }
 .graduation-cohort-select__trigger {
   display: flex;
@@ -455,7 +455,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 0 9px;
-  border: 1px solid #cfd7dc;
+  border: 1px solid var(--field-border);
   background: #fff;
   color: #20262c;
   font: inherit;
@@ -474,14 +474,14 @@
   min-height: 180px;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #bfcbd2;
+  border: 1px solid var(--grid-line-strong);
   border-radius: 3px;
   background: #fff;
   box-shadow: 0 8px 20px rgb(20 32 40 / 16%);
 }
 .graduation-cohort-select__search { position: relative; padding: 9px; border-bottom: 1px solid #e4e8eb; }
 .graduation-cohort-select__search svg { position: absolute; top: 19px; left: 18px; width: 15px; height: 15px; color: #64717a; pointer-events: none; }
-.graduation-cohort-select__search input { box-sizing: border-box; width: 100%; height: 34px; padding: 0 9px 0 31px; border: 1px solid #cfd7dc; border-radius: 3px; color: #20262c; font: inherit; }
+.graduation-cohort-select__search input { box-sizing: border-box; width: 100%; height: 34px; padding: 0 9px 0 31px; border: 1px solid var(--field-border); border-radius: 3px; color: #20262c; font: inherit; }
 .graduation-cohort-select__search input:focus { border-color: #0788b8; outline: 2px solid rgb(7 136 184 / 12%); }
 .graduation-cohort-select__toolbar { display: flex; justify-content: space-between; padding: 7px 9px; border-bottom: 1px solid #e8ecef; }
 .graduation-cohort-select__toolbar button { padding: 0; border: 0; background: transparent; color: #076d91; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
@@ -531,20 +531,17 @@
 .graduation-result-summary > header span { color: #52616b; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .graduation-result-summary > header h2 { margin: 3px 0 0; color: #20262c; font-size: 15px; }
 .graduation-result-summary > header p { margin: 0; color: #68737d; font-size: 12px; white-space: nowrap; }
-.graduation-result-summary__kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: #f7f9fa; }
+/* Ba thẻ: Đã tốt nghiệp, Tốt nghiệp đúng hạn, Hệ VLVH — giữ nguyên màu cũ của từng thẻ. */
+.graduation-result-summary__kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #f7f9fa; }
 .graduation-result-summary__kpis > div { position: relative; display: grid; min-height: 92px; align-content: center; gap: 3px; padding: 12px 16px 12px 19px; border-right: 1px solid #dfe4e8; }
-.graduation-result-summary__kpis > div::before { position: absolute; top: 15px; bottom: 15px; left: 0; width: 3px; background: #0788b8; content: ''; }
-.graduation-result-summary__kpis > div:nth-child(2)::before { background: #21884a; }
-.graduation-result-summary__kpis > div:nth-child(3)::before { background: #b86216; }
-.graduation-result-summary__kpis > div:nth-child(4)::before { background: #7557a5; }
-.graduation-result-summary__kpis > div:nth-child(5)::before { background: #526d82; }
+.graduation-result-summary__kpis > div::before { position: absolute; top: 15px; bottom: 15px; left: 0; width: 3px; background: #21884a; content: ''; }
+.graduation-result-summary__kpis > div:nth-child(2)::before { background: #7557a5; }
+.graduation-result-summary__kpis > div:nth-child(3)::before { background: #526d82; }
 .graduation-result-summary__kpis > div:last-child { border-right: 0; }
 .graduation-result-summary__kpis span { color: #4d5962; font-size: 12px; }
-.graduation-result-summary__kpis strong { color: #075d79; font-size: 25px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.graduation-result-summary__kpis > div:nth-child(2) strong { color: #137b3b; }
-.graduation-result-summary__kpis > div:nth-child(3) strong { color: #9a5511; }
-.graduation-result-summary__kpis > div:nth-child(4) strong { color: #65499a; }
-.graduation-result-summary__kpis > div:nth-child(5) strong { color: #40596c; }
+.graduation-result-summary__kpis strong { color: #137b3b; font-size: 25px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.graduation-result-summary__kpis > div:nth-child(2) strong { color: #65499a; }
+.graduation-result-summary__kpis > div:nth-child(3) strong { color: #40596c; }
 .graduation-result-summary__kpis small { color: #68737d; font-size: 11px; }
 .graduation-result-summary__ranks { padding: 12px 14px 0; border-top: 1px solid #dfe4e8; }
 .graduation-result-summary__section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -569,15 +566,38 @@
 .graduation-v3-card h2 { margin: 3px 0 0; font-size: 15px; }
 .graduation-v3-chart { height: 360px; padding: 8px 10px; }
 .graduation-v3-table > div, .graduation-period-manager, .graduation-history { overflow: auto; }
-.graduation-v3-table > div { max-height: 420px; scrollbar-gutter: stable; }
+/* Không chặn chiều cao nữa: bảng đã cắt trang 20 dòng, chặn 420px thì chỉ thấy
+   khoảng 10 dòng rồi phải cuộn trong một khung cuộn nằm trong trang cũng cuộn.
+   Vẫn để overflow: auto ở dòng trên cho cuộn ngang khi màn hình hẹp. */
+.graduation-v3-table > div { scrollbar-gutter: stable; }
 .graduation-v3-table table, .graduation-period-manager table, .graduation-history table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 13px; }
-.graduation-v3-table th, .graduation-v3-table td, .graduation-period-manager th, .graduation-period-manager td, .graduation-history th, .graduation-history td { padding: 9px 10px; border-right: 1px solid #edf0f2; border-bottom: 1px solid #edf0f2; text-align: right; }
+
+/*
+  Chia cột theo % chứ không để trình duyệt tự co theo nội dung: tên khoa và tên
+  chuyên ngành dài ngắn khác nhau giữa các bộ lọc, để auto thì mỗi lần lọc xong
+  các cột lại nhảy sang bề rộng khác. Mười hai cột, cộng đúng 100%.
+*/
+.graduation-v3-table table { table-layout: fixed; }
+.graduation-v3-table th:nth-child(1) { width: 17%; }
+.graduation-v3-table th:nth-child(2) { width: 17%; }
+.graduation-v3-table th:nth-child(3) { width: 5%; }
+.graduation-v3-table th:nth-child(4) { width: 8%; }
+.graduation-v3-table th:nth-child(5) { width: 8%; }
+.graduation-v3-table th:nth-child(6) { width: 8%; }
+.graduation-v3-table th:nth-child(7) { width: 6%; }
+.graduation-v3-table th:nth-child(8) { width: 6%; }
+.graduation-v3-table th:nth-child(9) { width: 6%; }
+.graduation-v3-table th:nth-child(10) { width: 6%; }
+.graduation-v3-table th:nth-child(11) { width: 6%; }
+.graduation-v3-table th:nth-child(12) { width: 7%; }
+.graduation-v3-table th, .graduation-v3-table td, .graduation-period-manager th, .graduation-period-manager td, .graduation-history th, .graduation-history td { padding: 9px 10px; border-right: 1px solid var(--grid-line); border-bottom: 1px solid var(--grid-line); text-align: right; }
 .graduation-v3-table th:first-child, .graduation-v3-table td:first-child, .graduation-v3-table th:nth-child(2), .graduation-v3-table td:nth-child(2), .graduation-period-manager th:nth-child(-n+5), .graduation-period-manager td:nth-child(-n+5), .graduation-history th:nth-child(-n+4), .graduation-history td:nth-child(-n+4) { text-align: left; }
 .graduation-v3-table th, .graduation-period-manager th, .graduation-history th { background: #f7f9fa; color: #000000; }
 .graduation-v3-table thead th { position: sticky; top: 0; z-index: 1; }
 .graduation-column-filterable { display: block; min-height: 24px; }
-.graduation-column-label { display: flex; min-height: 24px; align-items: center; justify-content: flex-end; gap: 4px; padding-right: 12px; font-weight: 700; }
-.graduation-v3-table th:nth-child(-n+2) .graduation-column-label { justify-content: flex-start; }
+/* Tiêu đề căn giữa ở mọi cột, kể cả hai cột chữ bên trái. Đệm đều hai bên chứ không
+   chỉ chừa bên phải cho nút lọc, nếu không chữ sẽ lệch trái so với tâm ô. */
+.graduation-column-label { display: flex; min-height: 24px; align-items: center; justify-content: center; gap: 4px; padding: 0 12px; font-weight: 700; text-align: center; }
 .graduation-column-label svg { width: 13px; height: 13px; flex: 0 0 auto; color: #0788b8; }
 .graduation-v3-table thead th .column-filter-button { position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; margin-left: 0; z-index: 2; }
 .graduation-table-empty { height: 88px; color: #64717a; text-align: center !important; }
@@ -663,7 +683,7 @@
   background: #f7f9fa;
 }
 .graduation-import-toolbar label { display: grid; gap: 5px; color: #000000; font-size: 13px; font-weight: 700; }
-.graduation-import-toolbar select { width: 100%; height: 36px; padding: 0 9px; border: 1px solid #cfd7dc; border-radius: 3px; background: #fff; color: #000000; font: inherit; }
+.graduation-import-toolbar select { width: 100%; height: 36px; padding: 0 9px; border: 1px solid var(--field-border); border-radius: 3px; background: #fff; color: #000000; font: inherit; }
 .graduation-period-status { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 13px; font-weight: 650; }
 .graduation-period-status i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #9ba5ac; }
 .graduation-period-status.is-ready { color: #137b3b; }
@@ -828,7 +848,7 @@
 .graduation-matrix p { margin: 3px 0 0; color: #000000; font-size: 13px; }
 .graduation-matrix > div { overflow: auto; }
 .graduation-matrix table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 13px; }
-.graduation-matrix th, .graduation-matrix td { padding: 9px 12px; border-right: 1px solid #edf0f2; border-bottom: 1px solid #edf0f2; text-align: right; font-variant-numeric: tabular-nums; }
+.graduation-matrix th, .graduation-matrix td { padding: 9px 12px; border-right: 1px solid var(--grid-line); border-bottom: 1px solid var(--grid-line); text-align: right; font-variant-numeric: tabular-nums; }
 .graduation-matrix th:first-child { position: sticky; left: 0; z-index: 1; background: #f7f9fa; text-align: left; }
 .graduation-matrix thead th { background: #f7f9fa; color: #000000; }
 
@@ -907,7 +927,7 @@
   background: #fff;
 }
 .graduation-period-context label { display: grid; min-width: min(320px, 100%); gap: 5px; color: #000000; font-size: 13px; font-weight: 600; }
-.graduation-period-context select { height: 36px; border: 1px solid #cfd6db; border-radius: 3px; background: #fff; padding: 0 10px; color: #000000; font: inherit; }
+.graduation-period-context select { height: 36px; border: 1px solid var(--field-border); border-radius: 3px; background: #fff; padding: 0 10px; color: #000000; font: inherit; }
 .graduation-period-context > div { display: grid; justify-items: end; gap: 3px; font-size: 13px; }
 .graduation-period-context > div span { color: #000000; }
 .graduation-table-section { margin-top: 8px; }
@@ -971,8 +991,8 @@
 .graduation-import__errors th,
 .graduation-import__errors td {
   padding: 6px 9px;
-  border-right: 1px solid #edf0f2;
-  border-bottom: 1px solid #edf0f2;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
   text-align: left;
 }
 

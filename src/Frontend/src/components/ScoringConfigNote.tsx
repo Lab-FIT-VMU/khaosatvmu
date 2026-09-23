@@ -1,7 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { Info } from 'lucide-react';
 import { useAuth } from '../auth/authContext';
-import { isUnrestrictedRole } from '../auth/roles';
+import { seesAllData } from '../auth/roles';
 import { useScoringThresholds } from '../hooks/useScoringThresholds';
 import '../styles/scoring-config-note.css';
 
@@ -14,7 +14,8 @@ import '../styles/scoring-config-note.css';
  * Đọc từ cache dùng chung của useScoringThresholds, nên lưu cấu hình ở nút Cập nhật
  * điểm hoặc nhận thông báo người khác vừa đổi là dòng này đổi theo ngay.
  *
- * Tạm thời chỉ hiện cho admin hệ thống và admin khảo sát.
+ * Tạm thời chỉ hiện cho các vai trò xem được toàn trường: admin hệ thống, admin khảo
+ * sát và Ban Giám hiệu.
  */
 type ScoringConfigNoteProps = {
   children?: ReactNode;
@@ -24,7 +25,7 @@ export const ScoringConfigNote: React.FC<ScoringConfigNoteProps> = ({ children }
   const { activeProfile } = useAuth();
   const thresholds = useScoringThresholds();
 
-  if (!isUnrestrictedRole(activeProfile?.roleCode)) return null;
+  if (!seesAllData(activeProfile?.roleCode)) return null;
 
   return (
     <p className="scoring-config-note">
@@ -32,9 +33,10 @@ export const ScoringConfigNote: React.FC<ScoringConfigNoteProps> = ({ children }
       <span>
         {children ?? (
           <>
-            Số liệu chỉ gộp lớp qua cả hai tiêu chí: tỷ lệ phản hồi ≥{' '}
+            Số liệu chỉ sử dụng dữ liệu các phiếu của các lớp, bộ môn và khoa/viện hợp lệ
+            (đảm bảo hai tiêu chí: tỷ lệ phản hồi ≥{' '}
             <strong>{thresholds.minimumResponseRate}%</strong> và tỷ lệ phiếu hợp lệ ≥{' '}
-            <strong>{thresholds.minimumValidRate}%</strong>. Cấu hình này đổi được ở nút Cập
+            <strong>{thresholds.minimumValidRate}%</strong>). Cấu hình này đổi được ở nút Cập
             nhật điểm.
           </>
         )}

@@ -13,8 +13,8 @@ import { TablePagination } from '../components/TablePagination';
 import { ExportDropdown } from '../components/ExportDropdown';
 import { ApiError } from '../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
-import type { SemesterSurvey } from '../types';
 import type { SectionStatisticsRow, SemesterSurveyStatistics } from '../services/surveyApi';
+import { useSemesterSurveys } from '../hooks/useSemesterSurveys';
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
 import { buildReportHash } from './reportRoute';
 import { UpdateScoresButton } from '../components/UpdateScoresButton';
@@ -30,7 +30,9 @@ import { foldVietnamese } from '../utils/vietnamese';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
+import { formatDecimal, formatDecimalOrDash, formatPercent } from '../utils/formatNumber';
 import {
+  campaignPlaceholder,
   getActiveSemesterSurveyId,
   selectAvailableSemesterSurveyId,
   setActiveSemesterSurveyId,
@@ -46,10 +48,12 @@ import {
   bên ngoài thì lần đầu vào trang ô chọn bung ra không còn hình hài gì.
 */
 const campaignSelectCss = `
-.campaign-select { position: relative; flex: 0 0 460px; min-width: 0; }
+/* Co lại được: cố định 460px thì khi phóng to trình duyệt, thanh công cụ hết chỗ
+   và nút Cập nhật điểm bị đẩy xuống dòng thứ hai. */
+.campaign-select { position: relative; flex: 0 1 380px; min-width: 200px; }
 .campaign-select__trigger {
   width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #000000;
+  padding: 6px 10px; border: 1px solid var(--field-border); background: #fff; color: #000000;
   font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .campaign-select__trigger:disabled { background: #f4f6f8; color: #8c969f; cursor: not-allowed; }
@@ -58,7 +62,7 @@ const campaignSelectCss = `
 .campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #000000; }
 .campaign-select__list {
   position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none;
-  overflow-y: auto; border: 1px solid #d7dee2; background: #fff;
+  overflow-y: auto; border: 1px solid var(--field-border); background: #fff;
   box-shadow: 0 8px 24px rgba(15,30,45,.16);
 }
 .campaign-select__option {
@@ -80,7 +84,7 @@ const campaignSelectCss = `
 }
 .campaign-select__empty { padding: 10px 12px; color: #000000; font-size: 13px; text-align: center; }
 .campaign-select__hint {
-  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid #d7dee2;
+  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid var(--field-border);
   background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #000000;
   font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: none;
 }
@@ -250,7 +254,11 @@ export const SurveyStatisticsPage: React.FC = () => {
     if (activeSemesterId) setSemesterId(String(activeSemesterId));
   }, [activeSemesterId]);
 
-  const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
+  const {
+    semesterSurveys,
+    loading: campaignsLoading,
+    error: campaignsError,
+  } = useSemesterSurveys(semesterId);
   const [semesterSurveyId, setSemesterSurveyId] = useState<string>(getActiveSemesterSurveyId);
   const [statistics, setStatistics] = useState<SemesterSurveyStatistics | null>(null);
 
@@ -262,31 +270,19 @@ export const SurveyStatisticsPage: React.FC = () => {
   // trang báo cáo luôn nói cùng một con số.
   const thresholds = useScoringThresholds();
 
-  // Đổi học kỳ thì nạp lại danh sách đợt khảo sát của kỳ đó.
+  // Danh sách đợt do useSemesterSurveys lo; ở đây chỉ chọn lại đợt cho khớp danh sách.
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      if (!semesterId) {
-        setSemesterSurveys([]);
-        setSemesterSurveyId('');
-        setStatistics(null);
-        return;
-      }
-      try {
-        const next = await surveyApi.semesterSurveys(Number(semesterId));
-        if (cancelled) return;
-        setSemesterSurveys(next);
-        setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(next, current));
-        setLoadError(null);
-      } catch (error) {
-        if (!cancelled) setLoadError(messageFrom(error));
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [semesterId]);
+    if (!semesterId) {
+      setSemesterSurveyId('');
+      setStatistics(null);
+      return;
+    }
+    setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(semesterSurveys, current));
+  }, [semesterId, semesterSurveys]);
+
+  useEffect(() => {
+    if (campaignsError) setLoadError(messageFrom(campaignsError));
+  }, [campaignsError]);
 
   const loadStatistics = useCallback(async () => {
     if (!semesterSurveyId) {
@@ -407,19 +403,19 @@ export const SurveyStatisticsPage: React.FC = () => {
         // Tỷ lệ phản hồi = số phiếu đã thu ÷ tổng số phiếu phải thu. Cột completionRate của API tính
         // theo phiếu hợp lệ nên không dùng lại được, phải tự tính.
         key: 'responseRate',
-        value: (row) => `${responseRateOf(row.totalResponseCount, row.classSize).toFixed(1)}%`,
+        value: (row) => `${formatPercent(responseRateOf(row.totalResponseCount, row.classSize), 3)}`,
         sortValue: (row) => responseRateOf(row.totalResponseCount, row.classSize),
       },
       {
         key: 'validRate',
         value: (row) =>
-          `${validRateOf(row.validResponseCount, row.totalResponseCount).toFixed(1)}%`,
+          `${formatPercent(validRateOf(row.validResponseCount, row.totalResponseCount), 3)}`,
         sortValue: (row) => validRateOf(row.validResponseCount, row.totalResponseCount),
       },
       {
         key: 'averageScore',
         // Ô trống hiện "—" trong menu, và luôn bị đẩy xuống cuối khi sắp xếp.
-        value: (row) => (row.averageScore === null ? '—' : row.averageScore.toFixed(2)),
+        value: (row) => (formatDecimalOrDash(row.averageScore, 3)),
         sortValue: (row) => row.averageScore,
       },
       {
@@ -531,9 +527,9 @@ export const SurveyStatisticsPage: React.FC = () => {
               width: 12,
               type: 'number' as const,
               align: 'right' as const,
-              numberFormat: '0.0"%"',
+              numberFormat: '0.000"%"',
               format: (_: unknown, row: SectionStatisticsRow) =>
-                Number(responseRateOf(row.totalResponseCount, row.classSize).toFixed(1)),
+                Number(responseRateOf(row.totalResponseCount, row.classSize).toFixed(3)),
             },
             {
               key: 'validRate',
@@ -541,9 +537,9 @@ export const SurveyStatisticsPage: React.FC = () => {
               width: 12,
               type: 'number' as const,
               align: 'right' as const,
-              numberFormat: '0.0"%"',
+              numberFormat: '0.000"%"',
               format: (_: unknown, row: SectionStatisticsRow) =>
-                Number(validRateOf(row.validResponseCount, row.totalResponseCount).toFixed(1)),
+                Number(validRateOf(row.validResponseCount, row.totalResponseCount).toFixed(3)),
             },
             ...columns.map((column) => ({
               key: `c_${column.questionId}`,
@@ -552,7 +548,7 @@ export const SurveyStatisticsPage: React.FC = () => {
               align: 'right' as const,
               format: (_: unknown, row: SectionStatisticsRow) => {
                 const score = row.questionScores.find((item) => item.questionId === column.questionId);
-                return score?.answerCount ? score.averageScore.toFixed(2) : '—';
+                return score?.answerCount ? formatDecimal(score.averageScore, 3) : '—';
               },
             })),
             {
@@ -561,7 +557,7 @@ export const SurveyStatisticsPage: React.FC = () => {
               width: 12,
               align: 'right' as const,
               format: (_: unknown, row: SectionStatisticsRow) => {
-                if (row.averageScore !== null) return row.averageScore.toFixed(2);
+                if (row.averageScore !== null) return formatDecimal(row.averageScore, 3);
                 return hasEnoughResponsesToScore(
                   row.classSize,
                   row.totalResponseCount,
@@ -633,7 +629,7 @@ export const SurveyStatisticsPage: React.FC = () => {
               setActiveSemesterSurveyId(value);
             }}
             disabled={semesterSurveys.length === 0}
-            placeholder={semesterSurveys.length === 0 ? 'Chưa có đợt nào' : 'Chọn đợt khảo sát'}
+            placeholder={campaignPlaceholder(campaignsLoading, semesterSurveys.length)}
             options={semesterSurveys.map((survey) => ({
               value: String(survey.semesterSurveyId),
               label: `${survey.surveyName} · ${survey.sectionSurveyCount} lớp`,
@@ -743,7 +739,8 @@ export const SurveyStatisticsPage: React.FC = () => {
           <span className="catalog-result-count" aria-live="polite">
             {filteredRows.length} kết quả
           </span>
-          <div className="statistics-filter-options" role="group" aria-label="Nhóm lớp học phần">
+          {/* Radio chứ không phải checkbox: mỗi lần chỉ xem ĐÚNG một nhóm lớp. */}
+          <div className="statistics-filter-options" role="radiogroup" aria-label="Nhóm lớp học phần">
             {([
               ['all', 'Toàn bộ'],
               ['eligible', 'Các lớp học phần đủ điều kiện'],
@@ -751,7 +748,8 @@ export const SurveyStatisticsPage: React.FC = () => {
             ] as const).map(([value, label]) => (
               <label key={value} className="statistics-filter-option">
                 <input
-                  type="checkbox"
+                  type="radio"
+                  name="statistics-eligibility-filter"
                   checked={eligibilityFilter === value}
                   onChange={() => setEligibilityFilter(value)}
                 />
@@ -912,10 +910,10 @@ export const SurveyStatisticsPage: React.FC = () => {
                       {row.invalidResponseCount}
                     </td>
                     <td className={`num col-metric${responseRate < thresholds.minimumResponseRate ? ' is-flagged' : ''}`}>
-                      {responseRate.toFixed(1)}%
+                      {formatPercent(responseRate, 3)}
                     </td>
                     <td className={`num col-metric${validRate < thresholds.minimumValidRate ? ' is-flagged' : ''}`}>
-                      {validRate.toFixed(1)}%
+                      {formatPercent(validRate, 3)}
                     </td>
                     {columns.map((column) => {
                       const score = scoreByQuestion.get(column.questionId);
@@ -929,7 +927,7 @@ export const SurveyStatisticsPage: React.FC = () => {
                               : 'num col-question'
                           }
                         >
-                          {value === null ? '—' : value.toFixed(2)}
+                          {formatDecimalOrDash(value, 3)}
                         </td>
                       );
                     })}
@@ -959,7 +957,7 @@ export const SurveyStatisticsPage: React.FC = () => {
                           '—'
                         )
                       ) : (
-                        row.averageScore.toFixed(2)
+                        formatDecimal(row.averageScore, 3)
                       )}
                     </td>
                     <td className="num col-right col-right-2">{row.openCommentCount ?? 0}</td>

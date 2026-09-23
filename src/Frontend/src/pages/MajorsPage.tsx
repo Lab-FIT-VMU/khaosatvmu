@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import { useAuth } from '../auth/authContext';
-import { canCreateOrDeleteCatalog } from '../auth/roles';
+import { canCreateOrDeleteCatalog, isReadOnlyRole } from '../auth/roles';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { MajorImportDialog } from '../components/MajorImportDialog';
@@ -45,6 +45,8 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
   // Thêm và xoá là việc của quản trị; trưởng bộ môn và giảng viên chỉ xem và sửa.
   const { activeProfile } = useAuth();
   const canManageCatalog = canCreateOrDeleteCatalog(activeProfile?.roleCode);
+  // Vai trò chỉ đọc (giảng viên, Ban Giám hiệu) không sửa được gì, nên ẩn cả nút Sửa.
+  const readOnly = isReadOnlyRole(activeProfile?.roleCode);
   const [search, setSearch] = useState('');
   const [facultyFilter, setFacultyFilter] = useState('');
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -161,36 +163,40 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
       filterValue: (item) => facultyNameOf(item.facultyId),
       render: (item) => facultyNameOf(item.facultyId),
     },
-    {
-      key: 'actions',
-      header: 'Hành động',
-      width: '12%',
-      render: (item) => (
-        <div className="catalog-actions">
-          <button
-            type="button"
-            className="catalog-icon-button"
-            onClick={() => openEdit(item)}
-            aria-label={`Sửa ${item.majorName}`}
-            title="Sửa"
-          >
-            <Pencil aria-hidden="true" size={15} />
-          </button>
-          {canManageCatalog && (
+  ];
+
+  // Bỏ hẳn cả cột cho vai trò chỉ đọc, không để lại một cột trống.
+  if (!readOnly) {
+    columns.push({
+        key: 'actions',
+        header: 'Hành động',
+        width: '12%',
+        render: (item) => (
+          <div className="catalog-actions">
             <button
               type="button"
-              className="catalog-icon-button catalog-icon-button--danger"
-              onClick={() => setToDelete(item)}
-              aria-label={`Xóa ${item.majorName}`}
-              title="Xóa"
+              className="catalog-icon-button"
+              onClick={() => openEdit(item)}
+              aria-label={`Sửa ${item.majorName}`}
+              title="Sửa"
             >
-              <Trash2 aria-hidden="true" size={15} />
+              <Pencil aria-hidden="true" size={15} />
             </button>
-          )}
-        </div>
-      ),
-    },
-  ];
+            {canManageCatalog && (
+              <button
+                type="button"
+                className="catalog-icon-button catalog-icon-button--danger"
+                onClick={() => setToDelete(item)}
+                aria-label={`Xóa ${item.majorName}`}
+                title="Xóa"
+              >
+                <Trash2 aria-hidden="true" size={15} />
+              </button>
+            )}
+          </div>
+        ),
+    });
+  }
 
   return (
     <div className="catalog-page">
@@ -212,13 +218,6 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
           fileName: 'danh-sach-nganh-dao-tao',
           subInstitution: 'PHÒNG ĐÀO TẠO',
         }}
-        filterOptions={[
-          { label: 'Tất cả khoa / viện', value: '' },
-          ...faculties.map((faculty) => ({
-            label: faculty.facultyName,
-            value: String(faculty.facultyId),
-          })),
-        ]}
         currentFilter={facultyFilter}
         onFilterChange={setFacultyFilter}
         onAddNew={canManageCatalog ? openCreate : undefined}

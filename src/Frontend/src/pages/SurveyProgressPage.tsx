@@ -24,6 +24,7 @@ import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
 import {
+  campaignPlaceholder,
   getActiveSemesterSurveyId,
   selectAvailableSemesterSurveyId,
   setActiveSemesterSurveyId,
@@ -39,10 +40,12 @@ import {
   bên ngoài thì lần đầu vào trang ô chọn bung ra không còn hình hài gì.
 */
 const campaignSelectCss = `
-.campaign-select { position: relative; flex: 0 0 460px; min-width: 0; }
+/* Co lại được: cố định 460px thì khi phóng to trình duyệt, thanh công cụ hết chỗ
+   và nút Cập nhật điểm bị đẩy xuống dòng thứ hai. */
+.campaign-select { position: relative; flex: 0 1 380px; min-width: 200px; }
 .campaign-select__trigger {
   width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #000000;
+  padding: 6px 10px; border: 1px solid var(--field-border); background: #fff; color: #000000;
   font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .campaign-select__trigger:disabled { background: #f4f6f8; color: #8c969f; cursor: not-allowed; }
@@ -51,7 +54,7 @@ const campaignSelectCss = `
 .campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #000000; }
 .campaign-select__list {
   position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none;
-  overflow-y: auto; border: 1px solid #d7dee2; background: #fff;
+  overflow-y: auto; border: 1px solid var(--field-border); background: #fff;
   box-shadow: 0 8px 24px rgba(15,30,45,.16);
 }
 .campaign-select__option {
@@ -73,7 +76,7 @@ const campaignSelectCss = `
 }
 .campaign-select__empty { padding: 10px 12px; color: #000000; font-size: 13px; text-align: center; }
 .campaign-select__hint {
-  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid #d7dee2;
+  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid var(--field-border);
   background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #000000;
   font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: none;
 }
@@ -263,7 +266,7 @@ const progressColumns = [
     width: 12,
     type: 'number' as const,
     align: 'right' as const,
-    numberFormat: '0"%"',
+    numberFormat: '0.000"%"',
   },
   { key: 'status', header: 'Trạng thái', width: 14, align: 'center' as const },
 ];
@@ -585,7 +588,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
                   setActiveSemesterSurveyId(value);
                 }}
                 disabled={semesterSurveys.length === 0}
-                placeholder={semesterSurveys.length === 0 ? 'Chưa có đợt nào' : 'Chọn đợt khảo sát'}
+                placeholder={campaignPlaceholder(isLoading, semesterSurveys.length)}
                 options={semesterSurveys.map((survey) => ({
                   value: String(survey.semesterSurveyId),
                   label: `${survey.surveyName} · ${survey.sectionSurveyCount} lớp`,

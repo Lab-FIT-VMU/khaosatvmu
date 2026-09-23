@@ -269,7 +269,14 @@ public sealed record SemesterSurveyDepartmentSummaryDto(
     int SchoolSectionCount,
     int SchoolResponseCount,
     decimal? SchoolAverageScore,
-    int SchoolWarningCount);
+    int SchoolWarningCount,
+    /// <summary>Các mục của bộ câu hỏi của đợt, theo thứ tự trên phiếu — để giao diện dựng ô chọn.</summary>
+    IReadOnlyList<NormalizationQuestionSectionDto> QuestionSections,
+    /// <summary>
+    /// Mục đang dùng để tính điểm và Z-Score; null là toàn bộ bài khảo sát. Khi có
+    /// mục, điểm của mỗi lớp chỉ gộp các câu thuộc mục đó.
+    /// </summary>
+    int? QuestionSectionId);
 
 // -------------------- Sheet 4: tách nguyên nhân học phần / giảng viên
 
@@ -319,7 +326,14 @@ public sealed record SemesterSurveyCourseDiagnosisDto(
     string TemplateName,
     string SemesterName,
     string AcademicYearName,
-    IReadOnlyList<CourseDiagnosisRowDto> Rows);
+    IReadOnlyList<CourseDiagnosisRowDto> Rows,
+    /// <summary>Các mục của bộ câu hỏi của đợt, theo thứ tự trên phiếu — để giao diện dựng ô chọn.</summary>
+    IReadOnlyList<NormalizationQuestionSectionDto> QuestionSections,
+    /// <summary>
+    /// Mục đang dùng để tính điểm và Z-Score; null là toàn bộ bài khảo sát. Khi có
+    /// mục, điểm của mỗi lớp chỉ gộp các câu thuộc mục đó.
+    /// </summary>
+    int? QuestionSectionId);
 
 public sealed record ScopeAnalysisOptionDto(
     int Value,
@@ -985,7 +999,8 @@ public interface ISurveyService
     /// <summary>Tổng hợp theo bộ môn của một đợt khảo sát, phục vụ trưởng khoa.</summary>
     Task<SurveyOperationResult<SemesterSurveyDepartmentSummaryDto>> GetSemesterSurveyDepartmentSummaryAsync(
         int semesterSurveyId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? questionSectionId = null);
 
     /// <summary>
     /// So các lớp trong cùng một học phần để tách nguyên nhân: vấn đề thuộc học
@@ -993,7 +1008,8 @@ public interface ISurveyService
     /// </summary>
     Task<SurveyOperationResult<SemesterSurveyCourseDiagnosisDto>> GetSemesterSurveyCourseDiagnosisAsync(
         int semesterSurveyId,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        int? questionSectionId = null);
 
     /// <summary>Chi tiết điểm theo từng câu hỏi của một khoa, bộ môn hoặc học phần.</summary>
     Task<SurveyOperationResult<SurveyScopeAnalysisDto>> GetSurveyScopeAnalysisAsync(

@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import { useAuth } from '../auth/authContext';
-import { canCreateOrDeleteCatalog } from '../auth/roles';
+import { canCreateOrDeleteCatalog, isReadOnlyRole } from '../auth/roles';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { DepartmentImportDialog } from '../components/DepartmentImportDialog';
@@ -53,6 +53,8 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
   // Thêm và xoá là việc của quản trị; trưởng bộ môn và giảng viên chỉ xem và sửa.
   const { activeProfile } = useAuth();
   const canManageCatalog = canCreateOrDeleteCatalog(activeProfile?.roleCode);
+  // Vai trò chỉ đọc (giảng viên, Ban Giám hiệu) không sửa được gì, nên ẩn cả nút Sửa.
+  const readOnly = isReadOnlyRole(activeProfile?.roleCode);
   const [search, setSearch] = useState('');
   // Ô lọc theo khoa/viện đã bỏ khỏi thanh công cụ; cột Khoa/viện vẫn lọc được
   // bằng menu lọc trên chính tiêu đề cột.
@@ -203,36 +205,40 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
         <span className="catalog-cell-primary">{lecturerCountOf(row.departmentId)}</span>
       ),
     },
-    {
-      key: 'actions',
-      header: 'Hành động',
-      width: '10%',
-      render: (row) => (
-        <div className="catalog-actions">
-          <button
-            type="button"
-            className="catalog-icon-button"
-            onClick={() => openEdit(row)}
-            aria-label={`Sửa ${row.departmentName}`}
-            title="Sửa"
-          >
-            <Pencil aria-hidden="true" size={15} />
-          </button>
-          {canManageCatalog && (
+  ];
+
+  // Bỏ hẳn cả cột cho vai trò chỉ đọc, không để lại một cột trống.
+  if (!readOnly) {
+    columns.push({
+        key: 'actions',
+        header: 'Hành động',
+        width: '10%',
+        render: (row) => (
+          <div className="catalog-actions">
             <button
               type="button"
-              className="catalog-icon-button catalog-icon-button--danger"
-              onClick={() => setToDelete(row)}
-              aria-label={`Xóa ${row.departmentName}`}
-              title="Xóa"
+              className="catalog-icon-button"
+              onClick={() => openEdit(row)}
+              aria-label={`Sửa ${row.departmentName}`}
+              title="Sửa"
             >
-              <Trash2 aria-hidden="true" size={15} />
+              <Pencil aria-hidden="true" size={15} />
             </button>
-          )}
-        </div>
-      ),
-    },
-  ];
+            {canManageCatalog && (
+              <button
+                type="button"
+                className="catalog-icon-button catalog-icon-button--danger"
+                onClick={() => setToDelete(row)}
+                aria-label={`Xóa ${row.departmentName}`}
+                title="Xóa"
+              >
+                <Trash2 aria-hidden="true" size={15} />
+              </button>
+            )}
+          </div>
+        ),
+    });
+  }
 
   return (
     <div className="catalog-page">

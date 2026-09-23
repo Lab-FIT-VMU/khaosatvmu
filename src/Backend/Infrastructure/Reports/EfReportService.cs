@@ -1,4 +1,4 @@
-using Application.Reports;
+﻿using Application.Reports;
 using Application.Surveys;
 using Domain;
 using Infrastructure.Persistence;
@@ -76,7 +76,7 @@ public sealed class EfReportService(
         public static readonly ResponseTally Empty = new(0, 0, 0, 0m, false);
 
         public decimal AverageScore =>
-            SnapshotValidCount > 0 ? Math.Round(ValidTotalScore / SnapshotValidCount, 2) : 0m;
+            SnapshotValidCount > 0 ? Math.Round(ValidTotalScore / SnapshotValidCount, 3) : 0m;
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ public sealed class EfReportService(
             .ToDictionary(
                 x => x.QuestionId,
                 x => new QuestionScoreSnapshot(
-                    Math.Round(x.WeightedScore / x.AnswerCount, 2),
+                    Math.Round(x.WeightedScore / x.AnswerCount, 3),
                     x.AnswerCount));
     }
 
@@ -314,7 +314,7 @@ public sealed class EfReportService(
 
             int classSize = sec?.ClassSize ?? 0;
             int responseCount = responseCounts.TryGetValue(ss.CourseSectionSurveyId, out var cnt) ? cnt : 0;
-            decimal rate = classSize > 0 ? Math.Round((decimal)responseCount / classSize * 100, 2) : 0;
+            decimal rate = classSize > 0 ? Math.Round((decimal)responseCount / classSize * 100, 3) : 0;
 
             string status;
             if (rate >= ReportThresholds.CompletedCompletionRate)
@@ -348,7 +348,7 @@ public sealed class EfReportService(
 
         int totalTarget = sectionDetails.Sum(x => x.ClassSize);
         int totalActual = sectionDetails.Sum(x => x.ResponseCount);
-        decimal overallRate = totalTarget > 0 ? Math.Round((decimal)totalActual / totalTarget * 100, 2) : 0;
+        decimal overallRate = totalTarget > 0 ? Math.Round((decimal)totalActual / totalTarget * 100, 3) : 0;
 
         return new OperationalProgressReportDto(
             semester.SemesterId,
@@ -509,13 +509,13 @@ public sealed class EfReportService(
                 tally.TotalCount,
                 tally.ValidCount,
                 tally.TotalCount - tally.ValidCount,
-                classSize > 0 ? Math.Round((decimal)tally.ValidCount / classSize * 100, 1) : 0,
+                classSize > 0 ? Math.Round((decimal)tally.ValidCount / classSize * 100, 3) : 0,
                 tally.AverageScore
             ));
         }
 
         decimal avgScore = scoredValidResponses > 0
-            ? Math.Round(scoredScoreSum / scoredValidResponses, 2)
+            ? Math.Round(scoredScoreSum / scoredValidResponses, 3)
             : 0;
 
         return new LecturerSectionsSummary(sectionSummaries, validResponses, scoredValidResponses, avgScore);
@@ -820,7 +820,7 @@ public sealed class EfReportService(
             }
 
             decimal facAvgScore = facScoredResponses > 0
-                ? Math.Round(facValidScoreSum / facScoredResponses, 2)
+                ? Math.Round(facValidScoreSum / facScoredResponses, 3)
                 : 0;
 
             var deptSummaries = new List<DepartmentSummaryDto>();
@@ -849,7 +849,7 @@ public sealed class EfReportService(
                 }
 
                 decimal deptAvg = deptScoredResponses > 0
-                    ? Math.Round(deptValidScoreSum / deptScoredResponses, 2)
+                    ? Math.Round(deptValidScoreSum / deptScoredResponses, 3)
                     : 0;
 
                 deptSummaries.Add(new DepartmentSummaryDto(
@@ -998,7 +998,7 @@ public sealed class EfReportService(
             template.SurveyTemplateId,
             template.TemplateName,
             responsesCount,
-            Math.Round(overallAvgScore, 2),
+            Math.Round(overallAvgScore, 3),
             questionRatings
         );
     }
@@ -1253,7 +1253,7 @@ public sealed class EfReportService(
             // Bảng tra cứu chi tiết đọc theo phiếu hợp lệ: phiếu bị lọc vẫn là một
             // lượt nộp nhưng không dùng được vào kết quả nào.
             decimal completionRate = classSize > 0
-                ? Math.Round((decimal)tally.ValidCount / classSize * 100, 1)
+                ? Math.Round((decimal)tally.ValidCount / classSize * 100, 3)
                 : 0;
             // Lớp chưa thu đủ phiếu thì không có điểm để đọc: trả 0 và bảng hiện
             // gạch ngang. Điểm của lớp hai người đánh giá đặt cạnh lớp ba mươi
@@ -1465,6 +1465,11 @@ public sealed class EfReportService(
         int schoolScoredResponses = 0;
         int schoolScoredSectionCount = 0;
         decimal schoolScoredScoreSum = 0;
+        // Điểm trung bình toàn trường lấy trung bình KHÔNG trọng số của điểm từng lớp,
+        // đúng như trang Phân tích chuyên sâu: mỗi LỚP là một quan sát. Trước đây chỗ
+        // này chia theo phiếu nên hai màn hình ra hai con số lệch nhau ở chữ số thứ ba.
+        int schoolAveragedSectionCount = 0;
+        decimal schoolSectionAverageSum = 0;
 
         foreach (var ss in sectionSurveys)
         {
@@ -1489,7 +1494,7 @@ public sealed class EfReportService(
             int classSize = sec?.ClassSize ?? 0;
             // Tiến độ tính trên phiếu hợp lệ: phiếu bị bộ lọc nhiễu loại vẫn là một
             // lượt nộp nhưng không dùng được vào kết quả nào.
-            decimal rate = classSize > 0 ? Math.Round((decimal)cnt / classSize * 100, 2) : 0;
+            decimal rate = classSize > 0 ? Math.Round((decimal)cnt / classSize * 100, 3) : 0;
 
             if (rate >= ReportThresholds.CompletedCompletionRate) completedCount++;
             else if (rate >= ReportThresholds.LaggingCompletionRate) inProgressCount++;
@@ -1504,6 +1509,11 @@ public sealed class EfReportService(
                 schoolScoredSectionCount++;
                 schoolScoredResponses += tally.SnapshotValidCount;
                 schoolScoredScoreSum += tally.ValidTotalScore;
+                if (tally.SnapshotValidCount > 0)
+                {
+                    schoolAveragedSectionCount++;
+                    schoolSectionAverageSum += tally.AverageScore;
+                }
             }
 
             if (reportFacultyId is { } fId)
@@ -1543,9 +1553,9 @@ public sealed class EfReportService(
             int deptCount = departments.Values.Count(d => d.FacultyId == fId);
             int responses = stats.Responses;
             decimal avg = stats.ScoredResponses > 0
-                ? Math.Round(stats.ScoreSum / stats.ScoredResponses, 2)
+                ? Math.Round(stats.ScoreSum / stats.ScoredResponses, 3)
                 : 0;
-            decimal completion = stats.Target > 0 ? Math.Round((decimal)responses / stats.Target * 100, 2) : 0;
+            decimal completion = stats.Target > 0 ? Math.Round((decimal)responses / stats.Target * 100, 3) : 0;
             facultyList.Add(new FacultyOverviewDto(
                 fId,
                 fac?.FacultyName ?? "Chưa thuộc khoa",
@@ -1567,9 +1577,9 @@ public sealed class EfReportService(
                 : "Chưa thuộc khoa";
             int responses = stats.Responses;
             decimal avg = stats.ScoredResponses > 0
-                ? Math.Round(stats.ScoreSum / stats.ScoredResponses, 2)
+                ? Math.Round(stats.ScoreSum / stats.ScoredResponses, 3)
                 : 0;
-            decimal completion = stats.Target > 0 ? Math.Round((decimal)responses / stats.Target * 100, 2) : 0;
+            decimal completion = stats.Target > 0 ? Math.Round((decimal)responses / stats.Target * 100, 3) : 0;
             deptList.Add(new DepartmentOverviewDto(
                 dId,
                 dept?.DepartmentName ?? "Chưa thuộc bộ môn",
@@ -1593,14 +1603,13 @@ public sealed class EfReportService(
         // Phiếu ĐÃ THU đếm cả phiếu bị lọc nhiễu — đó là tiến độ, khác hẳn phiếu hợp lệ.
         int totalSubmittedResponses = sectionSurveys.Sum(x =>
             responseStats.GetValueOrDefault(x.CourseSectionSurveyId, ResponseTally.Empty).TotalCount);
-        decimal overallCompletion = totalTarget > 0 ? Math.Round((decimal)totalResponses / totalTarget * 100, 2) : 0;
-        // Điểm thì ngược lại: chỉ gộp lớp đã thu đủ phiếu (schoolScoredResponses ở
-        // vòng lặp trên), cùng ngưỡng và cùng công thức với facultyStats/deptStats —
-        // trước đây chỗ này cộng thẳng từ mọi lớp nên lớp hai người đánh giá vẫn lọt
-        // vào mặt bằng chung, kéo lệch con số so với chính bảng xếp hạng khoa ngay
-        // bên trên nó.
-        decimal overallAvg = schoolScoredResponses > 0
-            ? Math.Round(schoolScoredScoreSum / schoolScoredResponses, 3)
+        decimal overallCompletion = totalTarget > 0 ? Math.Round((decimal)totalResponses / totalTarget * 100, 3) : 0;
+        // Điểm thì ngược lại: chỉ gộp lớp đã được chốt điểm ở lần tính gần nhất, và
+        // lấy trung bình KHÔNG trọng số của điểm từng lớp — mỗi lớp một quan sát,
+        // đúng bằng "Trung bình toàn trường" của trang Phân tích chuyên sâu. Chia theo
+        // phiếu thì lớp 50 phiếu đè lớp 5 phiếu và hai màn hình ra hai con số khác nhau.
+        decimal overallAvg = schoolAveragedSectionCount > 0
+            ? Math.Round(schoolSectionAverageSum / schoolAveragedSectionCount, 3)
             : 0;
 
         var scoreDistribution = new List<ScoreBandDto>();
@@ -1609,7 +1618,7 @@ public sealed class EfReportService(
         foreach (var band in new[] { 5, 4, 3, 2 })
         {
             int count = bandCountByBand.GetValueOrDefault(band);
-            decimal pct = bandTotal > 0 ? Math.Round((decimal)count / bandTotal * 100, 1) : 0;
+            decimal pct = bandTotal > 0 ? Math.Round((decimal)count / bandTotal * 100, 3) : 0;
             scoreDistribution.Add(new ScoreBandDto(band, ScoreBandLabel(band), count, pct));
         }
 
@@ -1663,7 +1672,7 @@ public sealed class EfReportService(
             semesterComparison,
             totalSubmittedResponses,
             totalTarget > 0
-                ? Math.Round((decimal)totalSubmittedResponses / totalTarget * 100, 1)
+                ? Math.Round((decimal)totalSubmittedResponses / totalTarget * 100, 3)
                 : 0m);
     }
 
@@ -1798,7 +1807,7 @@ public sealed class EfReportService(
                 .Select(option =>
                 {
                     int count = counts.Where(x => x.Value == option.Value).Sum(x => x.Count);
-                    decimal pct = Math.Round((decimal)count / scored * 100, 1);
+                    decimal pct = Math.Round((decimal)count / scored * 100, 3);
                     return new OptionCountDto(option.Value, option.DisplayText, count, pct);
                 })
                 .ToList();
@@ -1807,7 +1816,7 @@ public sealed class EfReportService(
                 qId,
                 questionOrders.GetValueOrDefault(qId),
                 textById.TryGetValue(qId, out var txt) ? txt : $"Câu hỏi #{qId}",
-                Math.Round(sum / scored, 2),
+                Math.Round(sum / scored, 3),
                 total,
                 options,
                 AnswerScaleKinds.Options,
@@ -1915,10 +1924,10 @@ public sealed class EfReportService(
         }
 
         decimal comparisonCompletion = comparisonTarget > 0
-            ? Math.Round((decimal)comparisonResponses / comparisonTarget * 100, 2)
+            ? Math.Round((decimal)comparisonResponses / comparisonTarget * 100, 3)
             : 0;
 
-        decimal currentCompletion = currentTarget > 0 ? Math.Round((decimal)currentResponses / currentTarget * 100, 2) : 0;
+        decimal currentCompletion = currentTarget > 0 ? Math.Round((decimal)currentResponses / currentTarget * 100, 3) : 0;
 
         return new SemesterComparisonDto(
             comparisonSurvey is null ? "semester" : "campaign",
@@ -1932,8 +1941,8 @@ public sealed class EfReportService(
             comparisonResponses,
             comparisonCompletion,
             comparisonAvg,
-            Math.Round(currentCompletion - comparisonCompletion, 2),
-            Math.Round(currentAvg - comparisonAvg, 2));
+            Math.Round(currentCompletion - comparisonCompletion, 3),
+            Math.Round(currentAvg - comparisonAvg, 3));
     }
 
     /// <summary>Chỉ số lõi (chỉ tiêu / phiếu thu / điểm TB) của một học kỳ, dùng cho so sánh.</summary>
@@ -1976,21 +1985,21 @@ public sealed class EfReportService(
         // Điểm chỉ gộp lớp đã thu đủ phiếu — cùng ngưỡng và cùng công thức với mặt
         // bằng hiện tại (overallAvg), để so sánh hai kỳ không bị lệch mốc vì mỗi bên
         // tính theo một quy tắc khác nhau.
-        int scoredResponses = 0;
-        decimal scoredScoreSum = 0;
+        int scoredSectionCount = 0;
+        decimal sectionAverageSum = 0;
         foreach (var section in sectionSurveys)
         {
             if (!tallies.TryGetValue(section.CourseSectionSurveyId, out var tally)) continue;
             var classSize = classSizeBySectionId.GetValueOrDefault(section.CourseSectionId);
-            if (!tally.IsScored)
+            if (!tally.IsScored || tally.SnapshotValidCount == 0)
             {
                 continue;
             }
-            scoredResponses += tally.ValidCount;
-            scoredScoreSum += tally.ValidTotalScore;
+            scoredSectionCount++;
+            sectionAverageSum += tally.AverageScore;
         }
 
-        decimal avg = scoredResponses == 0 ? 0m : Math.Round(scoredScoreSum / scoredResponses, 2);
+        decimal avg = scoredSectionCount == 0 ? 0m : Math.Round(sectionAverageSum / scoredSectionCount, 3);
         return (sectionSurveys.Count, target, responses, avg);
     }
 
@@ -2163,7 +2172,7 @@ public sealed class EfReportService(
             .Select(x => x!.Value)
             .ToList();
 
-        decimal average = values.Count > 0 ? Math.Round((decimal)values.Average(), 2) : 0;
+        decimal average = values.Count > 0 ? Math.Round((decimal)values.Average(), 3) : 0;
 
         // Phân bố theo đúng các mức mà thang này có, không cứng 1..5.
         var distribution = scale.Options
@@ -2171,7 +2180,7 @@ public sealed class EfReportService(
             .Select(option =>
             {
                 int count = values.Count(value => value == option.Value);
-                decimal pct = values.Count > 0 ? Math.Round((decimal)count / values.Count * 100, 1) : 0;
+                decimal pct = values.Count > 0 ? Math.Round((decimal)count / values.Count * 100, 3) : 0;
                 return new OptionCountDto(option.Value, option.DisplayText, count, pct);
             })
             .ToList();
@@ -2239,14 +2248,14 @@ public sealed class EfReportService(
             }
         }
 
-        decimal average = scoredCount > 0 ? Math.Round((decimal)sumScores / scoredCount, 2) : 0;
+        decimal average = scoredCount > 0 ? Math.Round((decimal)sumScores / scoredCount, 3) : 0;
 
         var distribution = scale.Options
             .OrderBy(option => option.Value)
             .Select(option =>
             {
                 int count = countByValue.GetValueOrDefault(option.Value);
-                decimal pct = scoredCount > 0 ? Math.Round((decimal)count / scoredCount * 100, 1) : 0;
+                decimal pct = scoredCount > 0 ? Math.Round((decimal)count / scoredCount * 100, 3) : 0;
                 return new OptionCountDto(option.Value, option.DisplayText, count, pct);
             })
             .ToList();
@@ -2443,7 +2452,7 @@ public sealed class EfReportService(
 
         int totalComments = commentItems.Count;
         decimal commentRate = totalResponses > 0
-            ? Math.Round((decimal)totalComments / totalResponses * 100, 1)
+            ? Math.Round((decimal)totalComments / totalResponses * 100, 3)
             : 0m;
         int sectionCountWithComments = commentItems.Select(x => x.CourseSectionSurveyId).Distinct().Count();
         int lecturerCountWithComments = commentItems

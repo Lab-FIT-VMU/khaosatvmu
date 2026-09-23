@@ -55,7 +55,9 @@ type StatusConfirmation =
  */
 const profileNamingByRole: Record<string, { name: string; suffix: string }> = {
   ADMIN: { name: 'Quản trị hệ thống', suffix: 'AD' },
+  BOARD_OF_DIRECTORS: { name: 'Ban Giám hiệu', suffix: 'GH' },
   DEPARTMENT_MANAGER: { name: 'Trưởng bộ môn', suffix: 'BM' },
+  FACULTY_MANAGER: { name: 'Trưởng khoa/viện', suffix: 'KV' },
   LECTURER: { name: 'Giảng viên', suffix: 'GV' },
   SURVEY_ADMIN: { name: 'Quản trị khảo sát', suffix: 'QT' },
 };
@@ -426,16 +428,33 @@ export function UsersAdminPage() {
   const roleLabelOf = (user: AdminUser) =>
     user.profiles.length === 0 ? 'Chưa có hồ sơ' : rolesOf(user).join(', ');
 
+  /**
+   * Tên lấy từ hồ sơ giảng viên gắn với tài khoản; tài khoản quản trị thuần không có
+   * hồ sơ đó nên lùi về tên hiển thị của tài khoản.
+   */
+  const lecturerNameOf = (user: AdminUser) =>
+    user.lecturerFullName || user.displayName || 'Chưa cập nhật họ tên';
+
   const userColumns = useMemo<FilterableColumn<AdminUser>[]>(() => [
-    { key: 'displayName', value: (user) => user.displayName || 'Chưa cập nhật họ tên' },
+    { key: 'displayName', value: lecturerNameOf },
+    { key: 'departmentName', value: (user) => user.departmentName || '—' },
+    { key: 'facultyName', value: (user) => user.facultyName || '—' },
     { key: 'email', value: (user) => user.email },
     { key: 'status', value: (user) => (user.isActive ? 'Hoạt động' : 'Vô hiệu') },
     {
       key: 'roles',
       value: roleLabelOf,
       values: rolesOf,
-      // Bốn vai trò cố định của hệ thống, cộng mục cho tài khoản chưa được cấp hồ sơ.
-      options: ['Quản trị hệ thống', 'Quản trị khảo sát', 'Trưởng bộ môn', 'Giảng viên', 'Chưa có hồ sơ'],
+      // Sáu vai trò cố định của hệ thống, cộng mục cho tài khoản chưa được cấp hồ sơ.
+      options: [
+        'Quản trị hệ thống',
+        'Quản trị khảo sát',
+        'Ban Giám hiệu',
+        'Trưởng khoa/viện',
+        'Trưởng bộ môn',
+        'Giảng viên',
+        'Chưa có hồ sơ',
+      ],
     },
     { key: 'lastLogin', value: (user) => formatDate(user.lastLoginAt) },
   ], []);
@@ -670,18 +689,20 @@ export function UsersAdminPage() {
               <caption className="admin-visually-hidden">Danh sách tài khoản được phép truy cập hệ thống</caption>
               <thead>
                 <tr>
-                  <th scope="col">{userFilters.filterHeader('displayName', 'Người dùng')}</th>
+                  <th scope="col">{userFilters.filterHeader('displayName', 'Giảng viên')}</th>
+                  <th scope="col">{userFilters.filterHeader('departmentName', 'Bộ môn')}</th>
+                  <th scope="col">{userFilters.filterHeader('facultyName', 'Khoa / Viện')}</th>
                   <th scope="col">{userFilters.filterHeader('email', 'Email')}</th>
                   <th scope="col">{userFilters.filterHeader('status', 'Trạng thái')}</th>
                   <th scope="col">{userFilters.filterHeader('roles', 'Hồ sơ và vai trò')}</th>
                   <th scope="col">{userFilters.filterHeader('lastLogin', 'Đăng nhập gần nhất')}</th>
-                  <th scope="col"><span className="admin-visually-hidden">Thao tác</span></th>
+                  <th scope="col">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="admin-state-row">
+                    <td colSpan={8} className="admin-state-row">
                       <LoaderCircle className="auth-spin" aria-hidden="true" />
                       <strong>Đang tải danh sách người dùng</strong>
                     </td>
@@ -689,7 +710,13 @@ export function UsersAdminPage() {
                 ) : visibleUsers.length ? visibleUsers.map((user) => (
                   <tr key={user.id}>
                     <td>
-                      <strong>{user.displayName || 'Chưa cập nhật họ tên'}</strong>
+                      <strong>{lecturerNameOf(user)}</strong>
+                    </td>
+                    <td>
+                      <span className="admin-cell-subtitle">{user.departmentName || '—'}</span>
+                    </td>
+                    <td>
+                      <span className="admin-cell-subtitle">{user.facultyName || '—'}</span>
                     </td>
                     <td>
                       <span className="admin-cell-subtitle">{user.email}</span>
@@ -734,7 +761,7 @@ export function UsersAdminPage() {
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={6} className="admin-state-row admin-empty-row">
+                    <td colSpan={8} className="admin-state-row admin-empty-row">
                       <UsersRound aria-hidden="true" />
                       <strong>{hasUserFilters ? 'Không có kết quả phù hợp' : 'Chưa có người dùng'}</strong>
                       <span>

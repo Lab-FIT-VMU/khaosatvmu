@@ -52,7 +52,9 @@ public static class GraduationAnalytics2Endpoints
                 return Results.NoContent();
             }
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
-        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+        })
+            .RequireAuthorization(AuthPolicies.GraduationUploadAccess)
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
 
         group.MapPost("/imports/preview", async (
             HttpRequest request,
@@ -68,7 +70,9 @@ public static class GraduationAnalytics2Endpoints
                 return Results.Ok(await catalogResolver.ResolveAsync(parsed, ct));
             }
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
-        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+        })
+            .RequireAuthorization(AuthPolicies.GraduationUploadAccess)
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
 
         group.MapPost("/imports/commit", async (
             HttpRequest request,
@@ -108,7 +112,9 @@ public static class GraduationAnalytics2Endpoints
                 return Results.Ok(result);
             }
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
-        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+        })
+            .RequireAuthorization(AuthPolicies.GraduationUploadAccess)
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
 
         group.MapPost("/explore/summary", async (
             GraduationExploreV3Request request,
@@ -140,6 +146,7 @@ public static class GraduationAnalytics2Endpoints
         {
             GraduationAnalyticsV3ErrorCodes.PeriodNotFound => StatusCodes.Status404NotFound,
             GraduationAnalyticsV3ErrorCodes.ConcurrentReplace => StatusCodes.Status409Conflict,
+            GraduationAnalyticsErrorCodes.OutOfScope => StatusCodes.Status403Forbidden,
             _ => StatusCodes.Status400BadRequest,
         };
         return Results.Json(

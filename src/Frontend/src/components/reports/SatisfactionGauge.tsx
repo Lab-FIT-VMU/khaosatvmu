@@ -1,6 +1,7 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import { scoreColor } from './theme';
+import { formatDecimal } from '../../utils/formatNumber';
 
 interface SatisfactionGaugeProps {
   /** Điểm trung bình toàn trường (thang 5). */
@@ -18,11 +19,11 @@ export const SatisfactionGauge: React.FC<SatisfactionGaugeProps> = ({ score, lab
   const segments = [1, 2, 3, 4, 5];
 
   return (
-    <div className="reports-satisfaction" aria-label={label ? `${label}: ${score.toFixed(2)}/5` : undefined}>
+    <div className="reports-satisfaction" aria-label={label ? `${label}: ${formatDecimal(score, 3)}/5` : undefined}>
       <div className="reports-satisfaction-score">
         <Star className="operation-icon" style={{ color, fill: 'currentColor' }} aria-hidden="true" />
-        <strong style={{ color }}>{score > 0 ? score.toFixed(2) : '—'}</strong>
-        <small>/ 5.0</small>
+        <strong style={{ color }}>{score > 0 ? formatDecimal(score, 3) : '—'}</strong>
+        <small>/ 5,0</small>
       </div>
       <div className="reports-satisfaction-scale" aria-hidden="true">
         {segments.map((segment) => (

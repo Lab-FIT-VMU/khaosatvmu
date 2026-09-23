@@ -71,6 +71,7 @@ import '../styles/reports.css';
 // Thanh chọn học kỳ / đợt dùng .statistics-toolbar nằm trong tệp này.
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
+import { formatDecimal, formatPercent } from '../utils/formatNumber';
 
 /*
   Ô chọn đợt khảo sát, viết riêng cho trang này.
@@ -82,10 +83,12 @@ import '../styles/catalogs.css';
   bên ngoài thì lần đầu vào trang ô chọn bung ra không còn hình hài gì.
 */
 const campaignSelectCss = `
-.campaign-select { position: relative; flex: 0 0 460px; min-width: 0; }
+/* Co lại được: cố định 460px thì khi phóng to trình duyệt, thanh công cụ hết chỗ
+   và nút Cập nhật điểm bị đẩy xuống dòng thứ hai. */
+.campaign-select { position: relative; flex: 0 1 380px; min-width: 200px; }
 .campaign-select__trigger {
   width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #000000;
+  padding: 6px 10px; border: 1px solid var(--field-border); background: #fff; color: #000000;
   font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .campaign-select__trigger:disabled { background: #f4f6f8; color: #8c969f; cursor: not-allowed; }
@@ -94,7 +97,7 @@ const campaignSelectCss = `
 .campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #000000; }
 .campaign-select__list {
   position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none;
-  overflow-y: auto; border: 1px solid #d7dee2; background: #fff;
+  overflow-y: auto; border: 1px solid var(--field-border); background: #fff;
   box-shadow: 0 8px 24px rgba(15,30,45,.16);
 }
 .campaign-select__option {
@@ -116,7 +119,7 @@ const campaignSelectCss = `
 }
 .campaign-select__empty { padding: 10px 12px; color: #000000; font-size: 13px; text-align: center; }
 .campaign-select__hint {
-  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid #d7dee2;
+  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid var(--field-border);
   background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #000000;
   font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: none;
 }
@@ -392,13 +395,13 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
     width: '10%',
     numeric: true,
     sortValue: (item) => item.responseRate,
-    filterValue: (item) => `${item.responseRate.toFixed(1)}%`,
+    filterValue: (item) => `${formatPercent(item.responseRate, 3)}`,
     render: (item) => (
       <span
         className="catalog-cell-number"
         style={{ color: completionColor(item.responseRate), fontWeight: 700 }}
       >
-        {item.responseRate.toFixed(1)}%
+        {formatPercent(item.responseRate, 3)}
       </span>
     ),
   },
@@ -408,8 +411,8 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
     width: '10%',
     numeric: true,
     sortValue: (item) => item.validRate,
-    filterValue: (item) => `${item.validRate.toFixed(1)}%`,
-    render: (item) => <span className="catalog-cell-number">{item.validRate.toFixed(1)}%</span>,
+    filterValue: (item) => `${formatPercent(item.validRate, 3)}`,
+    render: (item) => <span className="catalog-cell-number">{formatPercent(item.validRate, 3)}</span>,
   },
   {
     key: 'averageScore',
@@ -417,10 +420,10 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
     width: '8%',
     numeric: true,
     sortValue: (item) => item.averageScore,
-    filterValue: (item) => item.averageScore.toFixed(2),
+    filterValue: (item) => formatDecimal(item.averageScore, 3),
     render: (item) => (
       <span className="reports-rank-score" style={{ color: scoreColor(item.averageScore) }}>
-        {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'}
+        {item.averageScore > 0 ? formatDecimal(item.averageScore, 3) : '—'}
       </span>
     ),
   },
@@ -454,7 +457,7 @@ const facultyRankExportColumns: ExportColumn<RankedUnit>[] = [
     width: 14,
     type: 'string',
     align: 'right',
-    format: (val: any) => `${Number(val).toFixed(1)}%`,
+    format: (val: any) => `${Number(val).toFixed(3)}%`,
   },
   {
     key: 'validRate',
@@ -462,7 +465,7 @@ const facultyRankExportColumns: ExportColumn<RankedUnit>[] = [
     width: 16,
     type: 'string',
     align: 'right',
-    format: (val: any) => `${Number(val).toFixed(1)}%`,
+    format: (val: any) => `${Number(val).toFixed(3)}%`,
   },
   {
     key: 'averageScore',
@@ -470,7 +473,7 @@ const facultyRankExportColumns: ExportColumn<RankedUnit>[] = [
     width: 14,
     type: 'number',
     align: 'right',
-    format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+    format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
   },
 ];
 
@@ -551,13 +554,13 @@ const departmentRankColumns = (onOpenDetail?: (id: number) => void): Column<Rank
     width: '8%',
     numeric: true,
     sortValue: (item) => item.responseRate,
-    filterValue: (item) => `${item.responseRate.toFixed(1)}%`,
+    filterValue: (item) => `${formatPercent(item.responseRate, 3)}`,
     render: (item) => (
       <span
         className="catalog-cell-number"
         style={{ color: completionColor(item.responseRate), fontWeight: 700 }}
       >
-        {item.responseRate.toFixed(1)}%
+        {formatPercent(item.responseRate, 3)}
       </span>
     ),
   },
@@ -567,8 +570,8 @@ const departmentRankColumns = (onOpenDetail?: (id: number) => void): Column<Rank
     width: '8%',
     numeric: true,
     sortValue: (item) => item.validRate,
-    filterValue: (item) => `${item.validRate.toFixed(1)}%`,
-    render: (item) => <span className="catalog-cell-number">{item.validRate.toFixed(1)}%</span>,
+    filterValue: (item) => `${formatPercent(item.validRate, 3)}`,
+    render: (item) => <span className="catalog-cell-number">{formatPercent(item.validRate, 3)}</span>,
   },
   {
     key: 'averageScore',
@@ -576,10 +579,10 @@ const departmentRankColumns = (onOpenDetail?: (id: number) => void): Column<Rank
     width: '8%',
     numeric: true,
     sortValue: (item) => item.averageScore,
-    filterValue: (item) => item.averageScore.toFixed(2),
+    filterValue: (item) => formatDecimal(item.averageScore, 3),
     render: (item) => (
       <span className="reports-rank-score" style={{ color: scoreColor(item.averageScore) }}>
-        {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'}
+        {item.averageScore > 0 ? formatDecimal(item.averageScore, 3) : '—'}
       </span>
     ),
   },
@@ -614,7 +617,7 @@ const departmentRankExportColumns: ExportColumn<RankedUnit>[] = [
     width: 14,
     type: 'string',
     align: 'right',
-    format: (val: any) => `${Number(val).toFixed(1)}%`,
+    format: (val: any) => `${Number(val).toFixed(3)}%`,
   },
   {
     key: 'validRate',
@@ -622,7 +625,7 @@ const departmentRankExportColumns: ExportColumn<RankedUnit>[] = [
     width: 16,
     type: 'string',
     align: 'right',
-    format: (val: any) => `${Number(val).toFixed(1)}%`,
+    format: (val: any) => `${Number(val).toFixed(3)}%`,
   },
   {
     key: 'averageScore',
@@ -630,7 +633,7 @@ const departmentRankExportColumns: ExportColumn<RankedUnit>[] = [
     width: 14,
     type: 'number',
     align: 'right',
-    format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+    format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
   },
 ];
 
@@ -788,13 +791,13 @@ const RankedCourseTable: React.FC<{
       width: '6%',
       numeric: true,
       sortValue: (item) => item.responseRate,
-      filterValue: (item) => `${item.responseRate.toFixed(1)}%`,
+      filterValue: (item) => `${formatPercent(item.responseRate, 3)}`,
       render: (item) => (
         <span
           className="catalog-cell-number"
           style={{ color: completionColor(item.responseRate), fontWeight: 700 }}
         >
-          {item.responseRate.toFixed(1)}%
+          {formatPercent(item.responseRate, 3)}
         </span>
       ),
     },
@@ -804,8 +807,8 @@ const RankedCourseTable: React.FC<{
       width: '6%',
       numeric: true,
       sortValue: (item) => item.validRate,
-      filterValue: (item) => `${item.validRate.toFixed(1)}%`,
-      render: (item) => <span className="catalog-cell-number">{item.validRate.toFixed(1)}%</span>,
+      filterValue: (item) => `${formatPercent(item.validRate, 3)}`,
+      render: (item) => <span className="catalog-cell-number">{formatPercent(item.validRate, 3)}</span>,
     },
     {
       key: 'averageScore',
@@ -813,10 +816,10 @@ const RankedCourseTable: React.FC<{
       width: '6%',
       numeric: true,
       sortValue: (item) => item.averageScore,
-      filterValue: (item) => item.averageScore.toFixed(2),
+      filterValue: (item) => formatDecimal(item.averageScore, 3),
       render: (item) => (
         <span className="reports-rank-score" style={{ color: scoreColor(item.averageScore) }}>
-          {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'}
+          {item.averageScore > 0 ? formatDecimal(item.averageScore, 3) : '—'}
         </span>
       ),
     },
@@ -863,7 +866,7 @@ const RankedCourseTable: React.FC<{
         width: 14,
         type: 'string' as const,
         align: 'right' as const,
-        format: (val: any) => `${Number(val).toFixed(1)}%`,
+        format: (val: any) => `${Number(val).toFixed(3)}%`,
       },
       {
         key: 'validRate',
@@ -871,7 +874,7 @@ const RankedCourseTable: React.FC<{
         width: 16,
         type: 'string' as const,
         align: 'right' as const,
-        format: (val: any) => `${Number(val).toFixed(1)}%`,
+        format: (val: any) => `${Number(val).toFixed(3)}%`,
       },
       {
         key: 'averageScore',
@@ -879,7 +882,7 @@ const RankedCourseTable: React.FC<{
         width: 14,
         type: 'number' as const,
         align: 'right' as const,
-        format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+        format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
       },
     ],
   }), []);
@@ -1724,7 +1727,7 @@ export const ReportsOverviewPage: React.FC = () => {
         'Giảng viên': lecturerDetail?.fullName,
         'Đơn vị': lecturerDetail ? `${lecturerDetail.departmentName} · ${lecturerDetail.facultyName}` : undefined,
         'Học kỳ': semesterLabel,
-        'Điểm trung bình': lecturerDetail ? `${lecturerDetail.averageScore.toFixed(2)} / 5.0` : undefined,
+        'Điểm trung bình': lecturerDetail ? `${formatDecimal(lecturerDetail.averageScore, 3)} / 5,0` : undefined,
         'Phiếu dùng tính điểm': lecturerDetail?.scoredValidResponseCount.toLocaleString('vi-VN'),
         'Số lớp học phần': lecturerDetail?.courseSectionCount,
       },
@@ -1886,7 +1889,7 @@ export const ReportsOverviewPage: React.FC = () => {
             className="catalog-cell-number"
             style={{ color: completionColor(rate), fontWeight: 700 }}
           >
-            {rate.toFixed(1)}%
+            {formatPercent(rate, 3)}
           </span>
         );
       },
@@ -1895,12 +1898,12 @@ export const ReportsOverviewPage: React.FC = () => {
       key: 'validRate',
       header: 'Tỷ lệ phiếu hợp lệ',
       sortValue: (item) => validRateOf(item.validResponseCount, item.responseCount),
-      filterValue: (item) => `${validRateOf(item.validResponseCount, item.responseCount).toFixed(1)}%`,
+      filterValue: (item) => `${formatPercent(validRateOf(item.validResponseCount, item.responseCount), 3)}`,
       numeric: true,
       width: '5%',
       render: (item) => (
         <span className="catalog-cell-number">
-          {validRateOf(item.validResponseCount, item.responseCount).toFixed(1)}%
+          {formatPercent(validRateOf(item.validResponseCount, item.responseCount), 3)}
         </span>
       ),
     },
@@ -1908,12 +1911,12 @@ export const ReportsOverviewPage: React.FC = () => {
       key: 'averageScore',
       header: 'Điểm trung bình',
       sortValue: (item) => item.averageScore,
-      filterValue: (item) => item.averageScore.toFixed(2),
+      filterValue: (item) => formatDecimal(item.averageScore, 3),
       numeric: true,
       width: '5%',
       render: (item) => (
         <span className="catalog-score" style={{ color: scoreColor(item.averageScore) }}>
-          {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'}
+          {item.averageScore > 0 ? formatDecimal(item.averageScore, 3) : '—'}
         </span>
       ),
     },
@@ -2015,7 +2018,7 @@ export const ReportsOverviewPage: React.FC = () => {
               <span style={{ width: `${Math.min(100, item.completionRate)}%`, background: completionColor(item.completionRate) }} />
             </span>
             <span style={{ color: completionColor(item.completionRate), fontWeight: 700, fontSize: 13 }}>
-              {item.completionRate.toFixed(0)}%
+              {formatPercent(item.completionRate, 3)}
             </span>
           </span>
           <span className="catalog-secondary-value reports-progress-sub">
@@ -2030,10 +2033,10 @@ export const ReportsOverviewPage: React.FC = () => {
       width: '9%',
       numeric: true,
       sortValue: (item) => item.averageScore,
-      filterValue: (item) => item.averageScore.toFixed(2),
+      filterValue: (item) => formatDecimal(item.averageScore, 3),
       render: (item) => (
         <span className="catalog-score" style={{ color: scoreColor(item.averageScore) }}>
-          {item.averageScore > 0 ? item.averageScore.toFixed(2) : '—'}
+          {item.averageScore > 0 ? formatDecimal(item.averageScore, 3) : '—'}
         </span>
       ),
     },
@@ -2192,10 +2195,10 @@ export const ReportsOverviewPage: React.FC = () => {
                     Điểm trung bình
                     <strong style={{ color: scoreColor(lecturerDetail.averageScore) }}>
                       {lecturerDetail.averageScore > 0
-                        ? lecturerDetail.averageScore.toFixed(2)
+                        ? formatDecimal(lecturerDetail.averageScore, 3)
                         : '—'}
                     </strong>
-                    <small>/ 5.0</small>
+                    <small>/ 5,0</small>
                   </span>
                   <span className="reports-exec-stat" title="Phiếu hợp lệ của lớp đủ điều kiện, dùng để tính điểm">
                     Phiếu dùng để tính điểm
@@ -2224,7 +2227,7 @@ export const ReportsOverviewPage: React.FC = () => {
                   info: {
                     'Giảng viên': lecturerDetail.fullName,
                     'Đơn vị': `${lecturerDetail.departmentName} · ${lecturerDetail.facultyName}`,
-                    'Điểm trung bình': `${lecturerDetail.averageScore.toFixed(2)} / 5.0`,
+                    'Điểm trung bình': `${formatDecimal(lecturerDetail.averageScore, 3)} / 5,0`,
                     'Tổng phiếu hợp lệ': lecturerDetail.totalResponses.toLocaleString('vi-VN'),
                     'Số lớp học phần': lecturerDetail.courseSectionCount,
                   },
@@ -2249,7 +2252,7 @@ export const ReportsOverviewPage: React.FC = () => {
                       width: 12,
                       type: 'number' as const,
                       align: 'right' as const,
-                      format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+                      format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
                     },
                   ],
                 }}
@@ -2450,7 +2453,7 @@ export const ReportsOverviewPage: React.FC = () => {
             </span>
             <span className="reports-kpi-item" title="Số phiếu đã thu / tổng số phiếu phải thu">
               Tỷ lệ phản hồi
-              <strong>{kpi.responseRate.toFixed(1)}%</strong>
+              <strong>{formatPercent(kpi.responseRate, 3)}</strong>
             </span>
           </div>
           )}
@@ -2478,7 +2481,7 @@ export const ReportsOverviewPage: React.FC = () => {
                   'Học kỳ': semesterLabel,
                   'Số lớp khảo sát': kpi.classCount,
                   'Tổng số phiếu phải thu': kpi.totalTarget,
-                  'Số phiếu đã thu': `${kpi.totalResponses} (đạt ${kpi.responseRate.toFixed(1)}%)`,
+                  'Số phiếu đã thu': `${kpi.totalResponses} (đạt ${formatPercent(kpi.responseRate, 3)})`,
                   'Số phiếu hợp lệ': kpi.totalCollected,
                   'Số phiếu không hợp lệ': kpi.totalInvalid,
                 },
@@ -2508,7 +2511,7 @@ export const ReportsOverviewPage: React.FC = () => {
                         width: 14,
                         type: 'string' as const,
                         align: 'right' as const,
-                        format: (val: any) => `${Number(val).toFixed(1)}%`,
+                        format: (val: any) => `${Number(val).toFixed(3)}%`,
                       },
                       {
                         key: 'validRate',
@@ -2516,7 +2519,7 @@ export const ReportsOverviewPage: React.FC = () => {
                         width: 16,
                         type: 'string' as const,
                         align: 'right' as const,
-                        format: (val: any) => `${Number(val).toFixed(1)}%`,
+                        format: (val: any) => `${Number(val).toFixed(3)}%`,
                       },
                       {
                         key: 'averageScore',
@@ -2524,14 +2527,14 @@ export const ReportsOverviewPage: React.FC = () => {
                         width: 14,
                         type: 'number' as const,
                         align: 'right' as const,
-                        format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+                        format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
                       },
                     ],
                     data: exportResults,
                   },
                   {
                     sheetName: 'Lop diem thap (<3.50)',
-                    title: '2. DANH SÁCH LỚP CÓ ĐIỂM TRUNG BÌNH THẤP (< 3.50)',
+                    title: '2. DANH SÁCH LỚP CÓ ĐIỂM TRUNG BÌNH THẤP (< 3,50)',
                     subtitle: 'Các lớp cần ban chủ nhiệm khoa và bộ môn phối hợp rà soát',
                     columns: [
                       { key: 'sectionCode', header: 'Mã lớp HP', width: 14, align: 'center' as const },
@@ -2547,7 +2550,7 @@ export const ReportsOverviewPage: React.FC = () => {
                         width: 12,
                         type: 'number' as const,
                         align: 'right' as const,
-                        format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+                        format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
                       },
                     ],
                     data: results.filter((r) => (r.averageScore ?? 0) > 0 && (r.averageScore ?? 0) < 3.5),

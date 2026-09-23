@@ -184,6 +184,10 @@ export interface SemesterSurveyDepartmentSummary {
   schoolResponseCount: number;
   schoolAverageScore: number | null;
   schoolWarningCount: number;
+  /** Các mục của bộ câu hỏi của đợt, theo thứ tự trên phiếu. */
+  questionSections: NormalizationQuestionSection[];
+  /** Mục đang dùng để tính điểm và Z-Score; null là toàn bộ bài khảo sát. */
+  questionSectionId: number | null;
 }
 
 /** Một dòng của bảng chẩn đoán học phần. */
@@ -227,6 +231,10 @@ export interface SemesterSurveyCourseDiagnosis {
   semesterName: string;
   academicYearName: string;
   rows: CourseDiagnosisRow[];
+  /** Các mục của bộ câu hỏi của đợt, theo thứ tự trên phiếu. */
+  questionSections: NormalizationQuestionSection[];
+  /** Mục đang dùng để tính điểm và Z-Score; null là toàn bộ bài khảo sát. */
+  questionSectionId: number | null;
 }
 
 export type SurveyAnalysisScopeType = 'faculty' | 'department' | 'course';
@@ -573,20 +581,32 @@ export const surveyApi = {
         ? `/api/surveys/semester-surveys/${semesterSurveyId}/normalization?questionSectionId=${questionSectionId}`
         : `/api/surveys/semester-surveys/${semesterSurveyId}/normalization`,
     ),
-  /** Tổng hợp theo bộ môn, phục vụ trưởng khoa. */
-  semesterSurveyDepartmentSummary: (semesterSurveyId: number) =>
+  /**
+   * Tổng hợp theo bộ môn, phục vụ trưởng khoa. `questionSectionId` như ở
+   * `semesterSurveyNormalization`: bỏ trống là toàn bộ bài khảo sát.
+   */
+  semesterSurveyDepartmentSummary: (semesterSurveyId: number, questionSectionId?: number | null) =>
     apiRequest<SemesterSurveyDepartmentSummary>(
-      `/api/surveys/semester-surveys/${semesterSurveyId}/department-summary`,
+      questionSectionId
+        ? `/api/surveys/semester-surveys/${semesterSurveyId}/department-summary`
+          + `?questionSectionId=${questionSectionId}`
+        : `/api/surveys/semester-surveys/${semesterSurveyId}/department-summary`,
     ),
   /** Tổng quan toàn trường của một đợt khảo sát. */
   semesterSurveyDashboard: (semesterSurveyId: number) =>
     apiRequest<SemesterSurveyDashboard>(
       `/api/surveys/semester-surveys/${semesterSurveyId}/dashboard`,
     ),
-  /** So các lớp trong cùng một học phần để tách lỗi học phần khỏi lỗi giảng viên. */
-  semesterSurveyCourseDiagnosis: (semesterSurveyId: number) =>
+  /**
+   * So các lớp trong cùng một học phần để tách lỗi học phần khỏi lỗi giảng viên.
+   * `questionSectionId` như ở `semesterSurveyNormalization`.
+   */
+  semesterSurveyCourseDiagnosis: (semesterSurveyId: number, questionSectionId?: number | null) =>
     apiRequest<SemesterSurveyCourseDiagnosis>(
-      `/api/surveys/semester-surveys/${semesterSurveyId}/course-diagnosis`,
+      questionSectionId
+        ? `/api/surveys/semester-surveys/${semesterSurveyId}/course-diagnosis`
+          + `?questionSectionId=${questionSectionId}`
+        : `/api/surveys/semester-surveys/${semesterSurveyId}/course-diagnosis`,
     ),
   semesterSurveyScopeAnalysis: (
     semesterSurveyId: number,

@@ -8,7 +8,21 @@
   --bg-main: #F5F7F8;
   --bg-card: #FFFFFF;
   --border-color: #DFE4E8;
-  
+
+  /*
+    Nét kẻ bảng và viền ô nhập liệu, dùng chung cho mọi trang. Trước đây mỗi bảng tự
+    chọn một sắc xám riêng (#eef2f4, #edf0f2, #e8ecef, #f0f2f4...) nhạt tới mức dò
+    ngang một dòng dài là lạc ô, và hai bảng cạnh nhau lại đậm nhạt khác nhau.
+
+    Ba mức, đậm dần: kẻ ô bên trong bảng — viền ngoài bảng và viền ô nhập — nét ngăn
+    phần cần nhấn (cột ghim, dòng tổng kết). Đổi độ đậm cho toàn hệ thống thì sửa ở
+    ba dòng này.
+  */
+  --grid-line: #a3b1bc;
+  --grid-line-strong: #7d8d9a;
+  --grid-line-emphasis: #66798a;
+  --field-border: var(--grid-line-strong);
+
   --text-dark: #1E293B;
   --text-muted: #64748B;
   --text-light: #94A3B8;
@@ -959,7 +973,7 @@ textarea:focus-visible {
   align-items: center;
   gap: 8px;
   background-color: #F8FAFC;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--field-border);
   padding: 8px 14px;
   border-radius: 0px !important;
   width: 320px;
@@ -982,7 +996,7 @@ textarea:focus-visible {
 .filter-select {
   padding: 8px 12px;
   border-radius: 0px !important;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--field-border);
   font-size: 13px;
   background-color: white;
   outline: none;
@@ -1006,7 +1020,7 @@ textarea:focus-visible {
   color: var(--vmu-navy);
   font-weight: 600;
   padding: 12px 18px;
-  border-bottom: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--grid-line-strong);
   white-space: nowrap;
   font-size: 13px;
   text-transform: uppercase;
@@ -1015,7 +1029,7 @@ textarea:focus-visible {
 
 .vmu-table td {
   padding: 14px 18px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--grid-line);
   color: var(--text-dark);
 }
 
@@ -1141,7 +1155,7 @@ textarea:focus-visible {
   width: 100%;
   padding: 9px 12px;
   border-radius: 0px !important;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--field-border);
   font-size: 14px;
   outline: none;
   font-family: inherit;
@@ -1729,7 +1743,7 @@ textarea:focus-visible {
 
 .admin-table-section {
   background: #FFFFFF;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--grid-line-strong);
   margin-bottom: 24px;
   overflow: hidden;
 }

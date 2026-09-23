@@ -203,7 +203,7 @@
 .public-survey-table th,
 .public-survey-table td {
   padding: 10px 12px;
-  border-bottom: 1px solid #e5eaee;
+  border-bottom: 1px solid var(--grid-line);
   text-align: center;
   vertical-align: middle;
 }
@@ -282,7 +282,7 @@
 .public-survey-text-question textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid #d7dee2;
+  border: 1px solid var(--field-border);
   border-radius: 4px;
   background: #ffffff;
   color: #000000;
@@ -313,7 +313,7 @@
 .public-survey-comments textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid #d7dee2;
+  border: 1px solid var(--field-border);
   border-radius: 4px;
   background: #ffffff;
   color: #000000;
@@ -1168,7 +1168,7 @@
   display: block;
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #d7dee2;
+  border: 1px solid var(--field-border);
   border-radius: 8px;
   background: #ffffff;
   color: #000000;

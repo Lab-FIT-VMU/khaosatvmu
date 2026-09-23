@@ -1,16 +1,17 @@
 export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
-  overview: null,
+  // Mỗi mục trên thanh điều hướng có đúng một quyền, để trang Phân quyền Module bật
+  // tắt được từng mục một. Tên quyền bên backend cũng phải trùng nhãn của mục.
+  overview: 'DASHBOARD_ACCESS',
   progress: 'PROGRESS_ACCESS',
   reports: 'REPORTS_ACCESS',
   'survey-statistics': 'SURVEY_STATISTICS_ACCESS',
   'survey-analysis': 'SURVEY_ANALYSIS_ACCESS',
-  // Chỉ quản trị: vai trò lọc thêm ở Sidebar và App, backend chặn thật. Lấy quyền
-  // mà cả ADMIN lẫn SURVEY_ADMIN đang có sẵn để khỏi phải cấp thêm quyền mới.
-  'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
-  // Giữ hash cũ để bookmark tự chuyển vào module thống nhất.
-  'graduation-analytics-2': 'GRADUATION_ANALYTICS_ACCESS',
-  'graduation-data-upload': 'GRADUATION_ANALYTICS_ACCESS',
+  // Tải lên tách khỏi xem: đây là thao tác ghi trên dữ liệu toàn trường.
+  'graduation-data-upload': 'GRADUATION_UPLOAD_ACCESS',
   'graduation-statistics': 'GRADUATION_ANALYTICS_ACCESS',
+  // Giữ hash cũ để bookmark tự chuyển vào module thống nhất.
+  'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
+  'graduation-analytics-2': 'GRADUATION_ANALYTICS_ACCESS',
   'survey-dashboard': 'SURVEY_DASHBOARD_ACCESS',
   faculties: 'FACULTIES_ACCESS',
   departments: 'DEPARTMENTS_ACCESS',

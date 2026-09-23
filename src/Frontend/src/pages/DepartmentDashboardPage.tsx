@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useSemester } from '../context/semesterContext';
 import { catalogApi, type UnidentifiedLecturerReport } from '../services/catalogApi';
+import { writeSemesterSurveysCache } from '../hooks/useSemesterSurveys';
 import { surveyApi, type DepartmentDashboard } from '../services/surveyApi';
 import type { SemesterSurvey } from '../types';
 import { ExportDropdown } from '../components/ExportDropdown';
@@ -22,6 +23,7 @@ import {
   setActiveSemesterSurveyId,
 } from '../utils/surveySelection';
 import '../styles/dashboard.css';
+import { formatDecimal, formatDecimalOrDash, formatPercent } from '../utils/formatNumber';
 
 interface DepartmentDashboardPageProps {
   onNavigateTab: (tab: string) => void;
@@ -72,8 +74,8 @@ const quickActions: QuickAction[] = [
   },
 ];
 
-const formatScore = (value: number | null) => (value === null ? '—' : value.toFixed(2));
-const formatRate = (value: number) => `${value.toFixed(1)}%`;
+const formatScore = (value: number | null) => (formatDecimalOrDash(value, 3));
+const formatRate = (value: number) => `${formatPercent(value, 3)}`;
 
 export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = ({
   onNavigateTab,
@@ -105,6 +107,8 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
           catalogApi.unidentifiedLecturers(activeSemesterId),
         ]);
         if (cancelled) return;
+        // Ghi vào cache dùng chung để ô chọn Đợt ở các trang khác mở lên là có ngay.
+        writeSemesterSurveysCache(activeSemesterId, surveys);
         setSemesterSurveys(surveys);
         setUnidentified(report);
         setSelectedSurveyId((prev) =>
@@ -232,7 +236,7 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                     maxWidth: 'min(320px, 40vw)',
                     padding: '0 8px',
                     fontSize: '13px',
-                    border: '1px solid #cbd5e1',
+                    border: '1px solid var(--field-border)',
                     borderRadius: '3px',
                     textOverflow: 'ellipsis',
                   }}
@@ -282,13 +286,13 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                       },
                       {
                         metricName: 'Điểm hài lòng trung bình',
-                        deptValue: `${formatScore(metrics.averageScore)} / 5.0`,
-                        schoolValue: `${formatScore(metrics.schoolAverageScore)} / 5.0`,
+                        deptValue: `${formatScore(metrics.averageScore)} / 5,0`,
+                        schoolValue: `${formatScore(metrics.schoolAverageScore)} / 5,0`,
                       },
                       {
                         metricName: 'Số lớp học phần cần lưu ý',
                         deptValue: `${metrics.weakSectionCount} lớp`,
-                        schoolValue: `Ngưỡng điểm < ${metrics.weakScoreThreshold.toFixed(2)}`,
+                        schoolValue: `Ngưỡng điểm < ${formatDecimal(metrics.weakScoreThreshold, 3)}`,
                       },
                       {
                         metricName: 'Số lớp chưa xác định giảng viên',
@@ -352,7 +356,7 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                 {metrics ? metrics.weakSectionCount : '—'}
               </strong>
               <span className="department-metric__compare">
-                Dưới {metrics ? metrics.weakScoreThreshold.toFixed(2) : '—'} điểm
+                Dưới {metrics ? formatDecimal(metrics.weakScoreThreshold, 3) : '—'} điểm
               </span>
             </div>
 

@@ -39,5 +39,15 @@ export const bandLabel = (band: number): string => {
   }
 };
 
-/** Định dạng số theo locale vi-VN. */
-export const formatNumber = (value: number): string => value.toLocaleString('vi-VN');
+/**
+ * Định dạng số dùng chung cả hệ thống, giữ lại ở đây để các module báo cáo không
+ * phải sửa đường import. Bản gốc nằm ở `utils/formatNumber`.
+ */
+export {
+  formatNumber,
+  formatDecimal,
+  formatDecimalOrDash,
+  formatPercent,
+  formatPercentOrDash,
+  formatSigned,
+} from '../../utils/formatNumber';

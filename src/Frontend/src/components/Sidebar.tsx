@@ -145,8 +145,11 @@ export function Sidebar({
       ...group,
       items: group.items.filter(
         (item) =>
+          // Tải lên dữ liệu tốt nghiệp có quyền module riêng (GRADUATION_UPLOAD_ACCESS)
+          // nên không cần lọc thêm theo vai trò ở đây; vai trò chỉ đọc không được cấp
+          // quyền đó, và backend vẫn từ chối nếu ai đó bật nhầm.
           canAccessModule(permissions, item.id)
-          // Bảng điều khiển tạm đóng với giảng viên và trưởng bộ môn.
+          // Bảng điều khiển tạm đóng với giảng viên và các trưởng đơn vị.
           && (item.id !== 'overview' || dashboardAllowed)
       ),
     }))

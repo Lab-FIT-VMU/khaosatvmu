@@ -51,8 +51,9 @@ public sealed class EfScoringThresholdProvider(
         CancellationToken cancellationToken = default)
     {
         // Đổi ngưỡng là đổi tập lớp được tính điểm của cả trường, nên chỉ quản trị.
+        // Ban Giám hiệu thấy toàn trường nhưng không được đổi.
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.SeesEverything)
+        if (!scope.ManagesEverything)
         {
             return new SurveyOperationResult<ScoringThresholds>(
                 false, SurveyErrorCodes.OutOfScope, default);

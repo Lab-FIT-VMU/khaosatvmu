@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Application;
+using Application.Auth;
 using Application.GraduationAnalytics2;
 using Domain;
 using Infrastructure.Persistence;
@@ -17,8 +18,25 @@ namespace Infrastructure.GraduationAnalytics2;
 /// </summary>
 public sealed partial class EfGraduationAnalyticsV3Service(
     AppDbContext db,
-    ICurrentUserAccessor currentUser) : IGraduationAnalyticsV3Service
+    ICurrentUserAccessor currentUser,
+    IUserScopeResolver userScope) : IGraduationAnalyticsV3Service
 {
+    /// <summary>
+    /// Tải lên và xoá đợt là thao tác ghi trên dữ liệu toàn trường. Quyền vào module
+    /// chỉ quyết định mở được trang, nên phải chặn riêng ở đây: Ban Giám hiệu xem được
+    /// module này nhưng chỉ đọc.
+    /// </summary>
+    private async Task EnsureCanWriteAsync(CancellationToken cancellationToken)
+    {
+        var scope = await userScope.ResolveAsync(cancellationToken);
+        if (!scope.ManagesEverything)
+        {
+            throw new GraduationAnalyticsException(
+                GraduationAnalyticsErrorCodes.OutOfScope,
+                "Vai trò của bạn chỉ được xem số liệu tốt nghiệp, không được thay đổi.");
+        }
+    }
+
     /// <summary>Năm học 2018-2019 ứng với khoá 59, mỗi năm sau tăng một khoá.</summary>
     private const int BaseAcademicYearStart = 2018;
     private const int BaseCohortNumber = 59;
@@ -73,6 +91,7 @@ public sealed partial class EfGraduationAnalyticsV3Service(
         ImportGraduationRevisionCommand command,
         CancellationToken cancellationToken)
     {
+        await EnsureCanWriteAsync(cancellationToken);
         ValidateMetadata(command);
         ValidateParsedImport(command.ParsedImport);
 
@@ -348,6 +367,7 @@ public sealed partial class EfGraduationAnalyticsV3Service(
         string reason,
         CancellationToken cancellationToken)
     {
+        await EnsureCanWriteAsync(cancellationToken);
         var normalizedReason = reason.Trim();
         if (normalizedReason.Length is < 3 or > 1000)
         {

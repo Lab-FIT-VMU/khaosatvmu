@@ -2,6 +2,7 @@ import { toast } from 'sonner';
 import type { QuestionRating } from '../types';
 import { applyVmuFontsToPdf } from '../utils/vmuFontHelper';
 import { toVietnameseFileSlug } from '../utils/vietnamese';
+import { formatDecimal, formatPercent } from '../utils/formatNumber';
 
 export type QuestionExportFormat = 'xlsx' | 'docx' | 'pdf' | 'png';
 
@@ -183,7 +184,7 @@ export async function generateQuestionChartImage(
 
   // Điểm trung bình mốc hiển thị ở góc phải header
   if (computedAverage > 0) {
-    const avgText = `${averageLabel}: ${computedAverage.toFixed(2)} / 5.0`;
+    const avgText = `${averageLabel}: ${formatDecimal(computedAverage, 3)} / 5,0`;
     ctx.font = 'bold 12px "Segoe UI", Roboto, Arial, sans-serif';
     const textW = ctx.measureText(avgText).width;
     const badgeX = cssWidth - marginRight - textW - 20;
@@ -274,7 +275,7 @@ export async function generateQuestionChartImage(
         ctx.fillStyle = '#334155';
         ctx.font = 'bold 11px "Segoe UI", Roboto, Arial, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(score.toFixed(2), cx, barY - 6);
+        ctx.fillText(formatDecimal(score, 3), cx, barY - 6);
       }
 
       // Mã câu C1, C2... dưới chân cột
@@ -482,14 +483,14 @@ export async function exportQuestionAnalysisToPdf(options: QuestionAnalysisExpor
       const optCells = optionsList.map((col) => {
         const cell = q.optionDistribution?.find((o) => o.value === col.value);
         if (!cell) return '0 (0%)';
-        return `${cell.count}\n(${cell.percentage.toFixed(0)}%)`;
+        return `${cell.count}\n(${formatPercent(cell.percentage, 3)})`;
       });
 
       return [
         q.code,
         q.questionText,
         ...optCells,
-        q.averageScore > 0 ? q.averageScore.toFixed(2) : '—',
+        q.averageScore > 0 ? formatDecimal(q.averageScore, 3) : '—',
         getScoreRatingText(q.averageScore),
       ];
     });
@@ -882,7 +883,7 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
 
       const optCells = optionsList.map((col) => {
         const cell = q.optionDistribution?.find((o) => o.value === col.value);
-        const cellText = cell ? `${cell.count} (${cell.percentage.toFixed(0)}%)` : '0 (0%)';
+        const cellText = cell ? `${cell.count} (${formatPercent(cell.percentage, 3)})` : '0 (0%)';
         return new TableCell({
           shading: { fill, type: ShadingType.CLEAR },
           children: [
@@ -920,7 +921,7 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
             children: [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
-                children: [new TextRun({ text: q.averageScore > 0 ? q.averageScore.toFixed(2) : '—', bold: true, size: 17 })],
+                children: [new TextRun({ text: q.averageScore > 0 ? formatDecimal(q.averageScore, 3) : '—', bold: true, size: 17 })],
               }),
             ],
           }),
@@ -1242,7 +1243,7 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
       (m4?.percentage ?? 0) / 100,
       m5?.count ?? 0,
       (m5?.percentage ?? 0) / 100,
-      q.averageScore > 0 ? Number(q.averageScore.toFixed(2)) : 0,
+      q.averageScore > 0 ? Number(q.averageScore.toFixed(3)) : 0,
       getScoreRatingText(q.averageScore),
       q.totalAnswers,
     ];

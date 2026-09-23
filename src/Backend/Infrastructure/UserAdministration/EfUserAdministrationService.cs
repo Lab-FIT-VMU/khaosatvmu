@@ -433,14 +433,19 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         return new AdminPage<AdminAuditLogDto>(items, page, pageSize, totalCount);
     }
 
+    /// <summary>
+    /// Trang Phân quyền Module phải đọc y như thanh điều hướng bên trái: cùng thứ tự
+    /// nhóm, cùng thứ tự mục trong nhóm. Hai bảng dưới giữ đúng thứ tự đó — sửa menu
+    /// thì phải sửa cả ở đây, nếu không người phân quyền phải tự dò xem mục nào là mục nào.
+    /// </summary>
     private static readonly Dictionary<string, int> CategoryOrderMap = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Tổng quan"] = 1,
-        ["Báo cáo"] = 2,
+        ["Thống kê tốt nghiệp"] = 2,
         ["Danh mục đào tạo"] = 3,
         ["Khảo sát học phần"] = 4,
         ["Khảo sát chương trình"] = 5,
-        ["Quản trị hệ thống"] = 6
+        ["Quản trị"] = 6
     };
 
     private static int GetCategoryOrder(string category) =>
@@ -448,18 +453,32 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
 
     private static readonly Dictionary<string, int> PermissionOrderMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Nhóm Báo cáo: xếp theo đúng thứ tự bốn mục trên menu bên trái.
-        ["SURVEY_DASHBOARD_ACCESS"] = 1,
-        ["REPORTS_ACCESS"] = 2,
-        ["SURVEY_STATISTICS_ACCESS"] = 3,
-        ["SURVEY_ANALYSIS_ACCESS"] = 4,
-        ["GRADUATION_ANALYTICS_ACCESS"] = 5,
+        // Tổng quan
+        ["DASHBOARD_ACCESS"] = 1,
+        ["SURVEY_DASHBOARD_ACCESS"] = 2,
+        ["PROGRESS_ACCESS"] = 3,
+        ["SURVEY_STATISTICS_ACCESS"] = 4,
+        ["REPORTS_ACCESS"] = 5,
+        ["SURVEY_ANALYSIS_ACCESS"] = 6,
+        // Thống kê tốt nghiệp
+        ["GRADUATION_UPLOAD_ACCESS"] = 1,
+        ["GRADUATION_ANALYTICS_ACCESS"] = 2,
+        // Danh mục đào tạo
         ["FACULTIES_ACCESS"] = 1,
         ["DEPARTMENTS_ACCESS"] = 2,
         ["LECTURERS_ACCESS"] = 3,
         ["MAJORS_ACCESS"] = 4,
-        ["COURSES_ACCESS"] = 5,
-        ["COURSE_SECTIONS_ACCESS"] = 6
+        ["COHORT_MAJORS_ACCESS"] = 5,
+        ["COURSES_ACCESS"] = 6,
+        ["COURSE_SECTIONS_ACCESS"] = 7,
+        // Khảo sát học phần
+        ["COURSE_QUESTION_SETS_ACCESS"] = 1,
+        ["COURSE_CAMPAIGNS_ACCESS"] = 2,
+        // Khảo sát chương trình
+        ["PROGRAM_CAMPAIGNS_ACCESS"] = 1,
+        ["PROGRAM_CRITERIA_ACCESS"] = 2,
+        // Quản trị
+        ["USER_ADMIN_ACCESS"] = 1
     };
 
     private static int GetPermissionOrder(string code) =>
@@ -693,8 +712,11 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
             .ThenBy(x => x.ProfileName)
             .ToListAsync(cancellationToken);
         var profilesByUser = profiles.ToLookup(x => x.UserId);
+        var lecturerInfo = await LoadLecturerInfoAsync(
+            users.Where(x => x.LecturerId != null).Select(x => x.LecturerId!.Value).Distinct().ToList(),
+            cancellationToken);
         return users
-            .Select(user => MapUser(user, profilesByUser[user.Id]))
+            .Select(user => MapUser(user, profilesByUser[user.Id], LecturerInfoOf(lecturerInfo, user)))
             .ToList();
     }
 
@@ -705,7 +727,52 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
             .OrderByDescending(x => x.IsDefault)
             .ThenBy(x => x.ProfileName)
             .ToListAsync(cancellationToken);
-        return MapUser(user, profiles);
+        var lecturerInfo = await LoadLecturerInfoAsync(
+            user.LecturerId is { } lecturerId ? [lecturerId] : [],
+            cancellationToken);
+        return MapUser(user, profiles, LecturerInfoOf(lecturerInfo, user));
+    }
+
+    /// <summary>Tên, bộ môn và khoa/viện của hồ sơ giảng viên gắn với một tài khoản.</summary>
+    private sealed record LecturerInfo(string FullName, string? DepartmentName, string? FacultyName);
+
+    private static LecturerInfo? LecturerInfoOf(
+        IReadOnlyDictionary<int, LecturerInfo> lookup,
+        User user) =>
+        user.LecturerId is { } lecturerId && lookup.TryGetValue(lecturerId, out var info) ? info : null;
+
+    /// <summary>
+    /// Nạp một lần cho cả trang tài khoản thay vì tra từng dòng: bảng này mặc định
+    /// 535 tài khoản, tra lẻ là 535 lượt truy vấn.
+    /// </summary>
+    private async Task<Dictionary<int, LecturerInfo>> LoadLecturerInfoAsync(
+        IReadOnlyCollection<int> lecturerIds,
+        CancellationToken cancellationToken)
+    {
+        if (lecturerIds.Count == 0) return [];
+
+        // Bộ môn và khoa để trống thì vẫn phải trả về tên giảng viên, nên nối trái.
+        var rows = await (
+            from lecturer in db.Lecturers.AsNoTracking()
+            where lecturerIds.Contains(lecturer.LecturerId)
+            join department in db.Departments.AsNoTracking()
+                on lecturer.DepartmentId equals department.DepartmentId into departmentMatches
+            from department in departmentMatches.DefaultIfEmpty()
+            join faculty in db.Faculties.AsNoTracking()
+                on lecturer.FacultyId equals faculty.FacultyId into facultyMatches
+            from faculty in facultyMatches.DefaultIfEmpty()
+            select new
+            {
+                lecturer.LecturerId,
+                lecturer.FullName,
+                DepartmentName = department == null ? null : department.DepartmentName,
+                FacultyName = faculty == null ? null : faculty.FacultyName,
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(
+            x => x.LecturerId,
+            x => new LecturerInfo(x.FullName, x.DepartmentName, x.FacultyName));
     }
 
     private async Task<AdminProfileDto> BuildProfileAsync(
@@ -750,7 +817,10 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
             UpdatedAt = profile.UpdatedAt
         };
 
-    private static AdminUserDto MapUser(User user, IEnumerable<ProfileProjection> profiles) =>
+    private static AdminUserDto MapUser(
+        User user,
+        IEnumerable<ProfileProjection> profiles,
+        LecturerInfo? lecturer) =>
         new(
             user.Id,
             user.Email,
@@ -774,7 +844,10 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
                 x.LastSelectedAt,
                 x.CreatedAt,
                 x.UpdatedAt)).ToList(),
-            user.LecturerId);
+            user.LecturerId,
+            lecturer?.FullName,
+            lecturer?.DepartmentName,
+            lecturer?.FacultyName);
 
     private async Task ClearDefaultProfileAsync(
         Guid userId,
