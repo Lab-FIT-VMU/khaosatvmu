@@ -228,7 +228,12 @@
 .graduation-chart-panel > header > span svg { width: 14px; height: 14px; }
 .graduation-panel-actions { display: flex; align-items: center; gap: 8px; }
 .graduation-panel-actions > span { color: #000000; font-size: 13px; white-space: nowrap; }
-.graduation-panel-actions .graduation-chart-zoom { padding-left: 8px; border-left: 1px solid #cfd9df; color: #52616b; font-weight: 700; }
+.graduation-chart-zoom-controls { display: inline-flex; min-height: 28px; padding-left: 8px; align-items: center; gap: 5px; border-left: 1px solid #cfd9df; }
+.graduation-panel-actions .graduation-chart-zoom { color: #52616b; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.graduation-chart-zoom-controls button { display: inline-grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 1px solid #b9c8d1; border-radius: 3px; background: #fff; color: #075d79; cursor: pointer; }
+.graduation-chart-zoom-controls button:hover:not(:disabled) { border-color: #0788b8; background: #eaf7fb; }
+.graduation-chart-zoom-controls button:disabled { cursor: not-allowed; opacity: .42; }
+.graduation-chart-zoom-controls button svg { width: 15px; height: 15px; stroke-width: 2.4; }
 .graduation-report-export { position: relative; display: inline-flex; }
 .graduation-report-export .export-dropdown-trigger { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .graduation-report-export .export-dropdown-trigger svg { width: 15px; height: 15px; }

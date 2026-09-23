@@ -14,6 +14,7 @@ import {
   History,
   LineChart as LineChartIcon,
   LoaderCircle,
+  Minus,
   PieChart,
   Plus,
   RotateCcw,
@@ -125,9 +126,7 @@ const chartOptions: Array<{ id: GraduationChartType; label: string; icon: typeof
 ];
 
 const chartMetrics: Array<{ id: ExploreChartMetric; label: string }> = [
-  { id: 'studentTotal', label: 'Số sinh viên nhập học' },
   { id: 'graduated', label: 'Đã tốt nghiệp' },
-  { id: 'notGraduated', label: 'Chưa tốt nghiệp' },
   { id: 'onTime', label: 'Tốt nghiệp đúng hạn' },
   { id: 'workStudy', label: 'Hệ VLVH' },
   { id: 'excellent', label: 'Xuất sắc' },
@@ -282,6 +281,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
   const [showChartLabels, setShowChartLabels] = useState(true);
   const [chartZoomPercent, setChartZoomPercent] = useState(100);
   const graduationChartRef = useRef<GraduationEChartHandle>(null);
+  const chartZoomAvailable = chartType !== 'pie' && chartType !== 'donut';
   const [selectedCohorts, setSelectedCohorts] = useState<string[]>([]);
   const [selectedFacultyKeys, setSelectedFacultyKeys] = useState<string[]>([]);
   const [selectedProgramKeys, setSelectedProgramKeys] = useState<string[]>([]);
@@ -884,7 +884,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
               <label className="graduation-builder__check"><input type="checkbox" checked={showChartLabels} onChange={(event) => setShowChartLabels(event.target.checked)} /> Hiển thị nhãn giá trị</label>
             </aside>
             <article className="graduation-chart-panel">
-              <header><div><h2>{selectedGraduationChartTitle}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không phân chuỗi'} · Tỷ lệ trên {usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}; số lượng hiển thị trong tooltip</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span>}</div></header>
+              <header><div><h2>{selectedGraduationChartTitle}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không phân chuỗi'} · Tỷ lệ trên {usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}; số lượng hiển thị trong tooltip</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <div className="graduation-chart-zoom-controls"><button type="button" onClick={() => graduationChartRef.current?.zoomOut()} disabled={!chartZoomAvailable || chartZoomPercent <= 100} title="Thu nhỏ biểu đồ" aria-label="Thu nhỏ biểu đồ"><Minus aria-hidden="true" /></button><span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span><button type="button" onClick={() => graduationChartRef.current?.zoomIn()} disabled={!chartZoomAvailable || chartZoomPercent >= 2000} title="Phóng to biểu đồ" aria-label="Phóng to biểu đồ"><Plus aria-hidden="true" /></button></div>}</div></header>
               {chartModel.data.length > 0 ? <div className="graduation-chart"><GraduationEChart ref={graduationChartRef} type={chartType} data={chartModel.data} series={chartModel.series} unit="percent" showLabels={showChartLabels} onZoomChange={setChartZoomPercent} /></div> : <div className="graduation-chart-empty">{Array.isArray(explore.chartPoints) ? 'Không có dữ liệu phù hợp với cấu hình hiện tại.' : 'Backend API đang dùng phiên bản cũ. Hãy khởi động lại API để sử dụng cấu hình này.'}</div>}
             </article>
           </div>
