@@ -1747,6 +1747,19 @@
   white-space: nowrap;
 }
 
+/*
+  Bảng này chia cột theo % nên phải khoá table-layout: fixed. Để auto thì trình duyệt
+  nong cột theo nội dung: một ý kiến dài là cột Ý kiến khác chiếm hết bảng và dấu ba
+  chấm không bao giờ xuất hiện, vì ô luôn vừa đúng bề ngang của chữ.
+
+  Mười ba cột nên đặt sàn bề ngang rộng hơn mức chung 920px; hẹp hơn nữa thì các cột
+  Mức 1..5 bị bóp đến mức không đọc nổi.
+*/
+.section-responses-page .catalog-table {
+  min-width: 1180px;
+  table-layout: fixed;
+}
+
 /* Bảng phiếu trả lời rất dài nên bóp sát chiều cao dòng: mỗi ô đúng một dòng,
    nội dung đầy đủ nằm trong tooltip. */
 .section-responses-page .catalog-table td {
@@ -1908,16 +1921,44 @@
 .note-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  font-size: 13px;
-  line-height: 1.5;
+  gap: 14px;
+  font-size: 15px;
+  line-height: 1.6;
 }
 
+/*
+  .z-legend nguyên bản là dải chú thích nằm ngang dưới chân bảng, nên nó là
+  flex-row có wrap. Mang nguyên vào hộp thoại thì tiêu đề mục, công thức và bảng
+  ký hiệu bị xếp cạnh nhau rồi tự ngắt dòng bừa — nhìn như ba cột lệch nhau. Ở
+  trong hộp thoại nó phải là các khối xếp dọc.
+*/
 .note-modal-body .z-legend {
+  display: block;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.note-modal-body .z-legend__note {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* Câu dẫn của tab: đứng đầu hộp nên tách hẳn ra khỏi phần công thức bên dưới. */
+.note-modal-body .z-legend__note:first-child {
+  margin-bottom: 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--grid-line);
+  font-size: 15px;
+}
+
+/* Bốn dòng quy ước ở cuối hộp: gom thành một khối xám để tách khỏi công thức. */
+.note-modal-body .formula-note + .z-legend__note {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--grid-line);
 }
 
 /* Bảng lớp trong Danh sách đợt khảo sát dùng chung quy chuẩn tiêu đề với các bảng

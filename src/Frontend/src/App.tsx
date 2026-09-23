@@ -9,6 +9,7 @@ import { getHashRoot } from './pages/reportRoute';
 
 // Shared Components
 import { Header } from './components/Header';
+import { BreadcrumbTrailProvider } from './context/BreadcrumbTrailProvider';
 import { Sidebar } from './components/Sidebar';
 import { ScoringChangeNotifier } from './components/ScoringChangeNotifier';
 
@@ -605,6 +606,7 @@ function DashboardApp() {
 
   // Render Main Dashboard Layout
   return (
+    <BreadcrumbTrailProvider>
     <div className="app-container">
       {/* Navigation Sidebar */}
       <Sidebar
@@ -811,6 +813,7 @@ function DashboardApp() {
         }}
       />
     </div>
+    </BreadcrumbTrailProvider>
   );
 }
 

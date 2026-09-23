@@ -29,6 +29,7 @@ import type { ImportProfileRow } from '../utils/profileImportExcel';
 import { RolePermissionEditor } from '../components/RolePermissionEditor';
 import { UserImportDialog } from '../components/UserImportDialog';
 import { adminApi } from '../services/adminApi';
+import { useSetBreadcrumbTrail } from '../context/breadcrumbTrail';
 import { ApiError } from '../services/apiClient';
 import type {
   AdminAuditLog,
@@ -42,6 +43,13 @@ import '../styles/catalogs.css';
 import '../styles/auth-admin.css';
 
 type AdminView = 'users' | 'audit' | 'permissions';
+
+/** Nhãn của từng chế độ, dùng cho cả tab trên trang lẫn đường dẫn ở thanh trên cùng. */
+const adminViewLabels: Record<AdminView, string> = {
+  users: 'Tài khoản và hồ sơ',
+  audit: 'Nhật ký hệ thống',
+  permissions: 'Phân quyền Module',
+};
 type StatusConfirmation =
   | { type: 'user'; item: AdminUser }
   | { type: 'profile'; item: AdminProfile }
@@ -210,6 +218,9 @@ function messageFrom(error: unknown): string {
 
 export function UsersAdminPage() {
   const [view, setView] = useState<AdminView>('users');
+
+  // Đang ở chế độ nào thì đường dẫn trên thanh trên cùng in tới đó.
+  useSetBreadcrumbTrail([adminViewLabels[view]]);
   const [usersPage, setUsersPage] = useState<AdminPage<AdminUser> | null>(null);
   const [auditPage, setAuditPage] = useState<AdminPage<AdminAuditLog> | null>(null);
   const [roles, setRoles] = useState<AdminRole[]>([]);

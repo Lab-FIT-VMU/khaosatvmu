@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../auth/authContext';
 import { useSemester } from '../context/semesterContext';
+import { useSetBreadcrumbTrail } from '../context/breadcrumbTrail';
 import { DataTable, type Column, type DataTableSortDirection } from '../components/DataTable';
 import { QuestionAnalysisChart } from '../components/QuestionAnalysisChart';
 import { SchoolSurveyOverview } from '../components/reports/SchoolSurveyOverview';
@@ -29,7 +30,8 @@ import { UpdateScoresButton } from '../components/UpdateScoresButton';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { SectionSurveyResponsesPage } from './SectionSurveyResponsesPage';
 import { catalogApi } from '../services/catalogApi';
-import type { ExportColumn } from '../services/exportDataService';
+import type { ExportColumn, ExportSheet, ExportTable } from '../services/exportDataService';
+import { generateQuestionChartImage, getScoreRatingText } from '../services/exportQuestionAnalysisService';
 import { reportApi } from '../services/reportApi';
 import { surveyApi } from '../services/surveyApi';
 import {
@@ -48,6 +50,8 @@ import type {
   Course,
   Lecturer,
   LecturerPerformanceReport,
+  OptionCount,
+  QuestionRating,
   SemesterSurvey,
   SurveyResultDetail,
 } from '../types';
@@ -71,7 +75,7 @@ import '../styles/reports.css';
 // Thanh chọn học kỳ / đợt dùng .statistics-toolbar nằm trong tệp này.
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
-import { formatDecimal, formatPercent } from '../utils/formatNumber';
+import { formatDecimal, formatPercent, formatSigned } from '../utils/formatNumber';
 
 /*
   Ô chọn đợt khảo sát, viết riêng cho trang này.
@@ -315,6 +319,29 @@ const scopeParentWorkspace = (type?: ReportScopeType): ReportWorkspace => {
 const rankedPageSize = 20;
 
 /*
+  Đường dẫn điều hướng in ở dòng thứ hai của tệp xuất, đi từ gốc hệ thống xuống tới
+  đúng chỗ có số liệu — cùng lối với thanh trên cùng của web.
+
+  Khai thành hằng ở cấp module để giữ nguyên tham chiếu mảng: nhét thẳng vào deps của
+  useMemo mà mỗi lần render lại tạo mảng mới thì bảng dựng lại cấu hình xuất vô ích.
+*/
+const reportRootBreadcrumb = ['Thống kê & Báo cáo'];
+const facultyTabBreadcrumb = [...reportRootBreadcrumb, 'Theo Khoa/Viện'];
+const departmentTabBreadcrumb = [...reportRootBreadcrumb, 'Theo Bộ môn'];
+const courseTabBreadcrumb = [...reportRootBreadcrumb, 'Theo Học phần'];
+const detailsTabBreadcrumb = [...reportRootBreadcrumb, 'Tra cứu chi tiết'];
+
+/** Tên tab, dùng cho cả đường dẫn trên thanh trên cùng lẫn tệp xuất. */
+const workspaceLabels: Record<ReportWorkspace, string> = {
+  overview: 'Tổng quan',
+  faculties: 'Theo Khoa/Viện',
+  departments: 'Theo Bộ môn',
+  courses: 'Theo Học phần',
+  comments: 'Phân tích ý kiến mở',
+  details: 'Tra cứu chi tiết',
+};
+
+/*
   Ba bảng xếp hạng khai cột RIÊNG, không dùng chung một hàm sinh cột nữa.
 
   Trước đây cả ba đi qua `rankMetricColumns` nên đổi bề rộng một cột của bảng này
@@ -444,6 +471,21 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
   }] : []),
 ];
 
+/** Bảng xếp hạng đơn vị: cột tỷ lệ phần trăm dùng chung một cách định dạng. */
+const percentExportColumn = (
+  key: string,
+  header: string,
+  width: number,
+): ExportColumn<RankedUnit> => ({
+  key,
+  header,
+  width,
+  type: 'string',
+  align: 'right',
+  // formatPercent dùng dấu phẩy thập phân theo vi-VN, đúng như ô trên màn hình.
+  format: (val: any) => formatPercent(Number(val), 3),
+});
+
 const facultyRankExportColumns: ExportColumn<RankedUnit>[] = [
   { key: 'name', header: 'Khoa / Viện', width: 28 },
   { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number', align: 'right' },
@@ -451,22 +493,8 @@ const facultyRankExportColumns: ExportColumn<RankedUnit>[] = [
   { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number', align: 'right' },
   { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
   { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number', align: 'right' },
-  {
-    key: 'responseRate',
-    header: 'Tỷ lệ phản hồi',
-    width: 14,
-    type: 'string',
-    align: 'right',
-    format: (val: any) => `${Number(val).toFixed(3)}%`,
-  },
-  {
-    key: 'validRate',
-    header: 'Tỷ lệ phiếu hợp lệ',
-    width: 16,
-    type: 'string',
-    align: 'right',
-    format: (val: any) => `${Number(val).toFixed(3)}%`,
-  },
+  percentExportColumn('responseRate', 'Tỷ lệ phản hồi', 14),
+  percentExportColumn('validRate', 'Tỷ lệ phiếu hợp lệ', 16),
   {
     key: 'averageScore',
     header: 'Điểm trung bình',
@@ -611,22 +639,8 @@ const departmentRankExportColumns: ExportColumn<RankedUnit>[] = [
   { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number', align: 'right' },
   { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
   { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number', align: 'right' },
-  {
-    key: 'responseRate',
-    header: 'Tỷ lệ phản hồi',
-    width: 14,
-    type: 'string',
-    align: 'right',
-    format: (val: any) => `${Number(val).toFixed(3)}%`,
-  },
-  {
-    key: 'validRate',
-    header: 'Tỷ lệ phiếu hợp lệ',
-    width: 16,
-    type: 'string',
-    align: 'right',
-    format: (val: any) => `${Number(val).toFixed(3)}%`,
-  },
+  percentExportColumn('responseRate', 'Tỷ lệ phản hồi', 14),
+  percentExportColumn('validRate', 'Tỷ lệ phiếu hợp lệ', 16),
   {
     key: 'averageScore',
     header: 'Điểm trung bình',
@@ -646,6 +660,16 @@ interface RankedUnitTableProps {
   exportColumns: ExportColumn<RankedUnit>[];
   exportTitle: string;
   exportFileName: string;
+  /** Tên sheet đầu tiên trong tệp xuất. */
+  exportSheetName: string;
+  /** Đường dẫn điều hướng in ở dòng thứ hai của tệp xuất. */
+  breadcrumb: string[];
+  /**
+   * Dựng thêm các sheet sau sheet đầu — mỗi khoa/viện một sheet chẳng hạn. Hàm chỉ
+   * chạy lúc bấm xuất vì phải lấy thêm số liệu chi tiết từ API, và nhận đúng những
+   * dòng đang hiển thị trên bảng để tệp xuất không lệch với màn hình.
+   */
+  buildExtraSheets?: (rows: RankedUnit[]) => Promise<ExportSheet<any>[]>;
   onVisibleDataChange?: (rows: RankedUnit[]) => void;
 }
 
@@ -658,20 +682,65 @@ const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
   exportColumns,
   exportTitle,
   exportFileName,
+  exportSheetName,
+  breadcrumb,
+  buildExtraSheets,
   onVisibleDataChange,
 }) => {
-  const exportConfig = useMemo(() => ({
-    title: exportTitle,
-    fileName: exportFileName,
-    subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
-    summaryNotes: [
+  // Bảng tự báo ra số dòng còn lại sau tìm kiếm và lọc cột; giữ lại để sheet đầu của
+  // tệp xuất đúng bằng những gì đang nhìn thấy.
+  const [visibleRows, setVisibleRows] = useState<RankedUnit[]>(data);
+  const handleVisibleDataChange = useCallback((rows: RankedUnit[]) => {
+    setVisibleRows(rows);
+    onVisibleDataChange?.(rows);
+  }, [onVisibleDataChange]);
+
+  const exportConfig = useMemo(() => {
+    const notes = [
       'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu.',
       'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
       'Số phiếu không hợp lệ là phiếu bị bộ lọc nhiễu loại, không tham gia tính điểm.',
       'Chỉ gộp các lớp học phần đủ điều kiện tính điểm.',
-    ],
-    columns: exportColumns,
-  }), [exportTitle, exportFileName, exportColumns]);
+    ];
+
+    if (buildExtraSheets) {
+      return {
+        title: exportTitle,
+        fileName: exportFileName,
+        breadcrumb,
+        summaryNotes: notes,
+        // Sheet đầu vẫn là bảng xếp hạng như đang hiển thị; các sheet sau do trang
+        // dựng thêm, mỗi đơn vị một sheet.
+        sheets: async (): Promise<ExportSheet<any>[]> => {
+          const summarySheet: ExportSheet<RankedUnit> = {
+            sheetName: exportSheetName,
+            title: exportTitle,
+            breadcrumb,
+            columns: exportColumns,
+            data: visibleRows,
+            summaryNotes: notes,
+          };
+          return [summarySheet, ...(await buildExtraSheets(visibleRows))];
+        },
+      };
+    }
+
+    return {
+      title: exportTitle,
+      fileName: exportFileName,
+      breadcrumb,
+      summaryNotes: notes,
+      columns: exportColumns,
+    };
+  }, [
+    breadcrumb,
+    buildExtraSheets,
+    exportColumns,
+    exportFileName,
+    exportSheetName,
+    exportTitle,
+    visibleRows,
+  ]);
 
   return (
     <section className="reports-rank" aria-label={title}>
@@ -684,7 +753,7 @@ const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
         columns={columns}
         data={data}
         keyExtractor={(item) => String(item.id)}
-        onVisibleDataChange={onVisibleDataChange}
+        onVisibleDataChange={handleVisibleDataChange}
         showIndex={false}
         pageSize={rankedPageSize}
         exportConfig={exportConfig}
@@ -697,8 +766,9 @@ const RankedUnitTable: React.FC<RankedUnitTableProps> = ({
 /** Bảng Theo Học phần: 4 cột định danh + 8 cột số + Thao tác. */
 const RankedCourseTable: React.FC<{
   data: RankedCourse[];
+  breadcrumb: string[];
   onOpenDetail: (id: number) => void;
-}> = ({ data, onOpenDetail }) => {
+}> = ({ data, breadcrumb, onOpenDetail }) => {
   const columns: Column<RankedCourse>[] = [
     {
       key: 'facultyName',
@@ -843,7 +913,7 @@ const RankedCourseTable: React.FC<{
   const exportConfig = useMemo(() => ({
     title: 'BÁO CÁO XẾP HẠNG KẾT QUẢ THEO HỌC PHẦN',
     fileName: 'xep-hang-hoc-phan',
-    subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+    breadcrumb,
     summaryNotes: [
       'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu.',
       'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
@@ -866,7 +936,7 @@ const RankedCourseTable: React.FC<{
         width: 14,
         type: 'string' as const,
         align: 'right' as const,
-        format: (val: any) => `${Number(val).toFixed(3)}%`,
+        format: (val: any) => formatPercent(Number(val), 3),
       },
       {
         key: 'validRate',
@@ -874,7 +944,7 @@ const RankedCourseTable: React.FC<{
         width: 16,
         type: 'string' as const,
         align: 'right' as const,
-        format: (val: any) => `${Number(val).toFixed(3)}%`,
+        format: (val: any) => formatPercent(Number(val), 3),
       },
       {
         key: 'averageScore',
@@ -885,7 +955,7 @@ const RankedCourseTable: React.FC<{
         format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
       },
     ],
-  }), []);
+  }), [breadcrumb]);
 
   return (
     <section className="reports-rank" aria-label="Kết quả theo Học phần">
@@ -1060,6 +1130,8 @@ export const ReportsOverviewPage: React.FC = () => {
       setLecturer(null);
       setLecturerDetail(null);
       setScope(null);
+      // Đổi tab là rời khỏi chuỗi đi xuống của tab cũ.
+      setScopeParents([]);
       navigateToRoute(routeFromState(nextWorkspace, nextWorkspace === 'details' ? {} : {
         facultyId: undefined,
         departmentId: undefined,
@@ -1183,6 +1255,9 @@ export const ReportsOverviewPage: React.FC = () => {
       setScope(route.screen === 'scope' && route.scopeType && route.scopeId
         ? { type: route.scopeType, id: route.scopeId }
         : null);
+      // Đi bằng link/back của trình duyệt thì chuỗi cấp trên không còn suy ra được,
+      // nên bỏ đi thay vì để lại đường dẫn của lần đi trước.
+      setScopeParents([]);
 
       if (route.screen === 'survey' && route.surveyId) {
         setWorkspace('details');
@@ -1507,15 +1582,25 @@ export const ReportsOverviewPage: React.FC = () => {
     };
   }, [results]);
 
+  /*
+    Dòng đang nhìn thấy của bảng Tra cứu chi tiết, sau ô tìm kiếm và menu lọc cột.
+    Tệp xuất phải chứa đúng tập dòng đó: xuất cả danh sách trong khi màn hình đang
+    lọc theo một khoa thì người nhận tệp không đối chiếu được với ai.
+  */
+  const [visibleResultRows, setVisibleResultRows] = useState<SurveyResultDetail[]>(results);
+  const handleVisibleResultRows = useCallback(
+    (rows: SurveyResultDetail[]) => setVisibleResultRows(rows),
+    [],
+  );
   // Bảng tính tỷ lệ phản hồi ngay lúc vẽ, còn tệp xuất cần một trường thật để đổ
   // vào cột, nên gắn sẵn vào bản sao dùng riêng cho phần xuất.
-  const exportResults = useMemo(
-    () => results.map((item) => ({
+  const exportVisibleResults = useMemo(
+    () => visibleResultRows.map((item) => ({
       ...item,
       responseRate: responseRateOf(item.responseCount, item.classSize),
       validRate: validRateOf(item.validResponseCount, item.responseCount),
     })),
-    [results],
+    [visibleResultRows],
   );
 
   // Xếp hạng Khoa / Bộ môn / Học phần từ kết quả.
@@ -1599,6 +1684,15 @@ export const ReportsOverviewPage: React.FC = () => {
   const facultyRankings = useMemo(() => buildRanking('faculty'), [buildRanking]);
   const departmentRankings = useMemo(() => buildRanking('department'), [buildRanking]);
 
+  /*
+    Tên của phạm vi đang mở, tra từ chính các bảng xếp hạng đã gộp sẵn — mở trang chi
+    tiết bằng link trực tiếp thì tên đơn vị cũng có ngay khi số liệu về.
+
+    Cấp trên của chuỗi đi xuống (khoa → bộ môn → học phần) phải nhớ riêng, vì mỗi lần
+    đi xuống là một lần đổi phạm vi và cấp cũ bị thay chỗ.
+  */
+  const [scopeParents, setScopeParents] = useState<string[]>([]);
+
   const courseRankings = useMemo<RankedCourse[]>(() => {
     const groups = new Map<number, RankedCourse>();
     const scoreSums = new Map<number, number>();
@@ -1656,6 +1750,243 @@ export const ReportsOverviewPage: React.FC = () => {
     }).sort((left, right) => left.code.localeCompare(right.code, 'vi'));
   }, [catalogCourses, results, thresholds]);
 
+  // Nhãn học kỳ hiện ở tiêu đề tệp xuất và trong phần tóm tắt, nên phải có trước
+  // phần dựng sheet chi tiết.
+  const semesterLabel = useMemo(() => {
+    for (const year of academicYears) {
+      const found = year.semesters.find((s) => s.semesterId === selectedSemesterId);
+      if (found) return `${year.academicYearName} · ${found.semesterName}`;
+    }
+    return 'Học kỳ';
+  }, [academicYears, selectedSemesterId]);
+
+  /**
+   * Cột của bảng điểm chi tiết theo câu hỏi, dựng theo đúng bảng đang hiển thị ở
+   * trang "Xem KQ": mỗi mức của thang là một cột in "số lượng (tỷ lệ)", y như ô trên
+   * màn hình, chứ không tách thành hai cột số lượng và tỷ lệ.
+   */
+  const questionDetailExportColumns = (questions: QuestionRating[]): ExportColumn<any>[] => {
+    const levels = questions.find((question) => question.scaleKind !== 'Text')?.optionDistribution ?? [];
+    return [
+      {
+        key: 'code',
+        header: 'Mã',
+        width: 8,
+        align: 'center',
+        format: (_value: any, row: QuestionRating) => `C${row.questionOrder}`,
+      },
+      { key: 'questionText', header: 'Nội dung câu hỏi khảo sát', width: 60 },
+      ...levels.map((level) => ({
+        key: `level-${level.value}`,
+        header: `Mức ${level.value}`,
+        width: 16,
+        align: 'right' as const,
+        format: (_value: any, row: QuestionRating) => {
+          const cell = row.optionDistribution?.find(
+            (option: OptionCount) => option.value === level.value,
+          );
+          return `${cell?.count ?? 0} (${formatPercent(cell?.percentage ?? 0, 3)})`;
+        },
+      })),
+      {
+        key: 'averageScore',
+        header: 'Điểm TB',
+        width: 12,
+        align: 'right',
+        format: (value: any) => (Number(value) > 0 ? formatDecimal(Number(value), 3) : '—'),
+      },
+      {
+        key: 'rating',
+        header: 'Đánh giá',
+        width: 16,
+        format: (_value: any, row: QuestionRating) => getScoreRatingText(row.averageScore),
+      },
+    ];
+  };
+
+  /**
+   * Sheet cho từng khoa/viện ở tab Theo Khoa/Viện: gom đủ các phần của trang "Xem KQ"
+   * — dòng tóm tắt, bảng điểm chi tiết theo câu hỏi, danh sách bộ môn và danh sách
+   * lớp học phần. Số liệu chi tiết theo câu hỏi chỉ có ở API phạm vi nên mỗi khoa
+   * phải gọi một lượt, vì vậy hàm này chạy lúc bấm xuất chứ không dựng sẵn.
+   */
+  const buildFacultySheets = useCallback(
+    async (facultiesToExport: RankedUnit[]): Promise<ExportSheet<any>[]> => {
+      if (!semesterSurveyId || facultiesToExport.length === 0) return [];
+
+      const analyses = await Promise.all(facultiesToExport.map((faculty) =>
+        surveyApi
+          .semesterSurveyScopeAnalysis(semesterSurveyId, 'faculty', faculty.id)
+          .catch(() => null)));
+
+      /*
+        Biểu đồ cột điểm từng câu của mỗi khoa, vẽ trước thành ảnh PNG.
+
+        Hàm vẽ chạy bất đồng bộ nên phải gom ra một lượt riêng; phần ráp sheet bên
+        dưới viết theo lối đồng bộ nên đọc mạch lạc hơn. Khoa nào vẽ lỗi thì vẫn có
+        sheet với bảng số liệu, chỉ thiếu ảnh.
+      */
+      const charts = await Promise.all(analyses.map(async (analysis) => {
+        const questions = analysis?.questions.filter((question) => question.scaleKind !== 'Text') ?? [];
+        if (!analysis || questions.length === 0) return undefined;
+        try {
+          const { dataUrl, width, height } = await generateQuestionChartImage({
+            questions,
+            overallAverageScore: analysis.averageScore,
+            responseCount: analysis.responseCount,
+            title: `Điểm trung bình theo câu hỏi · ${analysis.scopeName}`,
+          });
+          return { dataUrl, width, height };
+        } catch {
+          return undefined;
+        }
+      }));
+
+      return facultiesToExport.map((faculty, index) => {
+        const analysis = analyses[index];
+        const classRows = results.filter((item) => item.facultyId === faculty.id);
+        const tables: ExportTable<any>[] = [];
+
+        if (analysis) {
+          const questions = analysis.questions.filter((question) => question.scaleKind !== 'Text');
+          if (questions.length > 0) {
+            tables.push({
+              title: '1. Bảng điểm chi tiết & tỷ lệ phân bố theo câu hỏi',
+              columns: questionDetailExportColumns(questions),
+              data: questions,
+            });
+          }
+          if (analysis.departments && analysis.departments.length > 0) {
+            tables.push({
+              title: '2. Danh sách các bộ môn',
+              columns: [
+                { key: 'departmentName', header: 'Bộ môn', width: 30 },
+                { key: 'sectionCount', header: 'Số lớp', width: 10, type: 'number', align: 'right' },
+                { key: 'lecturerCount', header: 'Số giảng viên', width: 12, type: 'number', align: 'right' },
+                { key: 'totalClassSize', header: 'Tổng số phiếu phải thu', width: 14, type: 'number', align: 'right' },
+                { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number', align: 'right' },
+                { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
+                {
+                  key: 'validResponseRate',
+                  header: 'Tỷ lệ phiếu hợp lệ',
+                  width: 14,
+                  align: 'right',
+                  format: (value: any) => formatPercent(Number(value), 3),
+                },
+                {
+                  key: 'averageScore',
+                  header: 'Điểm trung bình',
+                  width: 14,
+                  align: 'right',
+                  format: (value: any) => (value === null || value === undefined
+                    ? '—'
+                    : formatDecimal(Number(value), 3)),
+                },
+                {
+                  key: 'delta',
+                  header: 'Chênh lệch so với trung bình Khoa / Viện',
+                  width: 18,
+                  align: 'right',
+                  format: (_value: any, row: any) => (row.averageScore === null || row.averageScore === undefined
+                    ? '—'
+                    : formatSigned(Number(row.averageScore) - analysis.averageScore)),
+                },
+              ],
+              data: analysis.departments,
+            });
+          }
+        } else {
+          tables.push({
+            title: '1. Bảng điểm chi tiết & tỷ lệ phân bố theo câu hỏi',
+            columns: questionDetailExportColumns([]),
+            data: [],
+            summaryNotes: ['Không tải được số liệu chi tiết theo câu hỏi của khoa/viện này.'],
+          });
+        }
+
+        // Danh sách lớp lấy từ chính bảng tra cứu chi tiết, nên cột và con số khớp
+        // với những gì đang xem ở tab Tra cứu chi tiết khi lọc theo khoa này.
+        tables.push({
+          title: `${tables.length + 1}. Danh sách lớp học phần (${classRows.length} lớp)`,
+          columns: [
+            { key: 'departmentName', header: 'Bộ môn', width: 24 },
+            { key: 'courseName', header: 'Học phần', width: 30 },
+            { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'center' },
+            { key: 'sectionName', header: 'Lớp học phần', width: 14, align: 'center' },
+            { key: 'lecturerName', header: 'Giảng viên', width: 24 },
+            { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 12, type: 'number', align: 'right' },
+            { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number', align: 'right' },
+            { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
+            { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 16, type: 'number', align: 'right' },
+            {
+              key: 'responseRate',
+              header: 'Tỷ lệ phản hồi',
+              width: 14,
+              align: 'right',
+              format: (_value: any, row: SurveyResultDetail) =>
+                formatPercent(responseRateOf(row.responseCount, row.classSize), 3),
+            },
+            {
+              key: 'validRate',
+              header: 'Tỷ lệ phiếu hợp lệ',
+              width: 14,
+              align: 'right',
+              format: (_value: any, row: SurveyResultDetail) =>
+                formatPercent(validRateOf(row.validResponseCount, row.responseCount), 3),
+            },
+            {
+              key: 'averageScore',
+              header: 'Điểm trung bình',
+              width: 14,
+              align: 'right',
+              format: (value: any) => (Number(value) > 0 ? formatDecimal(Number(value), 3) : '—'),
+            },
+          ],
+          data: classRows,
+        });
+
+        return {
+          // Tên tab Excel tối đa 31 ký tự nên cắt bớt tên khoa; tên nào trùng nhau
+          // sau khi cắt thì bộ xuất tự thêm hậu tố để không mất tab.
+          sheetName: faculty.name.slice(0, 28),
+          title: `${faculty.name.toUpperCase()} · ${semesterLabel}`,
+          // Đường dẫn đi tới đúng khoa này, nối tiếp đường dẫn của cả tab.
+          breadcrumb: [...facultyTabBreadcrumb, faculty.name],
+          // Biểu đồ cột điểm theo câu hỏi, đứng trên bảng điểm chi tiết — trên màn
+          // hình cũng theo thứ tự đó.
+          chart: charts[index],
+          info: {
+            'Số lớp': faculty.sectionCount,
+            'Tổng số phiếu phải thu': faculty.classSize,
+            'Số phiếu đã thu': faculty.responseCount,
+            'Số phiếu hợp lệ': faculty.validResponseCount,
+            'Số phiếu không hợp lệ': faculty.invalidResponseCount,
+            'Tỷ lệ phản hồi': formatPercent(faculty.responseRate, 3),
+            'Tỷ lệ phiếu hợp lệ': formatPercent(faculty.validRate, 3),
+            'Điểm trung bình': faculty.averageScore > 0
+              ? `${formatDecimal(faculty.averageScore, 3)} / 5,0`
+              : '—',
+          },
+          tables,
+        } satisfies ExportSheet<any>;
+      });
+    },
+    [results, semesterLabel, semesterSurveyId],
+  );
+
+  /**
+   * Tên của một phạm vi, tra từ chính các bảng xếp hạng đã gộp sẵn — mở trang chi tiết
+   * bằng link trực tiếp thì tên đơn vị cũng có ngay khi số liệu về.
+   */
+  const scopeDisplayName = useCallback((selection: ScopeSelection): string => {
+    const source: RankedUnit[] = selection.type === 'faculty'
+      ? facultyRankings
+      : selection.type === 'department'
+        ? departmentRankings
+        : courseRankings;
+    return source.find((row) => row.id === selection.id)?.name ?? `#${selection.id}`;
+  }, [courseRankings, departmentRankings, facultyRankings]);
+
   /**
    * Mở trang chi tiết của một khoa/viện, bộ môn hay học phần. Trang này ở lại
    * trong chính module Thống kê & Báo cáo: trước đây nút "Xem KQ" đẩy người dùng
@@ -1664,6 +1995,8 @@ export const ReportsOverviewPage: React.FC = () => {
    */
   const openAnalysisDetail = useCallback((type: ReportScopeType, id: number) => {
     if (!selectedSemesterId || !semesterSurveyId) return;
+    // Mở một phạm vi mới từ bảng xếp hạng thì bắt đầu lại từ cấp đầu.
+    setScopeParents([]);
     navigateToRoute({
       screen: 'scope',
       semesterId: selectedSemesterId,
@@ -1676,6 +2009,10 @@ export const ReportsOverviewPage: React.FC = () => {
   /** Đi xuống một cấp trong trang chi tiết: khoa/viện → bộ môn → học phần → lớp. */
   const drillDownScope = useCallback((selection: ScopeSelection) => {
     if (!semesterSurveyId) return;
+    // Cấp đang xem trở thành cấp trên của cấp sắp mở, để thanh trên cùng in đủ đường đi.
+    setScopeParents((previous) => (scope
+      ? [...previous, scopeDisplayName(scope)]
+      : previous));
     navigateToRoute({
       screen: 'scope',
       semesterId: selectedSemesterId,
@@ -1683,19 +2020,32 @@ export const ReportsOverviewPage: React.FC = () => {
       scopeType: selection.type,
       scopeId: selection.id,
     });
-  }, [navigateToRoute, selectedSemesterId, semesterSurveyId]);
+  }, [navigateToRoute, scope, scopeDisplayName, selectedSemesterId, semesterSurveyId]);
 
   const backFromScope = useCallback(() => {
     navigateToWorkspace(scopeParentWorkspace(scope?.type));
   }, [navigateToWorkspace, scope?.type]);
 
-  const semesterLabel = useMemo(() => {
-    for (const year of academicYears) {
-      const found = year.semesters.find((s) => s.semesterId === selectedSemesterId);
-      if (found) return `${year.academicYearName} · ${found.semesterName}`;
-    }
-    return 'Học kỳ';
-  }, [academicYears, selectedSemesterId]);
+  /*
+    Đường dẫn điều hướng in ở thanh trên cùng: mục trên thanh điều hướng do thanh tự
+    biết, phần còn lại do trang này khai — đang ở tab nào, đang mở khoa/viện nào, đi
+    xuống bộ môn/học phần nào, hoặc đang xem giảng viên / bài khảo sát nào.
+  */
+  const breadcrumbTrail = useMemo(() => {
+    const segments: Array<string | undefined> = [workspaceLabels[workspace]];
+    if (scope) segments.push(...scopeParents, scopeDisplayName(scope));
+    if (lecturer) segments.push(lecturer.fullName);
+    if (surveyTitle) segments.push(surveyTitle);
+    return segments;
+  }, [lecturer, scope, scopeDisplayName, scopeParents, surveyTitle, workspace]);
+  useSetBreadcrumbTrail(breadcrumbTrail);
+
+  /** Đường dẫn của bài khảo sát đang mở, in vào tệp xuất của chính bài đó. */
+  const surveyBreadcrumb = useMemo(() => [
+    ...reportRootBreadcrumb,
+    ...(lecturer ? ['Giảng viên', lecturer.fullName] : []),
+    surveyTitle ?? 'Bài khảo sát',
+  ], [lecturer, surveyTitle]);
 
   if (!canViewReports) {
     return (
@@ -1723,6 +2073,11 @@ export const ReportsOverviewPage: React.FC = () => {
         ? `${lecturerDetail.departmentName} · ${lecturerDetail.facultyName} · ${semesterLabel}`
         : semesterLabel,
       fileName: `bao-cao-cau-hoi-giang-vien-${toVietnameseFileSlug(lecturerDetail?.fullName || 'gv')}-${toVietnameseFileSlug(semesterLabel)}`,
+      breadcrumb: [
+        ...reportRootBreadcrumb,
+        'Giảng viên',
+        lecturerDetail?.fullName ?? 'Chi tiết giảng viên',
+      ],
       info: {
         'Giảng viên': lecturerDetail?.fullName,
         'Đơn vị': lecturerDetail ? `${lecturerDetail.departmentName} · ${lecturerDetail.facultyName}` : undefined,
@@ -2165,6 +2520,7 @@ export const ReportsOverviewPage: React.FC = () => {
           courseSectionSurveyId={surveyId}
           onBack={backToLecturer}
           backLabel={lecturer ? `Quay lại đánh giá ${lecturer.fullName}` : 'Quay lại kết quả khảo sát'}
+          breadcrumb={surveyBreadcrumb}
           showAnalysis
         />
       )}
@@ -2223,7 +2579,8 @@ export const ReportsOverviewPage: React.FC = () => {
                   title: `BÁO CÁO KẾT QUẢ ĐÁNH GIÁ GIẢNG VIÊN ${lecturerDetail.fullName.toUpperCase()}`,
                   fileName: `bao-cao-danh-gia-giang-vien-${lecturerDetail.fullName}-${semesterLabel}`,
                   subtitle: `${lecturerDetail.departmentName} · ${lecturerDetail.facultyName}`,
-                  subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+                  // Đi từ mô-đun xuống tận giảng viên đang xem.
+                  breadcrumb: [...reportRootBreadcrumb, 'Giảng viên', lecturerDetail.fullName],
                   info: {
                     'Giảng viên': lecturerDetail.fullName,
                     'Đơn vị': `${lecturerDetail.departmentName} · ${lecturerDetail.facultyName}`,
@@ -2231,20 +2588,25 @@ export const ReportsOverviewPage: React.FC = () => {
                     'Tổng phiếu hợp lệ': lecturerDetail.totalResponses.toLocaleString('vi-VN'),
                     'Số lớp học phần': lecturerDetail.courseSectionCount,
                   },
+                  // Đúng thứ tự và đúng tiêu đề của bảng trên màn hình, chỉ bỏ cột
+                  // "Hoàn thành" dạng thanh tiến độ và cột Thao tác (là nút bấm): cột
+                  // số của thanh đó vẫn xuất kèm con số tỷ lệ y như đang hiển thị.
                   columns: [
-                    { key: 'sectionName', header: 'Lớp HP', width: 14, align: 'center' as const },
-                    { key: 'courseName', header: 'Tên môn học', width: 28 },
-                    { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
-                    { key: 'responseCount', header: 'Số phiếu đã thu', width: 10, type: 'number' as const, align: 'right' as const },
-                    { key: 'validResponseCount', header: 'Hợp lệ', width: 10, type: 'number' as const, align: 'right' as const },
+                    { key: 'courseCode', header: 'Mã Học phần', width: 12, align: 'center' as const },
+                    { key: 'courseName', header: 'Tên học phần', width: 30 },
+                    { key: 'sectionName', header: 'Nhóm lớp', width: 12, align: 'center' as const },
+                    { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 12, type: 'number' as const, align: 'right' as const },
+                    { key: 'responseCount', header: 'Số phiếu đã thu', width: 12, type: 'number' as const, align: 'right' as const },
+                    { key: 'invalidResponseCount', header: 'Phiếu lỗi', width: 10, type: 'number' as const, align: 'right' as const },
                     {
                       key: 'completionRate',
-                      header: 'Tỷ lệ',
-                      width: 10,
+                      header: 'Hoàn thành',
+                      width: 14,
                       type: 'string' as const,
                       align: 'right' as const,
-                      format: (_: any, item: any) =>
-                        `${Math.round((item.validResponseCount / (item.classSize || 1)) * 100)}%`,
+                      // Lấy thẳng con số backend trả về, không tự tính lại: màn hình
+                      // cũng in đúng con số đó với 3 chữ số thập phân.
+                      format: (val: any) => formatPercent(Number(val ?? 0), 3),
                     },
                     {
                       key: 'averageScore',
@@ -2371,6 +2733,9 @@ export const ReportsOverviewPage: React.FC = () => {
                 exportColumns={facultyRankExportColumns}
                 exportTitle="BÁO CÁO XẾP HẠNG KẾT QUẢ THEO KHOA/VIỆN"
                 exportFileName="xep-hang-khoa-vien"
+                exportSheetName="Xep hang khoa vien"
+                breadcrumb={facultyTabBreadcrumb}
+                buildExtraSheets={buildFacultySheets}
               />
             </div>
           )}
@@ -2385,6 +2750,8 @@ export const ReportsOverviewPage: React.FC = () => {
                 exportColumns={departmentRankExportColumns}
                 exportTitle="BÁO CÁO XẾP HẠNG KẾT QUẢ THEO BỘ MÔN"
                 exportFileName="xep-hang-bo-mon"
+                exportSheetName="Xep hang bo mon"
+                breadcrumb={departmentTabBreadcrumb}
               />
             </div>
           )}
@@ -2393,6 +2760,7 @@ export const ReportsOverviewPage: React.FC = () => {
             <div className="reports-aggregate-workspace" role="tabpanel">
               <RankedCourseTable
                 data={courseRankings}
+                breadcrumb={courseTabBreadcrumb}
                 onOpenDetail={(id) => openAnalysisDetail('course', id)}
               />
             </div>
@@ -2471,12 +2839,13 @@ export const ReportsOverviewPage: React.FC = () => {
               data={results}
               searchValue={search}
               onSearchChange={setSearch}
+              onVisibleDataChange={handleVisibleResultRows}
               searchPlaceholder="Mã HP, tên HP, nhóm lớp, giảng viên..."
               exportConfig={{
                 title: 'BÁO CÁO KẾT QUẢ KHẢO SÁT HỌC PHẦN CHI TIẾT',
                 fileName: `bao-cao-ket-qua-khao-sat-hoc-phan-chi-tiet-${semesterLabel}`,
                 subtitle: semesterLabel,
-                subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+                breadcrumb: detailsTabBreadcrumb,
                 info: {
                   'Học kỳ': semesterLabel,
                   'Số lớp khảo sát': kpi.classCount,
@@ -2499,7 +2868,7 @@ export const ReportsOverviewPage: React.FC = () => {
                       { key: 'departmentName', header: 'Bộ môn', width: 20 },
                       { key: 'courseName', header: 'Học phần', width: 28 },
                       { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'center' as const },
-                      { key: 'sectionName', header: 'Nhóm lớp', width: 10, align: 'center' as const },
+                      { key: 'sectionName', header: 'Lớp học phần', width: 10, align: 'center' as const },
                       { key: 'lecturerName', header: 'Giảng viên', width: 22 },
                       { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
                       { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
@@ -2511,7 +2880,7 @@ export const ReportsOverviewPage: React.FC = () => {
                         width: 14,
                         type: 'string' as const,
                         align: 'right' as const,
-                        format: (val: any) => `${Number(val).toFixed(3)}%`,
+                        format: (val: any) => formatPercent(Number(val), 3),
                       },
                       {
                         key: 'validRate',
@@ -2519,7 +2888,7 @@ export const ReportsOverviewPage: React.FC = () => {
                         width: 16,
                         type: 'string' as const,
                         align: 'right' as const,
-                        format: (val: any) => `${Number(val).toFixed(3)}%`,
+                        format: (val: any) => formatPercent(Number(val), 3),
                       },
                       {
                         key: 'averageScore',
@@ -2530,7 +2899,7 @@ export const ReportsOverviewPage: React.FC = () => {
                         format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
                       },
                     ],
-                    data: exportResults,
+                    data: exportVisibleResults,
                   },
                   {
                     sheetName: 'Lop diem thap (<3.50)',

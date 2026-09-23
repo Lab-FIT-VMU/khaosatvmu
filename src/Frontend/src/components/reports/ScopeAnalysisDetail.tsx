@@ -424,6 +424,8 @@ export const ScopeAnalysisDetail: React.FC<{
     return {
       title: 'BÁO CÁO PHÂN TÍCH KẾT QUẢ CÂU HỎI KHẢO SÁT',
       subtitle: data.templateName,
+      // Đi từ mô-đun xuống tận đơn vị đang xem, giống đường dẫn trên thanh trên cùng.
+      breadcrumb: ['Thống kê & Báo cáo', scopeLabels[data.scopeType], data.scopeName],
       fileName: `bao-cao-cau-hoi-${data.scopeType}-${toVietnameseFileSlug(data.scopeName)}`,
       info: {
         'Phạm vi': `${scopeLabels[data.scopeType]} - ${data.scopeName}`,

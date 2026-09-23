@@ -257,7 +257,7 @@ export const LecturerDashboardPage: React.FC<LecturerDashboardPageProps> = ({
                 metadata: {
                   title: 'BÁO CÁO TIẾN ĐỘ THU PHIẾU KHẢO SÁT CÁ NHÂN GIẢNG VIÊN',
                   subtitle: `Học kỳ: ${activeSemesterLabel}${selectedSurvey ? ` — Đợt: ${selectedSurvey.surveyName}` : ''}`,
-                  subInstitution: 'GIẢNG VIÊN',
+                  breadcrumb: ['Bảng điều khiển'],
                   info: {
                     'Học kỳ': activeSemesterLabel,
                     'Đợt khảo sát': selectedSurvey?.surveyName || '—',

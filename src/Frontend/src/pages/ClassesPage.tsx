@@ -723,6 +723,20 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
         item.lecturerId === null
           ? `⚠ ${item.unidentifiedLecturerName || 'Chưa có giảng viên'}`
           : (item.lecturerName ?? lecturerOf(item.lecturerId)?.fullName ?? '—'),
+      /*
+        Tệp xuất mô phỏng đúng hai dòng của ô trên màn hình — tên rồi email — và
+        không mang theo ký tự ⚠ của bộ lọc: ký hiệu đó chỉ có nghĩa trong menu lọc,
+        nằm trong ô dữ liệu thì thành rác.
+      */
+      exportFormat: (item) => {
+        if (item.lecturerId === null) {
+          return `${item.unidentifiedLecturerName || 'Chưa có giảng viên'} (chưa xác định — thiếu email)`;
+        }
+        const lecturer = lecturerOf(item.lecturerId);
+        const name = item.lecturerName ?? lecturer?.fullName ?? '—';
+        const email = item.lecturerEmail ?? lecturer?.email ?? '—';
+        return `${name} · ${email}`;
+      },
       render: (item) => {
         // Lớp chưa xác định được giảng viên: hiện tên đọc từ tệp import kèm
         // cảnh báo để quản trị hoặc trưởng bộ môn biết cần bổ sung email.
@@ -1002,7 +1016,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
                 title: `DANH SÁCH LỚP HỌC PHẦN - ${selectedSemester.semesterName} (${selectedYear?.academicYearName || ''})`,
                 fileName: `danh-sach-lop-hoc-phan-${selectedSemester.semesterName}-${selectedYear?.academicYearName || ''}`,
                 subtitle: `${selectedYear?.academicYearName || ''}`,
-                subInstitution: 'PHÒNG ĐÀO TẠO',
+                breadcrumb: ['Lớp học phần'],
               }}
               onAddNew={canManageCatalog ? openCreateSection : undefined}
               addNewLabel="Thêm lớp học phần"

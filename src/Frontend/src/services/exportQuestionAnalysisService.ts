@@ -9,6 +9,12 @@ export type QuestionExportFormat = 'xlsx' | 'docx' | 'pdf' | 'png';
 export interface QuestionAnalysisExportMetadata {
   institution?: string;
   subInstitution?: string;
+  /**
+   * Đường dẫn điều hướng tới chỗ có số liệu, in ở dòng thứ hai của tệp — cùng lối
+   * với thanh trên cùng của hệ thống. Khai rồi thì dòng đó là đường dẫn này, không
+   * dùng `subInstitution` nữa.
+   */
+  breadcrumb?: string[];
   title?: string;
   subtitle?: string;
   fileName?: string;
@@ -39,6 +45,15 @@ export const getScoreRatingText = (score: number): string => {
   if (score > 0) return 'Cần cải thiện';
   return 'Chưa có điểm';
 };
+
+/**
+ * Dòng thứ hai của tệp: đường dẫn điều hướng tới chỗ có số liệu, hoặc đơn vị phụ
+ * trách khi chỗ gọi chưa khai đường dẫn.
+ */
+function headerSecondLine(metadata?: QuestionAnalysisExportMetadata): string | undefined {
+  const parts = (metadata?.breadcrumb ?? []).map((part) => part.trim()).filter(Boolean);
+  return parts.length > 0 ? parts.join(' › ').toUpperCase() : metadata?.subInstitution?.toUpperCase();
+}
 
 function formatCurrentDateTime(): string {
   return new Intl.DateTimeFormat('vi-VN', {
@@ -340,11 +355,12 @@ export async function exportQuestionAnalysisToPdf(options: QuestionAnalysisExpor
   doc.text((metadata?.institution || 'TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM').toUpperCase(), margin, currentY);
   currentY += 4.5;
 
-  if (metadata?.subInstitution) {
+  const pdfSecondLine = headerSecondLine(metadata);
+  if (pdfSecondLine) {
     doc.setFont(fontName, 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(90, 90, 90);
-    doc.text(metadata.subInstitution.toUpperCase(), margin, currentY);
+    doc.text(pdfSecondLine, margin, currentY);
     currentY += 4.5;
   }
 
@@ -482,7 +498,9 @@ export async function exportQuestionAnalysisToPdf(options: QuestionAnalysisExpor
     const bodyRows = groupQuestions.map((q) => {
       const optCells = optionsList.map((col) => {
         const cell = q.optionDistribution?.find((o) => o.value === col.value);
-        if (!cell) return '0 (0%)';
+        // Ô không có lượt nào vẫn in đủ ba số lẻ như ô trên màn hình, để cả cột
+        // thẳng hàng và không ai tưởng bảng bị lỗi định dạng.
+        if (!cell) return `0 (${formatPercent(0, 3)})`;
         return `${cell.count}\n(${formatPercent(cell.percentage, 3)})`;
       });
 
@@ -643,13 +661,14 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
     }),
   );
 
-  if (metadata?.subInstitution) {
+  const wordSecondLine = headerSecondLine(metadata);
+  if (wordSecondLine) {
     docChildren.push(
       new Paragraph({
         alignment: AlignmentType.LEFT,
         children: [
           new TextRun({
-            text: metadata.subInstitution.toUpperCase(),
+            text: wordSecondLine,
             bold: true,
             size: 18,
             color: '555555',
@@ -883,7 +902,9 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
 
       const optCells = optionsList.map((col) => {
         const cell = q.optionDistribution?.find((o) => o.value === col.value);
-        const cellText = cell ? `${cell.count} (${formatPercent(cell.percentage, 3)})` : '0 (0%)';
+        const cellText = cell
+          ? `${cell.count} (${formatPercent(cell.percentage, 3)})`
+          : `0 (${formatPercent(0, 3)})`;
         return new TableCell({
           shading: { fill, type: ShadingType.CLEAR },
           children: [
@@ -1101,10 +1122,11 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
   instCell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF0F4C81' } };
   r++;
 
-  // Dòng 2: Phân hệ
-  if (metadata?.subInstitution) {
+  // Dòng 2: Đường dẫn điều hướng (hoặc đơn vị phụ trách)
+  const excelSecondLine = headerSecondLine(metadata);
+  if (excelSecondLine) {
     const subInstCell = ws.getCell(`A${r}`);
-    subInstCell.value = metadata.subInstitution.toUpperCase();
+    subInstCell.value = excelSecondLine;
     subInstCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF555555' } };
     r++;
   }
@@ -1243,7 +1265,7 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
       (m4?.percentage ?? 0) / 100,
       m5?.count ?? 0,
       (m5?.percentage ?? 0) / 100,
-      q.averageScore > 0 ? Number(q.averageScore.toFixed(3)) : 0,
+      q.averageScore > 0 ? Number(q.averageScore.toFixed(3)) : '—',
       getScoreRatingText(q.averageScore),
       q.totalAnswers,
     ];
@@ -1272,12 +1294,12 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
       } else if (colNumber === 2 || colNumber === 3) {
         cell.alignment = { horizontal: 'left', vertical: 'middle' };
       } else if ([5, 7, 9, 11, 13].includes(colNumber)) {
-        // Tỷ lệ %
-        cell.numFmt = '0.0%';
+        // Tỷ lệ % — ba số lẻ đúng như ô trên màn hình (24,000%), không phải một.
+        cell.numFmt = '0.000%';
         cell.alignment = { horizontal: 'right', vertical: 'middle' };
       } else if (colNumber === 14) {
-        // Điểm TB
-        cell.numFmt = '0.00';
+        // Điểm TB — ba số lẻ, và ô chưa có điểm in "—" chứ không phải 0,00.
+        cell.numFmt = '0.000';
         cell.font = { name: 'Arial', size: 9, bold: true };
         cell.alignment = { horizontal: 'right', vertical: 'middle' };
       } else if (colNumber === 15) {

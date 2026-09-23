@@ -1011,6 +1011,16 @@
   max-height: calc(100dvh - 48px);
 }
 
+/* Hộp chú thích: rộng hơn hộp compact vì phải chứa công thức có phân số lồng
+   phân số. Bó hẹp 720px thì tử số bị ngắt dòng giữa chừng và công thức mất
+   hình dạng. Cao hết màn hình vì mỗi tab có tới ba công thức kèm bảng ký hiệu. */
+.catalog-modal-card.catalog-modal-card--note {
+  width: min(960px, 100%);
+  max-width: 960px;
+  height: auto;
+  max-height: calc(100dvh - 48px);
+}
+
 .catalog-modal-header.modal-header {
   min-height: 62px;
   padding: 12px 16px 12px 20px;
@@ -1459,6 +1469,18 @@
     margin: auto;
     border: 1px solid #cfd7dc;
     border-radius: 4px !important;
+  }
+
+  /* Màn hẹp thì hộp chú thích chiếm hết bề ngang: công thức đã sát mép rồi,
+     chừa thêm lề nữa là tử số gãy dòng. */
+  .catalog-modal-card.catalog-modal-card--note {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0 !important;
   }
 
   .catalog-modal-close.modal-close-btn,

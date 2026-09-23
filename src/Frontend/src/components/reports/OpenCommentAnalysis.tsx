@@ -409,7 +409,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       title: 'BÁO CÁO PHÂN TÍCH Ý KIẾN MỞ CỦA SINH VIÊN',
       fileName: `bao-cao-y-kien-mo-${semesterLabel}`,
       subtitle: `${semesterLabel}${surveyName ? ` · ${surveyName}` : ''}`,
-      subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+      breadcrumb: ['Thống kê & Báo cáo', 'Phân tích ý kiến mở'],
       info: {
         'Học kỳ': semesterLabel,
         'Đợt khảo sát': surveyName || 'Tất cả các đợt',
@@ -426,17 +426,32 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         'Hệ thống bảo đảm hoàn toàn tính ẩn danh: không lưu thông tin người gửi.',
         'Cột Phân loại cảm xúc do mô hình tự động gán, cần đối chiếu nội dung gốc trước khi kết luận.',
         'Nhãn "Chưa chắc chắn" nghĩa là hệ thống chưa đủ căn cứ kết luận, không phải ý kiến trung tính.',
-        'Độ tin cậy là xác suất của mô hình cho nhãn dự đoán; ô đã hiệu chỉnh thủ công để trống vì nhãn do người đặt.',
+        'Độ tin cậy là xác suất của mô hình cho nhãn dự đoán; ý kiến đã hiệu chỉnh thủ công ghi "Đã hiệu chỉnh" vì nhãn do người đặt.',
       ],
+      // Cột khai theo đúng bảng đang hiển thị: cùng tiêu đề, cùng cách in giá trị.
       columns: [
-        { key: 'submittedAt', header: 'Thời gian gửi', width: 18, format: (val: unknown) => formatDateTime(String(val)) },
+        { key: 'submittedAt', header: 'Thời gian', width: 18, format: (val: unknown) => formatDateTime(String(val)) },
         { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
         { key: 'departmentName', header: 'Bộ môn', width: 22 },
         { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'center' as const },
         { key: 'courseName', header: 'Tên học phần', width: 28 },
-        { key: 'sectionName', header: 'Lớp học phần', width: 14, align: 'center' as const },
-        { key: 'lecturerName', header: 'Giảng viên', width: 24 },
-        { key: 'score', header: 'Điểm của phiếu khảo sát', width: 18, type: 'number' as const, align: 'right' as const, format: (val: unknown) => Number(Number(val || 0).toFixed(3)) },
+        { key: 'sectionName', header: 'Nhóm lớp', width: 14, align: 'center' as const },
+        {
+          key: 'lecturerName',
+          header: 'Giảng viên',
+          width: 24,
+          format: (val: unknown) => (val ? String(val) : 'Chưa phân công'),
+        },
+        {
+          key: 'score',
+          header: 'Điểm của phiếu khảo sát',
+          width: 18,
+          type: 'number' as const,
+          align: 'right' as const,
+          // Trang bảng in "—" khi phiếu chưa có điểm; in ra 0 thì người đọc tệp hiểu
+          // thành phiếu bị chấm 0 điểm.
+          format: (val: unknown) => (Number(val) > 0 ? formatDecimal(Number(val), 3) : '—'),
+        },
         { key: 'isValid', header: 'Tính hợp lệ', width: 14, align: 'center' as const, format: (val: unknown) => (val ? 'Hợp lệ' : 'Bị bộ lọc loại') },
         { key: 'sentimentLabel', header: 'Phân loại cảm xúc', width: 18, align: 'center' as const, format: (val: unknown) => (val ? String(val) : 'Chưa phân tích') },
         {
@@ -446,12 +461,14 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
           type: 'number' as const,
           align: 'right' as const,
           numberFormat: '0"%"',
-          // Chỉ nhãn do model đặt mới có độ tin cậy; nhãn người sửa để trống thay vì in ra
-          // một con số thuộc về dự đoán cũ và gây hiểu sai.
+          // Ô đã hiệu chỉnh thủ công ghi đúng chữ mà ô cảm xúc trên màn hình hiện,
+          // thay vì để trống khiến người đọc tưởng thiếu dữ liệu.
           format: (val: unknown, row: OpenCommentItem) =>
-            row.isManuallyReviewed || val === null || val === undefined
-              ? ''
-              : Number((Number(val) * 100).toFixed(0)),
+            row.isManuallyReviewed
+              ? 'Đã hiệu chỉnh'
+              : val === null || val === undefined
+                ? ''
+                : Number((Number(val) * 100).toFixed(0)),
         },
         {
           key: 'isManuallyReviewed',

@@ -477,7 +477,7 @@ export const SurveyStatisticsPage: React.FC = () => {
         subtitle: surveyName
           ? `${surveyName} · ${statistics.semesterName} năm học ${statistics.academicYearName}`
           : `${statistics.semesterName} năm học ${statistics.academicYearName}`,
-        subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+        breadcrumb: ['Bảng dữ liệu khảo sát'],
         info: {
           'Đợt khảo sát': surveyName || undefined,
           'Học kỳ': `${statistics.semesterName} · ${statistics.academicYearName}`,

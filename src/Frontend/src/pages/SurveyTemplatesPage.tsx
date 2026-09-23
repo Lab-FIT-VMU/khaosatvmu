@@ -564,6 +564,8 @@ export const SurveyTemplatesPage: React.FC = () => {
       header: 'Thang trả lời',
       width: '28%',
       filterValue: scaleNamesOf,
+      // Bộ chưa gán thang trả lời: màn hình in "—", tệp để trắng một ô vô nghĩa.
+      exportFormat: (item) => scaleNamesOf(item) || '—',
       render: (item) => <span className="catalog-cell-primary">{scaleNamesOf(item) || '—'}</span>,
     },
     {
@@ -572,6 +574,8 @@ export const SurveyTemplatesPage: React.FC = () => {
       width: '11%',
       filterValue: (item) => String(item.questions.length),
       numeric: true,
+      // Ô trên màn hình nói cả số mục; tệp xuất chỉ có số câu nên đọc thiếu thông tin.
+      exportFormat: (item) => `${item.questions.length} câu · ${item.sections.length} mục`,
       render: (item) => (
         <span className="catalog-cell-primary">
           {item.questions.length} câu · {item.sections.length} mục
@@ -661,7 +665,7 @@ export const SurveyTemplatesPage: React.FC = () => {
         exportConfig={{
           title: 'DANH SÁCH BỘ CÂU HỎI KHẢO SÁT',
           fileName: 'danh-sach-bo-cau-hoi-khao-sat',
-          subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+          breadcrumb: ['Danh sách bộ khảo sát'],
         }}
         onAddNew={() => setIsImportOpen(true)}
         addNewLabel="Thêm bộ khảo sát mới"

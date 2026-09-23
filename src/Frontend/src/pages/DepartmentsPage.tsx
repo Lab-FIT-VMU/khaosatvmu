@@ -258,7 +258,7 @@ export const DepartmentsPage: React.FC<DepartmentsPageProps> = ({
         exportConfig={{
           title: 'DANH SÁCH BỘ MÔN',
           fileName: 'danh-sach-bo-mon',
-          subInstitution: 'PHÒNG ĐÀO TẠO',
+          breadcrumb: ['Bộ môn'],
         }}
         onAddNew={canManageCatalog ? openCreate : undefined}
         addNewLabel="Thêm bộ môn"

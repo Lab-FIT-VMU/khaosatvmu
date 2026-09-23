@@ -425,7 +425,8 @@ textarea:focus-visible {
 
 .header-title-area h1 {
   overflow: hidden;
-  margin-top: 2px;
+  /* Tên trường/tiêu đề đứng trên, đường dẫn điều hướng nằm dưới nó. */
+  margin: 0;
   color: #20262C;
   font-size: 15px;
   font-weight: 650;
@@ -439,16 +440,18 @@ textarea:focus-visible {
   align-items: center;
   gap: 3px;
   overflow: hidden;
-  color: #74808A;
-  font-size: 10px;
+  margin-top: 2px;
+  /* Cùng màu chữ với tên trường ở dòng trên; chỉ khác cỡ chữ. */
+  color: #20262C;
+  font-size: 12px;
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .header-breadcrumb svg {
-  width: 12px;
-  height: 12px;
-  flex: 0 0 12px;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
 }
 
 .header-actions {

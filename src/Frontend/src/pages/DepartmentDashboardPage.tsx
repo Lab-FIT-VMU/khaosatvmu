@@ -260,7 +260,7 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                 metadata: {
                   title: `BÁO CÁO TỔNG QUAN BỘ MÔN ${(metrics.departmentName || '').toUpperCase()}`,
                   subtitle: `Học kỳ: ${activeSemesterLabel} — Đợt: ${selectedSurvey?.surveyName ?? '—'}`,
-                  subInstitution: 'TRƯỞNG BỘ MÔN',
+                  breadcrumb: ['Bảng điều khiển'],
                   info: {
                     'Bộ môn': metrics.departmentName || '—',
                     'Học kỳ': activeSemesterLabel,
@@ -286,18 +286,23 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                       },
                       {
                         metricName: 'Điểm hài lòng trung bình',
-                        deptValue: `${formatScore(metrics.averageScore)} / 5,0`,
-                        schoolValue: `${formatScore(metrics.schoolAverageScore)} / 5,0`,
+                        deptValue: formatScore(metrics.averageScore),
+                        schoolValue: formatScore(metrics.schoolAverageScore),
                       },
                       {
                         metricName: 'Số lớp học phần cần lưu ý',
                         deptValue: `${metrics.weakSectionCount} lớp`,
-                        schoolValue: `Ngưỡng điểm < ${formatDecimal(metrics.weakScoreThreshold, 3)}`,
+                        // Chữ phải trùng ô "Dưới X điểm" trên màn hình, không phải
+                        // "Ngưỡng điểm < X" — cùng một số mà hai cách gọi thì người
+                        // đọc tệp phải đoán xem có phải cùng một ngưỡng không.
+                        schoolValue: `Dưới ${formatDecimal(metrics.weakScoreThreshold, 3)} điểm`,
                       },
                       {
                         metricName: 'Số lớp chưa xác định giảng viên',
                         deptValue: `${unidentifiedCount} lớp`,
-                        schoolValue: 'Yêu cầu cập nhật',
+                        schoolValue: unidentified && unidentified.lecturerCount > 0
+                          ? `Thuộc ${unidentified.lecturerCount} người`
+                          : 'Yêu cầu cập nhật',
                       },
                     ],
                   },
@@ -306,11 +311,17 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                       sheetName: 'Lop chua xac dinh GV',
                       title: `2. DANH SÁCH LỚP CHƯA XÁC ĐỊNH GIẢNG VIÊN (${unidentified.sections.length} LỚP)`,
                       subtitle: 'Các lớp cần bổ sung/cập nhật thông tin giảng viên và email để gửi khảo sát',
+                      // Khai đúng những trường thật của lớp chưa gắn giảng viên; trước
+                      // đây hai cột trỏ vào trường không tồn tại nên tệp xuất ra cột trắng.
                       columns: [
-                        { key: 'courseSectionCode', header: 'Mã lớp HP', width: 16, align: 'center' as const },
-                        { key: 'courseName', header: 'Tên học phần', width: 28 },
-                        { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
-                        { key: 'unidentifiedReason', header: 'Lý do chưa xác định', width: 26 },
+                        { key: 'courseCode', header: 'Mã học phần', width: 16, align: 'center' as const },
+                        { key: 'courseName', header: 'Tên học phần', width: 30 },
+                        { key: 'sectionName', header: 'Nhóm lớp', width: 12, align: 'center' as const },
+                        { key: 'lecturerName', header: 'Giảng viên đọc từ tệp', width: 24 },
+                        { key: 'credits', header: 'Số tín chỉ', width: 12, type: 'number' as const, align: 'right' as const },
+                        { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 14, type: 'number' as const, align: 'right' as const },
+                        { key: 'departmentName', header: 'Bộ môn', width: 24, format: (val: any) => val || '—' },
+                        { key: 'facultyName', header: 'Khoa / Viện', width: 24, format: (val: any) => val || '—' },
                       ],
                       data: unidentified.sections,
                       summaryNotes: ['Đề nghị Trưởng bộ môn rà soát và phân công giảng viên phụ trách trên hệ thống.'],

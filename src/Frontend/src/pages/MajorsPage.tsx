@@ -147,6 +147,9 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
       header: 'Mã ngành',
       width: '16%',
       filterValue: (item) => item.majorCode,
+      // Tệp xuất lấy giá trị qua filterValue nên phải khai riêng: ngành chưa có mã thì
+      // màn hình in "—", còn tệp lại để trắng một ô không nói lên điều gì.
+      exportFormat: (item) => item.majorCode || '—',
       render: (item) => <span className="catalog-cell-primary">{item.majorCode || '—'}</span>,
     },
     {
@@ -216,7 +219,7 @@ export const MajorsPage: React.FC<MajorsPageProps> = ({
         exportConfig={{
           title: 'DANH SÁCH NGÀNH ĐÀO TẠO',
           fileName: 'danh-sach-nganh-dao-tao',
-          subInstitution: 'PHÒNG ĐÀO TẠO',
+          breadcrumb: ['Ngành đào tạo'],
         }}
         currentFilter={facultyFilter}
         onFilterChange={setFacultyFilter}

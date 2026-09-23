@@ -39,6 +39,12 @@ interface SectionSurveyResponsesPageProps {
   backLabel?: string;
   /** Bật phân tích từng câu hỏi của bài khảo sát (dùng trong Thống kê & Báo cáo). */
   showAnalysis?: boolean;
+  /**
+   * Đường dẫn điều hướng in ở dòng thứ hai của tệp xuất. Trang này dùng chung cho hai
+   * mô-đun nên đường dẫn do chỗ gọi khai; không khai thì lấy mặc định của mô-đun khảo
+   * sát học phần.
+   */
+  breadcrumb?: string[];
 }
 
 function messageFrom(error: unknown): string {
@@ -64,6 +70,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
   onBack,
   backLabel = 'Quay lại danh sách lớp',
   showAnalysis = false,
+  breadcrumb = ['Danh sách bộ khảo sát'],
 }) => {
   const [sectionSurvey, setSectionSurvey] = useState<CourseSectionSurvey | null>(null);
   const [responses, setResponses] = useState<SurveyResponseSummary[]>([]);
@@ -196,12 +203,18 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
       (response.additionalComments ?? '').toLowerCase().includes(normalized)
   );
 
+  // Bề rộng chia theo phần trăm chứ không theo pixel: bảng để table-layout: fixed nên
+  // cột Ý kiến khác mới cắt được bằng dấu ba chấm. Số mức của thang điểm thay đổi theo
+  // bộ đề, nên phần còn lại dồn hết cho cột ý kiến để tổng luôn tròn 100%.
+  const levelColumnWidth = 4;
+  const commentColumnWidth = 47 - levelColumnWidth * scaleValues.length;
+
   // Mọi cột đều có menu lọc trên tiêu đề, thay cho ô lọc riêng phía trên bảng.
   const columns: Column<SurveyResponseSummary>[] = [
     {
       key: 'responseId',
       header: 'Mã phiếu',
-      width: '86px',
+      width: '6%',
       sortValue: (item) => item.responseId,
       filterValue: (item) => `#${item.responseId}`,
       render: (item) => <span className="catalog-code">#{item.responseId}</span>,
@@ -209,7 +222,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     {
       key: 'submittedAt',
       header: 'Thời gian nộp',
-      width: '132px',
+      width: '10%',
       sortValue: (item) => item.submittedAt,
       // Lọc theo ngày: lọc tới từng phút thì mỗi phiếu một giá trị, gom được gì.
       filterValue: (item) => formatDate(item.submittedAt),
@@ -220,7 +233,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     {
       key: 'score',
       header: 'Điểm',
-      width: '72px',
+      width: '5%',
       numeric: true,
       sortValue: (item) => item.score,
       filterValue: (item) => formatDecimal(item.score, 3),
@@ -229,7 +242,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     {
       key: 'isValid',
       header: 'Trạng thái',
-      width: '136px',
+      width: '9%',
       filterValue: (item) => (item.isValid ? 'Hợp lệ' : 'Không hợp lệ'),
       render: (item) =>
         item.isValid ? (
@@ -244,7 +257,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     {
       key: 'rejectionReasons',
       header: 'Mô tả',
-      width: '220px',
+      width: '17%',
       // Dịch mã sang tiếng Việt, không phơi TOO_FAST ra màn hình.
       filterValue: (item) => rejectionReasonTexts(item.rejectionReasons).join(' · ') || '—',
       render: (item) => {
@@ -261,7 +274,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     ...scaleValues.map((option) => ({
       key: `value-${option.value}`,
       header: `Mức ${option.value}`,
-      width: '72px',
+      width: `${levelColumnWidth}%`,
       numeric: true,
       sortValue: (item: SurveyResponseSummary) => countOfValue(item, option.value),
       filterValue: (item: SurveyResponseSummary) => String(countOfValue(item, option.value)),
@@ -275,6 +288,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     {
       key: 'additionalComments',
       header: 'Ý kiến khác',
+      width: `${commentColumnWidth}%`,
       filterValue: (item) => (item.additionalComments ? 'Có ý kiến' : 'Không có'),
       render: (item) =>
         item.additionalComments ? (
@@ -288,7 +302,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     {
       key: 'actions',
       header: 'Chi tiết',
-      width: '92px',
+      width: '6%',
       render: (item) => (
         <button
           type="button"
@@ -308,6 +322,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     subtitle: sectionSurvey
       ? `${sectionSurvey.courseCode} - ${sectionSurvey.courseName} · GV: ${sectionSurvey.lecturerName || 'Chưa gắn GV'}`
       : undefined,
+    breadcrumb,
     fileName: `bao-cao-cau-hoi-lop-${toVietnameseFileSlug(sectionSurvey?.sectionName || String(courseSectionSurveyId))}`,
     info: {
       'Học phần': sectionSurvey ? `${sectionSurvey.courseCode} - ${sectionSurvey.courseName}` : undefined,
@@ -318,7 +333,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
       'Số phiếu hợp lệ': analysis?.responseCount ?? sectionSurvey?.validResponseCount,
       'Điểm trung bình': analysis?.averageScore ? `${formatDecimal(analysis.averageScore, 3)} / 5,0` : undefined,
     },
-  }), [sectionSurvey, analysis, courseSectionSurveyId]);
+  }), [sectionSurvey, analysis, breadcrumb, courseSectionSurveyId]);
 
   return (
     <div className="survey-operations-page section-responses-page">
@@ -481,7 +496,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
             sectionSurvey?.courseCode || ''
           }`,
           subtitle: `${sectionSurvey?.courseCode || ''} - ${sectionSurvey?.courseName || ''}`,
-          subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+          breadcrumb,
           info: {
             'Học phần': `${sectionSurvey?.courseCode || ''} - ${sectionSurvey?.courseName || ''}`,
             'Lớp học phần': sectionSurvey?.sectionName,
@@ -497,13 +512,24 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
             'Điểm trung bình chỉ tính trên các phiếu đánh giá hợp lệ qua bộ lọc.',
             'Ý kiến đóng góp của sinh viên được ghi nhận trung thực phục vụ nâng cao chất lượng giảng dạy.',
           ],
+          // Đúng thứ tự và đúng số cột của bảng trên màn hình, chỉ bỏ cột Chi tiết vì
+          // đó là nút bấm. Các cột Mức 1..N sinh theo thang điểm của bộ đề, giống hệt
+          // cách bảng dựng chúng.
           columns: [
             { key: 'responseId', header: 'Mã phiếu', width: 12, align: 'center' as const },
             { key: 'submittedAt', header: 'Thời gian nộp', width: 18, format: (val: any) => formatDateTime(val) },
             { key: 'score', header: 'Điểm', width: 10, type: 'number' as const, align: 'right' as const, format: (val: any) => Number(val).toFixed(3) },
             { key: 'isValid', header: 'Trạng thái', width: 12, align: 'center' as const, format: (val: any) => (val ? 'Hợp lệ' : 'Không hợp lệ') },
-            { key: 'rejectionReasons', header: 'Mô tả', width: 20, format: (_: any, item: any) => rejectionReasonTexts(item.rejectionReasons).join('; ') || '—' },
-            { key: 'additionalComments', header: 'Ý kiến đóng góp', width: 35, format: (val: any) => val || '—' },
+            { key: 'rejectionReasons', header: 'Mô tả', width: 20, format: (_: any, item: any) => rejectionReasonTexts(item.rejectionReasons).join(' · ') || '—' },
+            ...scaleValues.map((option) => ({
+              key: `value-${option.value}`,
+              header: `Mức ${option.value}`,
+              width: 8,
+              type: 'number' as const,
+              align: 'right' as const,
+              format: (_: any, item: any) => countOfValue(item, option.value),
+            })),
+            { key: 'additionalComments', header: 'Ý kiến khác', width: 35, format: (val: any) => val || 'Không có' },
           ],
         }}
         emptyMessage={loading ? 'Đang tải phiếu trả lời...' : 'Lớp này chưa có phiếu trả lời nào.'}

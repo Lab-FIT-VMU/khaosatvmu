@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
@@ -16,10 +16,12 @@ import {
   formatSigned,
 } from '../utils/formatNumber';
 import { useSemester } from '../context/semesterContext';
+import { useSetBreadcrumbTrail } from '../context/breadcrumbTrail';
 import { TablePagination } from '../components/TablePagination';
 import { usePaginatedItems } from '../hooks/usePaginatedItems';
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
 import { NoteModalButton } from '../components/NoteModalButton';
+import { Formula, FormulaDefs, FormulaTable, TeX } from '../components/FormulaBlock';
 import { useScoringThresholds } from '../hooks/useScoringThresholds';
 import { ExportDropdown } from '../components/ExportDropdown';
 import type { ExportColumn } from '../services/exportDataService';
@@ -399,54 +401,272 @@ function zTierClass(value: number | null): string {
   return 'num';
 }
 
-/** Công thức và bốn bậc của cột Nhận định, đọc trong hộp thoại chú thích. */
-const FormulaNotes: React.FC<{ notes: string[] }> = ({ notes }) => (
+/**
+ * Một mục trong hộp Chú thích.
+ *
+ * `display` là bản dựng bằng JSX để công thức có phân số, dấu căn, chỉ số dưới; `plain`
+ * là bản chữ một dòng in vào ghi chú của tệp xuất — tệp .xlsx/.docx/.pdf không xếp
+ * được phân số nên phải có bản chữ, và cả hai cùng nằm một chỗ để sửa là sửa cả hai.
+ */
+interface FormulaNote {
+  title?: string;
+  display: ReactNode;
+  plain: string[];
+}
+
+/**
+ * Công thức và bốn bậc của cột Nhận định, đọc trong hộp thoại chú thích.
+ *
+ * Mỗi mục là một khối riêng: tiêu đề đánh số, công thức đứng giữa một dải nền, rồi
+ * bảng ký hiệu. Trước đây ba phần này là anh em ruột trong một dải flex nằm ngang
+ * nên chúng xếp cạnh nhau, đọc không ra đâu là công thức của mục nào.
+ */
+const FormulaNotes: React.FC<{ notes: FormulaNote[] }> = ({ notes }) => (
   <>
     {notes.map((note) => (
-      <p className="z-legend__note" key={note}>
-        {note}
-      </p>
+      <section className="formula-note" key={note.plain[0] ?? note.title}>
+        {note.title && <h4 className="formula-note__title">{note.title}</h4>}
+        {note.display}
+      </section>
     ))}
   </>
 );
 
 /**
  * Công thức tính riêng của từng tab. Trang cha ghép chúng vào sau dòng mô tả tab
- * trong cùng một hộp Chú thích, và in lại vào phần ghi chú của tệp xuất — một nguồn
- * chữ cho cả hai để tệp xuất không lệch chú thích trên màn hình.
+ * trong cùng một hộp Chú thích, và in bản chữ của chúng vào ghi chú của tệp xuất.
  */
-const tabFormulaNotes: Partial<Record<TabId, string[]>> = {
+const tabFormulaNotes: Partial<Record<TabId, FormulaNote[]>> = {
   normalization: [
-    'Độ lệch chuẩn = √( Tổng bình phương (Điểm từng lớp − Điểm trung bình khoa) ÷ (Số lớp − 1) )',
-    'Z-Score = (Điểm trung bình khoa − Trung bình toàn trường)'
-      + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp)',
+    {
+      title: '1. Độ lệch chuẩn',
+      display: (
+        <>
+          <Formula tex={String.raw`\sigma = \sqrt{\dfrac{\displaystyle\sum_{i=1}^{n}\left(x_i - \bar{x}\right)^2}{n - 1}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`x_i`, meaning: 'Điểm trung bình của lớp thứ i.' },
+              { tex: String.raw`\bar{x}`, meaning: 'Điểm trung bình của khoa/viện.' },
+              { tex: String.raw`n`, meaning: 'Số lớp.' },
+              { tex: String.raw`\sigma`, meaning: 'Độ lệch chuẩn của điểm trung bình các lớp.' },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Độ lệch chuẩn σ = √( Σ(xᵢ − x̄)² ÷ (n − 1) ).'
+          + ' Trong đó xᵢ là điểm trung bình của lớp thứ i, x̄ là điểm trung bình của khoa/viện,'
+          + ' n là số lớp, σ là độ lệch chuẩn của điểm trung bình các lớp.',
+      ],
+    },
+    {
+      title: '2. Z-Score',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{khoa}} - \bar{x}_{\text{toàn trường}}}{\dfrac{\sigma_{\text{toàn trường}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{khoa}}`, meaning: 'Điểm trung bình của khoa/viện.' },
+              { tex: String.raw`\bar{x}_{\text{toàn trường}}`, meaning: 'Điểm trung bình của toàn trường.' },
+              { tex: String.raw`\sigma_{\text{toàn trường}}`, meaning: 'Độ lệch chuẩn của toàn trường.' },
+              { tex: String.raw`n`, meaning: 'Số lớp.' },
+              { tex: String.raw`\dfrac{\sigma_{\text{toàn trường}}}{\sqrt{n}}`, meaning: 'Sai số chuẩn.' },
+              {
+                tex: String.raw`Z`,
+                meaning: 'Mức chênh lệch giữa điểm trung bình của khoa/viện và toàn trường, tính theo đơn vị sai số chuẩn.',
+              },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Z-Score = (Điểm trung bình khoa − Trung bình toàn trường)'
+          + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp).'
+          + ' Trong đó x̄ khoa là điểm trung bình của khoa/viện, x̄ toàn trường là điểm trung bình của toàn trường,'
+          + ' σ toàn trường là độ lệch chuẩn của toàn trường, n là số lớp,'
+          + ' σ toàn trường ÷ √n là sai số chuẩn.',
+      ],
+    },
+    {
+      title: '3. Phân loại theo độ lệch chuẩn',
+      display: (
+        <FormulaTable
+          headers={['|Z|', 'Phân loại']}
+          rows={[
+            [<TeX key="z1" tex={String.raw`\left|Z\right| \le 1`} />, 'Trong khoảng 1σ'],
+            [<TeX key="z2" tex={String.raw`1 < \left|Z\right| \le 2`} />, 'Trong khoảng 2σ'],
+            [<TeX key="z3" tex={String.raw`2 < \left|Z\right| \le 3`} />, 'Trong khoảng 3σ'],
+          ]}
+        />
+      ),
+      plain: [
+        'Phân loại theo |Z|: |Z| ≤ 1 trong khoảng 1σ; 1 < |Z| ≤ 2 trong khoảng 2σ;'
+          + ' 2 < |Z| ≤ 3 trong khoảng 3σ.',
+      ],
+    },
   ],
   normalizationSections: [
-    'Z-Score so với toàn trường = (Điểm lớp − Trung bình toàn trường) ÷ Độ lệch chuẩn toàn trường',
-    'Z-Score so với khoa = (Điểm lớp − Điểm trung bình khoa) ÷ Độ lệch chuẩn khoa',
+    {
+      title: '1. Z-Score so với toàn trường',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\text{Điểm lớp} - \bar{x}_{\text{toàn trường}}}{\sigma_{\text{toàn trường}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\text{Điểm lớp}`, meaning: 'Điểm trung bình của lớp đang xét.' },
+              { tex: String.raw`\bar{x}_{\text{toàn trường}}`, meaning: 'Điểm trung bình của toàn trường.' },
+              { tex: String.raw`\sigma_{\text{toàn trường}}`, meaning: 'Độ lệch chuẩn của toàn trường.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Z-Score so với toàn trường = (Điểm lớp − Trung bình toàn trường) ÷ Độ lệch chuẩn toàn trường.'],
+    },
+    {
+      title: '2. Z-Score so với khoa',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\text{Điểm lớp} - \bar{x}_{\text{khoa}}}{\sigma_{\text{khoa}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{khoa}}`, meaning: 'Điểm trung bình của khoa/viện chủ quản lớp.' },
+              { tex: String.raw`\sigma_{\text{khoa}}`, meaning: 'Độ lệch chuẩn điểm các lớp trong khoa.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Z-Score so với khoa = (Điểm lớp − Điểm trung bình khoa) ÷ Độ lệch chuẩn khoa.'],
+    },
   ],
   departments: [
-    'Mỗi dòng gộp toàn bộ lớp của một bộ môn trong đợt khảo sát.',
-    'Độ lệch chuẩn = độ lệch chuẩn điểm các lớp của bộ môn.',
-    'Z-Score so với toàn trường = (Điểm trung bình bộ môn − Trung bình toàn trường)'
-      + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp)',
-    'Z-Score so với khoa = (Điểm trung bình bộ môn − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
-      + ' Để trống khi khoa có dưới 2 lớp.',
+    {
+      title: '1. Độ lệch chuẩn của bộ môn',
+      display: (
+        <>
+          <Formula tex={String.raw`\sigma = \sqrt{\dfrac{\displaystyle\sum_{i=1}^{n}\left(x_i - \bar{x}\right)^2}{n - 1}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`x_i`, meaning: 'Điểm trung bình của lớp thứ i trong bộ môn.' },
+              { tex: String.raw`\bar{x}`, meaning: 'Điểm trung bình của bộ môn.' },
+              { tex: String.raw`n`, meaning: 'Số lớp của bộ môn.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Độ lệch chuẩn = độ lệch chuẩn điểm các lớp của bộ môn (công thức như tab theo khoa/viện).'],
+    },
+    {
+      title: '2. Z-Score so với toàn trường',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{bộ môn}} - \bar{x}_{\text{toàn trường}}}{\dfrac{\sigma_{\text{toàn trường}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{bộ môn}}`, meaning: 'Điểm trung bình của bộ môn.' },
+              { tex: String.raw`\bar{x}_{\text{toàn trường}}`, meaning: 'Điểm trung bình của toàn trường.' },
+              { tex: String.raw`n`, meaning: 'Số lớp của bộ môn.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Z-Score so với toàn trường = (Điểm trung bình bộ môn − Trung bình toàn trường) ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp).'],
+    },
+    {
+      title: '3. Z-Score so với khoa',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{bộ môn}} - \bar{x}_{\text{khoa}}}{\dfrac{\sigma_{\text{khoa}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{khoa}}`, meaning: 'Điểm trung bình của khoa/viện chủ quản.' },
+              { tex: String.raw`\sigma_{\text{khoa}}`, meaning: 'Độ lệch chuẩn điểm các lớp trong khoa.' },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Z-Score so với khoa = (Điểm trung bình bộ môn − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
+          + ' Để trống khi khoa có dưới 2 lớp.',
+      ],
+    },
   ],
   courses: [
-    'Bảng này so các lớp TRONG CÙNG một học phần với nhau.',
-    'Chênh lệch giữa các lớp = Điểm lớp cao nhất − Điểm lớp thấp nhất.',
-    'Z-Score so với toàn trường = (Điểm trung bình học phần − Trung bình toàn trường)'
-      + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp)',
-    'Z-Score so với khoa = (Điểm trung bình học phần − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
-      + ' Để trống khi khoa có dưới 2 lớp.',
+    {
+      title: '1. Chênh lệch giữa các lớp',
+      display: (
+        <Formula tex={String.raw`\text{Chênh lệch} = \text{Điểm lớp cao nhất} - \text{Điểm lớp thấp nhất}`} />
+      ),
+      plain: ['Bảng này so các lớp TRONG CÙNG một học phần với nhau. Chênh lệch giữa các lớp = Điểm lớp cao nhất − Điểm lớp thấp nhất.'],
+    },
+    {
+      title: '2. Z-Score so với toàn trường',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{học phần}} - \bar{x}_{\text{toàn trường}}}{\dfrac{\sigma_{\text{toàn trường}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{học phần}}`, meaning: 'Điểm trung bình của học phần.' },
+              { tex: String.raw`n`, meaning: 'Số lớp của học phần.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Z-Score so với toàn trường = (Điểm trung bình học phần − Trung bình toàn trường) ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp).'],
+    },
+    {
+      title: '3. Z-Score so với khoa',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{học phần}} - \bar{x}_{\text{khoa}}}{\dfrac{\sigma_{\text{khoa}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{khoa}}`, meaning: 'Điểm trung bình của khoa/viện chủ quản học phần.' },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Z-Score so với khoa = (Điểm trung bình học phần − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
+          + ' Để trống khi khoa có dưới 2 lớp.',
+      ],
+    },
   ],
   lecturer: [
-    'Z-Score = (Điểm lớp − Trung bình nhóm so) ÷ Độ lệch chuẩn nhóm so.'
-      + ' Ba cột Z dùng ba nhóm: toàn trường, các lớp cùng khoa, các lớp cùng bộ môn.',
-    'Chênh so học phần = Điểm lớp − Điểm trung bình học phần.'
-      + ' Để trống khi học phần chỉ có đúng lớp này, không có ai để so.',
-    'Lớp cảnh báo = số lớp có điểm thấp hơn trung bình từ 1 độ lệch chuẩn trở lên (Z-Score ≤ −1).',
+    {
+      title: '1. Z-Score',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\text{Điểm lớp} - \bar{x}_{\text{nhóm so}}}{\sigma_{\text{nhóm so}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{nhóm so}}`, meaning: 'Điểm trung bình của nhóm đem ra so.' },
+              {
+                tex: String.raw`\sigma_{\text{nhóm so}}`,
+                meaning: 'Độ lệch chuẩn của nhóm so. Ba cột Z dùng ba nhóm: toàn trường, các lớp cùng khoa, các lớp cùng bộ môn.',
+              },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Z-Score = (Điểm lớp − Trung bình nhóm so) ÷ Độ lệch chuẩn nhóm so.'
+          + ' Ba cột Z dùng ba nhóm: toàn trường, các lớp cùng khoa, các lớp cùng bộ môn.',
+      ],
+    },
+    {
+      title: '2. Chênh so học phần',
+      display: (
+        <Formula tex={String.raw`\text{Chênh so học phần} = \text{Điểm lớp} - \bar{x}_{\text{học phần}}`} />
+      ),
+      plain: ['Chênh so học phần = Điểm lớp − Điểm trung bình học phần. Để trống khi học phần chỉ có đúng lớp này, không có ai để so.'],
+    },
+    {
+      title: '3. Lớp cảnh báo',
+      display: (
+        <Formula tex={String.raw`\text{Lớp cảnh báo}: Z \le -1`} />
+      ),
+      plain: ['Lớp cảnh báo = số lớp có điểm thấp hơn trung bình từ 1 độ lệch chuẩn trở lên (Z-Score ≤ −1).'],
+    },
   ],
 };
 
@@ -835,6 +1055,20 @@ export const SurveyAnalysisPage: React.FC = () => {
   }, []);
   const [lecturerReport, setLecturerReport] = useState<LecturerReport | null>(null);
 
+  /*
+    Đường dẫn điều hướng trên thanh trên cùng: mục đầu là tên tab đang mở, đi sâu vào
+    báo cáo của một giảng viên thì nối thêm tên người đó.
+  */
+  const breadcrumbTrail = useMemo(() => {
+    const segments = [tabs.find((item) => item.id === tab)?.label ?? 'Phân tích chuyên sâu'];
+    if (tab === 'lecturer' && selectedLecturerId !== null
+      && lecturerReport?.lecturerId === selectedLecturerId) {
+      segments.push(lecturerReport.fullName);
+    }
+    return segments;
+  }, [lecturerReport, selectedLecturerId, tab]);
+  useSetBreadcrumbTrail(breadcrumbTrail);
+
   // Tệp xuất đi đúng những gì tab đang hiện: cùng cột, cùng thứ tự, cùng các dòng sau
   // bộ lọc, kèm dòng tổng nếu bảng có, và phần ghi chú in lại nội dung Chú thích.
   const exportAnalysisOptions = useMemo(() => {
@@ -865,7 +1099,8 @@ export const SurveyAnalysisPage: React.FC = () => {
 
     const notesFor = (tabId: TabId, shown: number, total: number, extra: string[] = []) => [
       tabs.find((item) => item.id === tabId)?.hint ?? '',
-      ...(tabFormulaNotes[tabId] ?? []),
+      // Bản chữ một dòng của công thức: tệp xuất không xếp được phân số.
+      ...(tabFormulaNotes[tabId] ?? []).flatMap((note) => note.plain),
       ...extra,
       `Số liệu chỉ gộp lớp qua cả hai tiêu chí: tỷ lệ phản hồi ≥ ${thresholds.minimumResponseRate}%`
         + ` và tỷ lệ phiếu hợp lệ ≥ ${thresholds.minimumValidRate}%.`,
@@ -880,7 +1115,7 @@ export const SurveyAnalysisPage: React.FC = () => {
     const metadataOf = (title: string, info: Record<string, string | number | undefined>, summaryNotes: string[]) => ({
       title,
       subtitle,
-      subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+      breadcrumb: ['Phân tích chuyên sâu'],
       info: { ...baseInfo, ...info },
       summaryNotes,
     });
@@ -983,7 +1218,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm', 2, 8),
+              scoreColumn('averageScore', 'Điểm', 3, 8),
               zColumn('zSchool', 'Z-Score so với toàn trường'),
               zColumn('zFaculty', 'Z-Score so với khoa'),
             ],
@@ -1080,10 +1315,10 @@ export const SurveyAnalysisPage: React.FC = () => {
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm trung bình', 2, 8),
+              scoreColumn('averageScore', 'Điểm trung bình', 3, 8),
               scoreColumn('minScore', 'Lớp thấp nhất'),
               scoreColumn('maxScore', 'Lớp cao nhất'),
-              scoreColumn('spread', 'Chênh lệch giữa các lớp', 2, 14),
+              scoreColumn('spread', 'Chênh lệch giữa các lớp', 3, 14),
               zColumn('meanZScore', 'Z-Score so với toàn trường'),
               zColumn('facultyMeanZScore', 'Z-Score so với khoa'),
             ],
@@ -1130,8 +1365,8 @@ export const SurveyAnalysisPage: React.FC = () => {
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm', 2, 8),
-              scoreColumn('courseAverageScore', 'Điểm trung bình học phần', 2, 14),
+              scoreColumn('averageScore', 'Điểm', 3, 8),
+              scoreColumn('courseAverageScore', 'Điểm trung bình học phần', 3, 14),
               zColumn('differenceFromCourse', 'Chênh so học phần'),
               zColumn('zSchool', 'Z-Score so với toàn trường'),
               zColumn('zFaculty', 'Z-Score so với khoa'),
@@ -1198,7 +1433,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm trung bình', 2, 8),
+              scoreColumn('averageScore', 'Điểm trung bình', 3, 8),
               scoreColumn('minScore', 'Lớp thấp nhất'),
               scoreColumn('maxScore', 'Lớp cao nhất'),
             ],

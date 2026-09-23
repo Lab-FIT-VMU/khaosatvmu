@@ -185,7 +185,7 @@ export const FacultiesPage: React.FC<FacultiesPageProps> = ({
         exportConfig={{
           title: 'DANH SÁCH KHOA / VIỆN',
           fileName: 'danh-sach-khoa-vien',
-          subInstitution: 'PHÒNG ĐÀO TẠO',
+          breadcrumb: ['Khoa / Viện'],
         }}
         onAddNew={canManageCatalog ? openCreate : undefined}
         addNewLabel="Thêm khoa/viện"

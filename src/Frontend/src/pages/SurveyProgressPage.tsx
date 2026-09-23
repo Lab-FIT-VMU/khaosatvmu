@@ -254,19 +254,22 @@ const progressColumns = [
   { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
   { key: 'departmentName', header: 'Bộ môn', width: 20 },
   { key: 'name', header: 'Học phần', width: 28 },
-  { key: 'code', header: 'Nhóm lớp', width: 14, align: 'center' as const },
+  { key: 'code', header: 'Lớp học phần', width: 14, align: 'center' as const },
   { key: 'lecturerName', header: 'Giảng viên', width: 24 },
   { key: 'targetCount', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
   { key: 'actualCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
   {
     // Xuất SỐ kèm mã định dạng chứ không xuất chuỗi "18%": ô chữ thì Excel sắp
     // theo bảng chữ cái, 100% rơi xuống dưới 18%.
+    //
+    // Không có số lẻ: bảng trên màn hình in tỷ lệ đã làm tròn thành số nguyên ("77%"),
+    // để '0.000"%"' thì tệp lại hiện "77.000%" — hai nơi nói hai con số khác nhau.
     key: 'rate',
     header: 'Tỷ lệ phản hồi',
     width: 12,
     type: 'number' as const,
     align: 'right' as const,
-    numberFormat: '0.000"%"',
+    numberFormat: '0"%"',
   },
   { key: 'status', header: 'Trạng thái', width: 14, align: 'center' as const },
 ];
@@ -373,7 +376,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
       }-${activeSemesterLabel}`,
       title: 'BÁO CÁO TIẾN ĐỘ THU PHIẾU KHẢO SÁT Ý KIẾN SINH VIÊN',
       subtitle: 'Hệ thống Khảo sát & Đảm bảo Chất lượng Đào tạo VMU',
-      subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+      breadcrumb: ['Tiến độ thu phiếu'],
       info: {
         'Tổng số lớp khảo sát': progressItems.length,
         'Tổng số phiếu phải thu': totalTarget,
@@ -388,9 +391,11 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
       sheets: [
         {
           sheetName: 'Tien do toan bo lop',
-          title: `1. TIẾN ĐỘ THU PHIẾU TẤT CẢ CÁC LỚP HỌC PHẦN (${progressItems.length} LỚP)`,
+          // Đúng những dòng đang nằm trên bảng sau ô tìm kiếm, không phải cả danh sách:
+          // lọc xong rồi xuất mà tệp vẫn đầy đủ thì người nhận không đối chiếu được.
+          title: `1. TIẾN ĐỘ THU PHIẾU TẤT CẢ CÁC LỚP HỌC PHẦN (${filtered.length} LỚP)`,
           columns: progressColumns,
-          data: progressItems,
+          data: filtered,
         },
         {
           sheetName: 'Lop cham tien do',
@@ -411,6 +416,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
     };
   }, [
     progressItems,
+    filtered,
     totalTarget,
     totalActual,
     overallRate,

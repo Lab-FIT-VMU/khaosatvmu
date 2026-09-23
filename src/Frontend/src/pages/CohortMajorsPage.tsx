@@ -275,6 +275,9 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
       header: 'Ngành đào tạo',
       width: '26%',
       filterValue: (item) => item.majorName,
+      // Ô trên màn hình in hai dòng: tên ngành rồi khoa. Tệp xuất gộp cả hai vào một
+      // ô, thay vì chỉ có tên ngành như trước.
+      exportFormat: (item) => `${item.majorName} · ${item.facultyName}`,
       render: (item) => (
         <div>
           <div className="catalog-cell-primary">{item.majorName}</div>
@@ -463,7 +466,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
                 ? `danh-sach-khoa-nganh-dao-tao-${selectedCohort.cohortCode}`
                 : 'danh-sach-khoa-nganh-dao-tao',
               subtitle: selectedCohort?.academicYearName,
-              subInstitution: 'PHÒNG ĐÀO TẠO',
+              breadcrumb: ['Khoá ngành đào tạo'],
             }}
             onAddNew={canManageCatalog ? openCreate : undefined}
             addNewLabel="Thêm khoá ngành"

@@ -12,6 +12,7 @@ import { FacultyCompletionChart } from './FacultyCompletionChart';
 import { WeakestQuestionsPanel } from './WeakestQuestionsPanel';
 import { SchoolCriteriaChart } from './SchoolCriteriaChart';
 import { formatDecimal, formatNumber, formatPercent } from './theme';
+import { getScoreRatingText } from '../../services/exportQuestionAnalysisService';
 import type { ReportAnalysisView } from '../../pages/reportRoute';
 import {
   COMPLETED_COMPLETION_RATE,
@@ -210,7 +211,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
     metadata: {
       title: 'BÁO CÁO TỔNG QUAN KẾT QUẢ KHẢO SÁT TOÀN TRƯỜNG',
       subtitle: `${data.academicYearName} · ${data.semesterName}`,
-      subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+      breadcrumb: ['Thống kê & Báo cáo', 'Tổng quan'],
       info: {
         'Năm học / Học kỳ': `${data.academicYearName} · ${data.semesterName}`,
         'Tổng số phiếu phải thu': `${formatNumber(data.totalTargetResponses)} phiếu`,
@@ -235,16 +236,17 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
         title: `1. TIẾN ĐỘ & ĐIỂM SỐ THEO KHOA / VIỆN (${data.faculties.length} ĐƠN VỊ)`,
         columns: [
           { key: 'facultyName', header: 'Khoa / Viện', width: 28 },
+          { key: 'departmentCount', header: 'Số bộ môn', width: 12, type: 'number' as const, align: 'right' as const },
           { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number' as const, align: 'right' as const },
-          { key: 'totalResponses', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
-          { key: 'totalTargetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
+          { key: 'targetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
+          { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
           {
             key: 'completionRate',
             header: 'Tỷ lệ',
             width: 12,
             type: 'string' as const,
             align: 'right' as const,
-            format: (val: any) => `${Number(val).toFixed(3)}%`,
+            format: (val: any) => formatPercent(Number(val), 3),
           },
           {
             key: 'averageScore',
@@ -265,15 +267,15 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
           { key: 'departmentName', header: 'Bộ môn', width: 24 },
           { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
           { key: 'sectionCount', header: 'Số lớp', width: 10, type: 'number' as const, align: 'right' as const },
-          { key: 'totalResponses', header: 'Số phiếu đã thu', width: 12, type: 'number' as const, align: 'right' as const },
-          { key: 'totalTargetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
+          { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
+          { key: 'targetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
           {
             key: 'completionRate',
             header: 'Tỷ lệ',
             width: 12,
             type: 'string' as const,
             align: 'right' as const,
-            format: (val: any) => `${Number(val).toFixed(3)}%`,
+            format: (val: any) => formatPercent(Number(val), 3),
           },
           {
             key: 'averageScore',
@@ -291,19 +293,31 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
         sheetName: 'Tieu chi can cai thien',
         title: '3. DANH SÁCH CÁC TIÊU CHÍ CÂU HỎI CẦN CẢI THIỆN TOÀN TRƯỜNG',
         subtitle: 'Các câu hỏi khảo sát có điểm trung bình đánh giá thấp nhất trong kỳ',
+        // Cột khai đúng theo bảng "Xếp hạng tiêu chí" trên màn hình: tiêu chí, thang
+        // trả lời, số phiếu hợp lệ, điểm trung bình và xếp loại.
         columns: [
-          { key: 'order', header: 'Mã câu', width: 10, align: 'center' as const, format: (v: any) => `C${v}` },
-          { key: 'content', header: 'Nội dung tiêu chí câu hỏi', width: 45 },
-          { key: 'groupName', header: 'Nhóm tiêu chí', width: 24, format: (v: any) => v || 'Tiêu chuẩn chung' },
+          { key: 'questionText', header: 'Tiêu chí', width: 45 },
+          {
+            key: 'answerScaleName',
+            header: 'Thang trả lời',
+            width: 24,
+            format: (val: any) => val || '—',
+          },
+          { key: 'totalAnswers', header: 'Số phiếu hợp lệ', width: 16, type: 'number' as const, align: 'right' as const },
           {
             key: 'averageScore',
-            header: 'Điểm TB',
-            width: 12,
+            header: 'Điểm trung bình',
+            width: 14,
             type: 'number' as const,
             align: 'right' as const,
-            format: (val: any) => Number(val).toFixed(3),
+            format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
           },
-          { key: 'responseCount', header: 'Số lượt đánh giá', width: 16, type: 'number' as const, align: 'right' as const },
+          {
+            key: 'rating',
+            header: 'Xếp loại',
+            width: 16,
+            format: (_val: any, row: QuestionRating) => getScoreRatingText(row.averageScore),
+          },
         ],
         data: data.weakestQuestions || [],
       },

@@ -291,7 +291,19 @@
       "Bash(git merge-tree *)",
       "Bash(python \"C:/Users/Admin/AppData/Local/Temp/claude/e--CITAD/456c748c-ac4d-4402-bf3a-794268cea948/scratchpad/resolve_occ.py\")",
       "Bash(export ConnectionStrings__DefaultConnection=\"Host=localhost;Port=5433;Database=khaosatvmu;Username=postgres;Password=khaosatvmu@123\")",
-      "Bash(MSYS_NO_PATHCONV=1 docker exec khaosatvmu_db psql -U postgres -d khaosatvmu -c \"SELECT \\\\\"MigrationId\\\\\" FROM \\\\\"__EFMigrationsHistory\\\\\" WHERE \\\\\"MigrationId\\\\\" LIKE '%OpenComment%';\" -c \"SELECT to_regclass\\('public.\\\\\"OpenCommentAnalysisResults\\\\\"'\\) AS tbl;\")"
+      "Bash(MSYS_NO_PATHCONV=1 docker exec khaosatvmu_db psql -U postgres -d khaosatvmu -c \"SELECT \\\\\"MigrationId\\\\\" FROM \\\\\"__EFMigrationsHistory\\\\\" WHERE \\\\\"MigrationId\\\\\" LIKE '%OpenComment%';\" -c \"SELECT to_regclass\\('public.\\\\\"OpenCommentAnalysisResults\\\\\"'\\) AS tbl;\")",
+      "Bash(grep -n \"<th\\\\b\\\\|<th$\\\\|function NormalizationGroupTab\\\\|function DepartmentTab\\\\|function CourseTab\\\\|function LecturerTab\\\\|function SectionTab\\\\|const .*Tab = \\\\|<thead\" pages/SurveyAnalysisPage.tsx)",
+      "Bash(npm audit *)",
+      "Bash(npm pkg *)",
+      "Bash(sort -t'│' -k1)",
+      "Bash(node --input-type=module -e ' *)",
+      "Skill(browser-automation)",
+      "Skill(browser-automation:*)",
+      "Bash(node browser.mjs \"file:///C:/Users/Admin/AppData/Local/Temp/claude/e--CITAD/a56a01ef-2b8a-4618-96af-5eccc1875b53/scratchpad/preview.html\" --screenshot \"C:/Users/Admin/AppData/Local/Temp/claude/e--CITAD/a56a01ef-2b8a-4618-96af-5eccc1875b53/scratchpad/preview.png\")",
+      "Bash(node browser.mjs \"file:///E:/CITAD/src/Frontend/node_modules/katex/dist/preview.html\" --screenshot \"C:/Users/Admin/AppData/Local/Temp/claude/e--CITAD/a56a01ef-2b8a-4618-96af-5eccc1875b53/scratchpad/preview2.png\")",
+      "Bash(node browser.mjs \"file:///E:/CITAD/src/Frontend/node_modules/katex/dist/preview.html\" --screenshot \"C:/Users/Admin/AppData/Local/Temp/claude/e--CITAD/a56a01ef-2b8a-4618-96af-5eccc1875b53/scratchpad/preview3.png\")",
+      "Bash(node browser.mjs \"file:///E:/CITAD/src/Frontend/node_modules/katex/dist/preview.html\" --screenshot \"C:/Users/Admin/AppData/Local/Temp/claude/e--CITAD/a56a01ef-2b8a-4618-96af-5eccc1875b53/scratchpad/preview4.png\")",
+      "Bash(npx --prefix src/Frontend tsc --noEmit -p src/Frontend/tsconfig.app.json)"
     ],
     "additionalDirectories": [
       "\\tmp",

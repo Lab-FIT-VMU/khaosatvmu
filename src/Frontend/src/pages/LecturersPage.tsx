@@ -307,12 +307,16 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
       key: 'email',
       header: 'Email',
       width: '15%',
+      // Cột này không đi qua filterValue nên tệp xuất lấy thẳng giá trị thô; khai
+      // exportFormat để ô trống trong tệp cũng thành "—" như trên màn hình.
+      exportFormat: (row) => row.email ?? '—',
       render: (row) => row.email ?? '—',
     },
     {
       key: 'phoneNumber',
       header: 'Số điện thoại',
       width: '10%',
+      exportFormat: (row) => row.phoneNumber ?? '—',
       render: (row) => row.phoneNumber ?? '—',
     },
   ];
@@ -368,7 +372,7 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
         exportConfig={{
           title: 'DANH SÁCH GIẢNG VIÊN',
           fileName: 'danh-sach-giang-vien',
-          subInstitution: 'PHÒNG ĐÀO TẠO',
+          breadcrumb: ['Giảng viên'],
         }}
         onAddNew={canManageCatalog ? openCreate : undefined}
         addNewLabel="Thêm giảng viên"

@@ -275,6 +275,17 @@ export const SurveyDashboardPage: React.FC = () => {
   const [data, setData] = useState<SemesterSurveyDashboard | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Bộ lọc của bảng tiêu chí nằm ở trang chứ không nằm trong component bảng, vì nút
+  // Xuất báo cáo ở thanh công cụ phải xuất đúng những dòng đang hiển thị.
+  const [weakestClassCount, setWeakestClassCount] = useState('');
+  const [weakestDirection, setWeakestDirection] = useState<'gte' | 'lte'>('gte');
+  const weakestThreshold = weakestClassCount === ''
+    ? null
+    : Math.max(0, Number(weakestClassCount) || 0);
+  const weakestRows = useMemo(
+    () => (data ? weakestQuestionRows(data.questions, weakestThreshold, weakestDirection) : []),
+    [data, weakestDirection, weakestThreshold],
+  );
 
   useEffect(() => {
     setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(semesterSurveys, current));
@@ -364,7 +375,7 @@ export const SurveyDashboardPage: React.FC = () => {
                 metadata: {
                   title: 'BÁO CÁO TỔNG QUAN ĐỢT KHẢO SÁT HỌC PHẦN',
                   subtitle: `${data.templateName} — ${data.semesterName} năm học ${data.academicYearName}`,
-                  subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+                  breadcrumb: ['Tổng quan khảo sát'],
                   info: {
                     'Bộ câu hỏi': data.templateName,
                     'Học kỳ': `${data.semesterName} · ${data.academicYearName}`,
@@ -379,12 +390,47 @@ export const SurveyDashboardPage: React.FC = () => {
                     'Số liệu tính toán từ kết quả các phiếu khảo sát hợp lệ qua bộ lọc.',
                   ],
                 },
-                columns: [
-                  { key: 'facultyName', header: 'Khoa / Viện', width: 28 },
-                  { key: 'averageScore', header: 'Điểm TB', width: 14, type: 'number' as const, align: 'right' as const, format: (v: any) => formatDecimal(Number(v), 3) },
-                  { key: 'sectionsBelowThreshold', header: 'Số lớp dưới ngưỡng', width: 18, type: 'number' as const, align: 'right' as const },
+                // Mỗi bảng trên màn hình là một sheet, cột và thứ tự y như đang hiển thị.
+                sheets: [
+                  {
+                    sheetName: 'Theo khoa vien',
+                    title: 'ĐIỂM TRUNG BÌNH THEO KHOA / VIỆN',
+                    // Biểu đồ "Điểm tổng hợp theo khoa / viện" chỉ có tên khoa, số lớp
+                    // có phiếu hợp lệ và điểm — tệp xuất theo đúng ba thông tin đó.
+                    columns: [
+                      { key: 'facultyName', header: 'Khoa / Viện', width: 28 },
+                      { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number' as const, align: 'right' as const },
+                      {
+                        key: 'averageScore',
+                        header: 'Điểm TB',
+                        width: 14,
+                        type: 'number' as const,
+                        align: 'right' as const,
+                        numberFormat: '0.000',
+                      },
+                    ],
+                    data: data.faculties,
+                  },
+                  {
+                    sheetName: 'Tieu chi',
+                    title: weakestQuestionsTitle(weakestThreshold, weakestDirection).toLocaleUpperCase('vi-VN'),
+                    // Cột khớp bảng "Tiêu chí theo số lớp cảnh báo" trên màn hình.
+                    columns: [
+                      { key: 'questionOrder', header: 'Câu', width: 8, align: 'center' as const, format: (v: any) => `C${v}` },
+                      { key: 'questionText', header: 'Nội dung', width: 80 },
+                      {
+                        key: 'averageScore',
+                        header: 'Điểm trung bình',
+                        width: 16,
+                        type: 'number' as const,
+                        align: 'right' as const,
+                        numberFormat: '0.000',
+                      },
+                      { key: 'sectionsBelowThreshold', header: 'Lớp cảnh báo', width: 14, type: 'number' as const, align: 'right' as const },
+                    ],
+                    data: weakestRows,
+                  },
                 ],
-                data: data.faculties,
               }}
             />
           )}
@@ -414,13 +460,33 @@ export const SurveyDashboardPage: React.FC = () => {
           <strong>Đợt này chưa có số liệu.</strong>
         </div>
       ) : (
-        <DashboardReport data={data} />
+        <DashboardReport
+          data={data}
+          weakestClassCount={weakestClassCount}
+          onWeakestClassCountChange={setWeakestClassCount}
+          weakestDirection={weakestDirection}
+          onWeakestDirectionChange={setWeakestDirection}
+        />
       )}
     </div>
   );
 };
 
-const DashboardReport: React.FC<{ data: SemesterSurveyDashboard }> = ({ data }) => (
+interface DashboardReportProps {
+  data: SemesterSurveyDashboard;
+  weakestClassCount: string;
+  onWeakestClassCountChange: (value: string) => void;
+  weakestDirection: 'gte' | 'lte';
+  onWeakestDirectionChange: (value: 'gte' | 'lte') => void;
+}
+
+const DashboardReport: React.FC<DashboardReportProps> = ({
+  data,
+  weakestClassCount,
+  onWeakestClassCountChange,
+  weakestDirection,
+  onWeakestDirectionChange,
+}) => (
   <div className="dashboard-report" tabIndex={0} aria-label="Tổng quan đợt khảo sát">
     <section className="statistics-summary">
       <span className="summary-title">
@@ -449,7 +515,13 @@ const DashboardReport: React.FC<{ data: SemesterSurveyDashboard }> = ({ data }) 
       <QuestionChart questions={data.questions} overallScore={data.overallScore} />
     </div>
 
-    <WeakestQuestions rows={data.questions} />
+    <WeakestQuestions
+      rows={data.questions}
+      classCount={weakestClassCount}
+      onClassCountChange={onWeakestClassCountChange}
+      direction={weakestDirection}
+      onDirectionChange={onWeakestDirectionChange}
+    />
 
     <div className="dashboard-report-grid">
       <CourseReview data={data} />
@@ -586,32 +658,60 @@ const QuestionChart: React.FC<{
 
 // ----------------------------------------------- Tiêu chí theo số lớp cảnh báo
 
+/**
+ * Dòng của bảng tiêu chí, sau bộ lọc số lớp cảnh báo.
+ *
+ * Tách khỏi component để nút Xuất báo cáo ở thanh công cụ dùng lại đúng phép lọc này:
+ * tệp xuất phải chứa đúng những dòng đang nhìn thấy, không phải cả bộ đề.
+ */
+const weakestQuestionRows = (
+  rows: DashboardQuestionScore[],
+  threshold: number | null,
+  direction: 'gte' | 'lte',
+): DashboardQuestionScore[] => {
+  if (threshold === null) {
+    return [...rows].sort((left, right) => left.averageScore - right.averageScore).slice(0, 5);
+  }
+  return rows
+    .filter((row) => direction === 'gte'
+      ? row.sectionsBelowThreshold >= threshold
+      : row.sectionsBelowThreshold <= threshold)
+    .sort((left, right) => direction === 'gte'
+      ? right.sectionsBelowThreshold - left.sectionsBelowThreshold || left.averageScore - right.averageScore
+      : left.sectionsBelowThreshold - right.sectionsBelowThreshold || left.averageScore - right.averageScore);
+};
+
+const weakestQuestionsTitle = (threshold: number | null, direction: 'gte' | 'lte'): string =>
+  threshold === null
+    ? '5 tiêu chí yếu nhất toàn trường'
+    : `Tiêu chí có số lớp cảnh báo ${direction === 'gte' ? 'từ' : 'đến'} ${threshold}`;
+
+interface WeakestQuestionsProps {
+  rows: DashboardQuestionScore[];
+  classCount: string;
+  onClassCountChange: (value: string) => void;
+  direction: 'gte' | 'lte';
+  onDirectionChange: (value: 'gte' | 'lte') => void;
+}
+
 // Bảng dùng đúng theme .catalog-table, giống bảng phân bố ở màn phân tích.
-const WeakestQuestions: React.FC<{ rows: DashboardQuestionScore[] }> = ({ rows }) => {
-  const [classCount, setClassCount] = useState('');
-  const [direction, setDirection] = useState<'gte' | 'lte'>('gte');
+const WeakestQuestions: React.FC<WeakestQuestionsProps> = ({
+  rows,
+  classCount,
+  onClassCountChange,
+  direction,
+  onDirectionChange,
+}) => {
   const threshold = classCount === '' ? null : Math.max(0, Number(classCount) || 0);
-  const visibleRows = useMemo(() => {
-    if (threshold === null) {
-      return [...rows].sort((left, right) => left.averageScore - right.averageScore).slice(0, 5);
-    }
-    return rows
-      .filter((row) => direction === 'gte'
-        ? row.sectionsBelowThreshold >= threshold
-        : row.sectionsBelowThreshold <= threshold)
-      .sort((left, right) => direction === 'gte'
-        ? right.sectionsBelowThreshold - left.sectionsBelowThreshold || left.averageScore - right.averageScore
-        : left.sectionsBelowThreshold - right.sectionsBelowThreshold || left.averageScore - right.averageScore);
-  }, [direction, rows, threshold]);
+  const visibleRows = useMemo(
+    () => weakestQuestionRows(rows, threshold, direction),
+    [direction, rows, threshold],
+  );
 
   return (
   <section className="dashboard-report-block">
     <div className="dashboard-report-heading">
-      <h3 className="dashboard-report-title">
-        {threshold === null
-          ? '5 tiêu chí yếu nhất toàn trường'
-          : `Tiêu chí có số lớp cảnh báo ${direction === 'gte' ? 'từ' : 'đến'} ${threshold}`}
-      </h3>
+      <h3 className="dashboard-report-title">{weakestQuestionsTitle(threshold, direction)}</h3>
       <div className="dashboard-warning-filter" aria-label="Lọc theo số lớp cảnh báo">
         <label>
           <span>Số lớp cảnh báo</span>
@@ -622,12 +722,12 @@ const WeakestQuestions: React.FC<{ rows: DashboardQuestionScore[] }> = ({ rows }
             inputMode="numeric"
             placeholder="Để trống"
             value={classCount}
-            onChange={(event) => setClassCount(event.target.value.replace(/[^0-9]/g, ''))}
+            onChange={(event) => onClassCountChange(event.target.value.replace(/[^0-9]/g, ''))}
           />
         </label>
         <label>
           <span>Chiều lọc</span>
-          <select value={direction} onChange={(event) => setDirection(event.target.value as 'gte' | 'lte')}>
+          <select value={direction} onChange={(event) => onDirectionChange(event.target.value as 'gte' | 'lte')}>
             <option value="gte">Từ số lượng này trở lên</option>
             <option value="lte">Từ số lượng này trở xuống</option>
           </select>
