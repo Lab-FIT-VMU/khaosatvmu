@@ -1,4 +1,4 @@
-using Domain;
+﻿using Domain;
 
 namespace Application.GraduationAnalytics;
 
@@ -262,7 +262,7 @@ public static class GraduationExploreCalculator
         cells.Where(x => x.GraduationRank == rank).Sum(x => x.StudentCount);
 
     private static decimal Percentage(int count, int total) =>
-        total == 0 ? 0 : Math.Round(count * 100m / total, 2, MidpointRounding.AwayFromZero);
+        total == 0 ? 0 : Math.Round(count * 100m / total, 3, MidpointRounding.AwayFromZero);
 
     private static string PeriodLabel(GraduationExplorePeriod period) =>
         $"{period.ReviewMonth:00}/{period.ReviewYear}";

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { QuestionRating } from '../../types';
-import { formatNumber, scoreColor } from './theme';
+import { formatDecimal, formatNumber, scoreColor } from './theme';
 import '../../styles/catalogs.css';
 
 interface WeakestQuestionsPanelProps {
@@ -71,7 +71,7 @@ export const WeakestQuestionsPanel: React.FC<WeakestQuestionsPanelProps> = ({
                   <td>{question.answerScaleName || '—'}</td>
                   <td>{formatNumber(question.totalAnswers)}</td>
                   <td style={{ color: scoreColor(question.averageScore) }}>
-                    {question.averageScore > 0 ? question.averageScore.toFixed(2) : '—'}
+                    {question.averageScore > 0 ? formatDecimal(question.averageScore) : '—'}
                   </td>
                   <td style={{ color: scoreColor(question.averageScore) }}>
                     {ratingLabel(question.averageScore)}

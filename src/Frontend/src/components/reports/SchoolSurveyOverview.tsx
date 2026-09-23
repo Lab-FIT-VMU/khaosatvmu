@@ -11,7 +11,8 @@ import { FacultyScoreChart } from './FacultyScoreChart';
 import { FacultyCompletionChart } from './FacultyCompletionChart';
 import { WeakestQuestionsPanel } from './WeakestQuestionsPanel';
 import { SchoolCriteriaChart } from './SchoolCriteriaChart';
-import { formatNumber } from './theme';
+import { formatDecimal, formatNumber, formatPercent } from './theme';
+import { getScoreRatingText } from '../../services/exportQuestionAnalysisService';
 import type { ReportAnalysisView } from '../../pages/reportRoute';
 import {
   COMPLETED_COMPLETION_RATE,
@@ -210,14 +211,14 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
     metadata: {
       title: 'BÁO CÁO TỔNG QUAN KẾT QUẢ KHẢO SÁT TOÀN TRƯỜNG',
       subtitle: `${data.academicYearName} · ${data.semesterName}`,
-      subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+      breadcrumb: ['Thống kê & Báo cáo', 'Tổng quan'],
       info: {
         'Năm học / Học kỳ': `${data.academicYearName} · ${data.semesterName}`,
         'Tổng số phiếu phải thu': `${formatNumber(data.totalTargetResponses)} phiếu`,
         'Số phiếu đã thu': `${formatNumber(data.totalSubmittedResponses)} lượt`,
         'Số phiếu hợp lệ': `${formatNumber(data.totalResponses)} phiếu`,
-        'Tỷ lệ phản hồi': `${data.responseRate.toFixed(1)}%`,
-        'Điểm trung bình': `${data.overallAverageScore.toFixed(3)} / 5.0`,
+        'Tỷ lệ phản hồi': formatPercent(data.responseRate),
+        'Điểm trung bình': `${formatDecimal(data.overallAverageScore, 3)} / 5,0`,
         'Lớp đủ điều kiện tính điểm':
           `${formatNumber(data.scoredSectionCount)} / ${formatNumber(data.totalSections)} lớp`,
         'Số phiếu hợp lệ dùng để tính điểm': formatNumber(data.scoredValidResponseCount),
@@ -235,16 +236,17 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
         title: `1. TIẾN ĐỘ & ĐIỂM SỐ THEO KHOA / VIỆN (${data.faculties.length} ĐƠN VỊ)`,
         columns: [
           { key: 'facultyName', header: 'Khoa / Viện', width: 28 },
+          { key: 'departmentCount', header: 'Số bộ môn', width: 12, type: 'number' as const, align: 'right' as const },
           { key: 'sectionCount', header: 'Số lớp', width: 12, type: 'number' as const, align: 'right' as const },
-          { key: 'totalResponses', header: 'Số phiếu hợp lệ', width: 14, type: 'number' as const, align: 'right' as const },
-          { key: 'totalTargetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
+          { key: 'targetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
+          { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
           {
             key: 'completionRate',
             header: 'Tỷ lệ',
             width: 12,
             type: 'string' as const,
             align: 'right' as const,
-            format: (val: any) => `${Number(val).toFixed(1)}%`,
+            format: (val: any) => formatPercent(Number(val), 3),
           },
           {
             key: 'averageScore',
@@ -252,7 +254,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
             width: 12,
             type: 'number' as const,
             align: 'right' as const,
-            format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+            format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
           },
         ],
         data: data.faculties,
@@ -265,15 +267,15 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
           { key: 'departmentName', header: 'Bộ môn', width: 24 },
           { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
           { key: 'sectionCount', header: 'Số lớp', width: 10, type: 'number' as const, align: 'right' as const },
-          { key: 'totalResponses', header: 'Số phiếu đã thu', width: 12, type: 'number' as const, align: 'right' as const },
-          { key: 'totalTargetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
+          { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
+          { key: 'targetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
           {
             key: 'completionRate',
             header: 'Tỷ lệ',
             width: 12,
             type: 'string' as const,
             align: 'right' as const,
-            format: (val: any) => `${Number(val).toFixed(1)}%`,
+            format: (val: any) => formatPercent(Number(val), 3),
           },
           {
             key: 'averageScore',
@@ -281,7 +283,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
             width: 12,
             type: 'number' as const,
             align: 'right' as const,
-            format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(2) : '—'),
+            format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
           },
         ],
         data: laggingDepartments,
@@ -291,19 +293,31 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
         sheetName: 'Tieu chi can cai thien',
         title: '3. DANH SÁCH CÁC TIÊU CHÍ CÂU HỎI CẦN CẢI THIỆN TOÀN TRƯỜNG',
         subtitle: 'Các câu hỏi khảo sát có điểm trung bình đánh giá thấp nhất trong kỳ',
+        // Cột khai đúng theo bảng "Xếp hạng tiêu chí" trên màn hình: tiêu chí, thang
+        // trả lời, số phiếu hợp lệ, điểm trung bình và xếp loại.
         columns: [
-          { key: 'order', header: 'Mã câu', width: 10, align: 'center' as const, format: (v: any) => `C${v}` },
-          { key: 'content', header: 'Nội dung tiêu chí câu hỏi', width: 45 },
-          { key: 'groupName', header: 'Nhóm tiêu chí', width: 24, format: (v: any) => v || 'Tiêu chuẩn chung' },
+          { key: 'questionText', header: 'Tiêu chí', width: 45 },
+          {
+            key: 'answerScaleName',
+            header: 'Thang trả lời',
+            width: 24,
+            format: (val: any) => val || '—',
+          },
+          { key: 'totalAnswers', header: 'Số phiếu hợp lệ', width: 16, type: 'number' as const, align: 'right' as const },
           {
             key: 'averageScore',
-            header: 'Điểm TB',
-            width: 12,
+            header: 'Điểm trung bình',
+            width: 14,
             type: 'number' as const,
             align: 'right' as const,
-            format: (val: any) => Number(val).toFixed(2),
+            format: (val: any) => (Number(val) > 0 ? Number(val).toFixed(3) : '—'),
           },
-          { key: 'responseCount', header: 'Số lượt đánh giá', width: 16, type: 'number' as const, align: 'right' as const },
+          {
+            key: 'rating',
+            header: 'Xếp loại',
+            width: 16,
+            format: (_val: any, row: QuestionRating) => getScoreRatingText(row.averageScore),
+          },
         ],
         data: data.weakestQuestions || [],
       },
@@ -378,7 +392,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
                     <span className="reports-overview-kpi-unit">phiếu</span>
                     {data.totalSubmittedResponses > 0 && (
                       <span className="reports-overview-kpi-badge">
-                        {((data.totalResponses / data.totalSubmittedResponses) * 100).toFixed(1)}%
+                        {formatPercent((data.totalResponses / data.totalSubmittedResponses) * 100)}
                       </span>
                     )}
                   </div>
@@ -391,7 +405,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
                 >
                   <span className="reports-overview-kpi-label">Tỷ lệ phản hồi</span>
                   <div className="reports-overview-kpi-value">
-                    <strong className="reports-overview-kpi-num">{data.responseRate.toFixed(1)}%</strong>
+                    <strong className="reports-overview-kpi-num">{formatPercent(data.responseRate)}</strong>
                   </div>
                   <span className="reports-overview-kpi-sub">Phiếu đã thu trên chỉ tiêu</span>
                 </div>
@@ -409,8 +423,8 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
                 >
                   <span className="reports-overview-kpi-label">Điểm trung bình</span>
                   <div className="reports-overview-kpi-value">
-                    <strong className="reports-overview-kpi-num">{data.overallAverageScore.toFixed(3)}</strong>
-                    <span className="reports-overview-kpi-scale">/ 5.0</span>
+                    <strong className="reports-overview-kpi-num">{formatDecimal(data.overallAverageScore, 3)}</strong>
+                    <span className="reports-overview-kpi-scale">/ 5,0</span>
                   </div>
                   <span className="reports-overview-kpi-sub">
                     Chỉ tính các phiếu hợp lệ thuộc các lớp đủ 2 tiêu chí
@@ -429,7 +443,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
                     </strong>
                     {data.totalSections > 0 && (
                       <span className="reports-overview-kpi-badge">
-                        {((data.scoredSectionCount / data.totalSections) * 100).toFixed(1)}%
+                        {formatPercent((data.scoredSectionCount / data.totalSections) * 100)}
                       </span>
                     )}
                   </div>
@@ -592,7 +606,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
                     : 'tiêu chí — toàn trường'}
                 </h3>
                 <span className="reports-exec-card-note">
-                  Đường nét đứt = điểm TB toàn trường ({data.overallAverageScore.toFixed(3)})
+                  Đường nét đứt = điểm TB toàn trường ({formatDecimal(data.overallAverageScore, 3)})
                 </span>
               </div>
               <div className="reports-exec-actions">
@@ -600,8 +614,8 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
                   <ul className="dashboard-notes" style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
                     <li>Trục hoành hiển thị các tiêu chí đánh giá từ C1 đến C{criteriaQuestions?.length || 24}.</li>
                     <li>Trục tung biểu thị điểm trung bình đánh giá theo thang điểm từ 0 đến 5.</li>
-                    <li>Đường nét đứt ngang thể hiện điểm trung bình chung toàn trường ({data.overallAverageScore.toFixed(3)}).</li>
-                    <li>Màu sắc cột: Xanh lá (≥ 3.8), Vàng (3.5 – 3.79), Cam (3.2 – 3.49), Đỏ (&lt; 3.2).</li>
+                    <li>Đường nét đứt ngang thể hiện điểm trung bình chung toàn trường ({formatDecimal(data.overallAverageScore, 3)}).</li>
+                    <li>Màu sắc cột: Xanh lá (≥ 3,8), Vàng (3,5 – 3,79), Cam (3,2 – 3,49), Đỏ (&lt; 3,2).</li>
                     <li>Số lượt đánh giá của từng tiêu chí được tính dựa trên số phiếu dùng để tính điểm (phiếu hợp lệ của các lớp đủ điều kiện).</li>
                   </ul>
                 </NoteModalButton>

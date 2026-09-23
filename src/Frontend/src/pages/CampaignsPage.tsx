@@ -25,6 +25,7 @@ import { ConfirmDialog, Modal } from '../components/Modal';
 import { InlineTreeWizard } from '../components/InlineTreeWizard';
 import { TablePagination } from '../components/TablePagination';
 import { useSemester } from '../context/semesterContext';
+import { useSetBreadcrumbTrail } from '../context/breadcrumbTrail';
 import { usePaginatedItems } from '../hooks/usePaginatedItems';
 import type {
   SurveyCampaign,
@@ -70,6 +71,9 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
   const [activeTab, setActiveTab] = useState<'Học phần' | 'Chương trình đào tạo'>(
     surveyType || 'Học phần'
   );
+
+  // Loại khảo sát đang xem là cấp dưới của mục trên thanh điều hướng.
+  useSetBreadcrumbTrail([activeTab]);
 
   // Filter States
   const [search, setSearch] = useState('');

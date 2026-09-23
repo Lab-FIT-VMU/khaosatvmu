@@ -31,7 +31,9 @@ public static class DatabaseSeeder
             (Code: "ADMIN", Name: "Quản trị hệ thống", Description: "Hồ sơ quản trị toàn hệ thống"),
             (Code: "LECTURER", Name: "Giảng viên", Description: "Hồ sơ giảng viên"),
             (Code: "DEPARTMENT_MANAGER", Name: "Trưởng bộ môn", Description: "Hồ sơ quản lý bộ môn"),
-            (Code: "SURVEY_ADMIN", Name: "Quản trị khảo sát", Description: "Hồ sơ quản trị nghiệp vụ khảo sát")
+            (Code: "FACULTY_MANAGER", Name: "Trưởng khoa/viện", Description: "Hồ sơ quản lý khoa/viện, xem mọi bộ môn trong khoa"),
+            (Code: "SURVEY_ADMIN", Name: "Quản trị khảo sát", Description: "Hồ sơ quản trị nghiệp vụ khảo sát"),
+            (Code: "BOARD_OF_DIRECTORS", Name: "Ban Giám hiệu", Description: "Hồ sơ xem toàn trường, chỉ đọc")
         };
 
         var roles = new Dictionary<string, Role>(StringComparer.OrdinalIgnoreCase);
@@ -90,12 +92,14 @@ public static class DatabaseSeeder
             // Tên và nhóm phải trùng KHÍT với thanh điều hướng: trang phân quyền
             // là nơi người quản trị tích chọn từng module, đọc thấy tên khác tên
             // trên menu là không biết mình đang mở khoá cho trang nào.
-            (Code: "PROGRESS_ACCESS",             Name: "Tiến độ thu phiếu",                Description: "Truy cập module tiến độ thu phiếu",                    Category: "Tổng quan"),
+            (Code: "DASHBOARD_ACCESS",            Name: "Bảng điều khiển",                   Description: "Truy cập module bảng điều khiển",                       Category: "Tổng quan"),
             (Code: "SURVEY_DASHBOARD_ACCESS",     Name: "Tổng quan khảo sát",                Description: "Truy cập module tổng quan khảo sát",                    Category: "Tổng quan"),
-            (Code: "REPORTS_ACCESS",              Name: "Thống kê & Báo cáo",                Description: "Truy cập module thống kê và báo cáo",                  Category: "Tổng quan"),
+            (Code: "PROGRESS_ACCESS",             Name: "Tiến độ thu phiếu",                Description: "Truy cập module tiến độ thu phiếu",                    Category: "Tổng quan"),
             (Code: "SURVEY_STATISTICS_ACCESS",    Name: "Bảng dữ liệu khảo sát",             Description: "Truy cập module bảng dữ liệu khảo sát",                 Category: "Tổng quan"),
-            (Code: "SURVEY_ANALYSIS_ACCESS",      Name: "Thống kê chi tiết",                 Description: "Truy cập module thống kê chi tiết",                    Category: "Tổng quan"),
-            (Code: "GRADUATION_ANALYTICS_ACCESS", Name: "Thống kê tốt nghiệp",               Description: "Truy cập module thống kê sinh viên tốt nghiệp đúng hạn", Category: "Tổng quan"),
+            (Code: "REPORTS_ACCESS",              Name: "Thống kê & Báo cáo",                Description: "Truy cập module thống kê và báo cáo",                  Category: "Tổng quan"),
+            (Code: "SURVEY_ANALYSIS_ACCESS",      Name: "Phân tích chuyên sâu",              Description: "Truy cập module phân tích chuyên sâu",                 Category: "Tổng quan"),
+            (Code: "GRADUATION_UPLOAD_ACCESS",    Name: "Tải lên dữ liệu",                   Description: "Tải lên và xoá đợt dữ liệu tốt nghiệp",                Category: "Thống kê tốt nghiệp"),
+            (Code: "GRADUATION_ANALYTICS_ACCESS", Name: "Thống kê chi tiết",                 Description: "Xem thống kê sinh viên tốt nghiệp",                    Category: "Thống kê tốt nghiệp"),
             (Code: "FACULTIES_ACCESS",            Name: "Khoa / Viện",                       Description: "Truy cập module quản lý khoa và viện",                  Category: "Danh mục đào tạo"),
             (Code: "DEPARTMENTS_ACCESS",          Name: "Bộ môn",                            Description: "Truy cập module quản lý bộ môn",                        Category: "Danh mục đào tạo"),
             (Code: "LECTURERS_ACCESS",            Name: "Giảng viên",                        Description: "Truy cập module quản lý giảng viên và chức vụ",         Category: "Danh mục đào tạo"),
@@ -157,11 +161,13 @@ public static class DatabaseSeeder
         var definitions = new[]
         {
             // ADMIN: truy cập toàn bộ module.
+            (RoleCode: "ADMIN", PermissionCode: "DASHBOARD_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "PROGRESS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "SURVEY_DASHBOARD_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "REPORTS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "GRADUATION_UPLOAD_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),
@@ -179,11 +185,13 @@ public static class DatabaseSeeder
             (RoleCode: "ADMIN", PermissionCode: "OPEN_COMMENT_MODEL_ADMIN"),
 
             // SURVEY_ADMIN: toàn bộ module nghiệp vụ, không có quản trị người dùng.
+            (RoleCode: "SURVEY_ADMIN", PermissionCode: "DASHBOARD_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "PROGRESS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "SURVEY_DASHBOARD_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "REPORTS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
+            (RoleCode: "SURVEY_ADMIN", PermissionCode: "GRADUATION_UPLOAD_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),
@@ -200,12 +208,41 @@ public static class DatabaseSeeder
             // kỹ thuật, phải để lại dấu vết ở tài khoản quản trị hệ thống.
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "OPEN_COMMENT_SENTIMENT_REVIEW"),
 
+            // BOARD_OF_DIRECTORS: mở đúng bằng SURVEY_ADMIN. Khác nhau ở chỗ vai trò này
+            // chỉ ĐỌC — chặn ghi nằm ở UserScope.IsReadOnly chứ không ở danh sách module,
+            // vì quyền module chỉ quyết định vào được trang nào.
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "DASHBOARD_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "PROGRESS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "SURVEY_DASHBOARD_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "REPORTS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "FACULTIES_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "DEPARTMENTS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "LECTURERS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "MAJORS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COHORT_MAJORS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COURSES_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COURSE_SECTIONS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COURSE_QUESTION_SETS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COURSE_CAMPAIGNS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "PROGRAM_CAMPAIGNS_ACCESS"),
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "PROGRAM_CRITERIA_ACCESS"),
+
             // DEPARTMENT_MANAGER: chỉ tiến độ và báo cáo trong Phase 2.
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "PROGRESS_ACCESS"),
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "SURVEY_DASHBOARD_ACCESS"),
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "REPORTS_ACCESS"),
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
+
+            // FACULTY_MANAGER: cùng bộ module với trưởng bộ môn, khác ở phạm vi dữ liệu.
+            (RoleCode: "FACULTY_MANAGER", PermissionCode: "PROGRESS_ACCESS"),
+            (RoleCode: "FACULTY_MANAGER", PermissionCode: "SURVEY_DASHBOARD_ACCESS"),
+            (RoleCode: "FACULTY_MANAGER", PermissionCode: "REPORTS_ACCESS"),
+            (RoleCode: "FACULTY_MANAGER", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
+            (RoleCode: "FACULTY_MANAGER", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
         };
 
         foreach (var definition in definitions)

@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { Building2 } from 'lucide-react';
 import type { FacultyOverview } from '../../types';
-import { scoreColor } from './theme';
+import { formatDecimal, scoreColor } from './theme';
 import { FacultyNameAxisTick } from './FacultyNameAxisTick';
 import { wrapFacultyName } from './facultyChartLabels';
 
@@ -37,7 +37,7 @@ const ScoreTooltip: React.FC<{ active?: boolean; payload?: TooltipPayloadItem[] 
     <div className="reports-chart-tooltip">
       <strong>{f.facultyName}</strong>
       <span style={{ color: scoreColor(f.averageScore) }}>
-        Điểm TB: {f.averageScore > 0 ? f.averageScore.toFixed(2) : '—'} / 5.0
+        Điểm TB: {f.averageScore > 0 ? formatDecimal(f.averageScore) : '—'} / 5,0
       </span>
       <span>{f.responseCount.toLocaleString('vi-VN')} phiếu · {f.sectionCount} lớp</span>
     </div>
@@ -107,7 +107,7 @@ export const FacultyScoreChart: React.FC<FacultyScoreChartProps> = ({
               strokeDasharray="6 4"
               ifOverflow="extendDomain"
               label={{
-                value: `Toàn trường ${schoolAverage.toFixed(2)}`,
+                value: `Toàn trường ${formatDecimal(schoolAverage)}`,
                 position: 'top',
                 fill: '#1f2937',
                 fontSize: 13,

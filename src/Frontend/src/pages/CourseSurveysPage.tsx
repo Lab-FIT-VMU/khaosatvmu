@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../auth/authContext';
-import { isUnrestrictedRole, ROLE_CODES } from '../auth/roles';
+import { isUnitManagerRole, isUnrestrictedRole, ROLE_CODES } from '../auth/roles';
+import { writeSemesterSurveysCache } from '../hooks/useSemesterSurveys';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { SurveyFormDesigner } from '../components/SurveyFormDesigner';
@@ -234,9 +235,8 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   // Thêm phạm vi chỉ còn dành cho quản trị. Trưởng bộ môn trước đây tự thêm được
   // bộ môn mình vào đợt, giờ tắt theo yêu cầu.
   const canAddScope = canManageCampaign;
-  const canViewReports = canManageCampaign || roleCode === ROLE_CODES.departmentManager;
-  const hideCampaignCounts =
-    roleCode === ROLE_CODES.departmentManager || roleCode === ROLE_CODES.lecturer;
+  const canViewReports = canManageCampaign || isUnitManagerRole(roleCode);
+  const hideCampaignCounts = isUnitManagerRole(roleCode) || roleCode === ROLE_CODES.lecturer;
 
   const [templates, setTemplates] = useState<SurveyTemplate[]>([]);
   /** Thang trả lời của mọi bộ, để màn soạn phiếu dựng đúng các mức của từng câu. */
@@ -403,6 +403,9 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
       setLoading(true);
       try {
         const surveys = await surveyApi.semesterSurveys(Number(selectedSemesterId));
+        // Trang này là nơi tạo, sửa và xoá đợt, nên mỗi lần nạp lại phải ghi đè cache
+        // dùng chung — không thì ô chọn Đợt ở các trang khác còn giữ danh sách cũ.
+        writeSemesterSurveysCache(Number(selectedSemesterId), surveys);
         setSemesterSurveys(surveys);
         setLoadError(null);
         // Mở sẵn đợt mới nhất để thấy ngay link và mã QR của từng lớp.

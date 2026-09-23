@@ -1,4 +1,4 @@
-namespace UnitTests.ApplicationTests;
+﻿namespace UnitTests.ApplicationTests;
 
 using Application.GraduationAnalytics;
 using Domain;
@@ -33,7 +33,7 @@ public sealed class GraduationExploreCalculatorTests
         result.Kpis.Single(x => x.Id == "graduated").Count.Should().Be(6);
         result.Kpis.Single(x => x.Id == "onTime").Count.Should().Be(5);
         result.Kpis.Single(x => x.Id == "workStudy").Count.Should().Be(1);
-        result.Kpis.Single(x => x.Id == "workStudy").Rate.Should().Be(16.67m);
+        result.Kpis.Single(x => x.Id == "workStudy").Rate.Should().Be(16.667m);
         result.Ranks.Single(x => x.Rank == GraduationRank.Excellent).Count.Should().Be(2);
         result.Ranks.Single(x => x.Rank == GraduationRank.VeryGood).Count.Should().Be(0);
         result.Ranks.Single(x => x.Rank == GraduationRank.Good).Count.Should().Be(1);

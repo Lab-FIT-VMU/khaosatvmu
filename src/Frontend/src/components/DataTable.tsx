@@ -40,10 +40,22 @@ export interface DataTableExportConfig<T> {
   title?: string;
   subtitle?: string;
   subInstitution?: string;
+  /**
+   * Đường dẫn điều hướng in ở dòng thứ hai của tệp xuất, ví dụ
+   * ['Thống kê & Báo cáo', 'Theo Khoa/Viện']. Khai rồi thì dòng đó là đường dẫn
+   * này thay cho `subInstitution`.
+   */
+  breadcrumb?: string[];
   info?: Record<string, string | number | undefined | null>;
   summaryNotes?: string[];
   columns?: ExportColumn<T>[];
-  sheets?: ExportSheet<any>[];
+  /**
+   * Nhiều sheet, hoặc hàm dựng danh sách sheet.
+   *
+   * Hàm được gọi đúng lúc bấm xuất, nên dùng được cho sheet phải lấy thêm dữ liệu
+   * từ API — ví dụ mỗi khoa/viện một sheet kèm số liệu chi tiết của khoa đó.
+   */
+  sheets?: ExportSheet<any>[] | (() => Promise<ExportSheet<any>[]>);
   scope?: 'filtered' | 'all';
 }
 
@@ -232,7 +244,7 @@ export function DataTable<T>({
       }));
   }, [columns, exportConfig?.columns]);
 
-  const exportDataPayload = useMemo<AnyExportOptions<T>>(() => {
+  const exportDataPayload = useMemo<AnyExportOptions<T> | (() => Promise<AnyExportOptions<T>>)>(() => {
     const exportDataset = exportConfig?.scope === 'all' ? data : sortedData;
     // Placeholder chỉ hướng dẫn tìm kiếm, không mô tả nội dung báo cáo. Dùng nó làm
     // tên tệp từng tạo ra các tên sai như "tim-nhanh-theo-ten-bo-mon.xlsx".
@@ -241,29 +253,36 @@ export function DataTable<T>({
       exportConfig?.fileName ||
       'danh-sach-du-lieu';
 
+    const exportMetadata = {
+      title: resolvedTitle,
+      subtitle: exportConfig?.subtitle,
+      subInstitution: exportConfig?.subInstitution,
+      breadcrumb: exportConfig?.breadcrumb,
+      info: exportConfig?.info,
+      summaryNotes: exportConfig?.summaryNotes,
+    };
+
+    // Sheet phụ có thể cần gọi API nên chỉ dựng khi thật sự bấm xuất.
+    if (typeof exportConfig?.sheets === 'function') {
+      const buildSheets = exportConfig.sheets;
+      return async () => ({
+        fileName: resolvedFileName,
+        metadata: exportMetadata,
+        sheets: await buildSheets(),
+      });
+    }
+
     if (exportConfig?.sheets && exportConfig.sheets.length > 0) {
       return {
         fileName: resolvedFileName,
-        metadata: {
-          title: resolvedTitle,
-          subtitle: exportConfig?.subtitle,
-          subInstitution: exportConfig?.subInstitution,
-          info: exportConfig?.info,
-          summaryNotes: exportConfig?.summaryNotes,
-        },
+        metadata: exportMetadata,
         sheets: exportConfig.sheets,
       };
     }
 
     return {
       fileName: resolvedFileName,
-      metadata: {
-        title: resolvedTitle,
-        subtitle: exportConfig?.subtitle,
-        subInstitution: exportConfig?.subInstitution,
-        info: exportConfig?.info,
-        summaryNotes: exportConfig?.summaryNotes,
-      },
+      metadata: exportMetadata,
       columns: exportColumns,
       data: exportDataset,
     };
@@ -342,7 +361,7 @@ export function DataTable<T>({
             </label>
           )}
 
-          {enableExport && exportColumns.length > 0 && (
+          {enableExport && (exportColumns.length > 0 || typeof exportConfig?.sheets === 'function') && (
             <ExportDropdown options={exportDataPayload} size="sm" />
           )}
 

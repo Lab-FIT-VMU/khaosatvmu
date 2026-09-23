@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { roleDisplayName } from '../auth/roles';
+import { useBreadcrumbTrail } from '../context/breadcrumbTrail';
 import type { AuthProfile, AuthUser } from '../types';
 import { ProfileSelectionDialog } from './ProfileSelectionDialog';
+import { sidebarTabLabels } from './sidebarMenu';
 import { UserAccountMenu } from './UserAccountMenu';
 
 interface HeaderProps {
@@ -15,33 +17,20 @@ interface HeaderProps {
   onLogout: () => Promise<void>;
 }
 
-interface TabContext {
-  section: string;
-  title: string;
-}
+/**
+ * Dòng 1 của thanh trên cùng, cố định cho mọi trang.
+ */
+const institutionName = 'Trường Đại học Hàng hải Việt Nam';
 
-const tabContexts: Record<string, TabContext> = {
-  overview: { section: 'Tổng quan', title: 'Bảng điều khiển' },
-  progress: { section: 'Tổng quan', title: 'Tiến độ thu phiếu' },
-  'survey-analysis': { section: 'Tổng quan', title: 'Phân tích chuyên sâu' },
-  'graduation-analytics': { section: 'Thống kê tốt nghiệp', title: 'Tải lên dữ liệu' },
-  'graduation-analytics-2': { section: 'Thống kê tốt nghiệp', title: 'Tải lên dữ liệu' },
-  'graduation-data-upload': { section: 'Thống kê tốt nghiệp', title: 'Tải lên dữ liệu' },
-  'graduation-statistics': { section: 'Thống kê tốt nghiệp', title: 'Thống kê chi tiết' },
-  faculties: { section: 'Danh mục đào tạo', title: 'Khoa / Viện' },
-  departments: { section: 'Danh mục đào tạo', title: 'Bộ môn' },
-  lecturers: { section: 'Danh mục đào tạo', title: 'Giảng viên' },
-  majors: { section: 'Danh mục đào tạo', title: 'Ngành đào tạo' },
-  'cohort-majors': { section: 'Danh mục đào tạo', title: 'Khoá ngành đào tạo' },
-  courses: { section: 'Danh mục đào tạo', title: 'Học phần' },
-  classes: { section: 'Danh mục đào tạo', title: 'Lớp học phần' },
-  criteria: { section: 'Khảo sát học phần', title: 'Bộ câu hỏi khảo sát' },
-  campaigns: { section: 'Khảo sát học phần', title: 'Khảo sát học phần' },
-  'course-question-sets': { section: 'Khảo sát học phần', title: 'Bộ câu hỏi khảo sát' },
-  'course-campaigns': { section: 'Khảo sát học phần', title: 'Khảo sát học phần' },
-  'program-criteria': { section: 'Khảo sát chương trình', title: 'Tiêu chí CTĐT' },
-  'program-campaigns': { section: 'Khảo sát chương trình', title: 'Đợt khảo sát CTĐT' },
-  'users-admin': { section: 'Quản trị', title: 'Người dùng & phân quyền' },
+/**
+ * Nhãn cho các mã tab cũ còn nằm trong bookmark mà sidebar không còn mục riêng.
+ * Tab nào có mục trên sidebar thì lấy nhãn từ đó, khỏi phải khai lại hai nơi.
+ */
+const legacyTabLabels: Record<string, string> = {
+  'graduation-analytics': 'Tải lên dữ liệu',
+  'graduation-analytics-2': 'Tải lên dữ liệu',
+  criteria: 'Danh sách bộ khảo sát',
+  campaigns: 'Danh sách đợt khảo sát',
 };
 
 export function Header({
@@ -55,10 +44,16 @@ export function Header({
   const [busy, setBusy] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
-  const context = tabContexts[currentTab] ?? {
-    section: 'Hệ thống khảo sát',
-    title: 'Trường Đại học Hàng hải Việt Nam',
-  };
+  /*
+    Dòng 2 là đường dẫn điều hướng: mở đầu bằng tên mục đang chọn trên sidebar, rồi
+    tới các cấp sâu hơn mà chính trang khai ra (tab con, khoa/viện, lớp...). Không có
+    cụm "Hệ thống khảo sát" ở đầu — mục đầu tiên phải là mục người dùng vừa bấm.
+  */
+  const trail = useBreadcrumbTrail();
+  const crumbs = [
+    sidebarTabLabels[currentTab] ?? legacyTabLabels[currentTab] ?? 'Bảng điều khiển',
+    ...trail,
+  ].filter((crumb, index, all) => crumb.trim() !== '' && crumb !== all[index - 1]);
   const handleSwitch = async (profileId: string) => {
     if (profileId === activeProfile.id) return;
     setBusy(true);
@@ -97,12 +92,17 @@ export function Header({
   return (
     <header className="top-header">
       <div className="header-title-area">
-        <div className="header-breadcrumb">
-          <span>Hệ thống khảo sát</span>
-          <ChevronRight aria-hidden="true" />
-          <span>{context.section}</span>
-        </div>
-        <h1>{context.title}</h1>
+        {/* Tên trường đứng trên, cố định cho mọi trang; đường dẫn điều hướng xuống dưới:
+            đi vào trang nào thì dòng dưới hiện tới trang đó, vào sâu tiếp thì nối thêm. */}
+        <h1>{institutionName}</h1>
+        <nav className="header-breadcrumb" aria-label="Đường dẫn điều hướng">
+          {crumbs.map((crumb, index) => (
+            <Fragment key={crumb}>
+              {index > 0 && <ChevronRight aria-hidden="true" />}
+              <span>{crumb}</span>
+            </Fragment>
+          ))}
+        </nav>
       </div>
 
       <div className="header-actions">

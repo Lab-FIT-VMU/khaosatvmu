@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatNumber } from './theme';
+import { formatDecimal } from '../../utils/formatNumber';
 import {
   COMPLETED_COMPLETION_RATE,
   LAGGING_COMPLETION_RATE,
@@ -29,7 +30,7 @@ export const CompletionGauge: React.FC<CompletionGaugeProps> = ({
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.min(100, Math.max(0, value));
-  const displayValue = clamped > 0 && clamped < 1 ? clamped.toFixed(1) : clamped.toFixed(0);
+  const displayValue = clamped > 0 && clamped < 1 ? formatDecimal(clamped, 3) : formatDecimal(clamped, 3);
   const offset = circumference - (clamped / 100) * circumference;
   const color = completionColor(clamped);
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { ScoreBand } from '../../types';
 import { bandColor } from './theme';
+import { formatPercent } from '../../utils/formatNumber';
 
 interface ScoreDistributionDonutProps {
   scoreDistribution: ScoreBand[];
@@ -22,7 +23,7 @@ const DonutTooltip: React.FC<{ active?: boolean; payload?: TooltipPayloadItem[] 
     <div className="reports-chart-tooltip">
       <strong>{band.label}</strong>
       <span>{band.count.toLocaleString('vi-VN')} phiếu</span>
-      <span>{band.percentage.toFixed(1)}%</span>
+      <span>{formatPercent(band.percentage, 3)}</span>
     </div>
   );
 };
@@ -76,7 +77,7 @@ export const ScoreDistributionDonut: React.FC<ScoreDistributionDonutProps> = ({
               <span className="reports-donut-legend-dot" style={{ background: bandColor(band) }} />
               <span className="reports-donut-legend-label">{item?.label ?? '—'}</span>
               <span className="reports-donut-legend-value">
-                {item ? `${item.percentage.toFixed(0)}%` : '0%'}
+                {item ? `${formatPercent(item.percentage, 3)}` : '0%'}
               </span>
             </li>
           );

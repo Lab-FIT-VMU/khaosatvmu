@@ -1,25 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  BarChart3,
-  BookOpen,
-  Building2,
-  ChartColumn,
-  ClipboardCheck,
-  FileCheck2,
-  Gauge,
-  GraduationCap,
-  LayoutDashboard,
-  ListChecks,
-  Network,
   PanelLeftClose,
   PanelLeftOpen,
-  Presentation,
-  School,
-  Sigma,
-  Table2,
-  Upload,
-  UserCog,
-  UsersRound,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -27,6 +9,7 @@ import { canAccessModule } from '../auth/modulePermissions';
 import { useAuth } from '../auth/authContext';
 import { canAccessDashboard } from '../auth/roles';
 import { HeaderSemesterPicker } from './HeaderSemesterPicker';
+import { menuStructure } from './sidebarMenu';
 
 interface SidebarProps {
   currentTab: string;
@@ -83,72 +66,23 @@ export function Sidebar({
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [isMobileOpen]);
 
-  const menuGroups: SidebarGroup[] = [
-    {
-      section: 'TỔNG QUAN',
-      items: [
-        { id: 'overview', label: 'Bảng điều khiển', icon: LayoutDashboard },
-        { id: 'survey-dashboard', label: 'Tổng quan khảo sát', icon: Gauge },
-        { id: 'progress', label: 'Tiến độ thu phiếu', icon: ChartColumn },
-        { id: 'survey-statistics', label: 'Bảng dữ liệu khảo sát', icon: Table2 },
-        { id: 'reports', label: 'Thống kê & Báo cáo', icon: BarChart3 },
-        { id: 'survey-analysis', label: 'Phân tích chuyên sâu', icon: Sigma },
-      ],
-    },
-    {
-      section: 'THỐNG KÊ TỐT NGHIỆP',
-      items: [
-        { id: 'graduation-data-upload', label: 'Tải lên dữ liệu', icon: Upload },
-        { id: 'graduation-statistics', label: 'Thống kê chi tiết', icon: BarChart3 },
-      ],
-    },
-    {
-      section: 'DANH MỤC ĐÀO TẠO',
-      items: [
-        { id: 'faculties', label: 'Khoa / Viện', icon: Building2 },
-        { id: 'departments', label: 'Bộ môn', icon: Network },
-        { id: 'lecturers', label: 'Giảng viên', icon: Presentation },
-        { id: 'majors', label: 'Ngành đào tạo', icon: GraduationCap },
-        { id: 'cohort-majors', label: 'Khoá ngành đào tạo', icon: UsersRound },
-        { id: 'courses', label: 'Học phần', icon: BookOpen },
-        { id: 'classes', label: 'Lớp học phần', icon: UsersRound },
-      ],
-    },
-    {
-      section: 'KHẢO SÁT HỌC PHẦN',
-      items: [
-        { id: 'course-question-sets', 
-          label: 'Danh sách bộ khảo sát', icon: ListChecks },
-        {
-          id: 'course-campaigns',
-          label: 'Danh sách đợt khảo sát',
-          icon: ClipboardCheck,
-          badge: activeCampaignsCount > 0 ? activeCampaignsCount : undefined,
-        },
-      ],
-    },
-    {
-      section: 'KHẢO SÁT CHƯƠNG TRÌNH',
-      items: [
-        { id: 'program-campaigns', label: 'Đợt khảo sát CTĐT', icon: School },
-        { id: 'program-criteria', label: 'Tiêu chí CTĐT', icon: FileCheck2 },
-      ],
-    },
-    {
-      section: 'QUẢN TRỊ',
-      items: [
-        { id: 'users-admin', label: 'Người dùng & phân quyền', icon: UserCog },
-      ],
-    },
-  ]
+  const menuGroups: SidebarGroup[] = menuStructure
     .map((group) => ({
       ...group,
-      items: group.items.filter(
-        (item) =>
-          canAccessModule(permissions, item.id)
-          // Bảng điều khiển tạm đóng với giảng viên và trưởng bộ môn.
-          && (item.id !== 'overview' || dashboardAllowed)
-      ),
+      items: group.items
+        .filter(
+          (item) =>
+            // Tải lên dữ liệu tốt nghiệp có quyền module riêng (GRADUATION_UPLOAD_ACCESS)
+            // nên không cần lọc thêm theo vai trò ở đây; vai trò chỉ đọc không được cấp
+            // quyền đó, và backend vẫn từ chối nếu ai đó bật nhầm.
+            canAccessModule(permissions, item.id)
+            // Bảng điều khiển tạm đóng với giảng viên và các trưởng đơn vị.
+            && (item.id !== 'overview' || dashboardAllowed)
+        )
+        // Huy hiệu "đợt đang mở" chỉ có nghĩa với mục danh sách đợt khảo sát học phần.
+        .map((item) => (item.id === 'course-campaigns' && activeCampaignsCount > 0
+          ? { ...item, badge: activeCampaignsCount }
+          : item)),
     }))
     .filter((group) => group.items.length > 0);
 

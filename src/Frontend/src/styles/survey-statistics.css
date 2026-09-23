@@ -140,7 +140,7 @@
   flex: 1 1 auto;
   min-height: 200px;
   overflow: auto;
-  border: 1px solid #dfe4e8;
+  border: 1px solid var(--grid-line-strong);
   background: #ffffff;
   outline: none;
 
@@ -216,11 +216,13 @@
   background: #ffffff;
 }
 
+/* Nét kẻ ô đủ đậm để dò ngang một dòng 15 cột mà không lạc. Độ đậm lấy từ token
+   chung trong index.css, nên mọi bảng trong hệ thống kẻ giống nhau. */
 .statistics-table th,
 .statistics-table td {
   padding: 6px 10px;
-  border-right: 1px solid #eef2f4;
-  border-bottom: 1px solid #eef2f4;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
   text-align: left;
 }
 
@@ -364,7 +366,7 @@
   width: var(--col-left-3);
   min-width: var(--col-left-3);
   max-width: var(--col-left-3);
-  border-right: 1px solid #cfd7dc;
+  border-right: 1px solid var(--grid-line-emphasis);
 }
 
 /*
@@ -392,7 +394,7 @@
   width: var(--col-right-3);
   min-width: var(--col-right-3);
   max-width: var(--col-right-3);
-  border-left: 1px solid #cfd7dc;
+  border-left: 1px solid var(--grid-line-emphasis);
 }
 
 /*
@@ -481,7 +483,7 @@
   position: sticky;
   bottom: 0;
   z-index: 2;
-  border-top: 1px solid #cfd7dc;
+  border-top: 1px solid var(--grid-line-emphasis);
   font-weight: 650;
 }
 
@@ -555,7 +557,7 @@
   min-width: 0;
   min-height: 34px;
   padding: 6px 10px;
-  border: 1px solid #d7dee2;
+  border: 1px solid var(--field-border);
   background: #ffffff;
   color: #000000;
   font-size: 13px;
@@ -625,8 +627,9 @@
 }
 
 /*
-  Hàng chọn tính điểm và Z-Score theo toàn bài hay theo một mục, ở tab Phân tích theo
-  lớp học phần. Nằm ngay trên dòng tóm tắt; tên mục dài thì xuống dòng chứ không tràn.
+  Hàng chọn tính điểm và Z-Score theo toàn bài hay theo một mục, dùng chung cho bốn tab
+  tính điểm của trang Phân tích. Nằm ngay dưới thanh tab, trên dòng tóm tắt; tên mục dài
+  thì xuống dòng chứ không tràn.
 */
 .analysis-section-picker {
   display: flex;
@@ -675,7 +678,7 @@
 .analysis-group-table {
   margin-bottom: 12px;
   overflow-x: auto;
-  border: 1px solid #dfe4e8;
+  border: 1px solid var(--grid-line-strong);
   background: #ffffff;
   flex: 0 0 auto;
 }
@@ -845,7 +848,7 @@
   margin: 2px 0 0;
   padding: 4px 0;
   overflow-y: auto;
-  border: 1px solid #cfd7dc;
+  border: 1px solid var(--grid-line-strong);
   background: #ffffff;
   box-shadow: 0 6px 18px rgba(32, 38, 44, 0.16);
   list-style: none;

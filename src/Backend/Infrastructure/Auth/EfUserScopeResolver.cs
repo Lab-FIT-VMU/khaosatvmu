@@ -38,7 +38,9 @@ internal sealed class EfUserScopeResolver(
             return UserScope.None;
         }
 
-        if (roleCode is RoleCodes.Admin or RoleCodes.SurveyAdmin)
+        // Ban Giám hiệu thấy toàn bộ dữ liệu như hai vai trò quản trị; phần "chỉ đọc"
+        // do UserScope.IsReadOnly quyết định chứ không phải do phạm vi.
+        if (roleCode is RoleCodes.Admin or RoleCodes.SurveyAdmin or RoleCodes.BoardOfDirectors)
         {
             return UserScope.Unrestricted(roleCode);
         }

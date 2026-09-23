@@ -29,6 +29,7 @@ import {
   type QuestionExportFormat,
 } from '../services/exportQuestionAnalysisService';
 import '../styles/catalogs.css';
+import { formatDecimal, formatPercent } from '../utils/formatNumber';
 
 export interface QuestionAnalysisChartProps {
   questions: QuestionRating[];
@@ -86,8 +87,8 @@ const CustomQuestionTooltip: React.FC<CustomTooltipProps> = ({ active, payload }
         <div className="analysis-tooltip-score-info">
           <div className="analysis-tooltip-score" style={{ color }}>
             <Star className="analysis-tooltip-star" aria-hidden="true" />
-            <span>{score > 0 ? score.toFixed(2) : '—'}</span>
-            <small>/ 5.0</small>
+            <span>{score > 0 ? formatDecimal(score, 3) : '—'}</span>
+            <small>/ 5,0</small>
           </div>
           <span
             className="analysis-tooltip-tag"
@@ -131,7 +132,7 @@ const CustomQuestionTooltip: React.FC<CustomTooltipProps> = ({ active, payload }
                   />
                 </div>
                 <span className="dist-opt-count">
-                  {opt.count} ({opt.percentage.toFixed(0)}%)
+                  {opt.count} ({formatPercent(opt.percentage, 3)})
                 </span>
               </div>
             ))}
@@ -246,16 +247,16 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
         {/* Chú thích thang điểm nằm luôn trên hàng tiêu đề, đỡ tốn một băng riêng. */}
         <div className="analysis-legend-items" aria-label="Thang đánh giá">
           <span className="analysis-legend-chip">
-            <span className="legend-dot" style={{ backgroundColor: '#10b981' }} />≥ 4.5
+            <span className="legend-dot" style={{ backgroundColor: '#10b981' }} />≥ 4,5
           </span>
           <span className="analysis-legend-chip">
-            <span className="legend-dot" style={{ backgroundColor: '#0284c7' }} />4.0 - 4.49
+            <span className="legend-dot" style={{ backgroundColor: '#0284c7' }} />4,0 - 4,49
           </span>
           <span className="analysis-legend-chip">
-            <span className="legend-dot" style={{ backgroundColor: '#f59e0b' }} />3.0 - 3.99
+            <span className="legend-dot" style={{ backgroundColor: '#f59e0b' }} />3,0 - 3,99
           </span>
           <span className="analysis-legend-chip">
-            <span className="legend-dot" style={{ backgroundColor: '#ef4444' }} />&lt; 3.0
+            <span className="legend-dot" style={{ backgroundColor: '#ef4444' }} />&lt; 3,0
           </span>
         </div>
 
@@ -269,7 +270,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
             <span className="analysis-meta-dash" aria-hidden="true" />
             {averageLabel}:{' '}
             <strong style={{ color: getScoreColor(computedAverage) }}>
-              {computedAverage > 0 ? computedAverage.toFixed(2) : '—'} / 5.0
+              {computedAverage > 0 ? formatDecimal(computedAverage, 3) : '—'} / 5,0
             </strong>
           </span>
 
@@ -527,7 +528,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                   <LabelList
                     dataKey="averageScore"
                     position="top"
-                    formatter={(val: unknown) => (Number(val) > 0 ? Number(val).toFixed(2) : '')}
+                    formatter={(val: unknown) => (Number(val) > 0 ? formatDecimal(Number(val), 3) : '')}
                     style={{ fontSize: 13, fontWeight: 700, fill: '#475569' }}
                     offset={6}
                   />
@@ -633,13 +634,13 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                                 {cell?.count ?? 0}
                               </span>
                               <span className="section-analysis-option-pct">
-                                ({(cell?.percentage ?? 0).toFixed(0)}%)
+                                ({formatPercent((cell?.percentage ?? 0), 3)})
                               </span>
                             </td>
                           );
                         })}
                         <td className="section-analysis-avg-cell" style={{ color: scoreColor }}>
-                          <strong>{score > 0 ? score.toFixed(2) : '—'}</strong>
+                          <strong>{score > 0 ? formatDecimal(score, 3) : '—'}</strong>
                         </td>
                         <td className="analysis-rating-cell">
                           <span

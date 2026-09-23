@@ -2,12 +2,14 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import { toast } from 'sonner';
 import { useAuth } from './auth/authContext';
 import { canAccessModule } from './auth/modulePermissions';
-import { canAccessDashboard, isReadOnlyRole, isUnrestrictedRole } from './auth/roles';
+import { readSemesterSurveysCache, writeSemesterSurveysCache } from './hooks/useSemesterSurveys';
+import { canAccessDashboard, seesAllData, seesOnlyOwnSections } from './auth/roles';
 import { AuthLoading } from './components/AuthLoading';
 import { getHashRoot } from './pages/reportRoute';
 
 // Shared Components
 import { Header } from './components/Header';
+import { BreadcrumbTrailProvider } from './context/BreadcrumbTrailProvider';
 import { Sidebar } from './components/Sidebar';
 import { ScoringChangeNotifier } from './components/ScoringChangeNotifier';
 
@@ -173,7 +175,9 @@ function DashboardApp() {
   // Bảng điều khiển tạm đóng với giảng viên và trưởng bộ môn, nên hai vai trò đó
   // phải đáp xuống trang khác — cả khi mới vào lẫn khi gõ thẳng địa chỉ cũ.
   const dashboardAllowed = canAccessDashboard(auth.activeProfile?.roleCode);
-  const landingTab = dashboardAllowed
+  // Bảng điều khiển giờ có quyền module riêng, nên phải hỏi cả hai: vai trò mở được
+  // VÀ quyền còn bật. Thiếu vế thứ hai thì vòng "bị chặn → về trang đầu" chạy mãi.
+  const landingTab = dashboardAllowed && canAccessModule(permissions, 'overview')
     ? 'overview'
     : ['progress', 'course-campaigns', 'survey-statistics', 'reports', 'classes', 'users-admin']
         .find((moduleId) => canAccessModule(permissions, moduleId)) ?? 'progress';
@@ -266,6 +270,10 @@ function DashboardApp() {
     }
 
     let cancelled = false;
+    // Học kỳ này đã có trang khác nạp danh sách đợt thì hiện ngay, đừng để ô chọn
+    // trống một nhịp rồi mới có dữ liệu.
+    const cachedSurveys = readSemesterSurveysCache(activeSemesterId);
+    if (cachedSurveys) setSemesterSurveys(cachedSurveys);
     setSurveyLoading(true);
 
     const load = async () => {
@@ -275,6 +283,7 @@ function DashboardApp() {
           surveyApi.allCourseSectionSurveys({ semesterId: activeSemesterId }),
         ]);
         if (cancelled) return;
+        writeSemesterSurveysCache(activeSemesterId, surveys);
         setSemesterSurveys(surveys);
         setSectionSurveys(allSections);
         setSurveyLoadError(null);
@@ -597,6 +606,7 @@ function DashboardApp() {
 
   // Render Main Dashboard Layout
   return (
+    <BreadcrumbTrailProvider>
     <div className="app-container">
       {/* Navigation Sidebar */}
       <Sidebar
@@ -628,7 +638,7 @@ function DashboardApp() {
                 mặc định, không thì lại rơi vào trang của trưởng bộ môn.
                 Xem congviec2.md mục F1 và congviec3.md mục I1. */}
             {currentTab === 'overview' && (
-              isUnrestrictedRole(auth.activeProfile?.roleCode) ? (
+              seesAllData(auth.activeProfile?.roleCode) ? (
                 <DashboardOverview
                   semesterSurveys={semesterSurveys}
                   sectionSurveys={sectionSurveys}
@@ -637,7 +647,7 @@ function DashboardApp() {
                   permissions={permissions}
                   onNavigateTab={(tab) => setCurrentTab(tab)}
                 />
-              ) : isReadOnlyRole(auth.activeProfile?.roleCode) ? (
+              ) : seesOnlyOwnSections(auth.activeProfile?.roleCode) ? (
                 <LecturerDashboardPage onNavigateTab={(tab) => setCurrentTab(tab)} />
               ) : (
                 <DepartmentDashboardPage onNavigateTab={(tab) => setCurrentTab(tab)} />
@@ -803,6 +813,7 @@ function DashboardApp() {
         }}
       />
     </div>
+    </BreadcrumbTrailProvider>
   );
 }
 

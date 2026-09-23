@@ -46,7 +46,7 @@
   flex-direction: column;
   overflow: hidden;
   border: 0;
-  border-bottom: 1px solid #dfe4e8;
+  border-bottom: 1px solid var(--grid-line-strong);
   border-radius: 0;
   background: #ffffff;
 }
@@ -77,7 +77,7 @@
   align-items: center;
   gap: 8px;
   padding: 0 10px;
-  border: 1px solid #cfd7dc;
+  border: 1px solid var(--field-border);
   border-radius: 3px;
   background: #f7f9fa;
   color: #000000;
@@ -115,7 +115,7 @@
   width: min(260px, 26vw);
   height: 34px;
   padding: 0 30px 0 9px;
-  border: 1px solid #cfd7dc;
+  border: 1px solid var(--field-border);
   border-radius: 3px;
   background-color: #ffffff;
   color: #000000;
@@ -175,8 +175,8 @@
   z-index: 1;
   height: 46px;
   padding: 4px;
-  border-right: 1px solid #e5e9ec;
-  border-bottom: 1px solid #cfd7dc;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line-strong);
   background: #f7f9fa;
   color: #000000;
   font-size: 13px;
@@ -322,8 +322,8 @@
 .catalog-table td {
   height: 32px;
   padding: 4px 10px;
-  border-right: 1px solid #e8ecef;
-  border-bottom: 1px solid #e3e7ea;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
   vertical-align: middle;
   line-height: 1.35;
 }
@@ -344,8 +344,8 @@
 .catalog-table tfoot td {
   height: 38px;
   padding: 6px 10px;
-  border-top: 2px solid #b8c5cc;
-  border-right: 1px solid #dce3e7;
+  border-top: 2px solid var(--grid-line-emphasis);
+  border-right: 1px solid var(--grid-line);
   background: #eef4f6;
   color: #173f4d;
   font-weight: 700;
@@ -1011,6 +1011,16 @@
   max-height: calc(100dvh - 48px);
 }
 
+/* Hộp chú thích: rộng hơn hộp compact vì phải chứa công thức có phân số lồng
+   phân số. Bó hẹp 720px thì tử số bị ngắt dòng giữa chừng và công thức mất
+   hình dạng. Cao hết màn hình vì mỗi tab có tới ba công thức kèm bảng ký hiệu. */
+.catalog-modal-card.catalog-modal-card--note {
+  width: min(960px, 100%);
+  max-width: 960px;
+  height: auto;
+  max-height: calc(100dvh - 48px);
+}
+
 .catalog-modal-header.modal-header {
   min-height: 62px;
   padding: 12px 16px 12px 20px;
@@ -1110,7 +1120,7 @@
   width: 100%;
   min-height: 48px;
   padding: 11px 14px;
-  border: 1px solid #cfd7dc;
+  border: 1px solid var(--field-border);
   border-radius: 3px;
   background: #ffffff;
   color: #000000;
@@ -1461,6 +1471,18 @@
     border-radius: 4px !important;
   }
 
+  /* Màn hẹp thì hộp chú thích chiếm hết bề ngang: công thức đã sát mép rồi,
+     chừa thêm lề nữa là tử số gãy dòng. */
+  .catalog-modal-card.catalog-modal-card--note {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0 !important;
+  }
+
   .catalog-modal-close.modal-close-btn,
   .catalog-modal-card .btn {
     min-height: 44px;
@@ -1694,7 +1716,7 @@
   min-width: 0;
   min-height: 52px;
   padding: 6px 8px;
-  border: 1px solid #d7dee2;
+  border: 1px solid var(--field-border);
   border-radius: 3px;
   background: #ffffff;
   color: #000000;
@@ -1706,7 +1728,7 @@
 .survey-question-row-fields select {
   width: 100%;
   padding: 5px 8px;
-  border: 1px solid #d7dee2;
+  border: 1px solid var(--field-border);
   border-radius: 3px;
   background: #ffffff;
   color: #000000;
@@ -1871,7 +1893,7 @@
   flex: 1;
   min-width: 0;
   padding: 6px 8px;
-  border: 1px solid #d7dee2;
+  border: 1px solid var(--field-border);
   border-radius: 3px;
   background: #ffffff;
   color: #000000;
@@ -1912,7 +1934,7 @@
   width: 100%;
   min-height: 48px;
   padding: 11px 38px 11px 14px;
-  border: 1px solid #cfd7dc;
+  border: 1px solid var(--field-border);
   border-radius: 3px;
   background: #ffffff;
   color: #000000;
@@ -1957,7 +1979,7 @@
   padding: 4px 0;
   overflow-y: auto;
   list-style: none;
-  border: 1px solid #b9c2c9;
+  border: 1px solid var(--grid-line-strong);
   border-radius: 3px;
   background: #ffffff;
   box-shadow: 0 6px 18px rgba(15, 30, 45, 0.18);
@@ -2376,7 +2398,7 @@
   min-height: 28px;
   max-width: 150px;
   padding: 0 6px;
-  border: 1px solid #dfe4e8;
+  border: 1px solid var(--field-border);
   border-radius: 3px;
   background: #ffffff;
   font: inherit;
@@ -2535,7 +2557,7 @@
   width: 44px;
   height: 32px;
   padding: 2px;
-  border: 1px solid #dfe4e8;
+  border: 1px solid var(--field-border);
   background: #ffffff;
   cursor: pointer;
 }

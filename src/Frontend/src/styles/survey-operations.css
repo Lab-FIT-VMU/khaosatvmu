@@ -191,7 +191,7 @@
   width: 100%;
   min-height: 34px;
   padding: 6px 9px;
-  border: 1px solid var(--operations-border);
+  border: 1px solid var(--field-border);
   background: #ffffff;
   color: #000000;
   font: inherit;
@@ -355,7 +355,7 @@
 .campaign-table-scroll,
 .wizard-table-scroll {
   overflow-x: auto;
-  border: 1px solid var(--operations-border);
+  border: 1px solid var(--grid-line-strong);
 }
 
 .campaign-table,
@@ -371,8 +371,8 @@
 .wizard-table th {
   height: 38px;
   padding: 7px 9px;
-  border-right: 1px solid var(--operations-border);
-  border-bottom: 1px solid var(--operations-border);
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line-strong);
   background: var(--operations-muted);
   color: #000000;
   text-align: left;
@@ -385,8 +385,8 @@
 .wizard-table td {
   height: 46px;
   padding: 7px 9px;
-  border-right: 1px solid var(--operations-border);
-  border-bottom: 1px solid var(--operations-border);
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
   vertical-align: middle;
 }
 
@@ -806,7 +806,7 @@
   min-height: 34px;
   padding: 5px 9px;
   background: #ffffff;
-  border-color: var(--operations-border);
+  border-color: var(--field-border);
 }
 
 .operations-table-page .search-box > span:first-child {
@@ -816,7 +816,7 @@
 .operations-table-page .filter-select {
   min-height: 34px;
   padding: 5px 9px;
-  border-color: var(--operations-border);
+  border-color: var(--field-border);
 }
 
 .operations-table-page .vmu-table {
@@ -827,8 +827,8 @@
 .operations-table-page .vmu-table th {
   height: 40px;
   padding: 7px 10px;
-  border-right: 1px solid var(--operations-border);
-  border-bottom: 1px solid var(--operations-border);
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line-strong);
   color: #000000;
   font-size: 13px;
   letter-spacing: 0;
@@ -838,7 +838,7 @@
 .operations-table-page .vmu-table td {
   height: 46px;
   padding: 7px 10px;
-  border-right: 1px solid var(--operations-border);
+  border-right: 1px solid var(--grid-line);
   font-size: 13px;
 }
 
@@ -1747,6 +1747,19 @@
   white-space: nowrap;
 }
 
+/*
+  Bảng này chia cột theo % nên phải khoá table-layout: fixed. Để auto thì trình duyệt
+  nong cột theo nội dung: một ý kiến dài là cột Ý kiến khác chiếm hết bảng và dấu ba
+  chấm không bao giờ xuất hiện, vì ô luôn vừa đúng bề ngang của chữ.
+
+  Mười ba cột nên đặt sàn bề ngang rộng hơn mức chung 920px; hẹp hơn nữa thì các cột
+  Mức 1..5 bị bóp đến mức không đọc nổi.
+*/
+.section-responses-page .catalog-table {
+  min-width: 1180px;
+  table-layout: fixed;
+}
+
 /* Bảng phiếu trả lời rất dài nên bóp sát chiều cao dòng: mỗi ô đúng một dòng,
    nội dung đầy đủ nằm trong tooltip. */
 .section-responses-page .catalog-table td {
@@ -1908,28 +1921,83 @@
 .note-modal-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  font-size: 13px;
-  line-height: 1.5;
+  gap: 14px;
+  font-size: 15px;
+  line-height: 1.6;
 }
 
+/*
+  .z-legend nguyên bản là dải chú thích nằm ngang dưới chân bảng, nên nó là
+  flex-row có wrap. Mang nguyên vào hộp thoại thì tiêu đề mục, công thức và bảng
+  ký hiệu bị xếp cạnh nhau rồi tự ngắt dòng bừa — nhìn như ba cột lệch nhau. Ở
+  trong hộp thoại nó phải là các khối xếp dọc.
+*/
 .note-modal-body .z-legend {
+  display: block;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
 }
 
+.note-modal-body .z-legend__note {
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* Câu dẫn của tab: đứng đầu hộp nên tách hẳn ra khỏi phần công thức bên dưới. */
+.note-modal-body .z-legend__note:first-child {
+  margin-bottom: 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--grid-line);
+  font-size: 15px;
+}
+
+/* Bốn dòng quy ước ở cuối hộp: gom thành một khối xám để tách khỏi công thức. */
+.note-modal-body .formula-note + .z-legend__note {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--grid-line);
+}
+
 /* Bảng lớp trong Danh sách đợt khảo sát dùng chung quy chuẩn tiêu đề với các bảng
-   còn lại: chữ căn giữa cả hai chiều và được xuống dòng. Bảng này viết tay, không
-   có menu lọc trên tiêu đề nên không cần chỗ cho nút ở góc. */
+   còn lại: chữ căn giữa cả hai chiều và được xuống dòng. */
 .campaign-table th {
+  position: relative;
   height: 46px;
   padding: 4px 8px;
   white-space: normal;
   vertical-align: middle;
   text-align: center;
   line-height: 1.2;
+}
+
+/*
+  Nút lọc ghim góc trên phải của ô, đúng như bảng thống kê. Để nút nằm trong dòng
+  chảy thì cột rộng có nút cạnh chữ, cột hẹp như "Sĩ số" hay "Lượt trả lời" lại bị
+  đẩy nút xuống dòng dưới — mỗi cột một kiểu. Đưa nút ra khỏi dòng chảy thì chữ dùng
+  trọn bề ngang và mọi cột có nút ở cùng một chỗ.
+*/
+.campaign-table thead th .catalog-th-filterable {
+  display: block;
+}
+
+.campaign-table thead th .catalog-th-label {
+  display: block;
+  margin-right: 0;
+  white-space: normal;
+  text-align: center;
+}
+
+.campaign-table thead th .column-filter-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 14px;
+  height: 14px;
+  margin-left: 0;
+  z-index: 1;
 }
 
 /*
