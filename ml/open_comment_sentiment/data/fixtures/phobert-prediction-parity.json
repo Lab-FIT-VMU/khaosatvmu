@@ -1,0 +1,540 @@
+{
+  "generated_at_utc": "2026-09-20T10:46:52.147362+00:00",
+  "warning": "Fixture tá»•ng há»£p: nhÃ£n vÃ  Ä‘á»™ tin cáº­y do chÃ­nh engine Python sinh ra, dÃ¹ng Ä‘á»ƒ kiá»ƒm tra báº£n C# cho ra cÃ¹ng káº¿t quáº£. KHÃ”NG pháº£i metric cháº¥t lÆ°á»£ng mÃ´ hÃ¬nh â€” engine tá»± cháº¥m chÃ­nh nÃ³.",
+  "is_synthetic": true,
+  "engine": "SentimentInferenceEngine",
+  "confidence_threshold": 0.45,
+  "mixed_threshold": 0.2,
+  "max_length": 256,
+  "case_count": 44,
+  "cases": [
+    {
+      "case_id": "REG-001",
+      "text": "Giảng viên nhiệt tình, bài giảng dễ hiểu.",
+      "label": "Positive",
+      "confidence": 0.8721622228622437,
+      "base_label": "Positive",
+      "base_probabilities": {
+        "Negative": 0.02903192676603794,
+        "Neutral": 0.09880586713552475,
+        "Positive": 0.8721622228622437
+      }
+    },
+    {
+      "case_id": "REG-002",
+      "text": "Nội dung quá nhanh và thầy ít giải đáp thắc mắc.",
+      "label": "Neutral",
+      "confidence": 0.45704346895217896,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.4432668387889862,
+        "Neutral": 0.45704346895217896,
+        "Positive": 0.09968970715999603
+      }
+    },
+    {
+      "case_id": "REG-003",
+      "text": "Nên bổ sung thêm một buổi thực hành.",
+      "label": "Neutral",
+      "confidence": 0.8503354787826538,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.04385703429579735,
+        "Neutral": 0.8503354787826538,
+        "Positive": 0.10580749809741974
+      }
+    },
+    {
+      "case_id": "REG-004",
+      "text": "Cô hướng dẫn rất tận tâm nhưng lịch kiểm tra thay đổi quá nhiều.",
+      "label": "Neutral",
+      "confidence": 0.6238309741020203,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.09882581233978271,
+        "Neutral": 0.6238309741020203,
+        "Positive": 0.2773432731628418
+      }
+    },
+    {
+      "case_id": "REG-005",
+      "text": "Không có ý kiến.",
+      "label": "Neutral",
+      "confidence": 0.7254202961921692,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.2297498732805252,
+        "Neutral": 0.7254202961921692,
+        "Positive": 0.044829852879047394
+      }
+    },
+    {
+      "case_id": "REG-006",
+      "text": "Khong co y kien",
+      "label": "Neutral",
+      "confidence": 0.8892202973365784,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.06868992000818253,
+        "Neutral": 0.8892202973365784,
+        "Positive": 0.042089834809303284
+      }
+    },
+    {
+      "case_id": "REG-007",
+      "text": "ok",
+      "label": "Positive",
+      "confidence": 0.7515043020248413,
+      "base_label": "Positive",
+      "base_probabilities": {
+        "Negative": 0.03759150207042694,
+        "Neutral": 0.21090416610240936,
+        "Positive": 0.7515043020248413
+      }
+    },
+    {
+      "case_id": "REG-008",
+      "text": "Thầy dạy không dễ hiểu chút nào.",
+      "label": "Negative",
+      "confidence": 0.6435107588768005,
+      "base_label": "Negative",
+      "base_probabilities": {
+        "Negative": 0.6435107588768005,
+        "Neutral": 0.2941676676273346,
+        "Positive": 0.062321584671735764
+      }
+    },
+    {
+      "case_id": "REG-009",
+      "text": "Không phải là thầy dạy dở, chỉ là em chưa theo kịp.",
+      "label": "Neutral",
+      "confidence": 0.5931147336959839,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.35987305641174316,
+        "Neutral": 0.5931147336959839,
+        "Positive": 0.04701216146349907
+      }
+    },
+    {
+      "case_id": "REG-010",
+      "text": "sv k học đc j",
+      "label": "Neutral",
+      "confidence": 0.5323024392127991,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.42956268787384033,
+        "Neutral": 0.5323024392127991,
+        "Positive": 0.038134947419166565
+      }
+    },
+    {
+      "case_id": "REG-011",
+      "text": "Hay quá, bài tập nhiều không kịp thở :)))",
+      "label": "Neutral",
+      "confidence": 0.48934274911880493,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.3825892210006714,
+        "Neutral": 0.48934274911880493,
+        "Positive": 0.1280680149793625
+      }
+    },
+    {
+      "case_id": "REG-012",
+      "text": "!!!",
+      "label": "Neutral",
+      "confidence": 0.65076744556427,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.0888436809182167,
+        "Neutral": 0.65076744556427,
+        "Positive": 0.26038888096809387
+      }
+    },
+    {
+      "case_id": "REG-013",
+      "text": "asdfgh",
+      "label": "Neutral",
+      "confidence": 0.8519819378852844,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.055408306419849396,
+        "Neutral": 0.8519819378852844,
+        "Positive": 0.09260973334312439
+      }
+    },
+    {
+      "case_id": "REG-014",
+      "text": "nên đăng tài liệu sớm hơn",
+      "label": "Neutral",
+      "confidence": 0.8845983147621155,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.04966730996966362,
+        "Neutral": 0.8845983147621155,
+        "Positive": 0.0657343715429306
+      }
+    },
+    {
+      "case_id": "REG-015",
+      "text": "Tài liệu luôn đăng quá muộn làm sinh viên không chuẩn bị được.",
+      "label": "Negative",
+      "confidence": 0.6352801322937012,
+      "base_label": "Negative",
+      "base_probabilities": {
+        "Negative": 0.6352801322937012,
+        "Neutral": 0.3384753465652466,
+        "Positive": 0.02624455653131008
+      }
+    },
+    {
+      "case_id": "REG-016",
+      "text": "Phòng học nóng và máy chiếu mờ.",
+      "label": "Neutral",
+      "confidence": 0.6439664959907532,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.2740665674209595,
+        "Neutral": 0.6439664959907532,
+        "Positive": 0.08196698874235153
+      }
+    },
+    {
+      "case_id": "REG-017",
+      "text": "Thầy dạy bình thường, không có gì đặc biệt.",
+      "label": "Neutral",
+      "confidence": 0.7871917486190796,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.052555784583091736,
+        "Neutral": 0.7871917486190796,
+        "Positive": 0.16025245189666748
+      }
+    },
+    {
+      "case_id": "REG-018",
+      "text": "Cô rất nhiệt tình nhưng phòng học chật và nóng.",
+      "label": "Mixed",
+      "confidence": 0.69063401222229,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.34914731979370117,
+        "Neutral": 0.35546910762786865,
+        "Positive": 0.29538360238075256
+      }
+    },
+    {
+      "case_id": "REG-019",
+      "text": "Môn này khó nhưng thầy giảng kỹ nên em vẫn hiểu.",
+      "label": "Neutral",
+      "confidence": 0.7500585317611694,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.06933502852916718,
+        "Neutral": 0.7500585317611694,
+        "Positive": 0.1806064397096634
+      }
+    },
+    {
+      "case_id": "REG-020",
+      "text": "Em xin phép không nêu ý kiến.",
+      "label": "Neutral",
+      "confidence": 0.7937029600143433,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.163855642080307,
+        "Neutral": 0.7937029600143433,
+        "Positive": 0.04244139790534973
+      }
+    },
+    {
+      "case_id": "REG-021",
+      "text": "Nội dung ổn.",
+      "label": "Neutral",
+      "confidence": 0.78113853931427,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.054047223180532455,
+        "Neutral": 0.78113853931427,
+        "Positive": 0.16481426358222961
+      }
+    },
+    {
+      "case_id": "REG-022",
+      "text": "Bài giảng đúng tiến độ và đủ tài liệu.",
+      "label": "Positive",
+      "confidence": 0.7084638476371765,
+      "base_label": "Positive",
+      "base_probabilities": {
+        "Negative": 0.035433072596788406,
+        "Neutral": 0.2561030983924866,
+        "Positive": 0.7084638476371765
+      }
+    },
+    {
+      "case_id": "REG-023",
+      "text": "Thầy cho điểm không công bằng, rất bức xúc!!!",
+      "label": "Negative",
+      "confidence": 0.9137173891067505,
+      "base_label": "Negative",
+      "base_probabilities": {
+        "Negative": 0.9137173891067505,
+        "Neutral": 0.0562894344329834,
+        "Positive": 0.029993170872330666
+      }
+    },
+    {
+      "case_id": "REG-024",
+      "text": "thầy dạy hay lắm lun á mà cho bài tập hơi nhìu",
+      "label": "Positive",
+      "confidence": 0.8596625924110413,
+      "base_label": "Positive",
+      "base_probabilities": {
+        "Negative": 0.030590170994400978,
+        "Neutral": 0.10974720865488052,
+        "Positive": 0.8596625924110413
+      }
+    },
+    {
+      "case_id": "REG-025",
+      "text": "Cần thêm ví dụ thực tế vì lý thuyết hơi nhiều.",
+      "label": "Neutral",
+      "confidence": 0.838108241558075,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.11160502582788467,
+        "Neutral": 0.838108241558075,
+        "Positive": 0.050286758691072464
+      }
+    },
+    {
+      "case_id": "REG-026",
+      "text": "Cô luôn trả lời câu hỏi của sinh viên rất nhanh.",
+      "label": "Positive",
+      "confidence": 0.7120470404624939,
+      "base_label": "Positive",
+      "base_probabilities": {
+        "Negative": 0.039627738296985626,
+        "Neutral": 0.24832524359226227,
+        "Positive": 0.7120470404624939
+      }
+    },
+    {
+      "case_id": "REG-027",
+      "text": "Không biết",
+      "label": "Neutral",
+      "confidence": 0.8185298442840576,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.12141739577054977,
+        "Neutral": 0.8185298442840576,
+        "Positive": 0.060052741318941116
+      }
+    },
+    {
+      "case_id": "REG-028",
+      "text": "Đề thi không sát nội dung đã học.",
+      "label": "Neutral",
+      "confidence": 0.6999430060386658,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.22980506718158722,
+        "Neutral": 0.6999430060386658,
+        "Positive": 0.07025188952684402
+      }
+    },
+    {
+      "case_id": "REG-029",
+      "text": "em thấy bình thường ạ",
+      "label": "Neutral",
+      "confidence": 0.8833968043327332,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.04905862361192703,
+        "Neutral": 0.8833968043327332,
+        "Positive": 0.06754451245069504
+      }
+    },
+    {
+      "case_id": "REG-030",
+      "text": "Bài giảng hay nhưng âm thanh micro lúc rõ lúc không.",
+      "label": "Positive",
+      "confidence": 0.5915147662162781,
+      "base_label": "Positive",
+      "base_probabilities": {
+        "Negative": 0.11843821406364441,
+        "Neutral": 0.2900470495223999,
+        "Positive": 0.5915147662162781
+      }
+    },
+    {
+      "case_id": "EXTRA-001",
+      "text": "   ",
+      "label": "Uncertain",
+      "confidence": 0.0,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.0,
+        "Neutral": 1.0,
+        "Positive": 0.0
+      }
+    },
+    {
+      "case_id": "EXTRA-002",
+      "text": "a",
+      "label": "Neutral",
+      "confidence": 0.7852765917778015,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.09048417955636978,
+        "Neutral": 0.7852765917778015,
+        "Positive": 0.12423921376466751
+      }
+    },
+    {
+      "case_id": "EXTRA-003",
+      "text": "A",
+      "label": "Neutral",
+      "confidence": 0.7312437891960144,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.09260883927345276,
+        "Neutral": 0.7312437891960144,
+        "Positive": 0.17614734172821045
+      }
+    },
+    {
+      "case_id": "EXTRA-004",
+      "text": "Em cảm ơn thầy cô ạ.",
+      "label": "Positive",
+      "confidence": 0.75503009557724,
+      "base_label": "Positive",
+      "base_probabilities": {
+        "Negative": 0.029031196609139442,
+        "Neutral": 0.21593864262104034,
+        "Positive": 0.75503009557724
+      }
+    },
+    {
+      "case_id": "EXTRA-005",
+      "text": "Thầy dạy hay\tvà vui vẻ",
+      "label": "Positive",
+      "confidence": 0.9423351287841797,
+      "base_label": "Positive",
+      "base_probabilities": {
+        "Negative": 0.021013667806982994,
+        "Neutral": 0.03665119782090187,
+        "Positive": 0.9423351287841797
+      }
+    },
+    {
+      "case_id": "EXTRA-006",
+      "text": "Dòng một\nDòng hai",
+      "label": "Neutral",
+      "confidence": 0.8389924168586731,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.07968519628047943,
+        "Neutral": 0.8389924168586731,
+        "Positive": 0.0813223123550415
+      }
+    },
+    {
+      "case_id": "EXTRA-007",
+      "text": "Giảng viên KHÔNG giải đáp thắc mắc.",
+      "label": "Negative",
+      "confidence": 0.5426777601242065,
+      "base_label": "Negative",
+      "base_probabilities": {
+        "Negative": 0.5426777601242065,
+        "Neutral": 0.39055171608924866,
+        "Positive": 0.06677054613828659
+      }
+    },
+    {
+      "case_id": "EXTRA-008",
+      "text": "Cần thêm bài tập!!! Nhưng đừng quá nhiều...",
+      "label": "Neutral",
+      "confidence": 0.8688439726829529,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.07175524532794952,
+        "Neutral": 0.8688439726829529,
+        "Positive": 0.059400733560323715
+      }
+    },
+    {
+      "case_id": "EXTRA-009",
+      "text": "abcXYZ123",
+      "label": "Neutral",
+      "confidence": 0.745884895324707,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.07055830210447311,
+        "Neutral": 0.745884895324707,
+        "Positive": 0.18355682492256165
+      }
+    },
+    {
+      "case_id": "EXTRA-010",
+      "text": "Nhóm học tập làm việc hiệu quả, tuy nhiên khối lượng hơi nặng;",
+      "label": "Mixed",
+      "confidence": 0.4643506705760956,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.04896165058016777,
+        "Neutral": 0.6528633832931519,
+        "Positive": 0.2981748878955841
+      }
+    },
+    {
+      "case_id": "EXTRA-011",
+      "text": "Em không có ý kiến gì thêm, cảm ơn!",
+      "label": "Neutral",
+      "confidence": 0.8331374526023865,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.1250830888748169,
+        "Neutral": 0.8331374526023865,
+        "Positive": 0.041779372841119766
+      }
+    },
+    {
+      "case_id": "EXTRA-012",
+      "text": "Tài liệu @@ đặc biệt </s> <unk> <mask>",
+      "label": "Neutral",
+      "confidence": 0.8714097738265991,
+      "base_label": "Neutral",
+      "base_probabilities": {
+        "Negative": 0.04116110876202583,
+        "Neutral": 0.8714097738265991,
+        "Positive": 0.08742901682853699
+      }
+    },
+    {
+      "case_id": "EXTRA-013",
+      "text": "Điểm 9.5/10 nhưng đề thi quá khó???",
+      "label": "Mixed",
+      "confidence": 0.3831237852573395,
+      "base_label": "Negative",
+      "base_probabilities": {
+        "Negative": 0.4976622462272644,
+        "Neutral": 0.4277498126029968,
+        "Positive": 0.07458792626857758
+      }
+    },
+    {
+      "case_id": "EXTRA-014",
+      "text": "Thầy cô nhiệt tình, giải đáp nhanh, lịch học hợp lý.",
+      "label": "Positive",
+      "confidence": 0.8427686095237732,
+      "base_label": "Positive",
+      "base_probabilities": {
+        "Negative": 0.026792101562023163,
+        "Neutral": 0.13043926656246185,
+        "Positive": 0.8427686095237732
+      }
+    }
+  ]
+}

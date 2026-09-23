@@ -39,6 +39,14 @@ def length_bucket(text: str) -> str:
     return "long"
 
 
+TRUTHY_VALUES = {"t", "true", "1", "yes", "y"}
+
+
+def is_truthy(value: str) -> bool:
+    """Accept the truthy spellings used by PostgreSQL boolean exports and CSV tools."""
+    return (value or "").strip().casefold() in TRUTHY_VALUES
+
+
 def diverse_sample(rows: list[dict[str, str]], sample_size: int, seed: int) -> list[dict[str, str]]:
     rng = random.Random(seed)
     buckets: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
@@ -68,6 +76,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--text-column", default="AdditionalComments")
     parser.add_argument("--group-column", help="Optional survey period/semester column used for diverse sampling")
+    parser.add_argument(
+        "--valid-column",
+        help=(
+            "Optional column marking valid responses, e.g. IsValid. When given, only truthy rows are kept "
+            "so the gold sample cannot be filled with test or junk submissions."
+        ),
+    )
     parser.add_argument("--sample-size", type=int, default=400)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--overwrite", action="store_true")
@@ -85,13 +100,19 @@ def main() -> int:
 
     prepared: list[dict[str, str]] = []
     seen: set[str] = set()
+    dropped_by_validity = 0
     with input_path.open("r", encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream)
         if not reader.fieldnames or args.text_column not in reader.fieldnames:
             raise ValueError(f"Missing text column {args.text_column!r}; available columns: {reader.fieldnames}")
         if args.group_column and args.group_column not in reader.fieldnames:
             raise ValueError(f"Missing group column {args.group_column!r}; available columns: {reader.fieldnames}")
+        if args.valid_column and args.valid_column not in reader.fieldnames:
+            raise ValueError(f"Missing valid column {args.valid_column!r}; available columns: {reader.fieldnames}")
         for row in reader:
+            if args.valid_column and not is_truthy(row.get(args.valid_column, "")):
+                dropped_by_validity += 1
+                continue
             text = mask_direct_identifiers(normalize_text(row.get(args.text_column, "")))
             key = text.casefold()
             if not text or key in seen:
@@ -129,8 +150,11 @@ def main() -> int:
         "output_filename": output_path.name,
         "seed": args.seed,
         "requested_sample_size": args.sample_size,
+        "valid_column": args.valid_column,
+        "rows_dropped_by_validity": dropped_by_validity,
         "eligible_unique_rows": len(prepared),
         "selected_rows": len(selected),
+        "sampling_is_population": len(selected) == len(prepared),
         "length_distribution": dict(sorted(Counter(length_bucket(row["Text"]) for row in selected).items())),
         "source_group_count": len(set(row["SourceGroup"] for row in selected)),
         "direct_identifier_masking": ["email", "url", "phone"],

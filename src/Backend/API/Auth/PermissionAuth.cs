@@ -29,6 +29,10 @@ public static class AuthPolicies
     public const string SurveyAnalysisAccess = "PERMISSION_SURVEY_ANALYSIS_ACCESS";
     public const string GraduationAnalyticsAccess = "PERMISSION_GRADUATION_ANALYTICS_ACCESS";
     public const string CohortMajorsAccess = "PERMISSION_COHORT_MAJORS_ACCESS";
+    /// <summary>Hiệu chỉnh nhãn cảm xúc do model dự đoán. Không nằm trong nhóm mở module.</summary>
+    public const string OpenCommentSentimentReview = "PERMISSION_OPEN_COMMENT_SENTIMENT_REVIEW";
+    /// <summary>Xem trạng thái model cảm xúc và chạy lại phân tích.</summary>
+    public const string OpenCommentModelAdmin = "PERMISSION_OPEN_COMMENT_MODEL_ADMIN";
     /// <summary>Bất kỳ quyền nào trong nhóm Báo cáo, cho các endpoint dùng chung.</summary>
     public const string ReportingRead = "PERMISSION_REPORTING_READ";
     public const string SurveyOperationalRead = "PERMISSION_SURVEY_OPERATIONAL_READ";

@@ -60,8 +60,8 @@ Qua kiểm tra source code `.NET 9 Clean Architecture` hiện tại:
    * **Hậu quả**: 1,000 lượt nộp bài = **7,000 roundtrips DB + 2,000 Transaction Commit** độc lập. Làm gia tăng thời gian giữ DB lock, dễ gây deadlock và HTTP Timeout (504 Gateway Timeout).
 
 3. **Cấu hình Runtime & Database**:
-   * Cấu hình Npgsql Connection Pool `Maximum Pool Size=200` đã được tạo, nhưng chưa có `Min Pool Size` để warm-up kết nối sẵn.
-   * Chưa tinh chỉnh tham số bộ nhớ PostgreSQL trong Container (`shared_buffers`, `work_mem`, `wal_buffers`) phục vụ write-burst.
+   * Connection string chưa đặt `Minimum Pool Size` để warm-up, và **trần pool chưa khớp `max_connections` của PostgreSQL** — xem mục 3.1.
+   * PostgreSQL trong Container đã có tham số bộ nhớ (`shared_buffers`, `work_mem`, `wal_buffers`) ở mức của máy 4 GB. Đừng nâng theo bộ "máy lớn" ở mục 3.2.
    * ThreadPool trong .NET chưa được ấn định `MinThreads`, nguy cơ Thread Pool Starvation khi có burst 1,000 requests/giây.
 
 ---
@@ -135,45 +135,83 @@ Nếu số lượng sinh viên nộp bài đồng thời vượt ngưỡng 3,000
 ### Trụ Cột 3: Tinh Chỉnh Database Engine & Indexing (PostgreSQL & Connection Pool)
 
 #### 3.1. Cấu hình Connection String (`Npgsql Connection Pool`)
-Cập nhật connection string trong `appsettings.json` và `.env`:
+
+**Trần pool phải nhỏ hơn `max_connections` của PostgreSQL.** Kiểm tra ngày 20/09/2026:
+
+| Nơi khai | Giá trị |
+| --- | --- |
+| `.env` của máy phát triển | `Minimum Pool Size=50;Maximum Pool Size=300` |
+| `docker-compose.yml` (đường chạy thật) | không đặt gì → Npgsql dùng mặc định **100** |
+| PostgreSQL (cả hai đường) | `max_connections=30` |
+
+Cả hai đều vượt trần: 300 gấp mười lần, 100 gấp hơn ba lần. Khi vượt 30 kết nối đồng thời, request
+không chạy nhanh hơn mà chỉ **chờ kết nối** — và trên máy 4 GB thì 300 kết nối còn là 300 chỗ
+`work_mem` giữ sẵn.
+
+Với máy chủ 2 vCPU / 4 GB RAM, nộp phiếu là ghi ngắn và phần đọc đã được cache ở Trụ cột 1, nên số
+kết nối cần thiết nhỏ hơn nhiều so với con số tải danh nghĩa:
+
 ```json
 "ConnectionStrings": {
-  "DefaultConnection": "Host=localhost;Port=5433;Database=khaosatvmu;Username=postgres;Password=khaosatvmu@123;Maximum Pool Size=300;Minimum Pool Size=50;Connection Lifetime=300;Command Timeout=15;"
+  "DefaultConnection": "Host=localhost;Port=5432;Database=khaosatvmu;Username=postgres;Password=...;Maximum Pool Size=20;Minimum Pool Size=5;Connection Lifetime=300;Command Timeout=15;"
 }
 ```
-* `Minimum Pool Size=50`: Khởi tạo sẵn 50 kết nối DB ngay khi ứng dụng khởi động (tránh giật lag do latency handshake khi 1,000 SV ập vào).
-* `Maximum Pool Size=300`: Đáp ứng tối đa 300 truy vấn đồng thời từ .NET ThreadPool.
 
-#### 3.2. Cấu hình PostgreSQL (`docker-compose.yml` / `postgresql.conf`)
-Bổ sung các tham số tối ưu bộ nhớ cho PostgreSQL Container trong `docker-compose.yml`:
+* `Maximum Pool Size=20` < `max_connections=30`: chừa 10 kết nối cho pgAdmin, migration job và
+  chính worker phân tích cảm xúc.
+* `Minimum Pool Size=5` warm-up vừa đủ. Đặt 50 như bản đầu của tài liệu là giữ 50 kết nối thường
+  trực trên máy 4 GB cho những kết nối phần lớn thời gian không dùng tới.
+* Nâng trần pool chỉ có nghĩa khi nới `max_connections` tương ứng, và mỗi kết nối PostgreSQL tốn
+  vài MB (chủ yếu là `work_mem`) — trên 4 GB RAM thì 300 kết nối là tự bắn vào chân.
+
+#### 3.2. Cấu hình PostgreSQL (`docker-compose.yml`) — đọc theo dung lượng máy
+
+**Không copy thẳng khối cấu hình bên dưới nếu máy chủ không phải máy nhiều RAM.** Bản đầu của tài
+liệu đưa ra bộ tham số cho một máy chủ lớn; cả bốn giá trị trong đó đều không phù hợp với máy chủ
+triển khai thật (2 vCPU / 4 GB RAM):
+
+| Tham số | Bản "máy lớn" | Vì sao không dùng trên máy 4 GB |
+| --- | --- | --- |
+| `shared_buffers=1GB` | 1 GB | Đây là tham số **cấp phát RAM thật**. 1 GB cho PostgreSQL cộng với ~1,0 GB của model phân loại cảm xúc khi đã nạp là hết sạch bộ nhớ của máy 4 GB. |
+| `effective_cache_size=3GB` | 3 GB | Không cấp phát bộ nhớ, chỉ là con số nói với trình lập kế hoạch rằng "hệ điều hành còn 3 GB cache". Khai 3 GB trên máy 4 GB là dạy cho trình lập kế hoạch tin vào một điều không có thật, và nó sẽ chọn kế hoạch quét chỉ mục lớn. |
+| `max_connections=350` | 350 | Mỗi kết nối tốn vài MB (chủ yếu `work_mem`), nên 350 kết nối là trả giá bằng RAM thật mà không được gì thêm cho một tải ghi ngắn. |
+| `max_wal_size=4GB` | 4 GB | Đây là trần **trên đĩa**, không phải RAM: 4 GB WAL trên một VPS nhỏ là chuyện đầy đĩa, và thời gian phục hồi sau khi mất điện dài hơn. Tăng nó chỉ để bớt checkpoint là đánh đổi sai trên máy này. |
+
+Ghi chú về phân loại, vì bản đầu của tài liệu gọi cả nhóm này là "tham số tối ưu bộ nhớ": trong
+bốn tham số trên, chỉ `shared_buffers` và `work_mem` mới thực sự tiêu RAM. `max_wal_size` là chuyện
+đĩa, `effective_cache_size` là chuyện trình lập kế hoạch.
+
+Giá trị đang dùng trong `docker-compose.yml` là bản đã hạ theo dung lượng máy thật:
+
 ```yaml
   db:
-    image: postgres:15-alpine
-    container_name: khaosatvmu_db
-    restart: always
     command:
       - "postgres"
       - "-c"
-      - "max_connections=350"
+      - "max_connections=30"
       - "-c"
-      - "shared_buffers=1GB"
+      - "shared_buffers=64MB"
       - "-c"
-      - "effective_cache_size=3GB"
+      - "effective_cache_size=192MB"
       - "-c"
-      - "work_mem=16MB"
+      - "work_mem=4MB"
       - "-c"
-      - "maintenance_work_mem=256MB"
+      - "maintenance_work_mem=32MB"
       - "-c"
-      - "min_wal_size=1GB"
+      - "min_wal_size=80MB"
       - "-c"
-      - "max_wal_size=4GB"
+      - "max_wal_size=512MB"          # KHÔNG nâng lên 4GB trên máy 4 GB RAM
       - "-c"
       - "checkpoint_completion_target=0.9"
-      - "-c"
-      - "wal_buffers=16MB"
-      - "-c"
-      - "default_statistics_target=100"
 ```
+
+Không cần đặt `wal_buffers` ở đây: mặc định của PostgreSQL là 1/32 của `shared_buffers` (tối thiểu
+64 kB, tối đa 16 MB), tức khoảng 2 MB với `shared_buffers=64MB`, và ở mức tải này nó không phải
+điểm nghẽn.
+
+Bộ tham số "máy lớn" chỉ hợp lệ khi máy chủ được nâng lên **≥ 16 GB RAM và ≥ 8 vCPU** — và khi đó
+phải cân lại ngân sách tài nguyên trong `docker-compose.yml`, vì trần RAM của từng container ở đó
+được tính theo đúng 4 GB (xem khối chú thích ở đầu tệp).
 
 #### 3.3. Tối Ưu Chỉ Mục (Database Indexes)
 Đảm bảo các bảng liên quan đến khảo sát công khai có đầy đủ Index B-Tree:
@@ -483,9 +521,9 @@ export default function () {
 1. **Giai đoạn 1 (Tối ưu Backend Core & Cache)**:
    * Thêm `IMemoryCache` vào `EfSurveyService.cs`.
    * Refactor `GetPublicSurveyAsync` và `SubmitSurveyResponseAsync` (gộp `SaveChangesAsync`).
-   * Cập nhật Connection Pool `Min Pool Size=50`, `Max Pool Size=300`.
+   * Cập nhật Connection Pool `Min Pool Size=5`, `Max Pool Size=20` — phải nhỏ hơn `max_connections=30` (mục 3.1).
 2. **Giai đoạn 2 (Tối ưu Infrastructure & DB Engine)**:
-   * Cập nhật `docker-compose.yml` với các tham số tối ưu PostgreSQL RAM/WAL.
+   * Giữ tham số PostgreSQL trong `docker-compose.yml` theo ngân sách RAM của máy thật (mục 3.2). Không nâng `max_wal_size` lên 4 GB trên máy 4 GB RAM.
    * Thêm `ThreadPool.SetMinThreads(300, 300)` trong `Program.cs`.
 3. **Giai đoạn 3 (Tối ưu Frontend & UX)**:
    * Thêm single-click guard, saving to `localStorage`.

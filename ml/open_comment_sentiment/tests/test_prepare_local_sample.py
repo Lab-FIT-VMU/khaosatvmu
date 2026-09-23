@@ -8,7 +8,7 @@ import unittest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-from prepare_local_sample import diverse_sample, mask_direct_identifiers  # noqa: E402
+from prepare_local_sample import diverse_sample, is_truthy, mask_direct_identifiers  # noqa: E402
 
 
 class PrepareLocalSampleTests(unittest.TestCase):
@@ -16,6 +16,12 @@ class PrepareLocalSampleTests(unittest.TestCase):
         text = "Liên hệ sv@example.edu.vn, https://example.edu hoặc 0912 345 678"
         masked = mask_direct_identifiers(text)
         self.assertEqual(masked, "Liên hệ [EMAIL], [URL] hoặc [PHONE]")
+
+    def test_is_truthy_accepts_postgres_and_csv_spellings(self) -> None:
+        for value in ("t", "T", "true", "TRUE", "1", "yes", "y"):
+            self.assertTrue(is_truthy(value), value)
+        for value in ("f", "false", "0", "no", "", "  "):
+            self.assertFalse(is_truthy(value), value)
 
     def test_diverse_sample_is_deterministic_and_capped(self) -> None:
         rows = [

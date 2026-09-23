@@ -46,7 +46,10 @@
 - [ ] Tách liveness khỏi readiness; readiness kiểm tra database và dependency bắt buộc.
 - [ ] Bổ sung structured logging, correlation ID, metrics và cảnh báo 5xx/latency/DB pool.
 - [ ] Pin image bằng version/digest và bật image/dependency scan trong CI.
-- [ ] Chạy container bằng non-root user, filesystem read-only và giới hạn CPU/RAM phù hợp.
+- [x] Chạy container API và SentimentWorker bằng non-root user.
+- [x] Khai trần CPU/RAM cho mọi service trong Compose theo ngân sách máy chủ 2 vCPU / 4 GB RAM (xem khối chú thích đầu `docker-compose.yml`).
+- [ ] Kiểm chứng trần tài nguyên bằng số đo thật trên máy chủ: chạy worker một lượt và đọc lại RSS đỉnh, kiểm tra API không bị bóp CPU trong lúc đó.
+- [ ] Filesystem read-only cho container nghiệp vụ và tách dung lượng ghi ra volume.
 
 ## P2 - Hiệu năng và bảo trì
 

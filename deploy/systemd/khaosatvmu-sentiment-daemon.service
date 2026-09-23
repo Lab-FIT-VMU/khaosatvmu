@@ -1,0 +1,32 @@
+# Chạy nền để "bấm là có ngay", nhưng KHÔNG giữ model thường trực.
+#
+# Vì sao có unit này: chạy theo lịch thì không thể bấm-là-có-ngay — muốn tổng hợp ngay lúc đang họp
+# thì phải chờ mốc lịch kế tiếp. Còn để tiến trình ở lại mà ôm model thì mất khoảng 1 GB RAM suốt
+# ngày trên máy chủ 4 GB, đúng thứ mà việc tách worker khỏi tiến trình API sinh ra để tránh.
+#
+# Worker ở đây quét mỗi 15 giây và trả model lại cho hệ điều hành sau khi rảnh. RAM lúc rảnh chỉ
+# còn khoảng 85 MB (đo trên máy phát triển); model chỉ được nạp trong lúc thật sự có việc.
+#
+# Chọn unit này hay khaosatvmu-sentiment.timer: xem README.md cùng thư mục.
+[Unit]
+Description=Phân tích cảm xúc ý kiến mở — chạy nền, trả model khi rảnh
+Documentation=file:///opt/khaosatvmu/deploy/systemd/README.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Sửa đường dẫn này nếu repo không nằm ở /opt/khaosatvmu. Docker Compose đọc .env trong thư mục làm việc.
+WorkingDirectory=/opt/khaosatvmu
+# Khoảng quét chính là độ trễ từ lúc phiếu được nộp tới lúc số liệu đổi (cộng thời gian nạp model
+# nếu vừa trả model xong). Hai biến này compose chuyển tiếp vào container.
+Environment=OPEN_COMMENT_SCAN_INTERVAL_SECONDS=15
+Environment=OPEN_COMMENT_IDLE_UNLOAD_SECONDS=120
+ExecStart=/usr/bin/docker compose --profile sentiment run --rm sentiment-worker --watch
+# Tiến trình ở lại lâu dài nên phải tự dựng lại nếu chết, khác hẳn unit chạy một lượt.
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

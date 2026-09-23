@@ -34,6 +34,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         Set<CourseSectionSurveyQuestionScore>();
     public DbSet<SurveyResponse> SurveyResponses => Set<SurveyResponse>();
     public DbSet<SurveyResponseAnswer> SurveyResponseAnswers => Set<SurveyResponseAnswer>();
+    public DbSet<OpenCommentAnalysisResult> OpenCommentAnalysisResults => Set<OpenCommentAnalysisResult>();
     public DbSet<SurveyScoringSetting> SurveyScoringSettings => Set<SurveyScoringSetting>();
     public DbSet<SurveyScoringChangeLog> SurveyScoringChangeLogs => Set<SurveyScoringChangeLog>();
     public DbSet<GraduationPeriod> GraduationPeriods => Set<GraduationPeriod>();
@@ -729,6 +730,37 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.QuestionId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Kết quả phân loại cảm xúc của ý kiến mở. Một dòng cho mỗi phiếu có ý kiến mở.
+        modelBuilder.Entity<OpenCommentAnalysisResult>(entity =>
+        {
+            entity.ToTable("OpenCommentAnalysisResults");
+            entity.HasKey(x => x.SurveyResponseId);
+            entity.Property(x => x.Sentiment).HasMaxLength(16).IsRequired();
+            entity.Property(x => x.ManualSentiment).HasMaxLength(16);
+            entity.Property(x => x.ModelVersion).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.RuleVersion).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ContentHash).HasMaxLength(64).IsRequired();
+            // Xác suất luôn trong [0,1] nên 5 chữ số thập phân là quá đủ, khỏi dùng numeric mặc định.
+            entity.Property(x => x.Confidence).HasColumnType("numeric(6,5)");
+            entity.Property(x => x.PositiveScore).HasColumnType("numeric(6,5)");
+            entity.Property(x => x.NegativeScore).HasColumnType("numeric(6,5)");
+            entity.Property(x => x.NeutralScore).HasColumnType("numeric(6,5)");
+            entity.Property(x => x.TopicCodesJson).HasColumnType("jsonb");
+            entity.HasIndex(x => x.Sentiment);
+            entity.HasIndex(x => x.ModelVersion);
+            entity.HasIndex(x => x.AnalyzedAt);
+            // Xoá cứng phiếu là xoá theo kết quả; phiếu ở đây chỉ bị xoá mềm nên dòng này
+            // vẫn nằm lại và tự được bỏ qua khi truy vấn phiếu.
+            entity.HasOne<SurveyResponse>()
+                .WithMany()
+                .HasForeignKey(x => x.SurveyResponseId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.ReviewedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Module thống kê tốt nghiệp độc lập: chỉ liên hệ giữa hai bảng mới, không nối FK vào

@@ -266,6 +266,59 @@
   color: #0788b8;
 }
 
+/* Cảnh báo/giải thích riêng của cột. Có thể focus bằng bàn phím và dùng tooltip
+   gốc của trình duyệt để không làm tiêu đề bảng cao thêm. */
+.catalog-th-hint {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: #b54708;
+  cursor: help;
+  vertical-align: text-bottom;
+}
+
+.catalog-th-hint::after {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -8px;
+  z-index: 20;
+  width: 320px;
+  padding: 8px 10px;
+  border: 1px solid #e5b769;
+  border-radius: 4px;
+  background: #fffaf0;
+  box-shadow: 0 4px 12px rgba(31, 41, 55, 0.16);
+  color: #6f4100;
+  content: attr(data-tooltip);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  visibility: hidden;
+  white-space: normal;
+}
+
+.catalog-th-hint:hover::after,
+.catalog-th-hint:focus::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+.catalog-th-hint > svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+
+.catalog-th-hint:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid #b54708;
+  outline-offset: 2px;
+}
+
 .catalog-table td {
   height: 32px;
   padding: 4px 10px;

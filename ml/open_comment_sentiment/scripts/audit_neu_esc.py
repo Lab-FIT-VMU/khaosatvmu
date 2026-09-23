@@ -12,6 +12,7 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from sentiment_baseline.console import force_utf8_output  # noqa: E402
 from sentiment_baseline.data import DatasetUnavailableError, sha256_file  # noqa: E402
 from sentiment_baseline.neu_esc import (  # noqa: E402
     EXPECTED_SPLITS,
@@ -35,6 +36,7 @@ def fingerprint(text: str) -> str:
 
 
 def main() -> int:
+    force_utf8_output()
     args = parse_args()
     data_dir = args.data_dir.resolve()
     config = json.loads(SOURCE_CONFIG.read_text(encoding="utf-8"))

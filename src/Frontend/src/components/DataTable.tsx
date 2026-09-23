@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Inbox, Plus, Search } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Inbox, Plus, Search } from 'lucide-react';
 import { ColumnFilterMenu } from './ColumnFilterMenu';
 import { TablePagination } from './TablePagination';
 import { ExportDropdown } from './ExportDropdown';
@@ -9,6 +9,8 @@ import '../styles/catalogs.css';
 export interface Column<T> {
   key: string;
   header: string;
+  /** Giải thích ngắn cho tiêu đề cột, hiển thị qua biểu tượng cảnh báo có thể focus. */
+  headerHint?: string;
   render?: (item: T) => ReactNode;
   sortValue?: (item: T) => string | number | null | undefined;
   /**
@@ -376,6 +378,16 @@ export function DataTable<T>({
                         aria-label={`Sắp xếp ${column.header}: ${nextSortAction(column)}`}
                       >
                         {column.header}
+                        {column.headerHint && (
+                          <span
+                            className="catalog-th-hint"
+                            data-tooltip={column.headerHint}
+                            aria-label={column.headerHint}
+                            tabIndex={0}
+                          >
+                            <AlertTriangle aria-hidden="true" />
+                          </span>
+                        )}
                         {activeSortKey !== column.key
                           ? <ArrowUpDown aria-hidden="true" />
                           : activeSortDirection === 'asc'
@@ -385,6 +397,16 @@ export function DataTable<T>({
                     ) : (
                       <span className="catalog-th-label">
                         {column.header}
+                        {column.headerHint && (
+                          <span
+                            className="catalog-th-hint"
+                            data-tooltip={column.headerHint}
+                            aria-label={column.headerHint}
+                            tabIndex={0}
+                          >
+                            <AlertTriangle aria-hidden="true" />
+                          </span>
+                        )}
                         {activeSortKey === column.key && (
                           activeSortDirection === 'asc'
                             ? <ArrowUp aria-hidden="true" />

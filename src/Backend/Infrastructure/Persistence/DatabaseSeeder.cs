@@ -108,6 +108,11 @@ public static class DatabaseSeeder
             (Code: "PROGRAM_CAMPAIGNS_ACCESS",    Name: "Đợt khảo sát CTĐT",                 Description: "Truy cập module đợt khảo sát chương trình đào tạo",     Category: "Khảo sát chương trình"),
             (Code: "PROGRAM_CRITERIA_ACCESS",     Name: "Tiêu chí CTĐT",                     Description: "Truy cập module tiêu chí chương trình đào tạo",        Category: "Khảo sát chương trình"),
             (Code: "USER_ADMIN_ACCESS",           Name: "Người dùng & phân quyền",           Description: "Truy cập module quản trị người dùng và phân quyền",    Category: "Quản trị"),
+            // Hai quyền dưới đây không mở thêm mục nào trên menu. Chúng khoá hai thao tác
+            // ghi của tính năng phân loại cảm xúc: sửa nhãn model đã đoán, và chạy lại model.
+            // Không cấp sẵn cho DEPARTMENT_MANAGER: xem được kết quả không có nghĩa là được sửa.
+            (Code: "OPEN_COMMENT_SENTIMENT_REVIEW", Name: "Hiệu chỉnh cảm xúc ý kiến mở", Description: "Sửa nhãn cảm xúc do model dự đoán trên màn Phân tích ý kiến mở", Category: "Tổng quan"),
+            (Code: "OPEN_COMMENT_MODEL_ADMIN",    Name: "Quản trị model cảm xúc",           Description: "Xem trạng thái model và chạy lại phân tích cảm xúc",     Category: "Quản trị"),
         };
 
         var permissions = new Dictionary<string, Permission>(StringComparer.OrdinalIgnoreCase);
@@ -170,6 +175,8 @@ public static class DatabaseSeeder
             (RoleCode: "ADMIN", PermissionCode: "PROGRAM_CAMPAIGNS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "PROGRAM_CRITERIA_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "USER_ADMIN_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "OPEN_COMMENT_SENTIMENT_REVIEW"),
+            (RoleCode: "ADMIN", PermissionCode: "OPEN_COMMENT_MODEL_ADMIN"),
 
             // SURVEY_ADMIN: toàn bộ module nghiệp vụ, không có quản trị người dùng.
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "PROGRESS_ACCESS"),
@@ -189,6 +196,9 @@ public static class DatabaseSeeder
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_CAMPAIGNS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "PROGRAM_CAMPAIGNS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "PROGRAM_CRITERIA_ACCESS"),
+            // SURVEY_ADMIN sửa được nhãn nhưng không quản trị model: đổi model là thay đổi
+            // kỹ thuật, phải để lại dấu vết ở tài khoản quản trị hệ thống.
+            (RoleCode: "SURVEY_ADMIN", PermissionCode: "OPEN_COMMENT_SENTIMENT_REVIEW"),
 
             // DEPARTMENT_MANAGER: chỉ tiến độ và báo cáo trong Phase 2.
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "PROGRESS_ACCESS"),
