@@ -10,15 +10,15 @@
 # Chọn unit này hay khaosatvmu-sentiment.timer: xem README.md cùng thư mục.
 [Unit]
 Description=Phân tích cảm xúc ý kiến mở — chạy nền, trả model khi rảnh
-Documentation=file:///opt/khaosatvmu/deploy/systemd/README.md
+Documentation=file:///home/khaosatvmu/deploy/systemd/README.md
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-# Sửa đường dẫn này nếu repo không nằm ở /opt/khaosatvmu. Docker Compose đọc .env trong thư mục làm việc.
-WorkingDirectory=/opt/khaosatvmu
+# Sửa đường dẫn này nếu repo không nằm ở /home/khaosatvmu. Docker Compose đọc .env trong thư mục làm việc.
+WorkingDirectory=/home/khaosatvmu
 # Khoảng quét chính là độ trễ từ lúc phiếu được nộp tới lúc số liệu đổi (cộng thời gian nạp model
 # nếu vừa trả model xong). Hai biến này compose chuyển tiếp vào container.
 Environment=OPEN_COMMENT_SCAN_INTERVAL_SECONDS=15

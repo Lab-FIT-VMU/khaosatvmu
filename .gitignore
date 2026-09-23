@@ -171,3 +171,4 @@ models/
 
 # Báo cáo bài tập lớn sinh cục bộ (Word/PDF và tài nguyên đi kèm).
 baitaplon/
+/artifacts/*.tar.gz
