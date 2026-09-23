@@ -915,6 +915,13 @@ export interface RolePermissionGrantDto {
 // PHÂN TÍCH Ý KIẾN MỞ (OPEN COMMENTS ANALYSIS)
 // ---------------------------------------------------------------------------
 
+/**
+ * Năm nhãn cảm xúc của phiên bản 1.
+ * Model PhoBERT chỉ dự đoán ba nhãn Positive/Negative/Neutral; Mixed và Uncertain được suy ra
+ * bằng quy tắc ở backend, nên giao diện không được tự đoán lại từ xác suất.
+ */
+export type OpenCommentSentiment = 'Positive' | 'Negative' | 'Neutral' | 'Mixed' | 'Uncertain';
+
 export interface OpenCommentItem {
   responseId: number;
   courseSectionSurveyId: number;
@@ -931,6 +938,24 @@ export interface OpenCommentItem {
   facultyId: number | null;
   departmentId: number | null;
   lecturerId: number | null;
+  /**
+   * Nhãn hiệu lực, đã tính cả nhãn người hiệu chỉnh.
+   * NULL nghĩa là ý kiến chưa được phân tích — không được hiển thị như Trung tính.
+   */
+  sentiment: OpenCommentSentiment | null;
+  sentimentLabel: string | null;
+  /** Xác suất của nhãn hiệu lực, trong khoảng 0..1. */
+  confidence: number | null;
+  isManuallyReviewed: boolean;
+}
+
+/** Số lượng và tỷ lệ của một nhãn cảm xúc trong phạm vi đang xem. */
+export interface OpenCommentSentimentBreakdown {
+  sentiment: OpenCommentSentiment;
+  label: string;
+  count: number;
+  /** Tỷ lệ trên tổng số ý kiến ĐÃ phân tích, không phải trên tổng số ý kiến. */
+  percentage: number;
 }
 
 export interface OpenCommentAnalysisReport {
@@ -940,4 +965,9 @@ export interface OpenCommentAnalysisReport {
   sectionCountWithComments: number;
   lecturerCountWithComments: number;
   comments: OpenCommentItem[];
+  sentimentBreakdown: OpenCommentSentimentBreakdown[];
+  analyzedCommentCount: number;
+  pendingAnalysisCount: number;
+  uncertainCount: number;
+  manuallyReviewedCount: number;
 }

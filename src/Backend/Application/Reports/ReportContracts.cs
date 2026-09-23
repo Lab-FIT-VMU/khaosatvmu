@@ -370,6 +370,10 @@ public interface IReportService
 }
 
 /// <summary>Một ý kiến mở (AdditionalComments) do sinh viên đóng góp trong phiếu khảo sát.</summary>
+/// <param name="Sentiment">
+/// Nhãn hiệu lực sau phân loại, đã tính cả nhãn người hiệu chỉnh. Null khi ý kiến chưa được
+/// phân tích — giao diện phải hiện trạng thái "chưa phân tích", không được coi là Trung tính.
+/// </param>
 public sealed record OpenCommentItemDto(
     int ResponseId,
     int CourseSectionSurveyId,
@@ -385,13 +389,29 @@ public sealed record OpenCommentItemDto(
     string FacultyName,
     int? FacultyId,
     int? DepartmentId,
-    int? LecturerId);
+    int? LecturerId,
+    string? Sentiment = null,
+    string? SentimentLabel = null,
+    decimal? Confidence = null,
+    bool IsManuallyReviewed = false);
 
 /// <summary>Báo cáo phân tích tổng hợp các ý kiến mở.</summary>
+/// <param name="SentimentBreakdown">
+/// Phân bố cảm xúc trên đúng phạm vi đang xem. Rỗng khi chưa có ý kiến nào được phân tích.
+/// </param>
+/// <param name="AnalyzedCommentCount">Số ý kiến đã có kết quả phân loại.</param>
+/// <param name="PendingAnalysisCount">Số ý kiến chưa có kết quả — worker còn phải xử lý.</param>
+/// <param name="UncertainCount">Số ý kiến cần người xem lại vì chưa đủ căn cứ kết luận.</param>
+/// <param name="ManuallyReviewedCount">Số ý kiến đã được hiệu chỉnh thủ công.</param>
 public sealed record OpenCommentAnalysisReportDto(
     int TotalComments,
     int TotalResponses,
     decimal CommentRate,
     int SectionCountWithComments,
     int LecturerCountWithComments,
-    IReadOnlyList<OpenCommentItemDto> Comments);
+    IReadOnlyList<OpenCommentItemDto> Comments,
+    IReadOnlyList<OpenCommentSentimentBreakdownDto> SentimentBreakdown,
+    int AnalyzedCommentCount,
+    int PendingAnalysisCount,
+    int UncertainCount,
+    int ManuallyReviewedCount);

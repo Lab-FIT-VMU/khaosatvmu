@@ -42,12 +42,7 @@ public sealed class EfReportService(
     private async Task<IQueryable<CourseSectionSurvey>> VisibleSectionSurveysAsync(
         CancellationToken cancellationToken)
     {
-        var query = db.CourseSectionSurveys.AsNoTracking();
-        var visible = await publication.VisibleSurveyIdsAsync(cancellationToken);
-        if (visible is null) return query;
-
-        var ids = visible.ToList();
-        return query.Where(x => ids.Contains(x.SemesterSurveyId));
+        return await VisibleSurveyScope.SectionSurveysAsync(db, publication, cancellationToken);
     }
 
     /// <summary>
@@ -1746,6 +1741,9 @@ public sealed class EfReportService(
                 ? ranked.OrderBy(x => x.WeightedScore / x.TotalAnswers)
                 : ranked.OrderByDescending(x => x.WeightedScore / x.TotalAnswers))
             .ThenByDescending(x => x.TotalAnswers)
+            // Chốt hẳn thứ tự khi hai câu bằng điểm và bằng số phiếu. Thiếu chốt này thì
+            // thứ tự phụ thuộc vào việc Postgres trả nhóm theo thứ tự nào.
+            .ThenBy(x => x.QuestionId)
             .Take(take)
             .ToListAsync(cancellationToken);
 
@@ -1823,10 +1821,24 @@ public sealed class EfReportService(
                 scale.AnswerScaleName));
         }
 
-        return (lowestFirst
-                ? ratings.OrderBy(x => x.AverageScore) // yếu nhất trước
-                : ratings.OrderByDescending(x => x.AverageScore))
-            .ThenByDescending(x => x.TotalAnswers)
+        // Trả về ĐÚNG thứ tự đã xếp ở bước trên, không xếp lại theo điểm trung bình sống
+        // của bảng phiếu. Xếp lại là sai hai đường:
+        //   1. Thước đo khác hẳn — bước trên xếp theo điểm CÂN THEO SỐ PHIẾU trên tập lớp
+        //      đã chốt điểm, bước dưới chỉ có điểm trung bình đã làm tròn 2 chữ số của
+        //      phiếu sống. Hai câu lệch nhau dưới 0,005 thành bằng điểm, rồi
+        //      ThenByDescending(TotalAnswers) cũng bằng, nên thứ tự cuối cùng phụ thuộc
+        //      vào việc SQL trả nhóm theo thứ tự nào — bấm hai lần ra hai bảng khác nhau.
+        //   2. Điểm điều kiện lọc cũng khác — bước dưới dùng số phiếu đếm sống, lệch với
+        //      cột "Phiếu hợp lệ" mà bước trên đã dùng để xếp hạng.
+        var candidateOrder = candidateQuestionIds
+            .Select((id, index) => (Id: id, Index: index))
+            .ToDictionary(x => x.Id, x => x.Index);
+
+        return ratings
+            // Câu bẫy và câu tự nhập bị loại ở vòng lặp trên nên có thể thiếu; giữ nguyên
+            // thứ tự tương đối của những câu còn lại.
+            .Where(x => candidateOrder.ContainsKey(x.QuestionId))
+            .OrderBy(x => candidateOrder[x.QuestionId])
             .Take(take)
             .ToList();
     }
@@ -2299,7 +2311,7 @@ public sealed class EfReportService(
         var sectionSurveys = await sectionSurveyQuery.ToListAsync(cancellationToken);
         if (sectionSurveys.Count == 0)
         {
-            return new OpenCommentAnalysisReportDto(0, 0, 0m, 0, 0, []);
+            return EmptyOpenCommentReport();
         }
 
         var sectionIds = sectionSurveys.Select(x => x.CourseSectionId).Distinct().ToList();
@@ -2373,7 +2385,7 @@ public sealed class EfReportService(
         var matchedCssIds = matchedSections.Keys.ToList();
         if (matchedCssIds.Count == 0)
         {
-            return new OpenCommentAnalysisReportDto(0, 0, 0m, 0, 0, []);
+            return EmptyOpenCommentReport();
         }
 
         var baseResponsesQuery = db.SurveyResponses.AsNoTracking()
@@ -2404,7 +2416,7 @@ public sealed class EfReportService(
             .ToListAsync(cancellationToken);
 
         var term = search?.Trim().ToLowerInvariant();
-        var commentItems = new List<OpenCommentItemDto>(responsesWithComments.Count);
+        var matchedComments = new List<MatchedComment>(responsesWithComments.Count);
 
         foreach (var resp in responsesWithComments)
         {
@@ -2432,7 +2444,7 @@ public sealed class EfReportService(
                 }
             }
 
-            commentItems.Add(new OpenCommentItemDto(
+            matchedComments.Add(new MatchedComment(
                 resp.ResponseId,
                 resp.CourseSectionSurveyId,
                 comments,
@@ -2450,6 +2462,42 @@ public sealed class EfReportService(
                 meta.Lecturer?.LecturerId));
         }
 
+        // Kết quả phân loại chỉ đọc theo đúng danh sách ý kiến vừa lọc, không quét cả bảng.
+        var matchedIds = matchedComments.Select(x => x.ResponseId).ToList();
+        var analysisByResponse = matchedIds.Count == 0
+            ? []
+            : await db.OpenCommentAnalysisResults.AsNoTracking()
+                .Where(x => matchedIds.Contains(x.SurveyResponseId))
+                .ToDictionaryAsync(x => x.SurveyResponseId, cancellationToken);
+
+        var commentItems = new List<OpenCommentItemDto>(matchedComments.Count);
+        foreach (var row in matchedComments)
+        {
+            analysisByResponse.TryGetValue(row.ResponseId, out var analysis);
+            commentItems.Add(new OpenCommentItemDto(
+                row.ResponseId,
+                row.CourseSectionSurveyId,
+                row.Comments,
+                row.SubmittedAt,
+                row.Score,
+                row.IsValid,
+                row.CourseCode,
+                row.CourseName,
+                row.SectionName,
+                row.LecturerName,
+                row.DepartmentName,
+                row.FacultyName,
+                row.FacultyId,
+                row.DepartmentId,
+                row.LecturerId,
+                analysis?.EffectiveSentiment,
+                analysis is null
+                    ? null
+                    : OpenCommentSentimentLabels.ToDisplay(analysis.EffectiveSentiment),
+                analysis?.Confidence,
+                analysis?.IsManuallyReviewed ?? false));
+        }
+
         int totalComments = commentItems.Count;
         decimal commentRate = totalResponses > 0
             ? Math.Round((decimal)totalComments / totalResponses * 100, 3)
@@ -2461,12 +2509,62 @@ public sealed class EfReportService(
             .Distinct()
             .Count();
 
+        // Tổng hợp cảm xúc tính trên chính danh sách vừa trả về, không phải trên cả học kỳ:
+        // người dùng đang lọc theo khoa/bộ môn/từ khoá thì bảng, KPI và file Excel phải khớp nhau.
+        var analyzedCommentCount = commentItems.Count(x => x.Sentiment is not null);
+        var sentimentBreakdown = new List<OpenCommentSentimentBreakdownDto>();
+        if (analyzedCommentCount > 0)
+        {
+            foreach (var sentiment in OpenCommentSentiments.All)
+            {
+                var count = commentItems.Count(
+                    x => string.Equals(x.Sentiment, sentiment, StringComparison.Ordinal));
+                if (count == 0)
+                {
+                    continue;
+                }
+
+                sentimentBreakdown.Add(new OpenCommentSentimentBreakdownDto(
+                    sentiment,
+                    OpenCommentSentimentLabels.ToDisplay(sentiment),
+                    count,
+                    Math.Round((decimal)count / analyzedCommentCount * 100, 1)));
+            }
+        }
+
         return new OpenCommentAnalysisReportDto(
             totalComments,
             totalResponses,
             commentRate,
             sectionCountWithComments,
             lecturerCountWithComments,
-            commentItems);
+            commentItems,
+            sentimentBreakdown,
+            analyzedCommentCount,
+            totalComments - analyzedCommentCount,
+            commentItems.Count(x => x.Sentiment == OpenCommentSentiments.Uncertain),
+            commentItems.Count(x => x.IsManuallyReviewed));
     }
+
+    /// <summary>Báo cáo rỗng, dùng khi phạm vi lọc không có lớp nào.</summary>
+    private static OpenCommentAnalysisReportDto EmptyOpenCommentReport() =>
+        new(0, 0, 0m, 0, 0, [], [], 0, 0, 0, 0);
+
+    /// <summary>Một ý kiến đã qua bộ lọc tìm kiếm, chờ ghép với kết quả phân loại.</summary>
+    private sealed record MatchedComment(
+        int ResponseId,
+        int CourseSectionSurveyId,
+        string Comments,
+        DateTime SubmittedAt,
+        decimal Score,
+        bool IsValid,
+        string CourseCode,
+        string CourseName,
+        string SectionName,
+        string LecturerName,
+        string DepartmentName,
+        string FacultyName,
+        int? FacultyId,
+        int? DepartmentId,
+        int? LecturerId);
 }

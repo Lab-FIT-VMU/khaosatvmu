@@ -2452,6 +2452,31 @@
   gap: 12px;
 }
 
+/* Thu gọn các cột thông tin ở cấu hình bảng để toàn bộ phần chiều ngang còn lại
+   được dành cho nội dung góp ý. Chỉ giữ sàn đủ để bảng vẫn dễ đọc. */
+.reports-comments-workspace .reports-table-section .catalog-table {
+  min-width: 1120px;
+}
+
+.reports-comments-workspace .open-comment-content {
+  padding: 3px 0;
+}
+
+.reports-comments-workspace .open-comment-content .response-comment {
+  display: -webkit-box;
+  max-height: 48px;
+  overflow: hidden;
+  color: #1a1f24;
+  font-size: 13px;
+  font-style: normal;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
 .reports-cell-link {
   border: 0;
   background: transparent;
@@ -2469,4 +2494,316 @@
 .reports-cell-link:hover {
   color: #036e99;
   text-decoration: underline;
+}
+
+/* ------------------------------------- Phân loại cảm xúc ý kiến mở */
+
+/*
+  Màu không bao giờ là tín hiệu duy nhất: mọi badge đều có nhãn chữ, và nhãn "Chưa chắc chắn"
+  phân biệt bằng viền nét đứt nên người mù màu vẫn đọc được đúng thông tin.
+  Ô chưa phân tích để nền xám nhạt, không tô màu cảm xúc nào — nó không phải "Trung tính".
+*/
+.sentiment-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.sentiment-cell.is-compact {
+  flex-direction: row;
+  align-items: center;
+}
+
+.sentiment-cell-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: #68737d;
+  line-height: 1.2;
+}
+
+.sentiment-manual-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #eef4fb;
+  border: 1px solid #cfe0f0;
+  color: #1b5f8f;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sentiment-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.sentiment-badge.is-positive {
+  background: #f2faf6;
+  border-color: #cfe6d8;
+  color: #0f6b47;
+}
+
+.sentiment-badge.is-negative {
+  background: #fef3f2;
+  border-color: #f3c7c2;
+  color: #b42318;
+}
+
+.sentiment-badge.is-neutral {
+  background: #f4f6f8;
+  border-color: #dde3e8;
+  color: #46505a;
+}
+
+.sentiment-badge.is-mixed {
+  background: #f6f2fe;
+  border-color: #ddd0fa;
+  color: #5b21b6;
+}
+
+/* Trạng thái thiếu căn cứ, không phải một cực cảm xúc: viền nét đứt, không tô nền. */
+.sentiment-badge.is-uncertain {
+  background: #ffffff;
+  border-color: #b6bec6;
+  border-style: dashed;
+  color: #4b555e;
+}
+
+.sentiment-badge.is-pending {
+  background: #f8f9fa;
+  border-color: #e1e5e9;
+  color: #7a848d;
+  font-weight: 600;
+}
+
+/* ---------- Khối phân bố cảm xúc ---------- */
+/* Cùng kiểu nhóm với tab Tổng quan: tiêu đề nhóm rồi lưới thẻ, KHÔNG bọc thêm viền ngoài —
+   thẻ đã có viền rồi, bọc thêm là hai lớp viền lồng nhau. */
+.reports-sentiment-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reports-sentiment-group .reports-overview-group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reports-sentiment-group .reports-sentiment-pending {
+  flex: 0 0 auto;
+}
+
+/* Viền trái dày để thấy màu nhãn; màu đặt qua inline style từ theme.ts. */
+.reports-sentiment-card {
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+
+.reports-sentiment-group > .reports-sentiment-alert {
+  margin-top: 4px;
+}
+
+.reports-sentiment-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid #f0dcb4;
+  background: #fdf8ec;
+  color: #8a5b05;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+/* Phần giải thích sống trong lưới thẻ nhãn. Mặc định chiếm trọn một hàng; từ 1101px trở lên
+   lưới có 4 cột nên hàng thứ hai chỉ có một thẻ, ba cột còn lại là chỗ của phần chữ. Dưới mức
+   đó lưới co còn 1-2 cột, không còn chỗ trống đủ rộng, nên trả nó về một hàng riêng. */
+.reports-sentiment-notes {
+  grid-column: 1 / -1;
+  align-self: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@media (min-width: 1101px) {
+  .reports-sentiment-notes {
+    grid-column: 2 / -1;
+  }
+}
+
+.reports-sentiment-notes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #46505a;
+}
+
+.reports-sentiment-notes li svg {
+  flex: 0 0 14px;
+  margin-top: 2px;
+  color: #68737d;
+}
+
+.reports-sentiment-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #f3c7c2;
+  border-radius: 4px;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* ---------- Hiệu chỉnh nhãn trong modal chi tiết ---------- */
+.sentiment-review-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #dfe4e8;
+  border-radius: 4px;
+  background: #fbfcfd;
+}
+
+.sentiment-review-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sentiment-review-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #68737d;
+}
+
+.sentiment-review-saved {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid #cfe0f0;
+  border-radius: 4px;
+  background: #eef4fb;
+  color: #1b5f8f;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.sentiment-review-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sentiment-review-notice {
+  margin: 0;
+  color: #0f6b47;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.sentiment-review-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.sentiment-review-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #f0dcb4;
+  border-radius: 4px;
+  background: #fdf8ec;
+  color: #6b4a06;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.sentiment-review-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sentiment-review-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid #dfe4e8;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #46505a;
+  cursor: pointer;
+}
+
+.sentiment-review-option input {
+  margin: 0;
+  cursor: pointer;
+}
+
+.sentiment-review-option.is-selected {
+  border-color: var(--reports-primary, #0788b8);
+  background: #eef8fc;
+  color: #036e99;
+}
+
+.sentiment-review-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------- Vòng xoay dùng chung ---------- */
+.is-spinning {
+  animation: reports-spin 900ms linear infinite;
+}
+
+@keyframes reports-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-spinning {
+    animation: none;
+  }
 }

@@ -1,25 +1,44 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  AlertTriangle,
   Check,
   Copy,
   LoaderCircle,
+  Save,
+  Undo2,
   X,
 } from 'lucide-react';
 import { DataTable, type Column } from '../DataTable';
 import { Modal } from '../Modal';
+import { SentimentAnalysisPanel } from './SentimentAnalysisPanel';
+import { SentimentBadge } from './SentimentBadge';
 import { reportApi } from '../../services/reportApi';
 import { surveyApi } from '../../services/surveyApi';
+import { useAuth } from '../../auth/authContext';
 import type {
   Department,
   Faculty,
   Lecturer,
   OpenCommentAnalysisReport,
   OpenCommentItem,
+  OpenCommentSentiment,
   SurveyResponseDetail,
 } from '../../types';
 import { foldVietnamese } from '../../utils/vietnamese';
 import { formatDecimal } from '../../utils/formatNumber';
+
+/** Quyền được sửa nhãn model. Backend vẫn kiểm tra lại; đây chỉ là lớp ẩn nút. */
+const REVIEW_PERMISSION = 'OPEN_COMMENT_SENTIMENT_REVIEW';
+
+/** Năm nhãn cho ô chọn khi hiệu chỉnh, giữ đúng thứ tự hiển thị trên bảng KPI. */
+const SENTIMENT_OPTIONS: { value: OpenCommentSentiment; label: string }[] = [
+  { value: 'Positive', label: 'Tích cực' },
+  { value: 'Negative', label: 'Tiêu cực' },
+  { value: 'Neutral', label: 'Trung tính' },
+  { value: 'Mixed', label: 'Hỗn hợp' },
+  { value: 'Uncertain', label: 'Chưa chắc chắn' },
+];
 
 interface OpenCommentAnalysisProps {
   semesterId: number;
@@ -52,42 +71,67 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
 
-  // Tải dữ liệu ý kiến mở từ backend
-  useEffect(() => {
-    let isCancelled = false;
-    const loadComments = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await reportApi.openComments({
-          semesterId,
-          semesterSurveyId,
-        });
-        if (!isCancelled) {
-          setReport(data);
-        }
-      } catch {
-        if (!isCancelled) {
-          setError('Không tải được danh sách ý kiến mở. Vui lòng thử lại sau.');
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
-      }
-    };
+  // Trạng thái hiệu chỉnh nhãn cảm xúc trong modal chi tiết.
+  // reviewConfirming giữ HÀNH ĐỘNG đang chờ xác nhận: null là chưa xác nhận gì, chuỗi rỗng là
+  // đang xác nhận bỏ hiệu chỉnh, còn lại là nhãn sắp ghi. Gộp một chỗ để không có nhánh nào
+  // ghi được nhãn mà bỏ qua bước xác nhận.
+  const [reviewDraft, setReviewDraft] = useState<OpenCommentSentiment | ''>('');
+  const [reviewConfirming, setReviewConfirming] = useState<OpenCommentSentiment | '' | null>(null);
+  const [reviewSaving, setReviewSaving] = useState<boolean>(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
 
-    void loadComments();
-    return () => {
-      isCancelled = true;
-    };
+  const { access } = useAuth();
+  const canReview = access?.permissions.includes(REVIEW_PERMISSION) === true;
+
+  /**
+   * Số thứ tự của lần tải gần nhất. Đổi học kỳ liên tục thì phản hồi cũ về sau có thể ghi đè
+   * kết quả mới; so số này trước khi ghi state là cách chặn rẻ nhất.
+   */
+  const requestIdRef = useRef(0);
+
+  // Tải dữ liệu ý kiến mở từ backend. `silent` dùng khi tải lại sau hiệu chỉnh để không
+  // chớp bảng thành vòng xoay trong lúc người dùng còn đang mở modal.
+  const loadComments = useCallback(async (options?: { silent?: boolean }) => {
+    const requestId = ++requestIdRef.current;
+    if (!options?.silent) {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const data = await reportApi.openComments({
+        semesterId,
+        semesterSurveyId,
+      });
+      if (requestId === requestIdRef.current) {
+        setReport(data);
+      }
+    } catch {
+      if (requestId === requestIdRef.current && !options?.silent) {
+        setError('Không tải được danh sách ý kiến mở. Vui lòng thử lại sau.');
+      }
+    } finally {
+      if (requestId === requestIdRef.current && !options?.silent) {
+        setLoading(false);
+      }
+    }
   }, [semesterId, semesterSurveyId]);
+
+  useEffect(() => {
+    void loadComments();
+  }, [loadComments]);
 
   // Mở chi tiết phiếu khảo sát và nạp toàn bộ câu trả lời
   const handleOpenDetail = async (item: OpenCommentItem) => {
     setActiveModalComment(item);
     setDetailLoading(true);
     setResponseDetail(null);
+    // Mỗi phiếu có một phiên hiệu chỉnh riêng: mở phiếu khác phải xoá lựa chọn và thông báo cũ,
+    // nếu không người dùng tưởng nhãn vừa chọn đã thuộc về phiếu đang mở.
+    setReviewDraft('');
+    setReviewConfirming(null);
+    setReviewError(null);
+    setReviewNotice(null);
     try {
       const data = await surveyApi.surveyResponse(item.responseId);
       setResponseDetail(data);
@@ -95,6 +139,49 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       // Nếu API trả lời thất bại thì modal vẫn hiển thị thông tin ý kiến
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const closeDetail = () => {
+    setActiveModalComment(null);
+    setResponseDetail(null);
+    setReviewDraft('');
+    setReviewConfirming(null);
+    setReviewError(null);
+    setReviewNotice(null);
+  };
+
+  /**
+   * Lưu nhãn hiệu chỉnh. Chỉ gọi được khi người dùng đã bấm qua bước xác nhận.
+   * Truyền chuỗi rỗng khi bỏ hiệu chỉnh để backend xoá nhãn người đặt.
+   */
+  const submitReview = async (sentiment: OpenCommentSentiment | '') => {
+    if (!activeModalComment) return;
+    setReviewSaving(true);
+    setReviewError(null);
+    setReviewNotice(null);
+    try {
+      await reportApi.reviewOpenCommentSentiment(activeModalComment.responseId, sentiment);
+      const label = SENTIMENT_OPTIONS.find((option) => option.value === sentiment)?.label ?? null;
+      setActiveModalComment({
+        ...activeModalComment,
+        sentiment: sentiment === '' ? activeModalComment.sentiment : sentiment,
+        sentimentLabel: sentiment === '' ? activeModalComment.sentimentLabel : label,
+        isManuallyReviewed: sentiment !== '',
+      });
+      setReviewDraft('');
+      setReviewConfirming(null);
+      setReviewNotice(
+        sentiment === ''
+          ? 'Đã bỏ hiệu chỉnh, nhãn quay về kết quả của model.'
+          : 'Đã lưu nhãn hiệu chỉnh.',
+      );
+      // Tải lại bảng để KPI và biểu đồ phân bố khớp với nhãn vừa sửa.
+      await loadComments({ silent: true });
+    } catch {
+      setReviewError('Không lưu được nhãn. Vui lòng thử lại sau.');
+    } finally {
+      setReviewSaving(false);
     }
   };
 
@@ -146,7 +233,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'submittedAt',
         header: 'Thời gian',
-        width: '120px',
+        width: '90px',
         sortValue: (item) => new Date(item.submittedAt).getTime(),
         render: (item) => (
           <span className="operations-code" style={{ fontSize: '12px' }}>
@@ -157,7 +244,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'facultyName',
         header: 'Khoa / Viện',
-        width: '145px',
+        width: '95px',
         sortValue: (item) => item.facultyName,
         filterValue: (item) => item.facultyName,
         render: (item) => <span className="operations-primary-text">{item.facultyName}</span>,
@@ -165,7 +252,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'departmentName',
         header: 'Bộ môn',
-        width: '135px',
+        width: '80px',
         sortValue: (item) => item.departmentName,
         filterValue: (item) => item.departmentName,
         render: (item) => <span>{item.departmentName}</span>,
@@ -173,7 +260,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'courseName',
         header: 'Lớp học phần',
-        width: '190px',
+        width: '150px',
         sortValue: (item) => `${item.courseCode} ${item.courseName} ${item.sectionName}`,
         filterValue: (item) => `${item.courseCode} - ${item.courseName} (${item.sectionName})`,
         render: (item) => (
@@ -195,24 +282,14 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
               }}
             >
               <strong style={{ display: 'block', lineHeight: 1.35, color: '#0788b8', fontWeight: 650 }}>
-                {item.courseName}
+                {item.courseName} {item.sectionName}
               </strong>
-              <div style={{ fontSize: '12px', color: '#0284c7', marginTop: '2px', fontWeight: 500 }}>
-                <span>{item.courseCode}</span>
-                {' · '}
-                <span>Lớp {item.sectionName}</span>
-              </div>
             </button>
           ) : (
             <div>
               <strong className="operations-primary-text" style={{ display: 'block', lineHeight: 1.35 }}>
-                {item.courseName}
+                {item.courseName} {item.sectionName}
               </strong>
-              <div style={{ fontSize: '12px', color: '#68737d', marginTop: '2px' }}>
-                <span className="operations-code">{item.courseCode}</span>
-                {' · '}
-                <span>Lớp {item.sectionName}</span>
-              </div>
             </div>
           )
         ),
@@ -220,7 +297,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'lecturerName',
         header: 'Giảng viên',
-        width: '140px',
+        width: '105px',
         sortValue: (item) => item.lecturerName,
         filterValue: (item) => item.lecturerName,
         render: (item) => {
@@ -273,7 +350,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       {
         key: 'score',
         header: 'Điểm của phiếu khảo sát',
-        width: '135px',
+        width: '90px',
         align: 'center',
         numeric: true,
         sortValue: (item) => item.score,
@@ -284,16 +361,28 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         ),
       },
       {
-        key: 'isValid',
-        header: 'Trạng thái',
-        width: '85px',
-        align: 'center',
-        sortValue: (item) => (item.isValid ? 1 : 0),
-        filterValue: (item) => (item.isValid ? 'Hợp lệ' : 'Bị lọc'),
+        key: 'sentiment',
+        header: 'Phân loại cảm xúc',
+        headerHint:
+          'Phần trăm cho biết hệ thống chắc chắn đến mức nào khi nhận định một ý kiến là tích cực, tiêu cực, trung tính hoặc vừa khen vừa chê. Ví dụ: 91% nghĩa là hệ thống khá chắc với nhận định đang hiển thị. Kết quả này chỉ để tham khảo, có thể chưa chính xác và người có quyền có thể sửa lại sau khi đọc nội dung góp ý.',
+        width: '130px',
+        // Lọc kiểu Excel theo NHÃN (đúng yêu cầu nghiệp vụ) nhưng sắp xếp theo ĐỘ TIN CẬY:
+        // việc cần làm nhiều nhất trên bảng này là tìm ra những câu model đoán chưa chắc để
+        // người có chuyên môn xem lại. Ô chưa phân tích nhận giá trị -1 nên luôn xếp cuối.
+        sortValue: (item) => item.confidence ?? -1,
+        filterValue: (item) => item.sentimentLabel ?? 'Chưa phân tích',
+        quickFilters: [
+          { label: 'Chỉ ý kiến tiêu cực', match: (value) => value === 'Tiêu cực' },
+          { label: 'Chỉ ý kiến chưa chắc chắn', match: (value) => value === 'Chưa chắc chắn' },
+          { label: 'Chỉ ý kiến chưa phân tích', match: (value) => value === 'Chưa phân tích' },
+        ],
         render: (item) => (
-          <span className={`response-validity${item.isValid ? '' : ' is-rejected'}`}>
-            {item.isValid ? 'Hợp lệ' : 'Bị lọc'}
-          </span>
+          <SentimentBadge
+            sentiment={item.sentiment}
+            label={item.sentimentLabel}
+            confidence={item.confidence}
+            isManuallyReviewed={item.isManuallyReviewed}
+          />
         ),
       },
       {
@@ -301,27 +390,12 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         header: 'Nội dung ý kiến đóng góp',
         render: (item) => (
           <div
-            style={{ padding: '3px 0' }}
+            className="open-comment-content"
             title="Bấm vào dòng để xem chi tiết phiếu khảo sát"
           >
-            <div
-              className="response-comment"
-              style={{
-                lineHeight: 1.5,
-                color: '#1a1f24',
-                fontSize: '13px',
-                maxHeight: '48px',
-                WebkitLineClamp: 2,
-                fontStyle: 'normal',
-              }}
-            >
+            <div className="response-comment">
               "{item.additionalComments}"
             </div>
-            {item.additionalComments.length > 90 && (
-              <span style={{ fontSize: '11px', color: '#0788b8', fontWeight: 500, display: 'inline-block', marginTop: '2px' }}>
-                Xem chi tiết phiếu...
-              </span>
-            )}
           </div>
         ),
       },
@@ -343,10 +417,16 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         'Tỷ lệ phiếu có ý kiến': `${report?.commentRate ?? 0}%`,
         'Số lớp học phần có ý kiến': report?.sectionCountWithComments ?? 0,
         'Số giảng viên nhận ý kiến': report?.lecturerCountWithComments ?? 0,
+        'Số ý kiến đã phân tích cảm xúc': report?.analyzedCommentCount ?? 0,
+        'Số ý kiến chưa phân tích': report?.pendingAnalysisCount ?? 0,
+        'Số ý kiến đã hiệu chỉnh thủ công': report?.manuallyReviewedCount ?? 0,
       },
       summaryNotes: [
         'Dữ liệu bao gồm các ý kiến mở do sinh viên phản hồi trong bài khảo sát học phần.',
         'Hệ thống bảo đảm hoàn toàn tính ẩn danh: không lưu thông tin người gửi.',
+        'Cột Phân loại cảm xúc do mô hình tự động gán, cần đối chiếu nội dung gốc trước khi kết luận.',
+        'Nhãn "Chưa chắc chắn" nghĩa là hệ thống chưa đủ căn cứ kết luận, không phải ý kiến trung tính.',
+        'Độ tin cậy là xác suất của mô hình cho nhãn dự đoán; ô đã hiệu chỉnh thủ công để trống vì nhãn do người đặt.',
       ],
       columns: [
         { key: 'submittedAt', header: 'Thời gian gửi', width: 18, format: (val: unknown) => formatDateTime(String(val)) },
@@ -358,6 +438,28 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         { key: 'lecturerName', header: 'Giảng viên', width: 24 },
         { key: 'score', header: 'Điểm của phiếu khảo sát', width: 18, type: 'number' as const, align: 'right' as const, format: (val: unknown) => Number(Number(val || 0).toFixed(3)) },
         { key: 'isValid', header: 'Tính hợp lệ', width: 14, align: 'center' as const, format: (val: unknown) => (val ? 'Hợp lệ' : 'Bị bộ lọc loại') },
+        { key: 'sentimentLabel', header: 'Phân loại cảm xúc', width: 18, align: 'center' as const, format: (val: unknown) => (val ? String(val) : 'Chưa phân tích') },
+        {
+          key: 'confidence',
+          header: 'Độ tin cậy',
+          width: 14,
+          type: 'number' as const,
+          align: 'right' as const,
+          numberFormat: '0"%"',
+          // Chỉ nhãn do model đặt mới có độ tin cậy; nhãn người sửa để trống thay vì in ra
+          // một con số thuộc về dự đoán cũ và gây hiểu sai.
+          format: (val: unknown, row: OpenCommentItem) =>
+            row.isManuallyReviewed || val === null || val === undefined
+              ? ''
+              : Number((Number(val) * 100).toFixed(0)),
+        },
+        {
+          key: 'isManuallyReviewed',
+          header: 'Trạng thái hiệu chỉnh',
+          width: 20,
+          align: 'center' as const,
+          format: (val: unknown) => (val ? 'Đã hiệu chỉnh thủ công' : 'Kết quả của model'),
+        },
         { key: 'additionalComments', header: 'Nội dung ý kiến đóng góp', width: 45 },
       ],
     }),
@@ -366,29 +468,92 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
 
   return (
     <div className="reports-comments-workspace" role="tabpanel" aria-label="Phân tích ý kiến mở">
-      {/* 1. Dải số liệu KPI đặt lên trên cùng */}
-      <div className="reports-kpi-band" aria-label="Tổng quan số liệu ý kiến mở">
-        <span className="reports-kpi-item" title="Tổng số ý kiến nhận xét mở do sinh viên nhập">
-          Tổng số ý kiến mở
-          <strong>{loading ? '...' : (report?.totalComments ?? 0).toLocaleString('vi-VN')}</strong>
-        </span>
-        <span className="reports-kpi-item" title="Tỷ lệ phiếu có ý kiến trên tổng số lượt nộp">
-          Tỷ lệ phiếu có ý kiến
-          <strong>
-            {loading ? '...' : (report && report.totalComments > 0 && report.commentRate === 0 ? '< 0,1%' : `${report?.commentRate ?? 0}%`)}
-          </strong>
-        </span>
-        <span className="reports-kpi-item" title="Số lớp học phần nhận được ý kiến phản hồi mở">
-          Lớp học phần có ý kiến
-          <strong>{loading ? '...' : (report?.sectionCountWithComments ?? 0).toLocaleString('vi-VN')}</strong>
-        </span>
-        <span className="reports-kpi-item" title="Số giảng viên nhận được ý kiến phản hồi mở">
-          Giảng viên nhận ý kiến
-          <strong>{loading ? '...' : (report?.lecturerCountWithComments ?? 0).toLocaleString('vi-VN')}</strong>
-        </span>
+      {/* Tiêu đề khối: dùng đúng class của tab Tổng quan để hai tab nhìn như một hệ. */}
+      <header className="reports-exec-header">
+        <div className="reports-exec-heading">
+          <div>
+            <h2>Phân tích ý kiến mở do sinh viên đóng góp</h2>
+          </div>
+        </div>
+      </header>
+
+      {/* 1. Lưới thẻ KPI, cùng kiểu thẻ với tab Tổng quan */}
+      <div className="reports-overview-sections">
+        <div className="reports-overview-group">
+          <div className="reports-overview-group-header">
+            <span className="reports-overview-group-title">Quy mô ý kiến đóng góp</span>
+          </div>
+          <div
+            className="reports-overview-kpis"
+            role="region"
+            aria-label="Quy mô ý kiến đóng góp"
+          >
+            <div
+              className="reports-overview-kpi-card"
+              title="Tổng số ý kiến nhận xét mở do sinh viên nhập"
+            >
+              <span className="reports-overview-kpi-label">Tổng số ý kiến mở</span>
+              <div className="reports-overview-kpi-value">
+                <strong className="reports-overview-kpi-num">
+                  {loading ? '...' : (report?.totalComments ?? 0).toLocaleString('vi-VN')}
+                </strong>
+                <span className="reports-overview-kpi-unit">ý kiến</span>
+              </div>
+              <span className="reports-overview-kpi-sub">Sinh viên tự nhập, không giới hạn chủ đề</span>
+            </div>
+
+            <div
+              className="reports-overview-kpi-card"
+              title="Tỷ lệ phiếu có ý kiến trên tổng số lượt nộp"
+            >
+              <span className="reports-overview-kpi-label">Tỷ lệ phiếu có ý kiến</span>
+              <div className="reports-overview-kpi-value">
+                <strong className="reports-overview-kpi-num">
+                  {loading
+                    ? '...'
+                    : report && report.totalComments > 0 && report.commentRate === 0
+                      ? '< 0,1%'
+                      : `${report?.commentRate ?? 0}%`}
+                </strong>
+              </div>
+              <span className="reports-overview-kpi-sub">Trên tổng số phiếu đã thu</span>
+            </div>
+
+            <div
+              className="reports-overview-kpi-card"
+              title="Số lớp học phần nhận được ý kiến phản hồi mở"
+            >
+              <span className="reports-overview-kpi-label">Lớp học phần có ý kiến</span>
+              <div className="reports-overview-kpi-value">
+                <strong className="reports-overview-kpi-num">
+                  {loading ? '...' : (report?.sectionCountWithComments ?? 0).toLocaleString('vi-VN')}
+                </strong>
+                <span className="reports-overview-kpi-unit">lớp</span>
+              </div>
+              <span className="reports-overview-kpi-sub">Có ít nhất một ý kiến mở</span>
+            </div>
+
+            <div
+              className="reports-overview-kpi-card"
+              title="Số giảng viên nhận được ý kiến phản hồi mở"
+            >
+              <span className="reports-overview-kpi-label">Giảng viên nhận ý kiến</span>
+              <div className="reports-overview-kpi-value">
+                <strong className="reports-overview-kpi-num">
+                  {loading ? '...' : (report?.lecturerCountWithComments ?? 0).toLocaleString('vi-VN')}
+                </strong>
+                <span className="reports-overview-kpi-unit">giảng viên</span>
+              </div>
+              <span className="reports-overview-kpi-sub">Được sinh viên nhắc tới trong ý kiến</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* 2. Danh sách dữ liệu & DataTable (có sẵn tìm kiếm, sắp xếp và lọc cột) */}
+      {/* 2. Phân bố cảm xúc: lưới thẻ chỉ số, biểu đồ donut và các ghi chú bắt buộc */}
+      {!loading && !error && report && <SentimentAnalysisPanel report={report} />}
+
+      {/* 3. Danh sách dữ liệu & DataTable (có sẵn tìm kiếm, sắp xếp và lọc cột) */}
       <section className="reports-table-section" aria-label="Bảng ý kiến mở">
         {loading ? (
           <div className="operations-empty" role="status">
@@ -416,15 +581,12 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         )}
       </section>
 
-      {/* 3. Modal xem toàn văn ý kiến & chi tiết phiếu khảo sát */}
+      {/* 4. Modal xem toàn văn ý kiến & chi tiết phiếu khảo sát */}
       {activeModalComment &&
         createPortal(
           <Modal
             isOpen={true}
-            onClose={() => {
-              setActiveModalComment(null);
-              setResponseDetail(null);
-            }}
+            onClose={closeDetail}
             title={`Chi tiết phiếu khảo sát #${activeModalComment.responseId}`}
             size="workspace"
           >
@@ -540,6 +702,144 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
                 >
                   "{activeModalComment.additionalComments}"
                 </div>
+              </div>
+
+              {/* Phân loại cảm xúc và hiệu chỉnh thủ công */}
+              <div className="sentiment-review-box">
+                <div className="sentiment-review-head">
+                  <strong style={{ fontSize: '13px', color: '#1e293b' }}>
+                    Phân loại cảm xúc của ý kiến này:
+                  </strong>
+                  <SentimentBadge
+                    sentiment={activeModalComment.sentiment}
+                    label={activeModalComment.sentimentLabel}
+                    confidence={activeModalComment.confidence}
+                    isManuallyReviewed={activeModalComment.isManuallyReviewed}
+                    compact
+                  />
+                </div>
+
+                <p className="sentiment-review-hint">
+                  Kết quả do mô hình tự động tạo, cần đối chiếu nội dung gốc trước khi kết luận.
+                  Nhãn “Chưa chắc chắn” nghĩa là hệ thống chưa đủ căn cứ, khác hẳn “Trung tính”.
+                </p>
+
+                {activeModalComment.isManuallyReviewed && (
+                  <p className="sentiment-review-saved">
+                    <Check size={14} aria-hidden="true" />
+                    <span>
+                      Đã được hiệu chỉnh thủ công.
+                      {activeModalComment.confidence !== null && (
+                        <> Độ tin cậy hiển thị phía trên là của dự đoán mô hình, không thuộc nhãn người đặt.</>
+                      )}
+                    </span>
+                  </p>
+                )}
+
+                {canReview && activeModalComment.sentiment ? (
+                  <div className="sentiment-review-actions">
+                    {reviewNotice && <p className="sentiment-review-notice">{reviewNotice}</p>}
+                    {reviewError && (
+                      <p className="sentiment-review-error" role="alert">
+                        <AlertTriangle size={14} aria-hidden="true" />
+                        <span>{reviewError}</span>
+                      </p>
+                    )}
+
+                    {reviewConfirming !== null ? (
+                      <div className="sentiment-review-confirm" role="alertdialog">
+                        <span>
+                          {reviewConfirming === ''
+                            ? 'Xác nhận bỏ hiệu chỉnh và quay về nhãn của mô hình?'
+                            : `Xác nhận đặt nhãn “${
+                                SENTIMENT_OPTIONS.find((option) => option.value === reviewConfirming)
+                                  ?.label ?? ''
+                              }” cho ý kiến này? Nhãn do người đặt sẽ được ưu tiên khi thống kê.`}
+                        </span>
+                        <div className="sentiment-review-buttons">
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            disabled={reviewSaving}
+                            onClick={() => void submitReview(reviewConfirming)}
+                          >
+                            {reviewSaving ? (
+                              <LoaderCircle className="operation-icon auth-spin" aria-hidden="true" />
+                            ) : (
+                              <Save size={14} aria-hidden="true" />
+                            )}
+                            <span>Xác nhận lưu</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            disabled={reviewSaving}
+                            onClick={() => setReviewConfirming(null)}
+                          >
+                            Huỷ
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          className="sentiment-review-options"
+                          role="radiogroup"
+                          aria-label="Chọn nhãn đúng cho ý kiến"
+                        >
+                          {SENTIMENT_OPTIONS.map((option) => (
+                            <label
+                              key={option.value}
+                              className={`sentiment-review-option${
+                                reviewDraft === option.value ? ' is-selected' : ''
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name={`sentiment-review-${activeModalComment.responseId}`}
+                                value={option.value}
+                                checked={reviewDraft === option.value}
+                                onChange={() => {
+                                  setReviewDraft(option.value);
+                                  setReviewNotice(null);
+                                }}
+                              />
+                              <span>{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <div className="sentiment-review-buttons">
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            disabled={reviewDraft === '' || reviewSaving}
+                            onClick={() => setReviewConfirming(reviewDraft)}
+                          >
+                            <Save size={14} aria-hidden="true" />
+                            <span>Lưu nhãn hiệu chỉnh</span>
+                          </button>
+                          {activeModalComment.isManuallyReviewed && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              disabled={reviewSaving}
+                              onClick={() => setReviewConfirming('')}
+                            >
+                              <Undo2 size={14} aria-hidden="true" />
+                              <span>Bỏ hiệu chỉnh</span>
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  !canReview && (
+                    <p className="sentiment-review-hint">
+                      Chỉ tài khoản được cấp quyền hiệu chỉnh cảm xúc mới sửa được nhãn này.
+                    </p>
+                  )
+                )}
               </div>
 
               {/* Toàn bộ câu trả lời trong phiếu khảo sát */}

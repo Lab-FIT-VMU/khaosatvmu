@@ -288,7 +288,10 @@
       "Bash(MSYS_NO_PATHCONV=1 docker exec khaosatvmu_db psql -U postgres -d khaosatvmu -c 'SELECT \"PositionId\", \"PositionName\" FROM \"Positions\" ORDER BY 1;')",
       "Bash(MSYS_NO_PATHCONV=1 docker exec khaosatvmu_db psql -U postgres -d khaosatvmu -c 'SELECT \"Code\",\"Name\" FROM \"Roles\" ORDER BY \"Code\";' -c 'SELECT p.\"PositionName\", count\\(*\\) FROM \"Lecturers\" l JOIN \"Positions\" p ON p.\"PositionId\"=l.\"PositionId\" WHERE l.\"PositionId\" IN \\(4,5\\) GROUP BY 1;')",
       "Bash(sort -o /tmp/mine.txt /tmp/mine.txt)",
-      "Bash(git merge-tree *)"
+      "Bash(git merge-tree *)",
+      "Bash(python \"C:/Users/Admin/AppData/Local/Temp/claude/e--CITAD/456c748c-ac4d-4402-bf3a-794268cea948/scratchpad/resolve_occ.py\")",
+      "Bash(export ConnectionStrings__DefaultConnection=\"Host=localhost;Port=5433;Database=khaosatvmu;Username=postgres;Password=khaosatvmu@123\")",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec khaosatvmu_db psql -U postgres -d khaosatvmu -c \"SELECT \\\\\"MigrationId\\\\\" FROM \\\\\"__EFMigrationsHistory\\\\\" WHERE \\\\\"MigrationId\\\\\" LIKE '%OpenComment%';\" -c \"SELECT to_regclass\\('public.\\\\\"OpenCommentAnalysisResults\\\\\"'\\) AS tbl;\")"
     ],
     "additionalDirectories": [
       "\\tmp",

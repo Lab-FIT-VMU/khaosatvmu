@@ -1,8 +1,20 @@
-namespace API.Configuration;
+using Microsoft.Extensions.Hosting;
 
-internal static class DevelopmentEnvironment
+namespace Infrastructure.Configuration;
+
+/// <summary>
+/// Nạp tệp <c>.env</c> gần nhất vào biến môi trường, chỉ khi đang chạy ở môi trường Development.
+///
+/// Dùng chung cho cả tiến trình API và tiến trình worker để hai bên đọc đúng cùng một chuỗi kết
+/// nối và cùng một đường dẫn model khi chạy ở máy dev. Ở môi trường thật thì biến môi trường do
+/// nền tảng triển khai cấp, hàm này không làm gì.
+///
+/// Biến đã có sẵn trong môi trường LUÔN thắng tệp .env: người vận hành ghi đè bằng biến môi
+/// trường phải có hiệu lực, nếu không thì rất khó lần ra vì sao cấu hình không ăn.
+/// </summary>
+public static class LocalEnvironmentFile
 {
-    public static void LoadNearestEnvFile()
+    public static void LoadNearest()
     {
         var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
             ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
