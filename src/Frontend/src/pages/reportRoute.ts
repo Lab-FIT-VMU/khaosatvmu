@@ -23,6 +23,7 @@ export const reportResultSortKeys = [
   'validResponseCount',
   'invalidResponseCount',
   'responseRate',
+  'validRate',
   'averageScore',
 ] as const;
 

@@ -5,7 +5,6 @@ export const ROLE_CODES = {
   boardOfDirectors: 'BOARD_OF_DIRECTORS',
   facultyManager: 'FACULTY_MANAGER',
   departmentManager: 'DEPARTMENT_MANAGER',
-  deputyDepartmentManager: 'DEPUTY_DEPARTMENT_MANAGER',
   lecturer: 'LECTURER',
 } as const;
 
@@ -14,9 +13,8 @@ export const ROLE_NAMES: Readonly<Record<string, string>> = {
   [ROLE_CODES.admin]: 'Quản trị hệ thống',
   [ROLE_CODES.surveyAdmin]: 'Quản trị khảo sát',
   [ROLE_CODES.boardOfDirectors]: 'Ban Giám hiệu',
-  [ROLE_CODES.facultyManager]: 'Trưởng khoa/viện',
-  [ROLE_CODES.departmentManager]: 'Trưởng bộ môn',
-  [ROLE_CODES.deputyDepartmentManager]: 'Phó trưởng bộ môn',
+  [ROLE_CODES.facultyManager]: 'Quản lý khoa',
+  [ROLE_CODES.departmentManager]: 'Quản lý bộ môn',
   [ROLE_CODES.lecturer]: 'Giảng viên',
 };
 
@@ -67,12 +65,11 @@ export function seesOnlyOwnSections(roleCode: string | null | undefined): boolea
 }
 
 /**
- * Trưởng đơn vị: trưởng bộ môn xem bộ môn mình, trưởng khoa/viện xem cả khoa mình.
+ * Quản lý đơn vị: quản lý bộ môn xem bộ môn mình, quản lý khoa xem cả khoa mình.
  * Hai vai trò này dùng chung bộ module và chung các nút thao tác trong phạm vi.
  */
 export function isUnitManagerRole(roleCode: string | null | undefined): boolean {
   return roleCode === ROLE_CODES.departmentManager
-    || roleCode === ROLE_CODES.deputyDepartmentManager
     || roleCode === ROLE_CODES.facultyManager;
 }
 

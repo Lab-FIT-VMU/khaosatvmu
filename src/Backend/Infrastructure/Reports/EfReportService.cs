@@ -1,4 +1,5 @@
-﻿using Application.Reports;
+﻿using Application.Auth;
+using Application.Reports;
 using Application.Surveys;
 using Domain;
 using Infrastructure.Persistence;
@@ -13,7 +14,8 @@ public sealed class EfReportService(
     IMemoryCache cache,
     SchoolOverviewCacheVersion cacheVersion,
     IScoringThresholdProvider scoringThresholds,
-    ISurveyPublicationService publication) : IReportService
+    ISurveyPublicationService publication,
+    IUserScopeResolver userScope) : IReportService
 {
     /// <summary>Prefix key cache cho báo cáo tổng quan toàn trường (theo học kỳ).</summary>
     private const string SchoolOverviewCachePrefix = "school-overview:";
@@ -34,15 +36,16 @@ public sealed class EfReportService(
     private const int MaxTextAnswersPerQuestion = 200;
 
     /// <summary>
-    /// Bảng lớp đã lọc theo trạng thái phát hành. MỌI truy vấn số liệu của service này
-    /// phải đi qua đây chứ không đọc thẳng <c>db.CourseSectionSurveys</c>: quản trị thấy
-    /// tất cả, còn trưởng bộ môn và giảng viên chỉ thấy lớp thuộc đợt đã phát hành, nên
-    /// đợt chưa phát hành không lọt vào bất kỳ con số gộp nào.
+    /// Bảng lớp đã lọc theo trạng thái phát hành và phạm vi người xem. MỌI truy vấn số
+    /// liệu của service này phải đi qua đây chứ không đọc thẳng <c>db.CourseSectionSurveys</c>:
+    /// quản trị thấy tất cả; các vai trò khác chỉ thấy lớp thuộc đợt đã phát hành và nằm
+    /// trong khoa / bộ môn của mình, nên mọi con số gộp — kể cả dòng khoa, tab Tổng quan —
+    /// đều chỉ tính trên đúng phần đó.
     /// </summary>
     private async Task<IQueryable<CourseSectionSurvey>> VisibleSectionSurveysAsync(
         CancellationToken cancellationToken)
     {
-        return await VisibleSurveyScope.SectionSurveysAsync(db, publication, cancellationToken);
+        return await VisibleSurveyScope.SectionSurveysAsync(db, publication, userScope, cancellationToken);
     }
 
     /// <summary>
@@ -411,6 +414,17 @@ public sealed class EfReportService(
             .Where(x => sectionIds.Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
 
+        // Người xem bị giới hạn phạm vi chỉ thấy lớp nằm trong phạm vi: số lớp của giảng
+        // viên chỉ đếm những lớp đó, và giảng viên không còn lớp nào thì không hiện ra —
+        // kể cả khi mở thẳng trang giảng viên bằng đường dẫn.
+        if (!(await userScope.ResolveAsync(cancellationToken)).SeesEverything)
+        {
+            var visibleSectionIds = sectionSurveys.Select(x => x.CourseSectionId).ToHashSet();
+            sections = sections.Where(x => visibleSectionIds.Contains(x.CourseSectionId)).ToList();
+            var visibleLecturerIds = sections.Select(x => x.LecturerId).ToHashSet();
+            lecturers = lecturers.Where(x => visibleLecturerIds.Contains(x.LecturerId)).ToList();
+        }
+
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
 
         // Gộp ngay trong SQL thay vì kéo hết phiếu về bộ nhớ ứng dụng.
@@ -574,6 +588,17 @@ public sealed class EfReportService(
         var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => sectionIds.Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
+
+        // Cùng luật với giảng viên đã gắn mã: người xem bị giới hạn chỉ thấy lớp trong
+        // phạm vi, không còn lớp nào thì coi như không tìm thấy.
+        if (!(await userScope.ResolveAsync(cancellationToken)).SeesEverything)
+        {
+            var visibleSectionIds = sectionSurveys.Select(x => x.CourseSectionId).ToHashSet();
+            sections = sections.Where(x => visibleSectionIds.Contains(x.CourseSectionId)).ToList();
+            if (sections.Count == 0) return null;
+            sectionIds = sections.Select(x => x.CourseSectionId).ToList();
+        }
+
         var responseStats = await ResponseTalliesAsync(
             sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList(),
             cancellationToken);
@@ -767,6 +792,21 @@ public sealed class EfReportService(
         var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
             .Where(x => sections.Select(s => s.CourseSectionId).Contains(x.CourseSectionId))
             .ToListAsync(cancellationToken);
+
+        // Người xem bị giới hạn: chỉ khoa của mình, chỉ bộ môn trong phạm vi (trưởng khoa
+        // cả khoa, trưởng bộ môn một bộ môn), và mọi con số chỉ đếm lớp trong phạm vi.
+        var scope = await userScope.ResolveAsync(cancellationToken);
+        if (!scope.SeesEverything)
+        {
+            var visibleSectionIds = sectionSurveys.Select(x => x.CourseSectionId).ToHashSet();
+            sections = sections.Where(x => visibleSectionIds.Contains(x.CourseSectionId)).ToList();
+            var visibleLecturerIds = sections.Select(x => x.LecturerId).ToHashSet();
+            lecturers = lecturers.Where(x => visibleLecturerIds.Contains(x.LecturerId)).ToList();
+            faculties = faculties.Where(x => x.FacultyId == scope.FacultyId).ToList();
+            departments = scope.SeesWholeFaculty
+                ? departments.Where(x => x.FacultyId == scope.FacultyId).ToList()
+                : departments.Where(x => x.DepartmentId == scope.DepartmentId).ToList();
+        }
 
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
         
@@ -1325,7 +1365,11 @@ public sealed class EfReportService(
     {
         // Số phiên bản nằm ngay đầu khoá: huỷ phiếu của một lớp là tăng số đó, mọi
         // khoá cũ lập tức thành không ai hỏi tới, khỏi phải dò xoá từng khoá.
+        // Số liệu đã thu về phạm vi người xem nên khoá phải mang cả phạm vi: thiếu nó thì
+        // trưởng bộ môn đọc lại đúng bản quản trị vừa dựng, gồm cả đợt chưa phát hành.
+        var viewerKey = await VisibleSurveyScope.CacheKeyAsync(publication, userScope, cancellationToken);
         string cacheKey = $"{SchoolOverviewCachePrefix}v{cacheVersion.Current}:{semesterId}"
+            + $":viewer:{viewerKey}"
             + $":survey:{semesterSurveyId?.ToString() ?? "all"}"
             + $":compare-semester:{comparisonSemesterId?.ToString() ?? "auto"}"
             + $":compare-survey:{comparisonSemesterSurveyId?.ToString() ?? "auto"}";

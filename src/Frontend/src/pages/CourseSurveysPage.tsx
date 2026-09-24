@@ -990,7 +990,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                           </div>
                         </td>
                         <td>{section.lecturerName || 'Chưa phân công'}</td>
-                        <td className="campaign-number-cell">{section.classSize}</td>
+                        <td className="campaign-number-cell" style={{ textAlign: 'right' }}>{section.classSize}</td>
                         <td className="campaign-link-cell">
                           <div className="campaign-link-row">
                             <input
@@ -1017,7 +1017,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
                             <span>{formatDateRange(section.startTime, section.endTime)}</span>
                           </div>
                         </td>
-                        <td className="campaign-number-cell">
+                        <td className="campaign-number-cell" style={{ textAlign: 'right' }}>
                           {/* Số lượt trả lời là lối tắt sang trang Thống kê & Báo cáo,
                               mà vai trò chỉ đọc không có quyền vào đó — câu H-e chốt
                               giảng viên chỉ xem tiến độ, không xem kết quả. */}

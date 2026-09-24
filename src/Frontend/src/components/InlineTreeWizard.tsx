@@ -352,7 +352,7 @@ export const InlineTreeWizard: React.FC<InlineTreeWizardProps> = ({
                           <td><span className="operations-code">{section.sectionName}</span></td>
                           <td>{course?.courseName ?? '—'}</td>
                           <td>{lecturerNamesOf(section) || 'Chưa phân công'}</td>
-                          <td>{section.classSize}</td>
+                          <td style={{ textAlign: 'right' }}>{section.classSize}</td>
                         </tr>
                       );
                     })}

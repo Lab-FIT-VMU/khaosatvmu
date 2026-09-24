@@ -8,7 +8,7 @@ import {
   LoaderCircle,
 } from 'lucide-react';
 import { useAuth } from '../auth/authContext';
-import { seesAllData, seesOnlyOwnSections } from '../auth/roles';
+import { canAccessTab, TAB_PERMISSION } from '../auth/modulePermissions';
 import {
   formatDecimal,
   formatDecimalOrDash,
@@ -312,45 +312,38 @@ function buildAnalysisHash(route: AnalysisRouteState): string {
 }
 
 /**
- * `minimumRole` cho biết tab mở tới đâu:
- * - `unrestricted`: chỉ ADMIN / SURVEY_ADMIN. Phân tích theo khoa/viện là bức tranh cả
- *   trường, không phải việc của trưởng bộ môn hay giảng viên.
- * - `manager`: từ trưởng bộ môn trở lên.
- * - `all`: mọi vai trò mở được trang này.
+ * Tab nào hiện do quyền tab quyết định (trang Phân quyền Module, xem TAB_PERMISSION).
+ * Mặc định vẫn như trước: Phân tích theo khoa/viện chỉ cho vai trò thấy toàn trường,
+ * hai tab bộ môn / học phần từ trưởng bộ môn trở lên, hai tab cuối cho mọi vai trò.
  *
- * Ẩn nút không phải là khoá — backend từ chối hai endpoint của tab `manager` khi
- * người gọi là giảng viên.
+ * Ẩn nút không phải là khoá — backend từ chối hai endpoint của tab bộ môn / học phần
+ * khi người gọi là giảng viên, dù quản trị có bật tab đó.
  */
-const tabs: { id: TabId; label: string; hint: string; minimumRole: 'unrestricted' | 'manager' | 'all' }[] = [
+const tabs: { id: TabId; label: string; hint: string }[] = [
   {
     id: 'normalization',
     label: 'Phân tích theo khoa/viện',
     hint: 'Điểm trung bình từng khoa/viện. Cột Z-Score so điểm trung bình khoa với trung bình toàn trường theo sai số chuẩn σ/√n, chia bậc 1σ · 2σ · 3σ.',
-    minimumRole: 'unrestricted',
   },
   {
     id: 'departments',
     label: 'Phân tích theo bộ môn',
     hint: 'Phục vụ trưởng khoa: mỗi dòng là một bộ môn trong đợt khảo sát.',
-    minimumRole: 'manager',
   },
   {
     id: 'courses',
     label: 'Phân tích theo học phần',
     hint: 'So các lớp trong cùng một học phần để biết vấn đề nằm ở học phần hay ở giảng viên.',
-    minimumRole: 'manager',
   },
   {
     id: 'normalizationSections',
     label: 'Phân tích theo lớp học phần',
     hint: 'So điểm thô giữa các lớp khác khoa là so sai. Z-score đưa mọi lớp về cùng một thước.',
-    minimumRole: 'all',
   },
   {
     id: 'lecturer',
     label: 'Báo cáo giảng viên',
     hint: 'Tổng hợp kết quả đánh giá theo từng giảng viên trong đợt khảo sát. Bấm vào giảng viên để xem chi tiết các lớp giảng dạy.',
-    minimumRole: 'all',
   },
 ];
 
@@ -696,11 +689,11 @@ const countColumn = (key: string, header: string, width = 10): ExportColumn => (
 });
 const rateColumn = (key: string, header: string, width = 12): ExportColumn => ({
   key,
-  header,
+  header: `${header} (%)`,
   width,
   type: 'number',
   align: 'right',
-  numberFormat: '0.000"%"',
+  numberFormat: '0.000',
   format: (value: MaybeNumber) => fixedOrDash(value, 3),
 });
 const scoreColumn = (key: string, header: string, digits = 3, width = 12): ExportColumn => ({
@@ -723,7 +716,7 @@ const zColumn = (key: string, header: string, width = 14): ExportColumn => ({
 });
 
 export const SurveyAnalysisPage: React.FC = () => {
-  const { activeProfile } = useAuth();
+  const { access } = useAuth();
   const { academicYears, activeSemesterId } = useSemester();
   const [initialRoute] = useState(parseAnalysisRoute);
 
@@ -981,14 +974,10 @@ export const SurveyAnalysisPage: React.FC = () => {
 
   // Danh sách tab của riêng vai trò đang dùng. Đổi hồ sơ là App dựng lại cả cây
   // nên chỗ này tự tính lại, không cần theo dõi gì thêm.
-  const visibleTabs = useMemo(() => {
-    const roleCode = activeProfile?.roleCode;
-    // Ban Giám hiệu xem ngang quản trị nên phải hỏi seesAllData TRƯỚC: họ cũng là vai
-    // trò chỉ đọc, xét nhầm thứ tự là mất sạch tab ngoài mức "all".
-    if (seesAllData(roleCode)) return tabs;
-    if (seesOnlyOwnSections(roleCode)) return tabs.filter((item) => item.minimumRole === 'all');
-    return tabs.filter((item) => item.minimumRole !== 'unrestricted');
-  }, [activeProfile?.roleCode]);
+  const visibleTabs = useMemo(
+    () => tabs.filter((item) => canAccessTab(access?.permissions, TAB_PERMISSION.surveyAnalysis[item.id])),
+    [access?.permissions],
+  );
 
   const activeTab = useMemo(
     () => visibleTabs.find((item) => item.id === tab) ?? visibleTabs[0],
@@ -1012,9 +1001,9 @@ export const SurveyAnalysisPage: React.FC = () => {
   // Nút chú thích của tab được truyền xuống để mỗi tab đặt nó vào cuối dòng tóm
   // tắt số liệu của mình — hai thứ nằm chung một hàng thay vì ăn hai dòng.
   const noteButton = (
-    <NoteModalButton title={`Chú thích · ${activeTab.label}`}>
+    <NoteModalButton title={`Chú thích · ${activeTab?.label ?? ''}`}>
       <div className="z-legend">
-        <p className="z-legend__note">{activeTab.hint}</p>
+        <p className="z-legend__note">{activeTab?.hint}</p>
         <FormulaNotes notes={tabFormulaNotes[tab] ?? []} />
         {/* Ngưỡng quyết định lớp nào có mặt trong mọi con số của trang này, nên
             phải in ra chứ không để người xem đoán. Đổi ở trang Bảng dữ liệu. */}
@@ -1569,7 +1558,7 @@ export const SurveyAnalysisPage: React.FC = () => {
         bảng đó gộp theo giảng viên chứ không theo mục. Đặt ngoài khối nội dung để
         đang tải vẫn thấy mục đang chọn và đổi lại được.
       */}
-      {tab !== 'lecturer' && (
+      {visibleTabs.length > 0 && tab !== 'lecturer' && (
         <QuestionSectionPicker
           sections={questionSectionOptions}
           selectedId={questionSectionId}
@@ -1577,7 +1566,12 @@ export const SurveyAnalysisPage: React.FC = () => {
         />
       )}
 
-      {loading ? (
+      {visibleTabs.length === 0 ? (
+        <div className="operations-empty" role="status">
+          <strong>Vai trò này chưa được mở tab nào trong Phân tích chuyên sâu.</strong>
+          <span>Liên hệ Quản trị viên để được cấp quyền.</span>
+        </div>
+      ) : loading ? (
         <div className="operations-empty" role="status">
           <LoaderCircle className="operation-icon auth-spin" aria-hidden="true" />
           <strong>Đang tính toán...</strong>
@@ -1716,12 +1710,12 @@ const NormalizationGroupTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => formatPercent(row.responseRate, 3),
+      value: (row) => formatDecimal(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => formatPercent(row.validResponseRate, 3),
+      value: (row) => formatDecimal(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
   ], []);
@@ -1768,10 +1762,10 @@ const NormalizationGroupTab: React.FC<{
                 {groupFilters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
               <th scope="col" style={{ width: '9%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu">
-                {groupFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+                {groupFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi (%)')}
               </th>
               <th scope="col" style={{ width: '9%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
-                {groupFilters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
+                {groupFilters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ (%)')}
               </th>
               <th scope="col" style={{ width: '9%' }}>
                 {groupFilters.filterHeader('averageScore', 'Điểm trung bình khoa')}
@@ -1821,8 +1815,8 @@ const NormalizationGroupTab: React.FC<{
                   <td className="num">{group.totalClassSize}</td>
                   <td className="num">{group.responseCount}</td>
                   <td className="num">{group.validResponseCount}</td>
-                  <td className="num">{formatPercent(group.responseRate, 3)}</td>
-                  <td className="num">{formatPercent(group.validResponseRate, 3)}</td>
+                  <td className="num">{formatDecimal(group.responseRate, 3)}</td>
+                  <td className="num">{formatDecimal(group.validResponseRate, 3)}</td>
                   {/* Tô theo bậc Z chứ không theo thang điểm tuyệt đối: cả bảng này
                       đọc bằng một thước duy nhất là 68-95-99.7. */}
                   <td className={zTierClass(group.meanZScore)}>{formatDecimal(group.averageScore, 3)}</td>
@@ -1923,12 +1917,12 @@ const NormalizationSectionTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => formatPercent(row.responseRate, 3),
+      value: (row) => formatDecimal(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => formatPercent(row.validResponseRate, 3),
+      value: (row) => formatDecimal(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
     { key: 'averageScore', value: (row) => formatDecimal(row.averageScore, 3), numeric: true },
@@ -1966,13 +1960,13 @@ const NormalizationSectionTab: React.FC<{
         <table className="statistics-table statistics-table--fixed">
           <thead>
             <tr>
-              <th scope="col" style={{ width: '12%' }}>
+              <th scope="col" style={{ width: '11%' }}>
                 {sectionFilters.filterHeader('facultyName', 'Khoa / Viện')}
               </th>
               <th scope="col" style={{ width: '12%' }}>
                 {sectionFilters.filterHeader('departmentName', 'Bộ môn')}
               </th>
-              <th scope="col" style={{ width: '14%' }}>
+              <th scope="col" style={{ width: '13%' }}>
                 {sectionFilters.filterHeader('courseName', 'Học phần')}
               </th>
               <th scope="col" style={{ width: '5%' }}>
@@ -1981,7 +1975,7 @@ const NormalizationSectionTab: React.FC<{
               <th scope="col" style={{ width: '4%' }}>
                 {sectionFilters.filterHeader('sectionName', 'Lớp học phần')}
               </th>
-              <th scope="col" style={{ width: '14%' }}>
+              <th scope="col" style={{ width: '13%' }}>
                 {sectionFilters.filterHeader('lecturerName', 'Giảng viên')}
               </th>
               <th scope="col" style={{ width: '4%' }}>
@@ -1993,13 +1987,13 @@ const NormalizationSectionTab: React.FC<{
               <th scope="col" style={{ width: '5%' }}>
                 {sectionFilters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '5%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu lớp">
-                {sectionFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+              <th scope="col" style={{ width: '6%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu lớp">
+                {sectionFilters.filterHeader('responseRate', 'Tỷ lệ phản hồi (%)')}
               </th>
-              <th scope="col" style={{ width: '5%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
-                {sectionFilters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
+              <th scope="col" style={{ width: '6%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
+                {sectionFilters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ (%)')}
               </th>
-              <th scope="col" style={{ width: '4%' }}>
+              <th scope="col" style={{ width: '5%' }}>
                 {sectionFilters.filterHeader('averageScore', 'Điểm')}
               </th>
               <th scope="col" style={{ width: '6%' }}>
@@ -2038,8 +2032,8 @@ const NormalizationSectionTab: React.FC<{
                 <td className="num">{section.classSize}</td>
                 <td className="num">{section.responseCount}</td>
                 <td className="num">{section.validResponseCount}</td>
-                <td className="num">{formatPercent(section.responseRate, 3)}</td>
-                <td className="num">{formatPercent(section.validResponseRate, 3)}</td>
+                <td className="num">{formatDecimal(section.responseRate, 3)}</td>
+                <td className="num">{formatDecimal(section.validResponseRate, 3)}</td>
                 <td className={zTierClass(section.zFaculty)}>
                   {formatDecimal(section.averageScore, 3)}
                 </td>
@@ -2089,12 +2083,12 @@ const DepartmentTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => formatPercent(row.responseRate, 3),
+      value: (row) => formatDecimal(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => formatPercent(row.validResponseRate, 3),
+      value: (row) => formatDecimal(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
     {
@@ -2173,10 +2167,10 @@ const DepartmentTab: React.FC<{
                 {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
               <th scope="col" style={{ width: '6%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu">
-                {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+                {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi (%)')}
               </th>
               <th scope="col" style={{ width: '6%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
-                {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
+                {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ (%)')}
               </th>
               <th scope="col" style={{ width: '5%' }}>
                 {filters.filterHeader('averageScore', 'Điểm trung bình')}
@@ -2233,8 +2227,8 @@ const DepartmentTab: React.FC<{
                 <td className="num">{row.totalClassSize}</td>
                 <td className="num">{row.responseCount}</td>
                 <td className="num">{row.validResponseCount}</td>
-                <td className="num">{formatPercent(row.responseRate, 3)}</td>
-                <td className="num">{formatPercent(row.validResponseRate, 3)}</td>
+                <td className="num">{formatDecimal(row.responseRate, 3)}</td>
+                <td className="num">{formatDecimal(row.validResponseRate, 3)}</td>
                 <td className={scoreClass(row.averageScore)}>
                   {formatDecimalOrDash(row.averageScore, 3)}
                 </td>
@@ -2290,12 +2284,12 @@ const CourseDiagnosisTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => formatPercent(row.responseRate, 3),
+      value: (row) => formatDecimal(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => formatPercent(row.validResponseRate, 3),
+      value: (row) => formatDecimal(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
     // Học phần chỉ có MỘT lớp thì bốn cột này không so được với gì: điểm trung bình,
@@ -2360,13 +2354,13 @@ const CourseDiagnosisTab: React.FC<{
         <table className="statistics-table statistics-table--fixed">
           <thead>
             <tr>
-              <th scope="col" style={{ width: '11%' }}>
+              <th scope="col" style={{ width: '10%' }}>
                 {filters.filterHeader('facultyName', 'Khoa / Viện')}
               </th>
               <th scope="col" style={{ width: '10%' }}>
                 {filters.filterHeader('departmentName', 'Bộ môn')}
               </th>
-              <th scope="col" style={{ width: '17%' }}>
+              <th scope="col" style={{ width: '15%' }}>
                 {filters.filterHeader('courseName', 'Học phần')}
               </th>
               <th scope="col" style={{ width: '5%' }}>
@@ -2387,13 +2381,13 @@ const CourseDiagnosisTab: React.FC<{
               <th scope="col" style={{ width: '4%' }}>
                 {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
-              <th scope="col" style={{ width: '5%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu">
-                {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+              <th scope="col" style={{ width: '6%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu">
+                {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi (%)')}
               </th>
-              <th scope="col" style={{ width: '5%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
-                {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
+              <th scope="col" style={{ width: '6%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
+                {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ (%)')}
               </th>
-              <th scope="col" style={{ width: '5%' }}>
+              <th scope="col" style={{ width: '6%' }}>
                 {filters.filterHeader('averageScore', 'Điểm trung bình')}
               </th>
               <th scope="col" style={{ width: '4%' }}>
@@ -2456,8 +2450,8 @@ const CourseDiagnosisTab: React.FC<{
                 <td className="num">{row.totalClassSize}</td>
                 <td className="num">{row.responseCount}</td>
                 <td className="num">{row.validResponseCount}</td>
-                <td className="num">{formatPercent(row.responseRate, 3)}</td>
-                <td className="num">{formatPercent(row.validResponseRate, 3)}</td>
+                <td className="num">{formatDecimal(row.responseRate, 3)}</td>
+                <td className="num">{formatDecimal(row.validResponseRate, 3)}</td>
                 <td className={scoreClass(comparableScore(row.sectionCount, row.averageScore))}>
                   {scoreText(comparableScore(row.sectionCount, row.averageScore))}
                 </td>
@@ -2568,12 +2562,12 @@ const LecturerTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => formatPercent(row.responseRate, 3),
+      value: (row) => formatDecimal(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => formatPercent(row.validResponseRate, 3),
+      value: (row) => formatDecimal(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
     // Ba cột điểm đi qua comparableScore để giảng viên một lớp cũng lọc và sắp xếp
@@ -2690,10 +2684,10 @@ const LecturerTab: React.FC<{
                 {filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}
               </th>
               <th scope="col" style={{ width: '7%' }} title="Số phiếu đã thu chia tổng số phiếu phải thu">
-                {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+                {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi (%)')}
               </th>
               <th scope="col" style={{ width: '7%' }} title="Số phiếu hợp lệ chia số phiếu đã thu">
-                {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
+                {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ (%)')}
               </th>
               <th scope="col" style={{ width: '7%' }}>
                 {filters.filterHeader('averageScore', 'Điểm trung bình')}
@@ -2731,8 +2725,8 @@ const LecturerTab: React.FC<{
                 <td className="num">{row.totalClassSize}</td>
                 <td className="num">{row.responseCount}</td>
                 <td className="num">{row.validResponseCount}</td>
-                <td className="num">{formatPercent(row.responseRate, 3)}</td>
-                <td className="num">{formatPercent(row.validResponseRate, 3)}</td>
+                <td className="num">{formatDecimal(row.responseRate, 3)}</td>
+                <td className="num">{formatDecimal(row.validResponseRate, 3)}</td>
                 <td className={scoreClass(comparableScore(row.sectionCount, row.averageScore))}>
                   {scoreText(comparableScore(row.sectionCount, row.averageScore))}
                 </td>
@@ -2775,12 +2769,12 @@ const LecturerReportView: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => formatPercent(row.responseRate, 3),
+      value: (row) => formatDecimal(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => formatPercent(row.validResponseRate, 3),
+      value: (row) => formatDecimal(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
     { key: 'averageScore', value: (row) => formatDecimal(row.averageScore, 3), numeric: true },
@@ -2864,10 +2858,10 @@ const LecturerReportView: React.FC<{
                 <th scope="col">{filters.filterHeader('responseCount', 'Số phiếu đã thu')}</th>
                 <th scope="col">{filters.filterHeader('validResponseCount', 'Số phiếu hợp lệ')}</th>
                 <th scope="col" title="Số phiếu đã thu chia tổng số phiếu phải thu">
-                  {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+                  {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi (%)')}
                 </th>
                 <th scope="col" title="Số phiếu hợp lệ chia số phiếu đã thu">
-                  {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ')}
+                  {filters.filterHeader('validResponseRate', 'Tỷ lệ phiếu hợp lệ (%)')}
                 </th>
                 <th scope="col">{filters.filterHeader('averageScore', 'Điểm')}</th>
                 <th scope="col" title="Trung bình mọi lớp cùng học phần, kể cả lớp người khác dạy">
@@ -2909,8 +2903,8 @@ const LecturerReportView: React.FC<{
                     <td className="num">{section.classSize}</td>
                     <td className="num">{section.responseCount}</td>
                     <td className="num">{section.validResponseCount}</td>
-                    <td className="num">{formatPercent(section.responseRate, 3)}</td>
-                    <td className="num">{formatPercent(section.validResponseRate, 3)}</td>
+                    <td className="num">{formatDecimal(section.responseRate, 3)}</td>
+                    <td className="num">{formatDecimal(section.validResponseRate, 3)}</td>
                     <td className={zTierClass(section.zDepartment)}>
                       {formatDecimal(section.averageScore, 3)}
                     </td>

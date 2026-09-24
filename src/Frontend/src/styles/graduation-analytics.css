@@ -593,8 +593,8 @@
 .graduation-v3-table th:nth-child(8) { width: 6%; }
 .graduation-v3-table th:nth-child(9) { width: 6%; }
 .graduation-v3-table th:nth-child(10) { width: 6%; }
-.graduation-v3-table th:nth-child(11) { width: 6%; }
-.graduation-v3-table th:nth-child(12) { width: 7%; }
+.graduation-v3-table th:nth-child(11) { width: 7%; }
+.graduation-v3-table th:nth-child(12) { width: 6%; }
 .graduation-v3-table th, .graduation-v3-table td, .graduation-period-manager th, .graduation-period-manager td, .graduation-history th, .graduation-history td { padding: 9px 10px; border-right: 1px solid var(--grid-line); border-bottom: 1px solid var(--grid-line); text-align: right; }
 .graduation-v3-table th:first-child, .graduation-v3-table td:first-child, .graduation-v3-table th:nth-child(2), .graduation-v3-table td:nth-child(2), .graduation-period-manager th:nth-child(-n+5), .graduation-period-manager td:nth-child(-n+5), .graduation-history th:nth-child(-n+4), .graduation-history td:nth-child(-n+4) { text-align: left; }
 .graduation-v3-table th, .graduation-period-manager th, .graduation-history th { background: #f7f9fa; color: #000000; }

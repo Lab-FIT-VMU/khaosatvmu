@@ -416,7 +416,7 @@ export const SurveyDashboardPage: React.FC = () => {
                     title: weakestQuestionsTitle(weakestThreshold, weakestDirection).toLocaleUpperCase('vi-VN'),
                     // Cột khớp bảng "Tiêu chí theo số lớp cảnh báo" trên màn hình.
                     columns: [
-                      { key: 'questionOrder', header: 'Câu', width: 8, align: 'center' as const, format: (v: any) => `C${v}` },
+                      { key: 'questionOrder', header: 'Câu', width: 8, align: 'left' as const, format: (v: any) => `C${v}` },
                       { key: 'questionText', header: 'Nội dung', width: 80 },
                       {
                         key: 'averageScore',
@@ -756,12 +756,12 @@ const WeakestQuestions: React.FC<WeakestQuestionsProps> = ({
           <tbody>
             {visibleRows.map((row) => (
               <tr key={row.questionOrder}>
-                <td className="catalog-table__index">C{row.questionOrder}</td>
+                <td className="catalog-table__index" style={{ textAlign: 'left' }}>C{row.questionOrder}</td>
                 <td>
                   <span className="catalog-cell-primary">{row.questionText}</span>
                 </td>
-                <td className="num">{formatDecimal(row.averageScore, 3)}</td>
-                <td className={row.sectionsBelowThreshold > 0 ? 'num is-flagged' : 'num'}>
+                <td className="num" style={{ textAlign: 'right' }}>{formatDecimal(row.averageScore, 3)}</td>
+                <td className={row.sectionsBelowThreshold > 0 ? 'num is-flagged' : 'num'} style={{ textAlign: 'right' }}>
                   {row.sectionsBelowThreshold}
                 </td>
               </tr>

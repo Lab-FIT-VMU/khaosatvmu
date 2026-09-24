@@ -8,8 +8,13 @@ using Application.Surveys;
 /// bài test cũ vẫn kiểm đúng thứ chúng định kiểm (phạm vi, điểm, truy vấn) chứ không
 /// vướng chốt chặn phát hành. Test nào cần kiểm chính chốt chặn thì dựng với
 /// <c>published: false</c>.
+/// <para>
+/// <paramref name="lockedForScoring"/> là trạng thái <see cref="GetAsync"/> đọc ra — thứ
+/// quyết định có còn tính lại điểm được không. Mặc định là chưa phát hành, để các test
+/// tính lại điểm không vướng chốt khoá sau phát hành.
+/// </para>
 /// </summary>
-internal sealed class PublishedSurveyPublicationService(bool published = true)
+internal sealed class PublishedSurveyPublicationService(bool published = true, bool lockedForScoring = false)
     : ISurveyPublicationService
 {
     public Task<SurveyOperationResult<SurveyPublicationDto>> GetAsync(
@@ -18,7 +23,7 @@ internal sealed class PublishedSurveyPublicationService(bool published = true)
         Task.FromResult(new SurveyOperationResult<SurveyPublicationDto>(
             true,
             null,
-            new SurveyPublicationDto(semesterSurveyId, published, null, string.Empty, true)));
+            new SurveyPublicationDto(semesterSurveyId, lockedForScoring, null, string.Empty, true)));
 
     public Task<SurveyOperationResult<SurveyPublicationDto>> SetAsync(
         int semesterSurveyId,

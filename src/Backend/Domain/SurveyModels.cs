@@ -346,6 +346,13 @@ public sealed class SurveyScoringSetting
 
     public bool RejectAttentionCheckFailed { get; set; } = true;
 
+    /// <summary>
+    /// Chỉ tiêu tỷ lệ phản hồi (phần trăm) của RIÊNG trang Tiến độ thu phiếu: chỉ dùng để
+    /// gắn nhãn Đạt chỉ tiêu / Đang thu cho từng lớp. Không liên quan hai ngưỡng tính
+    /// điểm ở trên, đổi nó không ghi nhật ký cấu hình và không làm lệch điểm nào.
+    /// </summary>
+    public decimal ProgressTargetResponseRate { get; set; } = 50m;
+
     public DateTime UpdatedAt { get; set; }
 }
 

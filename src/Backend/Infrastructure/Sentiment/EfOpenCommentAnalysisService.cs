@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Application;
+using Application.Auth;
 using Application.Reports;
 using Application.Surveys;
 using Domain;
@@ -25,6 +26,7 @@ namespace Infrastructure.Sentiment;
 public sealed class EfOpenCommentAnalysisService(
     AppDbContext db,
     ISurveyPublicationService publication,
+    IUserScopeResolver userScope,
     IOptions<OpenCommentSentimentOptions> options,
     ICurrentUserAccessor currentUser,
     ILogger<EfOpenCommentAnalysisService> logger) : IOpenCommentAnalysisService
@@ -243,7 +245,7 @@ public sealed class EfOpenCommentAnalysisService(
         int? semesterSurveyId,
         CancellationToken cancellationToken)
     {
-        var query = await VisibleSurveyScope.SectionSurveysAsync(db, publication, cancellationToken);
+        var query = await VisibleSurveyScope.SectionSurveysAsync(db, publication, userScope, cancellationToken);
 
         if (semesterSurveyId is { } surveyId)
         {

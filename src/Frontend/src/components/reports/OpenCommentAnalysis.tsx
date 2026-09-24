@@ -351,7 +351,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         key: 'score',
         header: 'Điểm của phiếu khảo sát',
         width: '90px',
-        align: 'center',
+        align: 'right',
         numeric: true,
         sortValue: (item) => item.score,
         render: (item) => (
@@ -433,9 +433,9 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         { key: 'submittedAt', header: 'Thời gian', width: 18, format: (val: unknown) => formatDateTime(String(val)) },
         { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
         { key: 'departmentName', header: 'Bộ môn', width: 22 },
-        { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'center' as const },
+        { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'left' as const },
         { key: 'courseName', header: 'Tên học phần', width: 28 },
-        { key: 'sectionName', header: 'Nhóm lớp', width: 14, align: 'center' as const },
+        { key: 'sectionName', header: 'Nhóm lớp', width: 14, align: 'left' as const },
         {
           key: 'lecturerName',
           header: 'Giảng viên',
@@ -452,15 +452,15 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
           // thành phiếu bị chấm 0 điểm.
           format: (val: unknown) => (Number(val) > 0 ? formatDecimal(Number(val), 3) : '—'),
         },
-        { key: 'isValid', header: 'Tính hợp lệ', width: 14, align: 'center' as const, format: (val: unknown) => (val ? 'Hợp lệ' : 'Bị bộ lọc loại') },
-        { key: 'sentimentLabel', header: 'Phân loại cảm xúc', width: 18, align: 'center' as const, format: (val: unknown) => (val ? String(val) : 'Chưa phân tích') },
+        { key: 'isValid', header: 'Tính hợp lệ', width: 14, align: 'left' as const, format: (val: unknown) => (val ? 'Hợp lệ' : 'Bị bộ lọc loại') },
+        { key: 'sentimentLabel', header: 'Phân loại cảm xúc', width: 18, align: 'left' as const, format: (val: unknown) => (val ? String(val) : 'Chưa phân tích') },
         {
           key: 'confidence',
-          header: 'Độ tin cậy',
+          header: 'Độ tin cậy (%)',
           width: 14,
           type: 'number' as const,
           align: 'right' as const,
-          numberFormat: '0"%"',
+          numberFormat: '0',
           // Ô đã hiệu chỉnh thủ công ghi đúng chữ mà ô cảm xúc trên màn hình hiện,
           // thay vì để trống khiến người đọc tưởng thiếu dữ liệu.
           format: (val: unknown, row: OpenCommentItem) =>
@@ -474,7 +474,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
           key: 'isManuallyReviewed',
           header: 'Trạng thái hiệu chỉnh',
           width: 20,
-          align: 'center' as const,
+          align: 'left' as const,
           format: (val: unknown) => (val ? 'Đã hiệu chỉnh thủ công' : 'Kết quả của model'),
         },
         { key: 'additionalComments', header: 'Nội dung ý kiến đóng góp', width: 45 },
@@ -897,14 +897,14 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
                           );
                           return (
                             <tr key={ans.questionId}>
-                              <td style={{ textAlign: 'center', color: '#68737d' }}>{idx + 1}</td>
-                              <td className="response-detail-question" style={{ fontWeight: 500 }}>
+                              <td style={{ textAlign: 'right', color: '#68737d' }}>{idx + 1}</td>
+                              <td className="response-detail-question" style={{ fontWeight: 500, textAlign: 'left' }}>
                                 {ans.questionText}
                               </td>
-                              <td style={{ textAlign: 'center', color: '#68737d', fontSize: '12px' }}>
+                              <td style={{ textAlign: 'left', color: '#68737d', fontSize: '12px' }}>
                                 {scale?.answerScaleName || '—'}
                               </td>
-                              <td>
+                              <td style={{ textAlign: 'left' }}>
                                 {ans.scaleKind === 'Text' ? (
                                   <span style={{ fontStyle: 'italic', color: '#334155' }}>
                                     {ans.answerValue || 'Không trả lời.'}

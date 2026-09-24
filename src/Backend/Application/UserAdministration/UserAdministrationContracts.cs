@@ -47,15 +47,18 @@ public sealed record PermissionDto(
     string Code,
     string Name,
     string? Description,
-    string Category);
+    string Category,
+    string? ParentCode);
 
 /// <summary>Trạng thái permission (được cấp hay không) của một role.</summary>
+/// <param name="ParentCode">Quyền cha khi đây là quyền của một tab trong module.</param>
 public sealed record RolePermissionStatusDto(
     Guid PermissionId,
     string PermissionCode,
     string PermissionName,
     string Category,
-    bool IsGranted);
+    bool IsGranted,
+    string? ParentCode);
 
 /// <summary>Toàn bộ permission matrix của một role.</summary>
 public sealed record RolePermissionMatrixDto(
@@ -76,10 +79,13 @@ public static class RequiredRolePermissions
 {
     public const string AdminRoleCode = "ADMIN";
     public const string UserAdminPermissionCode = "USER_ADMIN_ACCESS";
+    /// <summary>Tab Phân quyền Module: tắt đi thì admin mất màn hình duy nhất cấp lại quyền.</summary>
+    public const string UserAdminPermissionsTabCode = "USER_ADMIN_TAB_PERMISSIONS";
 
     public static bool IsRequired(string roleCode, string permissionCode) =>
         string.Equals(roleCode, AdminRoleCode, StringComparison.OrdinalIgnoreCase)
-        && string.Equals(permissionCode, UserAdminPermissionCode, StringComparison.OrdinalIgnoreCase);
+        && (string.Equals(permissionCode, UserAdminPermissionCode, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(permissionCode, UserAdminPermissionsTabCode, StringComparison.OrdinalIgnoreCase));
 }
 
 
@@ -108,7 +114,7 @@ public sealed record ImportAdminUserRowCommand(int RowNumber, string Email, stri
 /// tạo hàng loạt và import Excel — đều phải cho ra cùng một kết quả.
 /// <para>
 /// Sáu chữ số đầu là số thứ tự tự tăng trên toàn hệ thống, hai ký tự cuối biểu thị
-/// vai trò. Ví dụ hồ sơ thứ 36 của trưởng bộ môn có mã <c>000036BM</c>.
+/// vai trò. Ví dụ hồ sơ thứ 36 của quản lý bộ môn có mã <c>000036BM</c>.
 /// </para>
 /// </summary>
 public static class ProfileNaming
@@ -118,9 +124,8 @@ public static class ProfileNaming
         {
             ["ADMIN"] = ("Quản trị hệ thống", "AD"),
             ["BOARD_OF_DIRECTORS"] = ("Ban Giám hiệu", "GH"),
-            ["DEPARTMENT_MANAGER"] = ("Trưởng bộ môn", "BM"),
-            ["DEPUTY_DEPARTMENT_MANAGER"] = ("Phó trưởng bộ môn", "PB"),
-            ["FACULTY_MANAGER"] = ("Trưởng khoa/viện", "KV"),
+            ["DEPARTMENT_MANAGER"] = ("Quản lý bộ môn", "BM"),
+            ["FACULTY_MANAGER"] = ("Quản lý khoa", "KV"),
             ["LECTURER"] = ("Giảng viên", "GV"),
             ["SURVEY_ADMIN"] = ("Quản trị khảo sát", "QT"),
         };

@@ -26,7 +26,7 @@ import {
   surveyFormTemplates,
   type SurveyFormTemplate,
 } from '../utils/surveyFormTemplates';
-import { Modal } from './Modal';
+import { ConfirmDialog, Modal } from './Modal';
 import { SurveyImagePicker } from './SurveyImagePicker';
 import {
   SurveyFormPreview,
@@ -78,6 +78,8 @@ export const SurveyFormDesigner: React.FC<{
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   /** Hộp chọn ảnh đang mở cho ô nào; null là đóng. */
   const [pickingImage, setPickingImage] = useState<'logo' | 'cover' | null>(null);
+  /** Hỏi lại trước khi về thư viện mẫu: chọn mẫu khác là bỏ hết chỉnh sửa đang có. */
+  const [confirmingTemplateChange, setConfirmingTemplateChange] = useState(false);
 
   // Mỗi lần mở lại hộp thoại là một lần soạn mới: lấy đúng cấu hình đang lưu bên ngoài.
   useEffect(() => {
@@ -88,6 +90,7 @@ export const SurveyFormDesigner: React.FC<{
     setRegion(null);
     setMovingCover(false);
     setPickingImage(null);
+    setConfirmingTemplateChange(false);
     setDevice('desktop');
   }, [isOpen, value]);
 
@@ -503,12 +506,12 @@ export const SurveyFormDesigner: React.FC<{
               ) : (
                 <Monitor className="operation-icon" aria-hidden="true" />
               )}
-              {device === 'mobile' ? 'Khổ điện thoại' : 'Khổ máy tính'}
+              {device === 'mobile' ? 'Giao diện điện thoại' : 'Giao diện máy tính'}
             </button>
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => setStep('gallery')}
+              onClick={() => setConfirmingTemplateChange(true)}
             >
               <LayoutTemplate className="operation-icon" aria-hidden="true" />
               Đổi mẫu
@@ -560,8 +563,10 @@ export const SurveyFormDesigner: React.FC<{
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={step === 'gallery' ? 'Chọn mẫu phiếu khảo sát' : 'Soạn hình thức phiếu'}
+      title={step === 'gallery' ? 'Chọn mẫu phiếu khảo sát' : 'Cấu hình phiếu'}
       size="designer"
+      // Đang soạn dở mà bấm trượt ra ngoài thì mất hết; chỉ đóng bằng nút X hoặc Hủy.
+      closeOnBackdropClick={false}
       // Ở bước chọn mẫu chưa có gì để lưu, nên không hiện chân hộp thoại.
       onSubmit={step === 'editor' ? () => onSave(draft) : undefined}
       submitText={saving ? 'Đang lưu...' : 'Dùng hình thức này'}
@@ -589,6 +594,20 @@ export const SurveyFormDesigner: React.FC<{
           }
           setPickingImage(null);
         }}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmingTemplateChange}
+        onClose={() => setConfirmingTemplateChange(false)}
+        onConfirm={() => {
+          setConfirmingTemplateChange(false);
+          setStep('gallery');
+        }}
+        title="Đổi mẫu phiếu"
+        recordName=""
+        message="Bạn có muốn đổi phiếu (Các chỉnh sửa vừa rồi sẽ không được lưu lại)?"
+        confirmText="Đổi mẫu"
+        confirmVariant="primary"
       />
     </Modal>
   );

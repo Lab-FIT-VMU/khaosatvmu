@@ -302,6 +302,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
     {
       key: 'actions',
       header: 'Chi tiết',
+      align: 'center',
       width: '6%',
       render: (item) => (
         <button
@@ -516,10 +517,10 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
           // đó là nút bấm. Các cột Mức 1..N sinh theo thang điểm của bộ đề, giống hệt
           // cách bảng dựng chúng.
           columns: [
-            { key: 'responseId', header: 'Mã phiếu', width: 12, align: 'center' as const },
+            { key: 'responseId', header: 'Mã phiếu', width: 12, align: 'left' as const },
             { key: 'submittedAt', header: 'Thời gian nộp', width: 18, format: (val: any) => formatDateTime(val) },
             { key: 'score', header: 'Điểm', width: 10, type: 'number' as const, align: 'right' as const, format: (val: any) => Number(val).toFixed(3) },
-            { key: 'isValid', header: 'Trạng thái', width: 12, align: 'center' as const, format: (val: any) => (val ? 'Hợp lệ' : 'Không hợp lệ') },
+            { key: 'isValid', header: 'Trạng thái', width: 12, align: 'left' as const, format: (val: any) => (val ? 'Hợp lệ' : 'Không hợp lệ') },
             { key: 'rejectionReasons', header: 'Mô tả', width: 20, format: (_: any, item: any) => rejectionReasonTexts(item.rejectionReasons).join(' · ') || '—' },
             ...scaleValues.map((option) => ({
               key: `value-${option.value}`,
@@ -578,11 +579,11 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
 
                     return (
                       <tr key={answer.questionId}>
-                        <td className="response-detail-question">
+                        <td className="response-detail-question" style={{ textAlign: 'left' }}>
                           {index + 1}. {answer.questionText}
                         </td>
-                        <td>{scale?.answerScaleName ?? '—'}</td>
-                        <td>
+                        <td style={{ textAlign: 'left' }}>{scale?.answerScaleName ?? '—'}</td>
+                        <td style={{ textAlign: 'left' }}>
                           {answer.scaleKind === 'Text' ? (
                             <span className="response-comment">
                               {answer.answerValue || 'Không trả lời.'}

@@ -30,6 +30,8 @@ interface SchoolSurveyOverviewProps {
   semesterSurveyId?: number;
   analysisView: ReportAnalysisView;
   onAnalysisViewChange: (view: ReportAnalysisView) => void;
+  /** Các tab con được mở cho vai trò đang dùng; tab ngoài danh sách không hiện. */
+  allowedAnalysisViews: readonly ReportAnalysisView[];
   onDrillDown?: (filter: SchoolOverviewDrillDown) => void;
 }
 
@@ -48,6 +50,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
   semesterSurveyId,
   analysisView,
   onAnalysisViewChange,
+  allowedAnalysisViews,
   onDrillDown,
 }) => {
   const [data, setData] = useState<SchoolSurveyOverviewData | null>(null);
@@ -242,11 +245,11 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
           { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
           {
             key: 'completionRate',
-            header: 'Tỷ lệ',
+            header: 'Tỷ lệ (%)',
             width: 12,
             type: 'string' as const,
             align: 'right' as const,
-            format: (val: any) => formatPercent(Number(val), 3),
+            format: (val: any) => formatDecimal(Number(val), 3),
           },
           {
             key: 'averageScore',
@@ -271,11 +274,11 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
           { key: 'targetResponses', header: 'Chỉ tiêu', width: 12, type: 'number' as const, align: 'right' as const },
           {
             key: 'completionRate',
-            header: 'Tỷ lệ',
+            header: 'Tỷ lệ (%)',
             width: 12,
             type: 'string' as const,
             align: 'right' as const,
-            format: (val: any) => formatPercent(Number(val), 3),
+            format: (val: any) => formatDecimal(Number(val), 3),
           },
           {
             key: 'averageScore',
@@ -495,38 +498,47 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
             </div>
           </div>
 
-          <div className="reports-analysis-tabs" role="tablist" aria-label="Chọn nhóm phân tích">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={analysisView === 'faculties'}
-              className={analysisView === 'faculties' ? 'is-active' : ''}
-              onClick={() => onAnalysisViewChange('faculties')}
-            >
-              So sánh theo Khoa
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={analysisView === 'quality'}
-              className={analysisView === 'quality' ? 'is-active' : ''}
-              onClick={() => onAnalysisViewChange('quality')}
-            >
-              Chất lượng phản hồi
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={analysisView === 'criteria'}
-              className={analysisView === 'criteria' ? 'is-active' : ''}
-              onClick={() => onAnalysisViewChange('criteria')}
-            >
-              Điểm theo tiêu chí
-            </button>
-          </div>
+          {/* Không tab con nào được mở thì bỏ luôn thanh tab trống. */}
+          {allowedAnalysisViews.length > 0 && (
+            <div className="reports-analysis-tabs" role="tablist" aria-label="Chọn nhóm phân tích">
+              {allowedAnalysisViews.includes('faculties') && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={analysisView === 'faculties'}
+                  className={analysisView === 'faculties' ? 'is-active' : ''}
+                  onClick={() => onAnalysisViewChange('faculties')}
+                >
+                  So sánh theo Khoa
+                </button>
+              )}
+              {allowedAnalysisViews.includes('quality') && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={analysisView === 'quality'}
+                  className={analysisView === 'quality' ? 'is-active' : ''}
+                  onClick={() => onAnalysisViewChange('quality')}
+                >
+                  Chất lượng phản hồi
+                </button>
+              )}
+              {allowedAnalysisViews.includes('criteria') && (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={analysisView === 'criteria'}
+                  className={analysisView === 'criteria' ? 'is-active' : ''}
+                  onClick={() => onAnalysisViewChange('criteria')}
+                >
+                  Điểm theo tiêu chí
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Hàng biểu đồ: điểm TB + tiến độ theo Khoa */}
-          {analysisView === 'faculties' && (
+          {analysisView === 'faculties' && allowedAnalysisViews.includes('faculties') && (
           <div className="reports-exec-grid reports-analysis-panel" role="tabpanel">
             <div className="reports-exec-card">
               <header className="reports-exec-card-head">
@@ -553,7 +565,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
           )}
 
           {/* Hàng thứ 2: xếp hạng tiêu chí, số lượng và đầu bảng do người dùng chọn */}
-          {analysisView === 'quality' && (
+          {analysisView === 'quality' && allowedAnalysisViews.includes('quality') && (
           <div className="reports-exec-card reports-analysis-panel reports-quality-card" role="tabpanel">
             <header className="reports-exec-card-head">
               <h3>{questionLowest ? 'Tiêu chí cần cải tiến' : 'Tiêu chí được đánh giá cao'}</h3>
@@ -596,7 +608,7 @@ export const SchoolSurveyOverview: React.FC<SchoolSurveyOverviewProps> = ({
           )}
 
           {/* Hàng thứ 3: Biểu đồ điểm trung bình các tiêu chí câu hỏi toàn trường */}
-          {analysisView === 'criteria' && (
+          {analysisView === 'criteria' && allowedAnalysisViews.includes('criteria') && (
           <div className="reports-exec-card reports-analysis-panel" role="tabpanel">
             <header className="reports-exec-card-head">
               <div>

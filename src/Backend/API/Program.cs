@@ -184,6 +184,7 @@ builder.Services.AddScoped<ICohortService, EfCohortService>();
 builder.Services.AddScoped<ISurveyService, EfSurveyService>();
 builder.Services.AddScoped<ICourseSurveyQrExporter, ClosedXmlCourseSurveyQrExporter>();
 builder.Services.AddScoped<IScoringThresholdProvider, EfScoringThresholdProvider>();
+builder.Services.AddScoped<IProgressTargetProvider, EfProgressTargetProvider>();
 builder.Services.AddScoped<ISurveyPublicationService, EfSurveyPublicationService>();
 // Kho ảnh của phiếu khảo sát; không giữ trạng thái nên dùng chung một thể hiện.
 builder.Services.AddSingleton<SurveyFormAssetStore>();

@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { roleDisplayName } from '../auth/roles';
+import { useAuth } from '../auth/authContext';
+import { canAccessTab, TAB_PERMISSION } from '../auth/modulePermissions';
 import { Modal } from '../components/Modal';
 import { ProfileImportDialog } from '../components/ProfileImportDialog';
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
@@ -44,6 +46,8 @@ import '../styles/auth-admin.css';
 
 type AdminView = 'users' | 'audit' | 'permissions';
 
+const ADMIN_VIEWS: readonly AdminView[] = ['users', 'audit', 'permissions'];
+
 /** Nhãn của từng chế độ, dùng cho cả tab trên trang lẫn đường dẫn ở thanh trên cùng. */
 const adminViewLabels: Record<AdminView, string> = {
   users: 'Tài khoản và hồ sơ',
@@ -64,9 +68,8 @@ type StatusConfirmation =
 const profileNamingByRole: Record<string, { name: string; suffix: string }> = {
   ADMIN: { name: 'Quản trị hệ thống', suffix: 'AD' },
   BOARD_OF_DIRECTORS: { name: 'Ban Giám hiệu', suffix: 'GH' },
-  DEPARTMENT_MANAGER: { name: 'Trưởng bộ môn', suffix: 'BM' },
-  DEPUTY_DEPARTMENT_MANAGER: { name: 'Phó trưởng bộ môn', suffix: 'PB' },
-  FACULTY_MANAGER: { name: 'Trưởng khoa/viện', suffix: 'KV' },
+  DEPARTMENT_MANAGER: { name: 'Quản lý bộ môn', suffix: 'BM' },
+  FACULTY_MANAGER: { name: 'Quản lý khoa', suffix: 'KV' },
   LECTURER: { name: 'Giảng viên', suffix: 'GV' },
   SURVEY_ADMIN: { name: 'Quản trị khảo sát', suffix: 'QT' },
 };
@@ -218,10 +221,16 @@ function messageFrom(error: unknown): string {
 }
 
 export function UsersAdminPage() {
-  const [view, setView] = useState<AdminView>('users');
+  const [selectedView, setView] = useState<AdminView>('users');
+  // Tab nào hiện do quản trị bật tắt ở trang Phân quyền Module. Tab đang chọn bị khoá
+  // thì mở tab đầu tiên được phép; không tab nào được phép thì view là null.
+  const { access } = useAuth();
+  const allowedViews = ADMIN_VIEWS.filter((item) =>
+    canAccessTab(access?.permissions, TAB_PERMISSION.usersAdmin[item]));
+  const view: AdminView | null = allowedViews.includes(selectedView) ? selectedView : (allowedViews[0] ?? null);
 
   // Đang ở chế độ nào thì đường dẫn trên thanh trên cùng in tới đó.
-  useSetBreadcrumbTrail([adminViewLabels[view]]);
+  useSetBreadcrumbTrail(view ? [adminViewLabels[view]] : []);
   const [usersPage, setUsersPage] = useState<AdminPage<AdminUser> | null>(null);
   const [auditPage, setAuditPage] = useState<AdminPage<AdminAuditLog> | null>(null);
   const [roles, setRoles] = useState<AdminRole[]>([]);
@@ -462,9 +471,8 @@ export function UsersAdminPage() {
         'Quản trị hệ thống',
         'Quản trị khảo sát',
         'Ban Giám hiệu',
-        'Trưởng khoa/viện',
-        'Trưởng bộ môn',
-        'Phó trưởng bộ môn',
+        'Quản lý khoa',
+        'Quản lý bộ môn',
         'Giảng viên',
         'Chưa có hồ sơ',
       ],
@@ -567,42 +575,48 @@ export function UsersAdminPage() {
     <div className="admin-users-page">
       <div className="admin-view-tabs-bar">
         <div className="admin-view-tabs" role="tablist" aria-label="Chế độ quản trị người dùng">
-          <button
-            id="admin-users-tab"
-            type="button"
-            className={view === 'users' ? 'active' : ''}
-            onClick={() => { setView('users'); setError(null); }}
-            role="tab"
-            aria-selected={view === 'users'}
-            aria-controls="admin-users-panel"
-          >
-            <UsersRound aria-hidden="true" />
-            Tài khoản và hồ sơ
-          </button>
-          <button
-            id="admin-audit-tab"
-            type="button"
-            className={view === 'audit' ? 'active' : ''}
-            onClick={() => { setView('audit'); setError(null); }}
-            role="tab"
-            aria-selected={view === 'audit'}
-            aria-controls="admin-audit-panel"
-          >
-            <FileClock aria-hidden="true" />
-            Nhật ký hệ thống
-          </button>
-          <button
-            id="admin-permissions-tab"
-            type="button"
-            className={view === 'permissions' ? 'active' : ''}
-            onClick={() => { setView('permissions'); setError(null); }}
-            role="tab"
-            aria-selected={view === 'permissions'}
-            aria-controls="admin-permissions-panel"
-          >
-            <ShieldCheck aria-hidden="true" />
-            Phân quyền Module
-          </button>
+          {allowedViews.includes('users') && (
+            <button
+              id="admin-users-tab"
+              type="button"
+              className={view === 'users' ? 'active' : ''}
+              onClick={() => { setView('users'); setError(null); }}
+              role="tab"
+              aria-selected={view === 'users'}
+              aria-controls="admin-users-panel"
+            >
+              <UsersRound aria-hidden="true" />
+              Tài khoản và hồ sơ
+            </button>
+          )}
+          {allowedViews.includes('audit') && (
+            <button
+              id="admin-audit-tab"
+              type="button"
+              className={view === 'audit' ? 'active' : ''}
+              onClick={() => { setView('audit'); setError(null); }}
+              role="tab"
+              aria-selected={view === 'audit'}
+              aria-controls="admin-audit-panel"
+            >
+              <FileClock aria-hidden="true" />
+              Nhật ký hệ thống
+            </button>
+          )}
+          {allowedViews.includes('permissions') && (
+            <button
+              id="admin-permissions-tab"
+              type="button"
+              className={view === 'permissions' ? 'active' : ''}
+              onClick={() => { setView('permissions'); setError(null); }}
+              role="tab"
+              aria-selected={view === 'permissions'}
+              aria-controls="admin-permissions-panel"
+            >
+              <ShieldCheck aria-hidden="true" />
+              Phân quyền Module
+            </button>
+          )}
         </div>
 
         {view === 'users' && (
@@ -916,7 +930,7 @@ export function UsersAdminPage() {
             </div>
           </div>
         </section>
-      ) : (
+      ) : view === 'permissions' ? (
         <section
           id="admin-permissions-panel"
           className="admin-table-section"
@@ -936,6 +950,10 @@ export function UsersAdminPage() {
             <RolePermissionEditor roles={roles} />
           )}
         </section>
+      ) : (
+        <div className="perm-empty" role="status">
+          Vai trò này chưa được mở tab nào trong Người dùng &amp; phân quyền. Liên hệ Quản trị viên để được cấp quyền.
+        </div>
       )}
 
 

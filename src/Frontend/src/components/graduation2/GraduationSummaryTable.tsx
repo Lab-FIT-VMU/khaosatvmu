@@ -38,15 +38,15 @@ const columns: Array<{ key: SortKey; label: string }> = [
   { key: 'facultyName', label: 'Khoa' },
   { key: 'programName', label: 'Chuyên ngành' },
   { key: 'cohortCode', label: 'Khóa' },
-  { key: 'studentCount', label: 'Số SV nhập học' },
+  { key: 'studentCount', label: 'Số sinh viên nhập học' },
   { key: 'graduated', label: 'Đã tốt nghiệp' },
   { key: 'notGraduated', label: 'Chưa tốt nghiệp' },
   { key: 'onTime', label: 'Đúng hạn' },
-  { key: 'workStudy', label: 'VLVH' },
   { key: 'excellent', label: 'Xuất sắc' },
   { key: 'veryGood', label: 'Giỏi' },
   { key: 'good', label: 'Khá' },
   { key: 'average', label: 'Trung bình' },
+  { key: 'workStudy', label: 'VLVH' },
 ];
 
 export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationSummaryTableProps) {
@@ -144,11 +144,11 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
                 { key: 'graduated', header: 'Đã tốt nghiệp', type: 'number', width: 14 },
                 { key: 'notGraduated', header: 'Chưa tốt nghiệp', type: 'number', width: 16 },
                 { key: 'onTime', header: 'Đúng hạn', type: 'number', width: 12 },
-                { key: 'workStudy', header: 'VLVH', type: 'number', width: 10 },
                 { key: 'excellent', header: 'Xuất sắc', type: 'number', width: 10 },
                 { key: 'veryGood', header: 'Giỏi', type: 'number', width: 10 },
                 { key: 'good', header: 'Khá', type: 'number', width: 10 },
                 { key: 'average', header: 'Trung bình', type: 'number', width: 12 },
+                { key: 'workStudy', header: 'VLVH', type: 'number', width: 10 },
               ],
               data: sortedRows.map((row) => ({
                 ...row,
@@ -192,16 +192,16 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
               <tr key={`${row.facultyKey}-${row.programKey}-${row.cohortCode}`}>
                 <td>{row.facultyName}</td>
                 <td>{row.programName}</td>
-                <td>{formatCohortCode(row.cohortCode)}</td>
+                <td style={{ textAlign: 'left' }}>{formatCohortCode(row.cohortCode)}</td>
                 <td>{row.studentCount}</td>
                 <td>{row.graduated}</td>
                 <td>{row.notGraduated}</td>
                 <td>{row.onTime}</td>
-                <td>{row.workStudy}</td>
                 <td>{row.excellent}</td>
                 <td>{row.veryGood}</td>
                 <td>{row.good}</td>
                 <td>{row.average}</td>
+                <td>{row.workStudy}</td>
               </tr>
             ))}
           </tbody>

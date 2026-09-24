@@ -267,7 +267,7 @@ export function DepartmentImportDialog({
                     <tbody>
                       {rows.map((row) => (
                         <tr key={row.rowNumber}>
-                          <td>{row.rowNumber}</td>
+                          <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                           <td>
                             {row.departmentId > 0 ? (
                               row.departmentId
@@ -323,7 +323,7 @@ export function DepartmentImportDialog({
                   <tbody>
                     {failedItems.map((item) => (
                       <tr key={`${item.rowNumber}-${item.name}`}>
-                        <td>{item.rowNumber}</td>
+                        <td style={{ textAlign: 'right' }}>{item.rowNumber}</td>
                         <td>{item.name || 'Không có'}</td>
                         <td>{item.facultyName || 'Không có'}</td>
                         <td>{catalogErrorMessage(item.errorCode)}</td>

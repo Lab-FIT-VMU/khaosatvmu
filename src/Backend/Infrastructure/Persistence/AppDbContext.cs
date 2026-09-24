@@ -146,6 +146,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(1000);
             entity.Property(x => x.Category).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.ParentCode).HasMaxLength(150);
             entity.HasIndex(x => x.Code).IsUnique();
         });
 
@@ -442,6 +443,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.RejectTooFast).HasDefaultValue(true);
             entity.Property(x => x.RejectSingleAnswer).HasDefaultValue(true);
             entity.Property(x => x.RejectAttentionCheckFailed).HasDefaultValue(true);
+            entity.Property(x => x.ProgressTargetResponseRate).HasColumnType("numeric(5,2)").HasDefaultValue(50m);
         });
 
         // Lịch sử đổi cấu hình và tính lại điểm, chỉ thêm dòng. Không gắn khoá ngoại

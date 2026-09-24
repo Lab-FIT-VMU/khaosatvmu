@@ -16,9 +16,8 @@ const maximumFileSize = 5 * 1024 * 1024;
 export const profileRoleOptions: { roleCode: string; label: string }[] = [
   { roleCode: 'ADMIN', label: 'Quản trị hệ thống' },
   { roleCode: 'BOARD_OF_DIRECTORS', label: 'Ban Giám hiệu' },
-  { roleCode: 'DEPARTMENT_MANAGER', label: 'Trưởng bộ môn' },
-  { roleCode: 'DEPUTY_DEPARTMENT_MANAGER', label: 'Phó trưởng bộ môn' },
-  { roleCode: 'FACULTY_MANAGER', label: 'Trưởng khoa/viện' },
+  { roleCode: 'DEPARTMENT_MANAGER', label: 'Quản lý bộ môn' },
+  { roleCode: 'FACULTY_MANAGER', label: 'Quản lý khoa' },
   { roleCode: 'LECTURER', label: 'Giảng viên' },
   { roleCode: 'SURVEY_ADMIN', label: 'Quản trị khảo sát' },
 ];
@@ -146,7 +145,7 @@ export async function downloadProfileImportTemplate(): Promise<void> {
 
   const sampleRows = [
     { fullName: 'Nguyễn Văn A', email: 'nguyenvana@vimaru.edu.vn', role: 'Giảng viên' },
-    { fullName: 'Trần Thị B', email: 'tranthib@vimaru.edu.vn', role: 'Trưởng bộ môn' },
+    { fullName: 'Trần Thị B', email: 'tranthib@vimaru.edu.vn', role: 'Quản lý bộ môn' },
     { fullName: 'Lê Văn C', email: 'levanc@vimaru.edu.vn', role: 'Quản trị khảo sát' },
   ];
 

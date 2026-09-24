@@ -300,7 +300,7 @@ export function CohortMajorImportDialog({
                     <tbody>
                       {rows.map((row) => (
                         <tr key={row.rowNumber}>
-                          <td>{row.rowNumber}</td>
+                          <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                           <td>
                             {row.cohortMajorCode || (
                               <span className="admin-import-invalid">Thiếu mã khoá ngành</span>
@@ -311,7 +311,7 @@ export function CohortMajorImportDialog({
                               <span className="admin-import-invalid">Thiếu tên ngành</span>
                             )}
                           </td>
-                          <td>
+                          <td style={{ textAlign: 'right' }}>
                             {row.studentCount === null ? (
                               <span className="admin-import-invalid">Thiếu số lượng</span>
                             ) : (
@@ -360,7 +360,7 @@ export function CohortMajorImportDialog({
                   <tbody>
                     {failedItems.map((item) => (
                       <tr key={`${item.rowNumber}-${item.cohortMajorCode}`}>
-                        <td>{item.rowNumber}</td>
+                        <td style={{ textAlign: 'right' }}>{item.rowNumber}</td>
                         <td>{item.cohortMajorCode || 'Không có'}</td>
                         <td>{cohortErrorMessage(item.errorCode)}</td>
                       </tr>

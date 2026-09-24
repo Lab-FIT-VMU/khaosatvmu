@@ -14,15 +14,41 @@ interface RolePermissionEditorProps {
 
 function messageFromError(error: unknown): string {
   if (error instanceof ApiError && error.errorCode === 'ADMIN_CANNOT_REVOKE_REQUIRED_PERMISSION') {
-    return 'Quyền Người dùng & phân quyền là bắt buộc đối với Quản trị hệ thống và không thể tắt.';
+    return 'Quyền Người dùng & phân quyền và tab Phân quyền Module là bắt buộc đối với Quản trị hệ thống, không thể tắt.';
   }
   return error instanceof Error ? error.message : 'Không thể tải danh sách quyền';
+}
+
+/** Tắt đi thì Quản trị hệ thống mất màn hình duy nhất cấp lại quyền. */
+const ADMIN_REQUIRED_PERMISSIONS = new Set(['USER_ADMIN_ACCESS', 'USER_ADMIN_TAB_PERMISSIONS']);
+
+const isRequiredPermission = (roleCode: string | undefined, permissionCode: string | undefined) =>
+  roleCode === 'ADMIN' && permissionCode !== undefined && ADMIN_REQUIRED_PERMISSIONS.has(permissionCode);
+
+type PermissionItem = RolePermissionMatrix['permissions'][number];
+
+/** Mọi tab con, cháu của một quyền. */
+function descendantsOf(permissions: PermissionItem[], code: string): PermissionItem[] {
+  const children = permissions.filter((item) => item.parentCode === code);
+  return children.flatMap((child) => [child, ...descendantsOf(permissions, child.permissionCode)]);
+}
+
+/** Các quyền cha, ông của một quyền, từ gần đến xa. */
+function ancestorsOf(permissions: PermissionItem[], item: PermissionItem): PermissionItem[] {
+  const result: PermissionItem[] = [];
+  let parentCode = item.parentCode;
+  while (parentCode) {
+    const parent = permissions.find((candidate) => candidate.permissionCode === parentCode);
+    if (!parent) break;
+    result.push(parent);
+    parentCode = parent.parentCode;
+  }
+  return result;
 }
 
 export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(roles[0]?.id ?? null);
   const [roleDataById, setRoleDataById] = useState<Record<string, RolePermissionMatrix>>({});
-  const [dirtyMap, setDirtyMap] = useState<Record<string, boolean>>({});
   const [loadingRole, setLoadingRole] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -46,7 +72,6 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
       );
       savedRoleDataByIdRef.current = nextRoleDataById;
       setRoleDataById(nextRoleDataById);
-      setDirtyMap({});
     } catch (err: unknown) {
       if (currentReqId !== requestIdRef.current) return;
       setFetchError(messageFromError(err));
@@ -68,35 +93,47 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
     };
   }, [fetchRolePermissions]);
 
-  const isDirty = Object.keys(dirtyMap).length > 0;
+  // Bật một quyền rồi tắt lại là trở về như cũ, nên so với bản đã lưu thay vì đếm
+  // số lần bấm — nhất là khi bật module còn tự bật kèm các tab của nó.
+  // Tính lại mỗi lần vẽ: bản đã lưu nằm trong ref nên useMemo không biết khi nào nó đổi.
+  const savedRoleData = roleData ? savedRoleDataByIdRef.current[roleData.roleId] : undefined;
+  const savedGrantById = new Map(savedRoleData?.permissions.map((p) => [p.permissionId, p.isGranted]));
+  const isDirty = Boolean(
+    roleData && savedRoleData
+      && roleData.permissions.some((p) => savedGrantById.get(p.permissionId) !== p.isGranted),
+  );
 
   const handleToggle = (permissionId: string) => {
     if (!roleData || !selectedRoleId) return;
     const permission = roleData.permissions.find((item) => item.permissionId === permissionId);
-    const isRequired = roleData.roleCode === 'ADMIN'
-      && permission?.permissionCode === 'USER_ADMIN_ACCESS';
-    if (isRequired) {
+    if (!permission) return;
+    if (isRequiredPermission(roleData.roleCode, permission.permissionCode)) {
       toast.warning('Không thể tắt quyền bắt buộc', {
-        description: 'Quản trị hệ thống luôn phải có quyền Người dùng & phân quyền.',
+        description: 'Quản trị hệ thống luôn phải có quyền Người dùng & phân quyền và tab Phân quyền Module.',
       });
       return;
     }
+
+    const turningOn = !permission.isGranted;
+    const descendants = descendantsOf(roleData.permissions, permission.permissionCode);
+    // Vừa mở module mà chưa tab nào bật thì trang mở ra trống trơn. Bật kèm mọi tab;
+    // đã có tab nào đang bật tức là người quản trị từng chọn riêng, giữ nguyên lựa chọn đó.
+    const enableDescendants = turningOn
+      && descendants.length > 0
+      && descendants.every((item) => !item.isGranted);
+    const descendantIds = new Set(descendants.map((item) => item.permissionId));
 
     setRoleDataById((current) => ({
       ...current,
       [selectedRoleId]: {
         ...roleData,
-        permissions: roleData.permissions.map((p) =>
-          p.permissionId === permissionId ? { ...p, isGranted: !p.isGranted } : p,
-        ),
+        permissions: roleData.permissions.map((p) => {
+          if (p.permissionId === permissionId) return { ...p, isGranted: turningOn };
+          if (enableDescendants && descendantIds.has(p.permissionId)) return { ...p, isGranted: true };
+          return p;
+        }),
       },
     }));
-    setDirtyMap((prev) => {
-      const next = { ...prev };
-      if (next[permissionId]) delete next[permissionId];
-      else next[permissionId] = true;
-      return next;
-    });
   };
 
   const persistCurrentRole = async (): Promise<boolean> => {
@@ -113,7 +150,6 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
         ...savedRoleDataByIdRef.current,
         [roleData.roleId]: roleData,
       };
-      setDirtyMap({});
       toast.success('Đã cập nhật phân quyền', { description: `Vai trò: ${roleDisplayName(roleData.roleCode, roleData.roleName)}` });
       return true;
     } catch (err: unknown) {
@@ -154,7 +190,6 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
         }));
       }
     }
-    setDirtyMap({});
     setSaveError(null);
     setPendingRoleId(null);
     setSelectedRoleId(nextRoleId);
@@ -163,19 +198,32 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
   const groupedPermissions = useMemo(() => {
     if (!roleData) return [];
     const query = searchQuery.trim().toLowerCase();
-    const filtered = query
-      ? roleData.permissions.filter(
-          (p) =>
-            p.permissionName.toLowerCase().includes(query) ||
-            p.permissionCode.toLowerCase().includes(query),
-        )
-      : roleData.permissions;
+    const permissions = roleData.permissions;
+    // Tìm ra một tab thì hiện kèm module cha của nó: nhiều module có tab trùng tên
+    // ("Học phần"), đứng một mình không biết là tab của trang nào.
+    const visibleIds = new Set<string>();
+    for (const p of permissions) {
+      const matches = !query
+        || p.permissionName.toLowerCase().includes(query)
+        || p.permissionCode.toLowerCase().includes(query);
+      if (!matches) continue;
+      visibleIds.add(p.permissionId);
+      for (const ancestor of ancestorsOf(permissions, p)) visibleIds.add(ancestor.permissionId);
+    }
 
-    const groups: { category: string; items: typeof filtered }[] = [];
-    for (const perm of filtered) {
+    // Backend trả sẵn theo thứ tự cây: module, rồi các tab của nó ngay bên dưới.
+    const groups: { category: string; items: { perm: PermissionItem; depth: number; parentOff: boolean }[] }[] = [];
+    for (const perm of permissions) {
+      if (!visibleIds.has(perm.permissionId)) continue;
+      const ancestors = ancestorsOf(permissions, perm);
+      const item = {
+        perm,
+        depth: ancestors.length,
+        parentOff: ancestors.some((ancestor) => !ancestor.isGranted),
+      };
       const group = groups.find((g) => g.category === perm.category);
-      if (group) group.items.push(perm);
-      else groups.push({ category: perm.category, items: [perm] });
+      if (group) group.items.push(item);
+      else groups.push({ category: perm.category, items: [item] });
     }
     return groups;
   }, [roleData, searchQuery]);
@@ -281,22 +329,39 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
           <div key={group.category} className="perm-group">
             <h4 className="perm-group__title">{group.category}</h4>
             <ul className="perm-group__list">
-              {group.items.map((perm) => {
+              {group.items.map(({ perm, depth, parentOff }) => {
                 const inputId = `perm-toggle-${perm.permissionId}`;
-                const isRequired = roleData?.roleCode === 'ADMIN'
-                  && perm.permissionCode === 'USER_ADMIN_ACCESS';
+                const isRequired = isRequiredPermission(roleData?.roleCode, perm.permissionCode);
+                const rowClass = [
+                  'perm-row',
+                  depth > 0 ? 'perm-row--child' : '',
+                  parentOff ? 'perm-row--inactive' : '',
+                ].filter(Boolean).join(' ');
                 return (
-                  <li key={perm.permissionId} className="perm-row">
+                  <li
+                    key={perm.permissionId}
+                    className={rowClass}
+                    // Mỗi cấp tab thụt thêm một nấc để thấy tab nào thuộc module nào.
+                    style={depth > 0 ? { paddingLeft: 12 + depth * 28 } : undefined}
+                  >
                     <div className="perm-row__name">
                       {perm.permissionName}{isRequired ? ' (Bắt buộc)' : ''}
+                      {depth > 0 && <small>Tab</small>}
                     </div>
                     <span className="perm-toggle">
                       <input
                         id={inputId}
                         type="checkbox"
                         checked={perm.isGranted}
-                        aria-disabled={isRequired}
-                        title={isRequired ? 'Quản trị hệ thống luôn phải có quyền này.' : undefined}
+                        // Module cha đang tắt thì tab không có tác dụng gì: khoá lại
+                        // cho khỏi tưởng bật tab là mở được trang.
+                        disabled={parentOff}
+                        aria-disabled={isRequired || parentOff}
+                        title={isRequired
+                          ? 'Quản trị hệ thống luôn phải có quyền này.'
+                          : parentOff
+                            ? 'Bật quyền của mục cha trước.'
+                            : undefined}
                         onChange={() => handleToggle(perm.permissionId)}
                       />
                       <label htmlFor={inputId} aria-label={perm.permissionName}>

@@ -11,6 +11,7 @@ import {
   publishScoringThresholds,
   useScoringThresholds,
 } from '../hooks/useScoringThresholds';
+import { useSurveyPublication } from '../hooks/useSurveyPublication';
 import type { ScoringThresholds } from '../utils/reportThresholds';
 import '../styles/catalogs.css';
 
@@ -30,6 +31,9 @@ function formatDateTime(value: string): string {
  * Cập nhật điểm ghi đè điểm của MỌI lớp trong đợt, không cắt được theo bộ môn — nên
  * chỉ quản trị toàn hệ thống mới thấy nút. Backend cũng chặn, đây chỉ là để người
  * không có quyền khỏi bấm rồi ăn lỗi.
+ *
+ * Đợt đã phát hành kết quả thì nút bị khoá: các đơn vị đang đọc đúng bộ điểm này. Thu hồi
+ * phát hành thì nút mở lại. Backend cũng từ chối tính lại khi đợt đã phát hành.
  */
 export const UpdateScoresButton: React.FC<{
   semesterSurveyId: number | string | null | undefined;
@@ -40,10 +44,12 @@ export const UpdateScoresButton: React.FC<{
   const thresholds = useScoringThresholds();
   const [isOpen, setIsOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
-
-  if (!isUnrestrictedRole(activeProfile?.roleCode)) return null;
-
+  const canUpdate = isUnrestrictedRole(activeProfile?.roleCode);
   const campaignId = Number(semesterSurveyId) || null;
+  const publication = useSurveyPublication(canUpdate ? campaignId : null);
+  const locked = publication?.isPublished === true;
+
+  if (!canUpdate) return null;
 
   /** Trả true khi tính xong, để hộp thoại biết mà tự đóng. */
   const handleUpdate = async (): Promise<boolean> => {
@@ -70,7 +76,10 @@ export const UpdateScoresButton: React.FC<{
         type="button"
         className="btn btn-primary btn-sm"
         onClick={() => setIsOpen(true)}
-        disabled={!campaignId || updating}
+        disabled={!campaignId || updating || locked}
+        title={locked
+          ? 'Đợt đã phát hành kết quả nên không cập nhật điểm được. Thu hồi phát hành để cập nhật lại.'
+          : undefined}
       >
         {updating ? (
           <LoaderCircle className="auth-spin" aria-hidden="true" size={16} />

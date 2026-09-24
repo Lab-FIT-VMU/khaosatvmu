@@ -583,7 +583,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                     <th className="section-analysis-question-col">Nội dung câu hỏi khảo sát</th>
                     {options.map((option) => (
                       <th key={option.value} className="section-analysis-option-col">
-                        Mức {option.value}
+                        Số lượng lựa chọn {option.value}
                         <small>{option.displayText}</small>
                       </th>
                     ))}
@@ -603,7 +603,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                         key={question.questionId}
                         className={`analysis-table-row ${isHovered ? 'is-highlighted' : ''}`}
                       >
-                        <td className="analysis-code-cell">
+                        <td className="analysis-code-cell" style={{ textAlign: 'left' }}>
                           <span
                             className="analysis-code-badge"
                             style={{
@@ -629,7 +629,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                           );
 
                           return (
-                            <td key={column.value} className="section-analysis-option-cell">
+                            <td key={column.value} className="section-analysis-option-cell" style={{ textAlign: 'right' }}>
                               <span className="section-analysis-option-count">
                                 {cell?.count ?? 0}
                               </span>
@@ -642,7 +642,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
                         <td className="section-analysis-avg-cell" style={{ color: scoreColor }}>
                           <strong>{score > 0 ? formatDecimal(score, 3) : '—'}</strong>
                         </td>
-                        <td className="analysis-rating-cell">
+                        <td className="analysis-rating-cell" style={{ textAlign: 'left' }}>
                           <span
                             className="analysis-status-pill"
                             style={{

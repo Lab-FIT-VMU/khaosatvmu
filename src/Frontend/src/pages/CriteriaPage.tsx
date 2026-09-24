@@ -5,6 +5,8 @@ import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import type { Criterion } from '../types';
+import { useAuth } from '../auth/authContext';
+import { canAccessTab, TAB_PERMISSION } from '../auth/modulePermissions';
 import '../styles/survey-operations.css';
 import { foldVietnamese } from '../utils/vietnamese';
 
@@ -15,15 +17,23 @@ interface CriteriaPageProps {
   onDeleteCriterion: (id: string) => void;
 }
 
+const CRITERIA_TABS = ['Học phần', 'Chương trình đào tạo'] as const;
+
 export const CriteriaPage: React.FC<CriteriaPageProps> = ({
   criteria,
   surveyType,
   onAddCriterion,
   onDeleteCriterion,
 }) => {
-  const [activeTab, setActiveTab] = useState<'Học phần' | 'Chương trình đào tạo'>(
+  const [selectedTab, setActiveTab] = useState<'Học phần' | 'Chương trình đào tạo'>(
     surveyType || 'Học phần'
   );
+  // Tab nào hiện do quản trị bật tắt ở trang Phân quyền Module. Tab đang chọn bị khoá
+  // thì mở tab còn lại.
+  const { access } = useAuth();
+  const allowedTabs = CRITERIA_TABS.filter((item) =>
+    canAccessTab(access?.permissions, TAB_PERMISSION.programCriteria[item]));
+  const activeTab = allowedTabs.includes(selectedTab) ? selectedTab : (allowedTabs[0] ?? selectedTab);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -105,7 +115,7 @@ export const CriteriaPage: React.FC<CriteriaPageProps> = ({
       width: '90px',
       filterValue: (item) => String(item.weight),
       numeric: true,
-      render: (item) => <span className="operations-primary-text">{item.weight}</span>,
+      render: (item) => <span className="operations-primary-text" style={{ justifyContent: 'flex-end' }}>{item.weight}</span>,
     },
     {
       key: 'status',
@@ -121,6 +131,7 @@ export const CriteriaPage: React.FC<CriteriaPageProps> = ({
     {
       key: 'actions',
       header: 'Thao Tác',
+      align: 'center',
       width: '90px',
       render: (item) => (
         <button
@@ -136,34 +147,49 @@ export const CriteriaPage: React.FC<CriteriaPageProps> = ({
     },
   ];
 
+  if (allowedTabs.length === 0) {
+    return (
+      <div className="survey-operations-page operations-table-page criteria-page">
+        <div className="operations-empty" role="status">
+          <strong>Vai trò này chưa được mở tab nào trong mục này.</strong>
+          <span>Liên hệ Quản trị viên để được cấp quyền.</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="survey-operations-page operations-table-page criteria-page">
       <div className="operations-tabs-bar">
         <div className="operations-tabs" role="tablist" aria-label="Loại bộ tiêu chí">
-        <button
-          className={`operations-tab ${activeTab === 'Học phần' ? 'is-active' : ''}`}
-          role="tab"
-          aria-selected={activeTab === 'Học phần'}
-          onClick={() => setActiveTab('Học phần')}
-        >
-          <BookOpen className="operation-icon" aria-hidden="true" />
-          Học phần
-          <span className="operations-tab-count">
-            {criteria.filter((c) => c.category === 'Học phần').length}
-          </span>
-        </button>
-        <button
-          className={`operations-tab ${activeTab === 'Chương trình đào tạo' ? 'is-active' : ''}`}
-          role="tab"
-          aria-selected={activeTab === 'Chương trình đào tạo'}
-          onClick={() => setActiveTab('Chương trình đào tạo')}
-        >
-          <GraduationCap className="operation-icon" aria-hidden="true" />
-          Chương trình đào tạo
-          <span className="operations-tab-count">
-            {criteria.filter((c) => c.category === 'Chương trình đào tạo').length}
-          </span>
-        </button>
+        {allowedTabs.includes('Học phần') && (
+          <button
+            className={`operations-tab ${activeTab === 'Học phần' ? 'is-active' : ''}`}
+            role="tab"
+            aria-selected={activeTab === 'Học phần'}
+            onClick={() => setActiveTab('Học phần')}
+          >
+            <BookOpen className="operation-icon" aria-hidden="true" />
+            Học phần
+            <span className="operations-tab-count">
+              {criteria.filter((c) => c.category === 'Học phần').length}
+            </span>
+          </button>
+        )}
+        {allowedTabs.includes('Chương trình đào tạo') && (
+          <button
+            className={`operations-tab ${activeTab === 'Chương trình đào tạo' ? 'is-active' : ''}`}
+            role="tab"
+            aria-selected={activeTab === 'Chương trình đào tạo'}
+            onClick={() => setActiveTab('Chương trình đào tạo')}
+          >
+            <GraduationCap className="operation-icon" aria-hidden="true" />
+            Chương trình đào tạo
+            <span className="operations-tab-count">
+              {criteria.filter((c) => c.category === 'Chương trình đào tạo').length}
+            </span>
+          </button>
+        )}
         </div>
         <div className="operations-tab-actions">
           <button className="btn btn-primary" onClick={handleOpenModal}>

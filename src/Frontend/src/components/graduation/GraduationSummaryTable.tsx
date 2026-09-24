@@ -171,7 +171,7 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
               <tr key={`${row.facultyKey}-${row.programKey}-${row.cohortCode}`}>
                 <td>{row.facultyName}</td>
                 <td>{row.programName}</td>
-                <td>{row.cohortCode}</td>
+                <td style={{ textAlign: 'left' }}>{row.cohortCode}</td>
                 <td>{row.graduated}</td>
                 <td>{row.onTime}</td>
                 <td>{row.workStudy}</td>

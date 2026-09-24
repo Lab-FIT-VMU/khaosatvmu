@@ -79,7 +79,7 @@ export const FormulaTable: React.FC<{
     <tbody>
       {rows.map((row, index) => (
         <tr key={index}>
-          <td>{row[0]}</td>
+          <td style={{ textAlign: 'left' }}>{row[0]}</td>
           <td>{row[1]}</td>
         </tr>
       ))}

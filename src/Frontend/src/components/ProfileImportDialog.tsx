@@ -190,7 +190,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImport }: ProfileImport
                 <tbody>
                   {invalidRoleRows.map((row) => (
                     <tr key={row.rowNumber}>
-                      <td>{row.rowNumber}</td>
+                      <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                       <td>{row.email}</td>
                       <td>{row.rawRole || '(trống)'}</td>
                     </tr>
@@ -220,7 +220,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImport }: ProfileImport
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.rowNumber}>
-                      <td>{row.rowNumber}</td>
+                      <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                       <td>{row.fullName || '—'}</td>
                       <td>{row.email}</td>
                       <td>{row.roleLabel}</td>

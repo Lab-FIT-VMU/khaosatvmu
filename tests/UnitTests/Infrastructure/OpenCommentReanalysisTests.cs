@@ -45,6 +45,7 @@ public class OpenCommentReanalysisTests
         new(
             db,
             new PublishedSurveyPublicationService(),
+            new FixedUserScopeResolver(),
             Options.Create(settings ?? new OpenCommentSentimentOptions { ModelVersion = "kiem-thu-v1" }),
             new FakeCurrentUser(actorId),
             NullLogger<EfOpenCommentAnalysisService>.Instance);

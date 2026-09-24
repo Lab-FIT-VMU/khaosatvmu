@@ -9,6 +9,11 @@ interface ModalProps {
   onSubmit?: () => void;
   submitText?: string;
   size?: 'workspace' | 'compact' | 'import' | 'data-preview' | 'designer' | 'note';
+  /**
+   * Bấm ra vùng tối bên ngoài thì đóng hộp. Tắt cho hộp soạn dài: bấm trượt một cái
+   * là mất hết những gì đang sửa dở.
+   */
+  closeOnBackdropClick?: boolean;
 }
 
 interface ConfirmDialogProps {
@@ -37,6 +42,7 @@ export const Modal: React.FC<ModalProps> = ({
   onSubmit,
   submitText = 'Lưu thay đổi',
   size = 'workspace',
+  closeOnBackdropClick = true,
 }) => {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -102,7 +108,7 @@ export const Modal: React.FC<ModalProps> = ({
     <div
       className="modal-backdrop catalog-modal-backdrop"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (closeOnBackdropClick && event.target === event.currentTarget) onClose();
       }}
     >
       <div

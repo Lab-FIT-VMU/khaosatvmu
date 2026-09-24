@@ -2125,8 +2125,10 @@
 }
 
 /* Thân hộp thoại phải là khối co giãn CÓ chiều cao thật, không thì `height: 100%` của
-   thư viện mẫu và trình sửa tính ra "auto", nội dung tràn ra ngoài mà không cuộn được. */
-.catalog-modal-card--designer .catalog-modal-body.modal-body {
+   thư viện mẫu và trình sửa tính ra "auto", nội dung tràn ra ngoài mà không cuộn được.
+   Chỉ nhắm thân của CHÍNH hộp này (`>`): hộp chọn ảnh, hộp xác nhận đổi mẫu nằm lồng
+   bên trong, viết con cháu thì chúng mất lề và bị xếp thành hàng ngang. */
+.catalog-modal-card--designer > .catalog-modal-body.modal-body {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
@@ -2134,7 +2136,7 @@
   overflow: hidden;
 }
 
-.catalog-modal-card--designer .catalog-modal-body.modal-body > * {
+.catalog-modal-card--designer > .catalog-modal-body.modal-body > * {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;

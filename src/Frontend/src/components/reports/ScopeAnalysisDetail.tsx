@@ -16,7 +16,7 @@ import type {
 import { scoreBandClass, scoreDeltaClass } from '../../utils/reportThresholds';
 import { toVietnameseFileSlug } from '../../utils/vietnamese';
 import type { QuestionAnalysisExportMetadata } from '../../services/exportQuestionAnalysisService';
-import { formatDecimal, formatDecimalOrDash, formatPercent, formatSigned } from '../../utils/formatNumber';
+import { formatDecimal, formatDecimalOrDash, formatSigned } from '../../utils/formatNumber';
 
 /** Phạm vi đang mở trang chi tiết: một khoa/viện, một bộ môn hay một học phần. */
 export interface ScopeSelection {
@@ -191,7 +191,7 @@ const ScopeRowsTable: React.FC<{
     },
     {
       key: 'validRate',
-      value: (row) => (row.validRate == null ? '—' : `${formatPercent(row.validRate, 3)}`),
+      value: (row) => (row.validRate == null ? '—' : `${formatDecimal(row.validRate, 3)}`),
       sortValue: (row) => row.validRate ?? null,
     },
     {
@@ -276,7 +276,7 @@ const ScopeRowsTable: React.FC<{
                   style={{ width: widthOf('validRate') }}
                   title="Số phiếu hợp lệ chia số phiếu đã thu, theo phần trăm"
                 >
-                  {filters.filterHeader('validRate', 'Tỷ lệ phiếu hợp lệ')}
+                  {filters.filterHeader('validRate', 'Tỷ lệ phiếu hợp lệ (%)')}
                 </th>
               )}
               <th scope="col" style={{ width: widthOf('averageScore') }}>
@@ -334,7 +334,7 @@ const ScopeRowsTable: React.FC<{
                     )}
                   </td>
                   {sublabelHeader && (
-                    <td className="num" title={row.sublabel}>
+                    <td style={{ textAlign: 'left' }} title={row.sublabel}>
                       <span className="operations-code">{row.sublabel ?? '—'}</span>
                     </td>
                   )}
@@ -350,7 +350,7 @@ const ScopeRowsTable: React.FC<{
                   {showsValidResponses && <td className="num">{row.validResponseCount}</td>}
                   {showsValidRate && (
                     <td className="num">
-                      {row.validRate == null ? '—' : `${formatPercent(row.validRate, 3)}`}
+                      {row.validRate == null ? '—' : `${formatDecimal(row.validRate, 3)}`}
                     </td>
                   )}
                   <td className={scoreBandClass(row.averageScore)}>

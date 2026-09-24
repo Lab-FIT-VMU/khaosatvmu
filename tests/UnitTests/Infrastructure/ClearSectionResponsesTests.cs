@@ -202,6 +202,39 @@ public class ClearSectionResponsesTests
     /// một mệnh đề NOT "IsDeleted" là đám phiếu vừa huỷ được đếm lại như chưa có
     /// chuyện gì. Test này khoá chặt đúng chỗ đó.
     /// </summary>
+    /// <summary>
+    /// Đợt đã phát hành thì không tính lại điểm được: các đơn vị đang đọc đúng bộ điểm đó.
+    /// Thu hồi phát hành rồi mới tính lại.
+    /// </summary>
+    [Fact]
+    public async Task Recalculate_WhenResultsPublished_IsRejectedAndLeavesScoresUntouched()
+    {
+        await RunInRollbackAsync(async (db, _) =>
+        {
+            var id = await FindSectionWithResponsesAsync(db);
+            if (id is null) return;
+            var sectionSurvey = await db.CourseSectionSurveys.AsNoTracking()
+                .FirstAsync(x => x.CourseSectionSurveyId == id.Value);
+
+            var service = new EfSurveyService(
+                db,
+                new MemoryCache(new MemoryCacheOptions()),
+                new FixedScopeResolver(Admin),
+                new FixedScoringThresholdProvider(),
+                new PublishedSurveyPublicationService(lockedForScoring: true),
+                new SchoolOverviewCacheVersion());
+
+            var result = await service.RecalculateSemesterSurveyScoresAsync(sectionSurvey.SemesterSurveyId);
+
+            result.Succeeded.Should().BeFalse();
+            result.ErrorCode.Should().Be(SurveyErrorCodes.ResultsPublishedLocked);
+            var after = await db.CourseSectionSurveys.AsNoTracking()
+                .FirstAsync(x => x.CourseSectionSurveyId == id.Value);
+            after.AverageScore.Should().Be(sectionSurvey.AverageScore, "điểm đã chốt phải đứng yên");
+            after.ScoreCalculatedAt.Should().Be(sectionSurvey.ScoreCalculatedAt);
+        });
+    }
+
     [Fact]
     public async Task Recalculate_AfterClear_ShouldNotResurrectDeletedResponses()
     {

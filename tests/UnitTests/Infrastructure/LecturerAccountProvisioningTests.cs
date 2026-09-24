@@ -104,10 +104,16 @@ public class LecturerAccountProvisioningTests
         });
     }
 
+    /// <summary>
+    /// Trưởng bộ môn và Phó bộ môn cùng nhận hồ sơ Quản lý bộ môn; Trưởng khoa và Phó
+    /// trưởng khoa cùng nhận hồ sơ Quản lý khoa. Luôn kèm hồ sơ Giảng viên làm mặc định.
+    /// </summary>
     [Theory]
     [InlineData("Trưởng Bộ môn", RoleCodes.DepartmentManager, "BM")]
-    [InlineData("Phó Trưởng Bộ môn", RoleCodes.DeputyDepartmentManager, "PB")]
-    public async Task CreateLecturer_WithDepartmentLeadershipPosition_ShouldCreateMatchingManagerProfile(
+    [InlineData("Phó Trưởng Bộ môn", RoleCodes.DepartmentManager, "BM")]
+    [InlineData("Trưởng khoa", RoleCodes.FacultyManager, "KV")]
+    [InlineData("Phó trưởng khoa", RoleCodes.FacultyManager, "KV")]
+    public async Task CreateLecturer_WithLeadershipPosition_ShouldCreateMatchingManagerProfile(
         string positionName,
         string expectedRoleCode,
         string expectedProfileSuffix)
@@ -157,21 +163,23 @@ public class LecturerAccountProvisioningTests
         {
             var lecturerEmail = $"import-gv-{Guid.NewGuid():N}@vimaru.edu.vn";
             var managerEmail = $"import-bm-{Guid.NewGuid():N}@vimaru.edu.vn";
+            var facultyEmail = $"import-kv-{Guid.NewGuid():N}@vimaru.edu.vn";
             var rows = new[]
             {
                 new ImportLecturerRowCommand(2, "Giảng viên import", lecturerEmail, null, null, null, "Giảng viên"),
                 new ImportLecturerRowCommand(3, "Quản lý import", managerEmail, null, null, null, "Phó Trưởng Bộ môn"),
+                new ImportLecturerRowCommand(4, "Quản lý khoa import", facultyEmail, null, null, null, "Phó trưởng khoa"),
             };
 
             var result = await service.ImportLecturersAsync(rows);
 
             result.Succeeded.Should().BeTrue();
-            result.Value!.CreatedCount.Should().Be(2);
+            result.Value!.CreatedCount.Should().Be(3);
             var assignedRoles = await (
                 from user in db.Users
                 join profile in db.UserProfiles on user.Id equals profile.UserId
                 join role in db.Roles on profile.RoleId equals role.Id
-                where user.Email == lecturerEmail || user.Email == managerEmail
+                where user.Email == lecturerEmail || user.Email == managerEmail || user.Email == facultyEmail
                 select new { user.Email, role.Code, profile.IsDefault })
                 .ToListAsync();
 
@@ -180,14 +188,21 @@ public class LecturerAccountProvisioningTests
                 .Should().Equal(RoleCodes.Lecturer);
             assignedRoles.Where(x => x.Email == managerEmail)
                 .Select(x => x.Code)
-                .Should().BeEquivalentTo(RoleCodes.Lecturer, RoleCodes.DeputyDepartmentManager);
+                .Should().BeEquivalentTo(RoleCodes.Lecturer, RoleCodes.DepartmentManager);
+            assignedRoles.Where(x => x.Email == facultyEmail)
+                .Select(x => x.Code)
+                .Should().BeEquivalentTo(RoleCodes.Lecturer, RoleCodes.FacultyManager);
             assignedRoles.Single(x => x.Email == managerEmail && x.Code == RoleCodes.Lecturer)
                 .IsDefault.Should().BeTrue();
         });
     }
 
+    /// <summary>
+    /// Trưởng bộ môn và Phó bộ môn dùng chung một hồ sơ Quản lý bộ môn: đổi qua lại giữa
+    /// hai chức vụ thì vẫn đúng một hồ sơ đó, đang bật. Thôi giữ chức thì hồ sơ tắt đi.
+    /// </summary>
     [Fact]
-    public async Task UpdateLecturer_FromDepartmentManagerToDeputy_ShouldConvertLeadershipProfile()
+    public async Task UpdateLecturer_BetweenDepartmentLeadershipPositions_KeepsOneManagerProfile()
     {
         await RunInRollbackAsync(async (db, service) =>
         {
@@ -205,117 +220,47 @@ public class LecturerAccountProvisioningTests
             };
             var created = await service.CreateLecturerAsync(command);
 
-            var updated = await service.UpdateLecturerAsync(
+            var toDeputy = await service.UpdateLecturerAsync(
                 created.Value!.LecturerId,
                 command with { PositionId = deputyPositionId });
+            toDeputy.Succeeded.Should().BeTrue();
 
-            updated.Succeeded.Should().BeTrue();
-            var roles = await (
+            var profiles = await (
+                from user in db.Users
+                join profile in db.UserProfiles on user.Id equals profile.UserId
+                join role in db.Roles on profile.RoleId equals role.Id
+                where user.LecturerId == created.Value.LecturerId
+                select new { role.Code, profile.IsActive, profile.ProfileName, profile.ProfileCode })
+                .ToListAsync();
+            profiles.Where(x => x.IsActive).Select(x => x.Code).Should().BeEquivalentTo(
+                RoleCodes.Lecturer,
+                RoleCodes.DepartmentManager);
+            var managerProfile = profiles.Single(x => x.Code == RoleCodes.DepartmentManager);
+            managerProfile.ProfileName.Should().Be("Quản lý bộ môn");
+            managerProfile.ProfileCode.Should().EndWith("BM");
+
+            var toLecturer = await service.UpdateLecturerAsync(
+                created.Value.LecturerId,
+                command with { PositionId = null });
+            toLecturer.Succeeded.Should().BeTrue();
+
+            var activeCodes = await (
                 from user in db.Users
                 join profile in db.UserProfiles on user.Id equals profile.UserId
                 join role in db.Roles on profile.RoleId equals role.Id
                 where user.LecturerId == created.Value.LecturerId && profile.IsActive
-                select new { role.Code, profile.ProfileName, profile.ProfileCode })
+                select role.Code)
                 .ToListAsync();
-
-            roles.Select(x => x.Code).Should().BeEquivalentTo(
-                RoleCodes.Lecturer,
-                RoleCodes.DeputyDepartmentManager);
-            roles.Should().NotContain(x => x.Code == RoleCodes.DepartmentManager);
-            var deputyProfile = roles.Single(x => x.Code == RoleCodes.DeputyDepartmentManager);
-            deputyProfile.ProfileName.Should().Be("Phó trưởng bộ môn");
-            deputyProfile.ProfileCode.Should().EndWith("PB");
+            activeCodes.Should().Equal(RoleCodes.Lecturer);
         });
     }
 
     [Fact]
-    public async Task ExistingDeputyLecturers_ShouldOnlyHaveTheDeputyLeadershipProfile()
+    public async Task DeputyDepartmentManagerRole_NoLongerExists()
     {
         await RunInRollbackAsync(async (db, _) =>
         {
-            var assignments = await (
-                from user in db.Users
-                join lecturer in db.Lecturers on user.LecturerId equals lecturer.LecturerId
-                join position in db.Positions on lecturer.PositionId equals position.PositionId
-                join profile in db.UserProfiles on user.Id equals profile.UserId
-                join role in db.Roles on profile.RoleId equals role.Id
-                where profile.IsActive
-                select new { user.Id, position.PositionName, role.Code })
-                .ToListAsync();
-
-            var deputyUsers = assignments
-                .Where(x => x.PositionName.Equals("Phó trưởng bộ môn", StringComparison.OrdinalIgnoreCase)
-                         || x.PositionName.Equals("Phó bộ môn", StringComparison.OrdinalIgnoreCase))
-                .GroupBy(x => x.Id);
-
-            foreach (var deputyUser in deputyUsers)
-            {
-                deputyUser.Select(x => x.Code).Should().Contain(RoleCodes.DeputyDepartmentManager);
-                deputyUser.Select(x => x.Code).Should().NotContain(RoleCodes.DepartmentManager);
-            }
-        });
-    }
-
-    [Fact]
-    public async Task DeputyDepartmentManager_ShouldHaveTheSamePermissionMatrixAsDepartmentManager()
-    {
-        await RunInRollbackAsync(async (db, _) =>
-        {
-            var matrices = await (
-                from role in db.Roles
-                join rolePermission in db.RolePermissions on role.Id equals rolePermission.RoleId
-                where role.Code == RoleCodes.DepartmentManager
-                   || role.Code == RoleCodes.DeputyDepartmentManager
-                select new { role.Code, rolePermission.PermissionId, rolePermission.IsGranted })
-                .ToListAsync();
-
-            var manager = matrices
-                .Where(x => x.Code == RoleCodes.DepartmentManager)
-                .Select(x => (x.PermissionId, x.IsGranted));
-            var deputy = matrices
-                .Where(x => x.Code == RoleCodes.DeputyDepartmentManager)
-                .Select(x => (x.PermissionId, x.IsGranted));
-
-            deputy.Should().BeEquivalentTo(manager);
-        });
-    }
-
-    [Fact]
-    public async Task UpdatingEitherDepartmentLeadershipRole_ShouldSynchronizeBothPermissionMatrices()
-    {
-        await RunInRollbackAsync(async (db, _) =>
-        {
-            var roles = await db.Roles
-                .Where(x => x.Code == RoleCodes.DepartmentManager
-                         || x.Code == RoleCodes.DeputyDepartmentManager)
-                .ToDictionaryAsync(x => x.Code);
-            var roleIds = roles.Values.Select(role => role.Id).ToList();
-            var permission = await db.Permissions.SingleAsync(x => x.Code == "PROGRESS_ACCESS");
-            var service = new EfUserAdministrationService(db);
-
-            var disabled = await service.UpdateRolePermissionsAsync(
-                roles[RoleCodes.DepartmentManager].Id,
-                [new RolePermissionGrantDto(permission.Id, IsGranted: false)]);
-            disabled.Succeeded.Should().BeTrue();
-
-            var disabledStates = await db.RolePermissions
-                .Where(x => roleIds.Contains(x.RoleId)
-                         && x.PermissionId == permission.Id)
-                .Select(x => x.IsGranted)
-                .ToListAsync();
-            disabledStates.Should().OnlyContain(x => !x);
-
-            var enabled = await service.UpdateRolePermissionsAsync(
-                roles[RoleCodes.DeputyDepartmentManager].Id,
-                [new RolePermissionGrantDto(permission.Id, IsGranted: true)]);
-            enabled.Succeeded.Should().BeTrue();
-
-            var enabledStates = await db.RolePermissions
-                .Where(x => roleIds.Contains(x.RoleId)
-                         && x.PermissionId == permission.Id)
-                .Select(x => x.IsGranted)
-                .ToListAsync();
-            enabledStates.Should().HaveCount(2).And.OnlyContain(x => x);
+            (await db.Roles.AnyAsync(x => x.Code == "DEPUTY_DEPARTMENT_MANAGER")).Should().BeFalse();
         });
     }
 

@@ -749,6 +749,12 @@ export const surveyApi = {
   /** Chỉ quản trị mới đổi được; server tự chặn các vai trò khác. */
   updateScoringThresholds: (thresholds: ScoringThresholds) =>
     csrfRequest<ScoringThresholds>('/api/surveys/scoring-thresholds', 'PUT', thresholds),
+  /** Chỉ tiêu tỷ lệ phản hồi của riêng trang Tiến độ thu phiếu, đơn vị phần trăm. */
+  progressTarget: () =>
+    apiRequest<{ responseRate: number }>('/api/surveys/progress-target'),
+  /** Chỉ quản trị hệ thống và quản trị khảo sát đổi được; server tự chặn các vai trò khác. */
+  updateProgressTarget: (responseRate: number) =>
+    csrfRequest<{ responseRate: number }>('/api/surveys/progress-target', 'PUT', { responseRate }),
   /**
    * Các lần đổi cấu hình / cập nhật điểm do NGƯỜI KHÁC làm sau mốc `afterId`.
    * Không truyền `afterId` thì chỉ nhận mốc mới nhất để bắt đầu theo dõi.
@@ -970,6 +976,8 @@ export const surveyErrorMessages: Record<string, string> = {
     'Kết quả của đợt khảo sát này chưa được phát hành. Quản trị sẽ phát hành sau khi đợt kết thúc.',
   SURVEY_NOT_ENDED:
     'Đợt khảo sát chưa kết thúc nên chưa phát hành kết quả được.',
+  SURVEY_RESULTS_PUBLISHED_LOCKED:
+    'Đợt đã phát hành kết quả nên không cập nhật điểm được. Thu hồi phát hành rồi mới cập nhật lại.',
   SURVEY_SEMESTER_SURVEY_NAME_REQUIRED: 'Vui lòng đặt tên cho bài khảo sát.',
   SURVEY_FORM_CONFIG_COLOR_INVALID:
     'Mã màu của phiếu không hợp lệ. Dùng dạng #RRGGBB, ví dụ #0788b8.',

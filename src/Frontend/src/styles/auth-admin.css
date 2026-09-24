@@ -2496,6 +2496,27 @@
   color: #000000;
 }
 
+/* Quyền tab thụt vào dưới quyền module cha (thụt bao nhiêu do component tính theo cấp). */
+.perm-row--child .perm-row__name {
+  font-weight: 500;
+}
+
+.perm-row__name small {
+  margin-left: 6px;
+  color: #68737d;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Cha đang tắt thì tab không có tác dụng: làm mờ và khoá công tắc. */
+.perm-row--inactive {
+  opacity: 0.5;
+}
+
+.perm-toggle input:disabled + label {
+  cursor: not-allowed;
+}
+
 .perm-toggle {
   position: relative;
   display: inline-flex;

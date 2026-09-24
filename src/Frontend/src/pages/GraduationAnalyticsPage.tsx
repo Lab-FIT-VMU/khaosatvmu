@@ -782,7 +782,7 @@ export function GraduationAnalyticsPage() {
               <td title={period?.originalFileName}>{period ? <><strong className="graduation-file-name">{period.originalFileName}</strong><small>Tải lên vào {new Date(period.importedAtUtc).toLocaleTimeString('vi-VN')} ngày {new Date(period.importedAtUtc).toLocaleDateString('vi-VN')}</small></> : <span className="graduation-muted">Chưa chọn file Excel</span>}</td>
               <td title={period?.importedByName}>{period?.importedByName || '—'}</td>
               <td>{period ? formatNumber(period.studentCount) : '—'}</td>
-              <td>{period ? `Lần ${period.activeRevisionNumber}` : '—'}</td>
+              <td style={{ textAlign: 'left' }}>{period ? `Lần ${period.activeRevisionNumber}` : '—'}</td>
               <td className={period?.skippedRowCount ? 'has-warning' : ''}>{period ? period.skippedRowCount : '—'}</td>
               <td><div className="graduation-row-actions">
                 <button type="button" className="btn btn-secondary graduation-icon-button" onClick={() => setImportTarget({ academicYearStart, roundNumber: round, period })} title={period ? `Tải lên lại Đợt ${round}` : `Tải file lên cho Đợt ${round}`} aria-label={period ? `Tải lên lại Đợt ${round}` : `Tải file lên cho Đợt ${round}`}><Upload aria-hidden="true" /></button>
@@ -796,7 +796,7 @@ export function GraduationAnalyticsPage() {
         </table>
       </div>
       <div className="graduation-add-round"><button type="button" onClick={addRound}><Plus size={16} /> Thêm Đợt {visibleRoundCount + 1}</button></div>
-      {historyPeriodId && <div className="graduation-history"><h3>Lịch sử cập nhật</h3>{historyLoading ? <div className="graduation-state"><LoaderCircle className="spin" /> Đang tải...</div> : <table><thead><tr><th>Lần cập nhật</th><th>File</th><th>Thời gian</th><th>Người tải lên</th><th>Số sinh viên</th><th>Dòng bỏ</th><th>Lý do thay thế</th></tr></thead><tbody>{revisions.map((revision) => <tr key={revision.revisionId}><td>Lần {revision.revisionNumber}</td><td>{revision.originalFileName}</td><td>{new Date(revision.importedAtUtc).toLocaleString('vi-VN')}</td><td>{revision.importedByName}</td><td>{formatNumber(revision.importedRowCount)}</td><td>{revision.skippedRowCount}</td><td>{revision.replaceReason ?? 'Tải lên lần đầu'}</td></tr>)}</tbody></table>}</div>}
+      {historyPeriodId && <div className="graduation-history"><h3>Lịch sử cập nhật</h3>{historyLoading ? <div className="graduation-state"><LoaderCircle className="spin" /> Đang tải...</div> : <table><thead><tr><th>Lần cập nhật</th><th>File</th><th>Thời gian</th><th>Người tải lên</th><th>Số sinh viên</th><th>Dòng bỏ</th><th>Lý do thay thế</th></tr></thead><tbody>{revisions.map((revision) => <tr key={revision.revisionId}><td>Lần {revision.revisionNumber}</td><td>{revision.originalFileName}</td><td>{new Date(revision.importedAtUtc).toLocaleString('vi-VN')}</td><td>{revision.importedByName}</td><td>{formatNumber(revision.importedRowCount)}</td><td>{revision.skippedRowCount}</td><td style={{ textAlign: 'left' }}>{revision.replaceReason ?? 'Tải lên lần đầu'}</td></tr>)}</tbody></table>}</div>}
     </section>}
 
     <GraduationImportDialog isOpen={Boolean(importTarget)} target={importTarget} onClose={() => setImportTarget(null)} onCommitted={handleCommitted} />

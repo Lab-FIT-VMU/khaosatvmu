@@ -1970,6 +1970,14 @@ public sealed class EfSurveyService(
             return Failed<RecalculateScoresDto>(SurveyErrorCodes.SemesterSurveyNotFound);
         }
 
+        // Đã phát hành thì trưởng khoa, trưởng bộ môn, giảng viên đang đọc đúng bộ điểm
+        // này; tính lại là đổi số dưới chân họ. Phải thu hồi phát hành rồi mới tính lại.
+        var publicationState = await publication.GetAsync(semesterSurveyId, cancellationToken);
+        if (publicationState.Value?.IsPublished == true)
+        {
+            return Failed<RecalculateScoresDto>(SurveyErrorCodes.ResultsPublishedLocked);
+        }
+
         var calculatedAt = DateTime.UtcNow;
 
         // Cả ba câu phải cùng ăn hoặc cùng bỏ: điểm tổng hợp của lớp và điểm từng
@@ -2742,52 +2750,63 @@ public sealed class EfSurveyService(
         // đợt, để cột "Lớp cảnh báo" của hai tab đếm bằng cùng một thước.
         var warningCutoff = WarningScoreCutoff(schoolScores);
 
-        var groups = sections
+        NormalizationGroupDto BuildGroup(int? facultyId, string facultyName, IReadOnlyList<AnalysedSection> g)
+        {
+            var scores = g.Select(x => x.AverageScore).ToList();
+            var groupAverage = scores.Average();
+            var groupClassSize = g.Sum(x => x.ClassSize);
+            var groupResponses = g.Sum(x => x.ResponseCount);
+            var groupValidResponses = g.Sum(x => x.ValidResponseCount);
+
+            // So MẶT BẰNG của khoa với mặt bằng trường thì mẫu số là sai số chuẩn
+            // σ/√n, không phải σ. σ đo độ tản của một lớp lẻ; trung bình của n lớp
+            // ổn định hơn đúng √n lần vì lớp cao và lớp thấp triệt tiêu nhau. Chia
+            // nhầm sang σ thì cả 14 khoa đều nằm trong ±0.25 và không khoa nào chạm
+            // một bậc nào. Xem docs/plans/phan-tich-chuyen-sau-cach-tinh-tung-cot.md.
+            decimal? meanZ = schoolSd is > 0
+                ? Math.Round(
+                    (groupAverage - schoolAverage) / (schoolSd.Value / (decimal)Math.Sqrt(scores.Count)),
+                    2)
+                : null;
+
+            return new NormalizationGroupDto(
+                facultyId,
+                facultyName,
+                scores.Count,
+                Math.Round(groupAverage, 3),
+                SampleStandardDeviation(scores),
+                scores.Count >= ReportThresholds.MinimumSectionsForNormalization,
+                meanZ,
+                CountLecturers(g),
+                groupClassSize,
+                groupResponses,
+                groupValidResponses,
+                Percentage(groupResponses, groupClassSize),
+                Percentage(groupValidResponses, groupResponses),
+                warningCutoff is { } cutoff ? scores.Count(x => x <= cutoff) : 0);
+        }
+
+        List<NormalizationGroupDto> BuildGroups(IEnumerable<AnalysedSection> source) => source
             .GroupBy(x => new { x.FacultyId, x.FacultyName })
-            .Select(g =>
-            {
-                var scores = g.Select(x => x.AverageScore).ToList();
-                var groupAverage = scores.Average();
-                var groupClassSize = g.Sum(x => x.ClassSize);
-                var groupResponses = g.Sum(x => x.ResponseCount);
-                var groupValidResponses = g.Sum(x => x.ValidResponseCount);
-
-                // So MẶT BẰNG của khoa với mặt bằng trường thì mẫu số là sai số chuẩn
-                // σ/√n, không phải σ. σ đo độ tản của một lớp lẻ; trung bình của n lớp
-                // ổn định hơn đúng √n lần vì lớp cao và lớp thấp triệt tiêu nhau. Chia
-                // nhầm sang σ thì cả 14 khoa đều nằm trong ±0.25 và không khoa nào chạm
-                // một bậc nào. Xem docs/plans/phan-tich-chuyen-sau-cach-tinh-tung-cot.md.
-                decimal? meanZ = schoolSd is > 0
-                    ? Math.Round(
-                        (groupAverage - schoolAverage) / (schoolSd.Value / (decimal)Math.Sqrt(scores.Count)),
-                        2)
-                    : null;
-
-                return new NormalizationGroupDto(
-                    g.Key.FacultyId,
-                    g.Key.FacultyName,
-                    scores.Count,
-                    Math.Round(groupAverage, 3),
-                    SampleStandardDeviation(scores),
-                    scores.Count >= ReportThresholds.MinimumSectionsForNormalization,
-                    meanZ,
-                    CountLecturers(g),
-                    groupClassSize,
-                    groupResponses,
-                    groupValidResponses,
-                    Percentage(groupResponses, groupClassSize),
-                    Percentage(groupValidResponses, groupResponses),
-                    warningCutoff is { } cutoff ? scores.Count(x => x <= cutoff) : 0);
-            })
+            .Select(g => BuildGroup(g.Key.FacultyId, g.Key.FacultyName, g.ToList()))
             .OrderByDescending(x => x.SectionCount)
             .ThenBy(x => x.FacultyName)
             .ToList();
+
+        var groups = BuildGroups(sections);
         var groupByFaculty = groups.ToDictionary(x => x.FacultyName);
 
         // Mặt bằng đã tính xong ở trên trên TOÀN BỘ lớp. Từ đây mới lọc xuống phạm vi
         // người xem để dựng bảng chi tiết; z-score vẫn so với mặt bằng toàn trường.
         var scope = await userScope.ResolveAsync(cancellationToken);
-        var rows = VisibleTo(scope, sections)
+        var visibleSections = VisibleTo(scope, sections);
+
+        // Dòng khoa cũng thu về phạm vi: người xem bị giới hạn chỉ thấy khoa của mình, và
+        // số trên dòng chỉ gộp lớp mình được xem — trưởng khoa là cả khoa, trưởng bộ môn
+        // là phần bộ môn mình. Z-Score của dòng vẫn so với mặt bằng toàn trường ở trên.
+        var visibleGroups = scope.SeesEverything ? groups : BuildGroups(visibleSections);
+
+        var rows = visibleSections
             .Select(section =>
             {
                 var group = groupByFaculty[section.FacultyName];
@@ -2837,7 +2856,7 @@ public sealed class EfSurveyService(
             sections.Count,
             schoolAverage,
             schoolSd,
-            groups,
+            visibleGroups,
             rows,
             questionSections,
             questionSectionId));
@@ -3051,18 +3070,19 @@ public sealed class EfSurveyService(
         var schoolAverageScore = schoolScores.Count == 0 ? (decimal?)null : Math.Round(schoolScores.Average(), 3);
         var schoolWarningCount = rows.Sum(x => x.WarningSectionCount);
 
-        // Trưởng bộ môn xem được mọi bộ môn TRONG KHOA của mình: bảng này sinh ra để
-        // so bộ môn với bộ môn, chỉ còn đúng một dòng của chính mình thì không so được
-        // với ai. Mặt bằng ở chân bảng vẫn là toàn trường nên vẫn có mốc lớn mà đối chiếu.
+        // Trưởng khoa/viện xem mọi bộ môn trong khoa mình; trưởng bộ môn chỉ còn dòng của
+        // bộ môn mình. Mặt bằng ở chân bảng vẫn là toàn trường nên vẫn có mốc để đối chiếu.
         //
         // Giảng viên không mở được tab này; nếu gọi thẳng API thì vẫn giữ mức hẹp nhất.
         var scope = summaryScope;
         var visibleRows = scope.SeesEverything
             ? rows
-            : scope.SeesOnlyOwn
-                ? rows.Where(x => x.DepartmentId == scope.DepartmentId).ToList()
-                : scope.FacultyId is { } scopeFacultyId
+            : scope.SeesWholeFaculty
+                ? scope.FacultyId is { } scopeFacultyId
                     ? rows.Where(x => x.FacultyId == scopeFacultyId).ToList()
+                    : []
+                : scope.DepartmentId is { } scopeDepartmentId
+                    ? rows.Where(x => x.DepartmentId == scopeDepartmentId).ToList()
                     : [];
 
         return Succeeded(new SemesterSurveyDepartmentSummaryDto(
@@ -3360,10 +3380,10 @@ public sealed class EfSurveyService(
         int semesterSurveyId,
         CancellationToken cancellationToken = default)
     {
-        // CỐ Ý không lọc phạm vi. Mọi con số ở đây là tổng hợp cấp đợt, không có dữ
-        // liệu của riêng lớp hay giảng viên nào. Hệ thống vốn đã chủ trương cho
-        // trưởng bộ môn thấy mặt bằng toàn trường để còn có cái mà so — xem dòng
-        // tổng của SemesterSurveyDepartmentSummaryDto và congviec2.md mục D6.
+        // Thu về phạm vi người xem, giống tab Tổng quan của Thống kê & Báo cáo: trưởng
+        // khoa thấy số của khoa mình, trưởng bộ môn của bộ môn mình. Riêng các mốc cảnh
+        // báo vẫn tính trên toàn bộ lớp của đợt (congviec2.md mục D6), để một lớp bị
+        // gắn "cảnh báo" theo cùng một thước dù ai đang xem.
         var header = await LoadSurveyHeaderAsync(semesterSurveyId, cancellationToken);
         if (header is null)
         {
@@ -3380,8 +3400,12 @@ public sealed class EfSurveyService(
         // Bốn chỉ số đầu là TIẾN ĐỘ: đếm mọi lớp của đợt và mọi phiếu thu được,
         // kể cả phiếu bị lọc nhiễu — đó vẫn là phiếu sinh viên đã nộp. Phần điểm
         // bên dưới mới lọc phiếu hợp lệ.
-        var allSectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
-            .Where(x => x.SemesterSurveyId == semesterSurveyId)
+        var scope = await userScope.ResolveAsync(cancellationToken);
+        var allSectionSurveys = await VisibleSurveyScope.InScope(
+                db,
+                db.CourseSectionSurveys.AsNoTracking()
+                    .Where(x => x.SemesterSurveyId == semesterSurveyId),
+                scope)
             .Select(x => new { x.CourseSectionSurveyId, x.CourseSectionId })
             .ToListAsync(cancellationToken);
 
@@ -3402,28 +3426,32 @@ public sealed class EfSurveyService(
             .Where(dashboardThresholds.CountsTowardScore())
             .CountAsync(cancellationToken);
 
-        var sections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
+        // Toàn bộ lớp của đợt để tính mốc; phần hiển thị chỉ lấy lớp trong phạm vi.
+        var allSections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
+        var sections = VisibleTo(scope, allSections);
+        var visibleCssIds = sections.Select(x => x.CourseSectionSurveyId).ToHashSet();
 
         var questionOrder = await QuestionOrderMapAsync(header.SurveyTemplateId, cancellationToken);
         var perQuestion = await SectionQuestionStatsAsync(
-            sections.Select(x => x.CourseSectionSurveyId).ToList(),
+            allSections.Select(x => x.CourseSectionSurveyId).ToList(),
             questionOrder.Keys.ToList(),
             cancellationToken);
 
         var questions = perQuestion
             .GroupBy(x => x.QuestionId)
-            .Where(g => g.Sum(x => x.AnswerCount) > 0)
+            .Where(g => g.Where(x => visibleCssIds.Contains(x.CourseSectionSurveyId)).Sum(x => x.AnswerCount) > 0)
             .Select(g =>
             {
                 // Mốc riêng của TỪNG CÂU: câu khó vốn điểm thấp hơn câu dễ, nên so
                 // mọi câu với một mốc chung sẽ dồn hết cảnh báo vào mấy câu khó.
-                var scored = g.Where(x => x.AnswerCount > 0).Select(x => x.Average).ToList();
-                var cutoff = WarningScoreCutoff(scored);
+                var cutoff = WarningScoreCutoff(g.Where(x => x.AnswerCount > 0).Select(x => x.Average).ToList());
+                var mine = g.Where(x => visibleCssIds.Contains(x.CourseSectionSurveyId)).ToList();
+                var scored = mine.Where(x => x.AnswerCount > 0).Select(x => x.Average).ToList();
 
                 return new DashboardQuestionScoreDto(
                     questionOrder[g.Key].Order,
                     questionOrder[g.Key].Text,
-                    Math.Round(g.Sum(x => x.Total) / g.Sum(x => x.AnswerCount), 3),
+                    Math.Round(mine.Sum(x => x.Total) / mine.Sum(x => x.AnswerCount), 3),
                     // Đếm theo LỚP chứ không theo phiếu: một câu bị nhiều lớp chấm
                     // thấp là vấn đề hệ thống, còn một lớp chấm thấp thì chỉ là cá biệt.
                     cutoff is { } c ? scored.Count(x => x <= c) : 0);
@@ -3441,14 +3469,14 @@ public sealed class EfSurveyService(
             .OrderByDescending(x => x.AverageScore)
             .ToList();
 
-        var dashboardScores = sections.Select(x => x.AverageScore).ToList();
+        var dashboardScores = allSections.Select(x => x.AverageScore).ToList();
         var courseRows = await BuildCourseDiagnosisAsync(
             header.SurveyTemplateId,
             sections,
             WarningScoreCutoff(dashboardScores),
             dashboardScores.Count == 0 ? 0m : Math.Round(dashboardScores.Average(), 3),
             SampleStandardDeviation(dashboardScores),
-            sections,
+            allSections,
             cancellationToken);
 
         return Succeeded(new SemesterSurveyDashboardDto(
@@ -3517,14 +3545,15 @@ public sealed class EfSurveyService(
         // Phạm vi lấy thẳng từ query string nên phải kiểm: không có chỗ này thì
         // trưởng bộ môn chỉ việc đổi scopeId là đọc được phân tích của khoa khác.
         //
-        // Đòi hỏi TOÀN BỘ lớp của phạm vi phải nằm trong tầm nhìn, không phải chỉ
-        // một phần — trả về nửa số lớp của một khoa mà vẫn gắn nhãn "phân tích khoa"
-        // là đưa ra con số sai chứ không phải con số hẹp.
+        // Thu về đúng phần lớp người xem được thấy, giống dòng khoa ở các bảng xếp hạng:
+        // trưởng bộ môn mở khoa của mình thì chỉ thấy phần bộ môn mình. Không còn lớp
+        // nào thì coi như không có phạm vi này. Mọi mặt bằng so sánh bên dưới vẫn tính
+        // trên toàn bộ lớp của đợt (allSections).
         var scope = await userScope.ResolveAsync(cancellationToken);
         if (!scope.SeesEverything)
         {
-            var visible = VisibleTo(scope, sections);
-            if (visible.Count != sections.Count)
+            sections = VisibleTo(scope, sections);
+            if (sections.Count == 0)
             {
                 return Failed<SurveyScopeAnalysisDto>(SurveyErrorCodes.ScopeNotFound);
             }

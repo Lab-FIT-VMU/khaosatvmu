@@ -216,7 +216,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                           {campaign.status}
                         </span>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td style={{ textAlign: 'center' }}>
                         <button
                           type="button"
                           className="executive-action-link"

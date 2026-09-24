@@ -1,3 +1,4 @@
+using Application.Auth;
 using Application.Surveys;
 using Domain;
 using Infrastructure.Persistence;
@@ -6,28 +7,97 @@ using Microsoft.EntityFrameworkCore;
 namespace Infrastructure.Reports;
 
 /// <summary>
-/// Bảng lớp đã lọc theo trạng thái phát hành — nguồn duy nhất cho mọi truy vấn số liệu.
+/// Bảng lớp đã lọc theo trạng thái phát hành VÀ phạm vi người xem — nguồn duy nhất cho
+/// mọi truy vấn số liệu.
 ///
-/// Quản trị thấy tất cả; trưởng bộ môn và giảng viên chỉ thấy lớp thuộc đợt đã phát hành, nên
-/// đợt chưa phát hành không lọt vào bất kỳ con số gộp nào. Tính năng phân loại cảm xúc bắt buộc
-/// phải đi qua đây giống hệt màn báo cáo hiện có: một tính năng mới không được tự mở rộng phạm
-/// vi dữ liệu mà người dùng được xem.
+/// Quản trị thấy tất cả; các vai trò còn lại chỉ thấy lớp thuộc đợt đã phát hành, và chỉ
+/// lớp trong phạm vi của mình: trưởng khoa cả khoa, trưởng bộ môn một bộ môn, giảng viên
+/// lớp mình dạy. Tính năng phân loại cảm xúc bắt buộc phải đi qua đây giống hệt màn báo
+/// cáo hiện có: một tính năng mới không được tự mở rộng phạm vi dữ liệu mà người dùng
+/// được xem.
 /// </summary>
 internal static class VisibleSurveyScope
 {
     public static async Task<IQueryable<CourseSectionSurvey>> SectionSurveysAsync(
         AppDbContext db,
         ISurveyPublicationService publication,
+        IUserScopeResolver userScope,
         CancellationToken cancellationToken)
     {
         var query = db.CourseSectionSurveys.AsNoTracking();
         var visible = await publication.VisibleSurveyIdsAsync(cancellationToken);
-        if (visible is null)
+        if (visible is not null)
         {
-            return query;
+            var ids = visible.ToList();
+            query = query.Where(x => ids.Contains(x.SemesterSurveyId));
         }
 
-        var ids = visible.ToList();
-        return query.Where(x => ids.Contains(x.SemesterSurveyId));
+        var scope = await userScope.ResolveAsync(cancellationToken);
+        return InScope(db, query, scope);
+    }
+
+    /// <summary>
+    /// Thu một truy vấn lớp về phạm vi người xem. Cùng quy tắc với trang Bảng dữ liệu
+    /// khảo sát: lớp thuộc khoa / bộ môn nào là theo học phần của lớp.
+    /// </summary>
+    public static IQueryable<CourseSectionSurvey> InScope(
+        AppDbContext db,
+        IQueryable<CourseSectionSurvey> query,
+        UserScope scope)
+    {
+        if (scope.SeesEverything) return query;
+
+        // Bị giới hạn mà không biết giới hạn vào đâu thì không thấy gì, tuyệt đối không
+        // rơi về nhánh không lọc.
+        if (scope.SeesNothing) return query.Where(_ => false);
+
+        if (scope.SeesOnlyOwn)
+        {
+            var lecturerId = scope.LecturerId;
+            return query.Where(x => db.CourseSections
+                .Any(section => section.CourseSectionId == x.CourseSectionId
+                                && section.LecturerId == lecturerId));
+        }
+
+        if (scope.SeesWholeFaculty)
+        {
+            var facultyId = scope.FacultyId;
+            return query.Where(x => db.CourseSections
+                .Any(section => section.CourseSectionId == x.CourseSectionId
+                                && db.Courses.Any(course =>
+                                    course.CourseId == section.CourseId
+                                    && course.FacultyId == facultyId)));
+        }
+
+        var departmentId = scope.DepartmentId;
+        return query.Where(x => db.CourseSections
+            .Any(section => section.CourseSectionId == x.CourseSectionId
+                            && db.Courses.Any(course =>
+                                course.CourseId == section.CourseId
+                                && course.DepartmentId == departmentId)));
+    }
+
+    /// <summary>
+    /// Nhãn phạm vi để ghép vào khoá cache: hai người khác phạm vi, hoặc khác tập đợt đã
+    /// phát hành, không được đọc chung một bản đã dựng sẵn.
+    /// </summary>
+    public static async Task<string> CacheKeyAsync(
+        ISurveyPublicationService publication,
+        IUserScopeResolver userScope,
+        CancellationToken cancellationToken)
+    {
+        var scope = await userScope.ResolveAsync(cancellationToken);
+        if (scope.SeesEverything) return "all";
+
+        var visible = await publication.VisibleSurveyIdsAsync(cancellationToken);
+        var published = visible is null ? "all" : string.Join(',', visible.Order());
+        var unit = scope.SeesNothing
+            ? "none"
+            : scope.SeesOnlyOwn
+                ? $"lecturer-{scope.LecturerId}"
+                : scope.SeesWholeFaculty
+                    ? $"faculty-{scope.FacultyId}"
+                    : $"department-{scope.DepartmentId}";
+        return $"{unit}:published-{published}";
     }
 }

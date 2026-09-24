@@ -1415,7 +1415,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
               <tbody>
                 {(unidentified?.lecturers ?? []).map((lecturer, index) => (
                   <tr key={`${lecturer.lecturerName}-${lecturer.departmentName ?? ''}`}>
-                    <td>{index + 1}</td>
+                    <td style={{ textAlign: 'right' }}>{index + 1}</td>
                     <td><strong>{lecturer.lecturerName}</strong></td>
                     <td>{lecturer.departmentName ?? '—'}</td>
                     <td className="unidentified-table__count">{lecturer.sectionCount}</td>

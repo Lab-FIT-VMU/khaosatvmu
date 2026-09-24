@@ -14,8 +14,9 @@ import '../styles/scoring-config-note.css';
  * Đọc từ cache dùng chung của useScoringThresholds, nên lưu cấu hình ở nút Cập nhật
  * điểm hoặc nhận thông báo người khác vừa đổi là dòng này đổi theo ngay.
  *
- * Tạm thời chỉ hiện cho các vai trò xem được toàn trường: admin hệ thống, admin khảo
- * sát và Ban Giám hiệu.
+ * Hiện cho mọi vai trò: trưởng khoa, trưởng bộ môn và giảng viên cũng cần biết con số
+ * mình đang đọc đã bỏ những lớp nào. Câu chỉ chỗ đổi cấu hình chỉ in cho các vai trò
+ * xem toàn trường, vì các vai trò còn lại không có nút Cập nhật điểm.
  */
 type ScoringConfigNoteProps = {
   children?: ReactNode;
@@ -24,8 +25,7 @@ type ScoringConfigNoteProps = {
 export const ScoringConfigNote: React.FC<ScoringConfigNoteProps> = ({ children }) => {
   const { activeProfile } = useAuth();
   const thresholds = useScoringThresholds();
-
-  if (!seesAllData(activeProfile?.roleCode)) return null;
+  const showsWhereToChange = seesAllData(activeProfile?.roleCode);
 
   return (
     <p className="scoring-config-note">
@@ -36,8 +36,8 @@ export const ScoringConfigNote: React.FC<ScoringConfigNoteProps> = ({ children }
             Số liệu chỉ sử dụng dữ liệu các phiếu của các lớp, bộ môn và khoa/viện hợp lệ
             (đảm bảo hai tiêu chí: tỷ lệ phản hồi ≥{' '}
             <strong>{thresholds.minimumResponseRate}%</strong> và tỷ lệ phiếu hợp lệ ≥{' '}
-            <strong>{thresholds.minimumValidRate}%</strong>). Cấu hình này đổi được ở nút Cập
-            nhật điểm.
+            <strong>{thresholds.minimumValidRate}%</strong>).
+            {showsWhereToChange && ' Cấu hình này đổi được ở nút Cập nhật điểm.'}
           </>
         )}
       </span>

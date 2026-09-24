@@ -25,6 +25,8 @@ import { ConfirmDialog, Modal } from '../components/Modal';
 import { InlineTreeWizard } from '../components/InlineTreeWizard';
 import { TablePagination } from '../components/TablePagination';
 import { useSemester } from '../context/semesterContext';
+import { useAuth } from '../auth/authContext';
+import { canAccessTab, TAB_PERMISSION } from '../auth/modulePermissions';
 import { useSetBreadcrumbTrail } from '../context/breadcrumbTrail';
 import { usePaginatedItems } from '../hooks/usePaginatedItems';
 import type {
@@ -53,6 +55,8 @@ interface CampaignsPageProps {
   onOpenQR: (campaign: SurveyCampaign) => void;
 }
 
+const CAMPAIGN_TABS = ['Học phần', 'Chương trình đào tạo'] as const;
+
 export const CampaignsPage: React.FC<CampaignsPageProps> = ({
   campaigns,
   majors,
@@ -68,9 +72,15 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
   onOpenQR,
 }) => {
   const { activeSemester, activeYear } = useSemester();
-  const [activeTab, setActiveTab] = useState<'Học phần' | 'Chương trình đào tạo'>(
+  const [selectedTab, setActiveTab] = useState<'Học phần' | 'Chương trình đào tạo'>(
     surveyType || 'Học phần'
   );
+  // Tab nào hiện do quản trị bật tắt ở trang Phân quyền Module. Tab đang chọn bị khoá
+  // thì mở tab còn lại.
+  const { access } = useAuth();
+  const allowedTabs = CAMPAIGN_TABS.filter((item) =>
+    canAccessTab(access?.permissions, TAB_PERMISSION.programCampaigns[item]));
+  const activeTab = allowedTabs.includes(selectedTab) ? selectedTab : (allowedTabs[0] ?? selectedTab);
 
   // Loại khảo sát đang xem là cấp dưới của mục trên thanh điều hướng.
   useSetBreadcrumbTrail([activeTab]);
@@ -210,34 +220,49 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
     return acc;
   }, {} as Record<string, Record<string, SurveyCampaign[]>>);
 
+  if (allowedTabs.length === 0) {
+    return (
+      <div className="survey-operations-page campaigns-page">
+        <div className="operations-empty" role="status">
+          <strong>Vai trò này chưa được mở tab nào trong mục này.</strong>
+          <span>Liên hệ Quản trị viên để được cấp quyền.</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="survey-operations-page campaigns-page">
       <div className="operations-tabs-bar">
         <div className="operations-tabs" role="tablist" aria-label="Loại khảo sát">
-          <button
-            className={`operations-tab ${activeTab === 'Học phần' ? 'is-active' : ''}`}
-            role="tab"
-            aria-selected={activeTab === 'Học phần'}
-            onClick={() => setActiveTab('Học phần')}
-          >
-            <BookOpen className="operation-icon" aria-hidden="true" />
-            Học phần
-            <span className="operations-tab-count">
-              {campaigns.filter((c) => c.type === 'Học phần').length}
-            </span>
-          </button>
-          <button
-            className={`operations-tab ${activeTab === 'Chương trình đào tạo' ? 'is-active' : ''}`}
-            role="tab"
-            aria-selected={activeTab === 'Chương trình đào tạo'}
-            onClick={() => setActiveTab('Chương trình đào tạo')}
-          >
-            <GraduationCap className="operation-icon" aria-hidden="true" />
-            Chương trình đào tạo
-            <span className="operations-tab-count">
-              {campaigns.filter((c) => c.type === 'Chương trình đào tạo').length}
-            </span>
-          </button>
+          {allowedTabs.includes('Học phần') && (
+            <button
+              className={`operations-tab ${activeTab === 'Học phần' ? 'is-active' : ''}`}
+              role="tab"
+              aria-selected={activeTab === 'Học phần'}
+              onClick={() => setActiveTab('Học phần')}
+            >
+              <BookOpen className="operation-icon" aria-hidden="true" />
+              Học phần
+              <span className="operations-tab-count">
+                {campaigns.filter((c) => c.type === 'Học phần').length}
+              </span>
+            </button>
+          )}
+          {allowedTabs.includes('Chương trình đào tạo') && (
+            <button
+              className={`operations-tab ${activeTab === 'Chương trình đào tạo' ? 'is-active' : ''}`}
+              role="tab"
+              aria-selected={activeTab === 'Chương trình đào tạo'}
+              onClick={() => setActiveTab('Chương trình đào tạo')}
+            >
+              <GraduationCap className="operation-icon" aria-hidden="true" />
+              Chương trình đào tạo
+              <span className="operations-tab-count">
+                {campaigns.filter((c) => c.type === 'Chương trình đào tạo').length}
+              </span>
+            </button>
+          )}
         </div>
         <div className="operations-tab-actions">
           <button className="btn btn-secondary" onClick={handleExportCampaigns}>
@@ -471,7 +496,7 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
                                         </div>
                                       </td>
                                       <td>
-                                        <div className="campaign-row-actions">
+                                        <div className="campaign-row-actions" style={{ justifyContent: 'center' }}>
                                           <button className="btn btn-secondary btn-sm" onClick={() => onOpenQR(row)}>
                                             <QrCode className="operation-icon" aria-hidden="true" />
                                             Mã QR

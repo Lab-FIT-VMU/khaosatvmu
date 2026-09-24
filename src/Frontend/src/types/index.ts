@@ -889,6 +889,8 @@ export interface PermissionDto {
   name: string;
   description: string | null;
   category: string;
+  /** Quyền cha khi đây là quyền của một tab trong module. */
+  parentCode: string | null;
 }
 
 export interface RolePermissionStatus {
@@ -897,6 +899,7 @@ export interface RolePermissionStatus {
   permissionName: string;
   category: string;
   isGranted: boolean;
+  parentCode: string | null;
 }
 
 export interface RolePermissionMatrix {

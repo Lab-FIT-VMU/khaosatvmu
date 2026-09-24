@@ -488,7 +488,7 @@ export async function exportQuestionAnalysisToPdf(options: QuestionAnalysisExpor
       { content: 'Mã', styles: { halign: 'center' as const } },
       { content: 'Nội dung câu hỏi khảo sát', styles: { halign: 'left' as const } },
       ...optionsList.map((opt) => ({
-        content: `Mức ${opt.value}\n(${opt.displayText})`,
+        content: `Số lượng lựa chọn ${opt.value}\n(${opt.displayText})`,
         styles: { halign: 'center' as const },
       })),
       { content: 'Điểm TB', styles: { halign: 'center' as const } },
@@ -536,10 +536,14 @@ export async function exportQuestionAnalysisToPdf(options: QuestionAnalysisExpor
         fillColor: [248, 250, 252],
       },
       columnStyles: {
-        0: { cellWidth: 14, halign: 'center', fontStyle: 'bold' },
+        0: { cellWidth: 14, halign: 'left', fontStyle: 'bold' },
         1: { cellWidth: 'auto', halign: 'left' },
-        [headCols.length - 2]: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
-        [headCols.length - 1]: { cellWidth: 26, halign: 'center' },
+        // Các cột số lượng lựa chọn: số nên căn phải.
+        ...Object.fromEntries(
+          Array.from({ length: headCols.length - 4 }, (_, i) => [i + 2, { halign: 'right' as const }]),
+        ),
+        [headCols.length - 2]: { cellWidth: 18, halign: 'right', fontStyle: 'bold' },
+        [headCols.length - 1]: { cellWidth: 26, halign: 'left' },
       },
       margin: { left: margin, right: margin },
       didDrawPage: () => {
@@ -909,7 +913,7 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
           shading: { fill, type: ShadingType.CLEAR },
           children: [
             new Paragraph({
-              alignment: AlignmentType.CENTER,
+              alignment: AlignmentType.RIGHT,
               children: [new TextRun({ text: cellText, size: 16 })],
             }),
           ],
@@ -922,7 +926,7 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
             shading: { fill, type: ShadingType.CLEAR },
             children: [
               new Paragraph({
-                alignment: AlignmentType.CENTER,
+                alignment: AlignmentType.LEFT,
                 children: [new TextRun({ text: q.code, bold: true, size: 17 })],
               }),
             ],
@@ -941,7 +945,7 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
             shading: { fill, type: ShadingType.CLEAR },
             children: [
               new Paragraph({
-                alignment: AlignmentType.CENTER,
+                alignment: AlignmentType.RIGHT,
                 children: [new TextRun({ text: q.averageScore > 0 ? formatDecimal(q.averageScore, 3) : '—', bold: true, size: 17 })],
               }),
             ],
@@ -950,7 +954,7 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
             shading: { fill, type: ShadingType.CLEAR },
             children: [
               new Paragraph({
-                alignment: AlignmentType.CENTER,
+                alignment: AlignmentType.LEFT,
                 children: [new TextRun({ text: getScoreRatingText(q.averageScore), size: 16 })],
               }),
             ],
@@ -1200,16 +1204,16 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
     'Mã câu',
     'Nội dung câu hỏi',
     'Thang đo',
-    'Mức 1 (SL)',
-    'Mức 1 (%)',
-    'Mức 2 (SL)',
-    'Mức 2 (%)',
-    'Mức 3 (SL)',
-    'Mức 3 (%)',
-    'Mức 4 (SL)',
-    'Mức 4 (%)',
-    'Mức 5 (SL)',
-    'Mức 5 (%)',
+    'Số lượng lựa chọn 1',
+    'Tỷ lệ lựa chọn 1 (%)',
+    'Số lượng lựa chọn 2',
+    'Tỷ lệ lựa chọn 2 (%)',
+    'Số lượng lựa chọn 3',
+    'Tỷ lệ lựa chọn 3 (%)',
+    'Số lượng lựa chọn 4',
+    'Tỷ lệ lựa chọn 4 (%)',
+    'Số lượng lựa chọn 5',
+    'Tỷ lệ lựa chọn 5 (%)',
     'Điểm TB',
     'Đánh giá',
     'Tổng lượt TL',
@@ -1256,15 +1260,15 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
       q.questionText,
       q.answerScaleName || 'Thang trả lời',
       m1?.count ?? 0,
-      (m1?.percentage ?? 0) / 100,
+      Number((m1?.percentage ?? 0).toFixed(3)),
       m2?.count ?? 0,
-      (m2?.percentage ?? 0) / 100,
+      Number((m2?.percentage ?? 0).toFixed(3)),
       m3?.count ?? 0,
-      (m3?.percentage ?? 0) / 100,
+      Number((m3?.percentage ?? 0).toFixed(3)),
       m4?.count ?? 0,
-      (m4?.percentage ?? 0) / 100,
+      Number((m4?.percentage ?? 0).toFixed(3)),
       m5?.count ?? 0,
-      (m5?.percentage ?? 0) / 100,
+      Number((m5?.percentage ?? 0).toFixed(3)),
       q.averageScore > 0 ? Number(q.averageScore.toFixed(3)) : '—',
       getScoreRatingText(q.averageScore),
       q.totalAnswers,
@@ -1289,13 +1293,13 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
 
       // Định dạng số & căn lề
       if (colNumber === 1) {
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
         cell.font = { name: 'Arial', size: 9, bold: true };
       } else if (colNumber === 2 || colNumber === 3) {
         cell.alignment = { horizontal: 'left', vertical: 'middle' };
       } else if ([5, 7, 9, 11, 13].includes(colNumber)) {
-        // Tỷ lệ % — ba số lẻ đúng như ô trên màn hình (24,000%), không phải một.
-        cell.numFmt = '0.000%';
+        // Tỷ lệ — ba số lẻ; đơn vị % đã ghi ở tiêu đề cột nên ô không kèm dấu %.
+        cell.numFmt = '0.000';
         cell.alignment = { horizontal: 'right', vertical: 'middle' };
       } else if (colNumber === 14) {
         // Điểm TB — ba số lẻ, và ô chưa có điểm in "—" chứ không phải 0,00.
@@ -1304,7 +1308,7 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
         cell.alignment = { horizontal: 'right', vertical: 'middle' };
       } else if (colNumber === 15) {
         // Đánh giá
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
       } else {
         // Số lượng
         cell.numFmt = '#,##0';
@@ -1361,8 +1365,8 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
           const row = wsText.getRow(tr);
           row.values = [tq.code, tq.questionText, aIdx + 1, ans];
           row.font = { name: 'Arial', size: 9 };
-          row.getCell(1).alignment = { horizontal: 'center' };
-          row.getCell(3).alignment = { horizontal: 'center' };
+          row.getCell(1).alignment = { horizontal: 'left' };
+          row.getCell(3).alignment = { horizontal: 'right' };
           tr++;
         });
       }

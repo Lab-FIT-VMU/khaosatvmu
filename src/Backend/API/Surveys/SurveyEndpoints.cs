@@ -184,6 +184,20 @@ public static class SurveyEndpoints
                 cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>();
 
+        // Chỉ tiêu tỷ lệ phản hồi của trang Tiến độ thu phiếu. Ai vào được trang đó đều
+        // đọc được; ghi thì provider tự chặn về quản trị hệ thống và quản trị khảo sát.
+        operationalReadGroup.MapGet("/progress-target", async (
+            [FromServices] IProgressTargetProvider provider,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await provider.GetAsync(cancellationToken)));
+
+        operationalReadGroup.MapPut("/progress-target", async (
+            SaveProgressTargetRequest request,
+            [FromServices] IProgressTargetProvider provider,
+            CancellationToken cancellationToken) =>
+            ToResult(await provider.UpdateAsync(request.ResponseRate, cancellationToken)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
         // Đếm trước số lớp của một phạm vi, để hộp thoại nói rõ sẽ tạo bao nhiêu bài
         // trước khi người dùng bấm xác nhận.
         campaignGroup.MapGet("/section-scope-preview", async (
@@ -345,8 +359,10 @@ public static class SurveyEndpoints
             .AddEndpointFilter<RequireAntiforgeryFilter>();
 
         // Trạng thái phát hành kết quả của một đợt. Ai cũng đọc được để giao diện biết
-        // vì sao trống, nhưng chỉ quản trị mới đổi được (service tự chặn).
-        surveyStatisticsGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/publication", async (
+        // vì sao trống, nhưng chỉ quản trị mới đổi được (service tự chặn). Đọc nằm ở nhóm
+        // vận hành vì trang Tiến độ thu phiếu cũng cần: đợt đã kết thúc và phát hành thì
+        // lớp chưa đạt chỉ tiêu được gắn "Không đạt chỉ tiêu".
+        operationalReadGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/publication", async (
             int semesterSurveyId,
             [FromServices] ISurveyPublicationService publication,
             CancellationToken cancellationToken) =>
@@ -542,6 +558,7 @@ public static class SurveyEndpoints
             SurveyErrorCodes.OutOfScope => StatusCodes.Status403Forbidden,
             SurveyErrorCodes.ResultsNotPublished => StatusCodes.Status403Forbidden,
             SurveyErrorCodes.SurveyNotEnded => StatusCodes.Status409Conflict,
+            SurveyErrorCodes.ResultsPublishedLocked => StatusCodes.Status409Conflict,
             SurveyErrorCodes.AnswerScaleNotFound => StatusCodes.Status404NotFound,
             SurveyErrorCodes.TemplateNotFound => StatusCodes.Status404NotFound,
             SurveyErrorCodes.SemesterNotFound => StatusCodes.Status404NotFound,
@@ -571,6 +588,9 @@ public static class SurveyEndpoints
 
     /// <summary>Hình thức phiếu gửi lên từ màn soạn phiếu; null là trả đợt về mẫu mặc định.</summary>
     public sealed record SaveSurveyFormConfigRequest(SurveyFormConfigDto? FormConfig);
+
+    /// <summary>Chỉ tiêu tỷ lệ phản hồi của trang Tiến độ thu phiếu, đơn vị phần trăm.</summary>
+    public sealed record SaveProgressTargetRequest(decimal ResponseRate);
 
     /// <summary>Hai vòng lọc lớp được tính điểm, đơn vị phần trăm.</summary>
     public sealed record SaveScoringThresholdsRequest(

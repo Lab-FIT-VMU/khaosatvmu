@@ -482,14 +482,34 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         ["USER_ADMIN_ACCESS"] = 1
     };
 
+    /// <summary>
+    /// Quyền tab xếp ngay dưới module cha, theo đúng thứ tự trong
+    /// <see cref="ModuleTabPermissions.All"/> — danh sách đó đã để tab con sau tab cha.
+    /// </summary>
+    private static readonly Dictionary<string, int> TabOrderMap = ModuleTabPermissions.All
+        .Select((tab, index) =>
+        {
+            var root = tab.ParentCode;
+            while (ModuleTabPermissions.All.FirstOrDefault(x => x.Code == root) is { } parent)
+            {
+                root = parent.ParentCode;
+            }
+
+            var rootOrder = PermissionOrderMap.TryGetValue(root, out var order) ? order : 99;
+            return (tab.Code, Order: rootOrder * 1000 + index + 1);
+        })
+        .ToDictionary(x => x.Code, x => x.Order, StringComparer.OrdinalIgnoreCase);
+
     private static int GetPermissionOrder(string code) =>
-        PermissionOrderMap.TryGetValue(code, out var order) ? order : 99;
+        TabOrderMap.TryGetValue(code, out var tabOrder)
+            ? tabOrder
+            : (PermissionOrderMap.TryGetValue(code, out var order) ? order : 99) * 1000;
 
     public async Task<IReadOnlyList<PermissionDto>> GetPermissionsAsync(CancellationToken cancellationToken = default) =>
         await db.Permissions
             .AsNoTracking()
             .OrderBy(x => x.Code)
-            .Select(x => new PermissionDto(x.Id, x.Code, x.Name, x.Description, x.Category))
+            .Select(x => new PermissionDto(x.Id, x.Code, x.Name, x.Description, x.Category, x.ParentCode))
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<RolePermissionMatrixDto>> GetRolePermissionMatrixAsync(CancellationToken cancellationToken = default)
@@ -526,7 +546,8 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
                 permission.Code,
                 permission.Name,
                 permission.Category,
-                grantedSet.Contains((role.Id, permission.Id))
+                grantedSet.Contains((role.Id, permission.Id)),
+                permission.ParentCode
             )).ToList()
         )).ToList();
     }
@@ -562,7 +583,7 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
             allPermissions
                 .Select(p => new RolePermissionStatusDto(
                     p.Id, p.Code, p.Name, p.Category,
-                    grantedIds.Contains(p.Id)))
+                    grantedIds.Contains(p.Id), p.ParentCode))
                 .ToList()
         );
     }
@@ -602,48 +623,30 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
             }
         }
 
-        var synchronizedRoleIds = new List<Guid> { roleId };
-        if (roleCode is RoleCodes.DepartmentManager or RoleCodes.DeputyDepartmentManager)
-        {
-            var pairedRoleCode = roleCode == RoleCodes.DepartmentManager
-                ? RoleCodes.DeputyDepartmentManager
-                : RoleCodes.DepartmentManager;
-            var pairedRoleId = await db.Roles
-                .AsNoTracking()
-                .Where(x => x.Code == pairedRoleCode)
-                .Select(x => (Guid?)x.Id)
-                .SingleOrDefaultAsync(cancellationToken);
-            if (pairedRoleId is { } id) synchronizedRoleIds.Add(id);
-        }
-
         var existing = await db.RolePermissions
-            .Where(x => synchronizedRoleIds.Contains(x.RoleId))
+            .Where(x => x.RoleId == roleId)
             .ToListAsync(cancellationToken);
 
-        foreach (var targetRoleId in synchronizedRoleIds)
+        foreach (var grant in grants)
         {
-            foreach (var grant in grants)
+            var record = existing.FirstOrDefault(x => x.PermissionId == grant.PermissionId);
+            if (record is null)
             {
-                var record = existing.FirstOrDefault(x =>
-                    x.RoleId == targetRoleId && x.PermissionId == grant.PermissionId);
-                if (record is null)
+                if (grant.IsGranted)
                 {
-                    if (grant.IsGranted)
+                    db.RolePermissions.Add(new Domain.RolePermission
                     {
-                        db.RolePermissions.Add(new Domain.RolePermission
-                        {
-                            Id = Guid.NewGuid(),
-                            RoleId = targetRoleId,
-                            PermissionId = grant.PermissionId,
-                            IsGranted = true,
-                            CreatedAt = DateTime.UtcNow
-                        });
-                    }
+                        Id = Guid.NewGuid(),
+                        RoleId = roleId,
+                        PermissionId = grant.PermissionId,
+                        IsGranted = true,
+                        CreatedAt = DateTime.UtcNow
+                    });
                 }
-                else
-                {
-                    record.IsGranted = grant.IsGranted;
-                }
+            }
+            else
+            {
+                record.IsGranted = grant.IsGranted;
             }
         }
 

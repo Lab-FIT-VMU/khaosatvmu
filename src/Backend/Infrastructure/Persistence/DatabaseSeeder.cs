@@ -30,9 +30,8 @@ public static class DatabaseSeeder
         {
             (Code: "ADMIN", Name: "Quản trị hệ thống", Description: "Hồ sơ quản trị toàn hệ thống"),
             (Code: "LECTURER", Name: "Giảng viên", Description: "Hồ sơ giảng viên"),
-            (Code: "DEPARTMENT_MANAGER", Name: "Trưởng bộ môn", Description: "Hồ sơ quản lý bộ môn"),
-            (Code: "DEPUTY_DEPARTMENT_MANAGER", Name: "Phó trưởng bộ môn", Description: "Hồ sơ phó quản lý bộ môn, có cùng quyền hạn với trưởng bộ môn"),
-            (Code: "FACULTY_MANAGER", Name: "Trưởng khoa/viện", Description: "Hồ sơ quản lý khoa/viện, xem mọi bộ môn trong khoa"),
+            (Code: "DEPARTMENT_MANAGER", Name: "Quản lý bộ môn", Description: "Hồ sơ quản lý bộ môn, cấp cho Trưởng bộ môn và Phó bộ môn"),
+            (Code: "FACULTY_MANAGER", Name: "Quản lý khoa", Description: "Hồ sơ quản lý khoa/viện, cấp cho Trưởng khoa và Phó trưởng khoa, xem mọi bộ môn trong khoa"),
             (Code: "SURVEY_ADMIN", Name: "Quản trị khảo sát", Description: "Hồ sơ quản trị nghiệp vụ khảo sát"),
             (Code: "BOARD_OF_DIRECTORS", Name: "Ban Giám hiệu", Description: "Hồ sơ xem toàn trường, chỉ đọc")
         };
@@ -120,8 +119,20 @@ public static class DatabaseSeeder
             (Code: "OPEN_COMMENT_MODEL_ADMIN",    Name: "Quản trị model cảm xúc",           Description: "Xem trạng thái model và chạy lại phân tích cảm xúc",     Category: "Quản trị"),
         };
 
+        // Quyền tab nằm cùng nhóm với module cha để trang phân quyền xếp ngay dưới nó.
+        var categoryByCode = definitions.ToDictionary(x => x.Code, x => x.Category, StringComparer.OrdinalIgnoreCase);
+        var allDefinitions = definitions
+            .Select(x => (x.Code, x.Name, x.Description, x.Category, ParentCode: (string?)null))
+            .ToList();
+        foreach (var tab in ModuleTabPermissions.All)
+        {
+            var category = categoryByCode[tab.ParentCode];
+            categoryByCode[tab.Code] = category;
+            allDefinitions.Add((tab.Code, tab.Name, $"Xem tab {tab.Name}", category, tab.ParentCode));
+        }
+
         var permissions = new Dictionary<string, Permission>(StringComparer.OrdinalIgnoreCase);
-        foreach (var definition in definitions)
+        foreach (var definition in allDefinitions)
         {
             var permission = await db.Permissions.SingleOrDefaultAsync(x => x.Code == definition.Code, cancellationToken);
             if (permission is null)
@@ -132,7 +143,8 @@ public static class DatabaseSeeder
                     Code = definition.Code,
                     Name = definition.Name,
                     Description = definition.Description,
-                    Category = definition.Category
+                    Category = definition.Category,
+                    ParentCode = definition.ParentCode
                 };
                 db.Permissions.Add(permission);
             }
@@ -144,6 +156,7 @@ public static class DatabaseSeeder
                 permission.Name = definition.Name;
                 permission.Description = definition.Description;
                 permission.Category = definition.Category;
+                permission.ParentCode = definition.ParentCode;
             }
 
             permissions[definition.Code] = permission;
@@ -238,13 +251,6 @@ public static class DatabaseSeeder
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
 
-            // DEPUTY_DEPARTMENT_MANAGER: cùng quyền và cùng phạm vi với trưởng bộ môn.
-            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "PROGRESS_ACCESS"),
-            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "SURVEY_DASHBOARD_ACCESS"),
-            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "REPORTS_ACCESS"),
-            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
-            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
-
             // FACULTY_MANAGER: cùng bộ module với trưởng bộ môn, khác ở phạm vi dữ liệu.
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "PROGRESS_ACCESS"),
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "SURVEY_DASHBOARD_ACCESS"),
@@ -277,6 +283,60 @@ public static class DatabaseSeeder
                 // Tự phục hồi dữ liệu đã bị tắt trước khi có ràng buộc này. Nếu không,
                 // admin sẽ bị khóa ngoài màn hình duy nhất có thể cấp lại quyền.
                 existing.IsGranted = true;
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsureTabPermissionsAsync(db, roles, permissions, cancellationToken);
+    }
+
+    /// <summary>
+    /// Cấp quyền tab cho mọi vai trò đang có quyền cha mà chưa có dòng nào cho tab đó —
+    /// kể cả vai trò được người quản trị cấp quyền module bằng tay. Đã có dòng (bật hay
+    /// tắt) thì để nguyên: đó là lựa chọn của người quản trị.
+    /// </summary>
+    private static async Task EnsureTabPermissionsAsync(
+        AppDbContext db,
+        IReadOnlyDictionary<string, Role> roles,
+        IReadOnlyDictionary<string, Permission> permissions,
+        CancellationToken cancellationToken)
+    {
+        var rows = await db.RolePermissions.ToListAsync(cancellationToken);
+        var rowByPair = rows.ToDictionary(x => (x.RoleId, x.PermissionId));
+
+        foreach (var role in roles.Values)
+        {
+            // Danh sách tab xếp tab cha trước tab con, nên tab con đọc được trạng thái
+            // tab cha vừa thêm ở vòng trước.
+            foreach (var tab in ModuleTabPermissions.All)
+            {
+                var tabPermission = permissions[tab.Code];
+                if (rowByPair.ContainsKey((role.Id, tabPermission.Id))) continue;
+
+                var parentPermission = permissions[tab.ParentCode];
+                var parentGranted = rowByPair.TryGetValue((role.Id, parentPermission.Id), out var parentRow)
+                    && parentRow.IsGranted;
+                if (!parentGranted) continue;
+
+                var row = new RolePermission
+                {
+                    Id = Guid.NewGuid(),
+                    RoleId = role.Id,
+                    PermissionId = tabPermission.Id,
+                    IsGranted = ModuleTabPermissions.IsGrantedByDefault(role.Code, tab.Code),
+                    CreatedAt = DateTime.UtcNow
+                };
+                db.RolePermissions.Add(row);
+                rowByPair[(role.Id, tabPermission.Id)] = row;
+            }
+
+            foreach (var tab in ModuleTabPermissions.All)
+            {
+                if (!RequiredRolePermissions.IsRequired(role.Code, tab.Code)) continue;
+                if (rowByPair.TryGetValue((role.Id, permissions[tab.Code].Id), out var requiredRow))
+                {
+                    requiredRow.IsGranted = true;
+                }
             }
         }
 

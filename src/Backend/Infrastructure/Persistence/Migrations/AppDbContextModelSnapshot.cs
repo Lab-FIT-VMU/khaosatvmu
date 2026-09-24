@@ -1345,6 +1345,10 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("ParentCode")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
@@ -1715,6 +1719,11 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Property<decimal>("MinimumValidRate")
                         .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal>("ProgressTargetResponseRate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(5,2)")
+                        .HasDefaultValue(50m);
 
                     b.Property<bool>("RejectAttentionCheckFailed")
                         .ValueGeneratedOnAdd()

@@ -86,11 +86,15 @@ public class ReportScopeTests
             SeesEverything: false);
     }
 
-    /// <summary>Đợt khảo sát có nhiều lớp thu được phiếu nhất, để có dữ liệu mà so.</summary>
+    /// <summary>
+    /// Đợt khảo sát có nhiều lớp đã chốt điểm nhất, để có dữ liệu mà so. Chọn theo số lớp
+    /// thôi thì dễ rơi vào một đợt chưa tính điểm, và các test ở đây lặng lẽ thoát sớm.
+    /// </summary>
     private static Task<int> BusiestSurveyAsync(AppDbContext db) =>
         db.CourseSectionSurveys
             .GroupBy(x => x.SemesterSurveyId)
-            .OrderByDescending(x => x.Count())
+            .OrderByDescending(x => x.Count(c => c.AverageScore != null))
+            .ThenByDescending(x => x.Count())
             .Select(x => x.Key)
             .FirstOrDefaultAsync();
 
@@ -131,7 +135,11 @@ public class ReportScopeTests
             manager.SchoolSectionCount.Should().Be(admin.SchoolSectionCount);
             manager.SchoolAverageScore.Should().Be(admin.SchoolAverageScore);
             manager.SchoolStandardDeviation.Should().Be(admin.SchoolStandardDeviation);
-            manager.Groups.Count.Should().Be(admin.Groups.Count, "bảng nhóm theo khoa giữ nguyên");
+
+            // Dòng khoa thu về phạm vi: chỉ khoa của mình, và chỉ gộp phần bộ môn mình.
+            manager.Groups.Should().ContainSingle();
+            manager.Groups[0].FacultyId.Should().Be(managerScope.FacultyId);
+            manager.Groups[0].SectionCount.Should().Be(manager.Sections.Count);
 
             // Z-score của cùng một lớp phải giống hệt nhau ở hai góc nhìn.
             var sample = manager.Sections[0];
@@ -142,13 +150,11 @@ public class ReportScopeTests
     }
 
     /// <summary>
-    /// Trưởng bộ môn thấy MỌI bộ môn trong khoa của mình, không phải chỉ bộ môn mình: bảng này
-    /// sinh ra để so bộ môn với bộ môn, còn đúng một dòng thì không so được với ai. Điều bắt buộc
-    /// là không lọt bộ môn của khoa khác, và dòng tổng ở chân bảng vẫn phải là mặt bằng toàn
-    /// trường để còn mốc mà đối chiếu.
+    /// Trưởng bộ môn chỉ thấy dòng của bộ môn mình. Dòng tổng ở chân bảng vẫn phải là mặt
+    /// bằng toàn trường để còn mốc mà đối chiếu.
     /// </summary>
     [Fact]
-    public async Task DepartmentSummary_ShowsOwnFacultyOnly_ButKeepsSchoolTotalsInTheFooter()
+    public async Task DepartmentSummary_ShowsOwnDepartmentOnly_ButKeepsSchoolTotalsInTheFooter()
     {
         await RunAsync(async (db, serviceFor) =>
         {
@@ -169,15 +175,8 @@ public class ReportScopeTests
             var admin = asAdmin.Value!;
             var manager = asManager.Value!;
 
-            var expected = admin.Rows
-                .Where(x => x.FacultyId == managerScope.FacultyId)
-                .Select(x => x.DepartmentId)
-                .ToList();
-            if (expected.Count == 0) return;
-
-            // Không lọt bộ môn của khoa khác — đây là tính chất bảo mật của phạm vi.
-            manager.Rows.Should().OnlyContain(x => x.FacultyId == managerScope.FacultyId);
-            manager.Rows.Select(x => x.DepartmentId).Should().Equal(expected);
+            // Không lọt bộ môn nào khác — đây là tính chất bảo mật của phạm vi.
+            manager.Rows.Select(x => x.DepartmentId).Should().Equal([departmentId.Value]);
 
             // Chân bảng tính TRƯỚC khi lọc nên hai góc nhìn phải giống hệt nhau.
             manager.SchoolDepartmentCount.Should().Be(admin.SchoolDepartmentCount);
@@ -299,6 +298,98 @@ public class ReportScopeTests
                 .All(question =>
                     question.OptionDistribution.Sum(option => option.Count) <= question.TotalAnswers)
                 .Should().BeTrue();
+        });
+    }
+
+    /// <summary>Phạm vi của trưởng khoa/viện, dựng giống resolver thật: khoa lấy từ hồ sơ giảng viên.</summary>
+    private static async Task<UserScope> FacultyManagerScopeAsync(AppDbContext db, int departmentId) =>
+        (await ManagerScopeAsync(db, departmentId)) with { RoleCode = RoleCodes.FacultyManager };
+
+    /// <summary>
+    /// Trưởng khoa/viện thấy mọi bộ môn của khoa mình và chỉ dòng khoa của mình; số trên
+    /// dòng khoa là số của cả khoa, trùng với dòng đó ở góc nhìn quản trị.
+    /// </summary>
+    [Fact]
+    public async Task FacultyManager_SeesWholeOwnFaculty_AndNothingElse()
+    {
+        await RunAsync(async (db, serviceFor) =>
+        {
+            var semesterSurveyId = await BusiestSurveyAsync(db);
+            if (semesterSurveyId == 0) return;
+            var departmentId = await BusiestDepartmentAsync(db, semesterSurveyId);
+            if (departmentId is null) return;
+            var facultyScope = await FacultyManagerScopeAsync(db, departmentId.Value);
+            if (facultyScope.FacultyId is not { } facultyId) return;
+
+            var adminSummary = await serviceFor(Admin).GetSemesterSurveyDepartmentSummaryAsync(semesterSurveyId);
+            var managerSummary = await serviceFor(facultyScope).GetSemesterSurveyDepartmentSummaryAsync(semesterSurveyId);
+            var adminNormalization = await serviceFor(Admin).GetSemesterSurveyNormalizationAsync(semesterSurveyId);
+            var managerNormalization = await serviceFor(facultyScope).GetSemesterSurveyNormalizationAsync(semesterSurveyId);
+            if (!adminSummary.Succeeded || !adminNormalization.Succeeded) return;
+
+            managerSummary.Value!.Rows.Select(x => x.DepartmentId).Should().Equal(
+                adminSummary.Value!.Rows.Where(x => x.FacultyId == facultyId).Select(x => x.DepartmentId));
+
+            var ownGroup = adminNormalization.Value!.Groups.Single(x => x.FacultyId == facultyId);
+            managerNormalization.Value!.Groups.Should().ContainSingle()
+                .Which.Should().BeEquivalentTo(ownGroup, "trưởng khoa thấy đúng số của cả khoa");
+            managerNormalization.Value!.Sections.Should().HaveCount(ownGroup.SectionCount);
+        });
+    }
+
+    /// <summary>
+    /// Trưởng bộ môn mở trang chi tiết của khoa mình thì chỉ thấy phần bộ môn mình; mở khoa
+    /// khác thì coi như không có.
+    /// </summary>
+    [Fact]
+    public async Task ScopeAnalysis_DepartmentManager_SeesOnlyOwnPartOfOwnFaculty()
+    {
+        await RunAsync(async (db, serviceFor) =>
+        {
+            var semesterSurveyId = await BusiestSurveyAsync(db);
+            if (semesterSurveyId == 0) return;
+            var departmentId = await BusiestDepartmentAsync(db, semesterSurveyId);
+            if (departmentId is null) return;
+            var managerScope = await ManagerScopeAsync(db, departmentId.Value);
+            if (managerScope.FacultyId is not { } facultyId) return;
+
+            var ownFaculty = await serviceFor(managerScope)
+                .GetSurveyScopeAnalysisAsync(semesterSurveyId, "faculty", facultyId);
+            ownFaculty.Succeeded.Should().BeTrue(ownFaculty.ErrorCode);
+            ownFaculty.Value!.Departments!.Select(x => x.DepartmentId).Should().Equal([departmentId.Value]);
+
+            var otherFacultyId = await db.CourseSectionSurveys
+                .Where(x => x.SemesterSurveyId == semesterSurveyId)
+                .Join(db.CourseSections, css => css.CourseSectionId, section => section.CourseSectionId, (_, section) => section)
+                .Join(db.Courses, section => section.CourseId, course => course.CourseId, (_, course) => course.FacultyId)
+                .FirstOrDefaultAsync(x => x != null && x != facultyId);
+            if (otherFacultyId is not { } otherId) return;
+
+            var otherFaculty = await serviceFor(managerScope)
+                .GetSurveyScopeAnalysisAsync(semesterSurveyId, "faculty", otherId);
+            otherFaculty.Succeeded.Should().BeFalse("khoa khác nằm ngoài phạm vi");
+        });
+    }
+
+    /// <summary>Trang Tổng quan khảo sát thu về phạm vi: chỉ khoa của mình, chỉ lớp của mình.</summary>
+    [Fact]
+    public async Task SemesterDashboard_ShouldNarrowToOwnDepartment()
+    {
+        await RunAsync(async (db, serviceFor) =>
+        {
+            var semesterSurveyId = await BusiestSurveyAsync(db);
+            if (semesterSurveyId == 0) return;
+            var departmentId = await BusiestDepartmentAsync(db, semesterSurveyId);
+            if (departmentId is null) return;
+            var managerScope = await ManagerScopeAsync(db, departmentId.Value);
+            if (managerScope.FacultyId is null) return;
+
+            var admin = await serviceFor(Admin).GetSemesterSurveyDashboardAsync(semesterSurveyId);
+            var manager = await serviceFor(managerScope).GetSemesterSurveyDashboardAsync(semesterSurveyId);
+            if (!admin.Succeeded || admin.Value!.ScoredSectionCount == 0) return;
+
+            manager.Value!.SectionCount.Should().BeLessThan(admin.Value!.SectionCount);
+            manager.Value!.Faculties.Select(x => x.FacultyId).Should().OnlyContain(x => x == managerScope.FacultyId);
         });
     }
 }

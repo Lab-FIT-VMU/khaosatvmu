@@ -233,7 +233,7 @@ export function SurveyTemplateImportDialog({
                 <tbody>
                   {answerScales.map((scale) => (
                     <tr key={scale.answerScaleId}>
-                      <td>{scale.answerScaleId}</td>
+                      <td style={{ textAlign: 'right' }}>{scale.answerScaleId}</td>
                       <td>{scale.answerScaleName}</td>
                       <td>
                         {scale.scaleKind === 'Text'
@@ -321,7 +321,7 @@ export function SurveyTemplateImportDialog({
                 <tbody>
                   {invalidSectionRows.map((row) => (
                     <tr key={row.rowNumber}>
-                      <td>{row.rowNumber}</td>
+                      <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                       <td>{row.questionText}</td>
                       <td>{row.sectionName || '(trống)'}</td>
                       <td>
@@ -355,7 +355,7 @@ export function SurveyTemplateImportDialog({
                 <tbody>
                   {invalidScaleRows.map((row) => (
                     <tr key={row.rowNumber}>
-                      <td>{row.rowNumber}</td>
+                      <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                       <td>{row.questionText}</td>
                       <td>{row.rawCode || '(trống)'}</td>
                     </tr>
@@ -385,7 +385,7 @@ export function SurveyTemplateImportDialog({
                 <tbody>
                   {invalidTrapRows.map((row) => (
                     <tr key={row.rowNumber}>
-                      <td>{row.rowNumber}</td>
+                      <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                       <td>{row.questionText}</td>
                       <td>{row.rawValue || '(trống)'}</td>
                       <td>
@@ -423,7 +423,7 @@ export function SurveyTemplateImportDialog({
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.rowNumber}>
-                      <td>{row.rowNumber}</td>
+                      <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                       <td>{row.sectionName}</td>
                       <td>{row.questionText}</td>
                       <td>{row.answerScaleName}</td>

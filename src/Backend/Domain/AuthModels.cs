@@ -59,6 +59,11 @@ public sealed class Permission
     public string? Description { get; set; }
     /// <summary>Nhóm module hiển thị trong màn phân quyền. Ví dụ: "Quản trị hệ thống", "Khảo sát", "Báo cáo".</summary>
     public string Category { get; set; } = string.Empty;
+    /// <summary>
+    /// Mã quyền cha khi đây là quyền của một tab bên trong module. Null là quyền của
+    /// chính mục trên thanh điều hướng. Tab chỉ hiện khi cả quyền cha lẫn quyền tab đều bật.
+    /// </summary>
+    public string? ParentCode { get; set; }
 }
 
 public sealed class RolePermission

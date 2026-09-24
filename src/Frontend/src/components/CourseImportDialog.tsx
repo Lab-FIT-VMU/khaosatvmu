@@ -275,7 +275,7 @@ export function CourseImportDialog({
                     <tbody>
                       {rows.map((row) => (
                         <tr key={row.rowNumber}>
-                          <td>{row.rowNumber}</td>
+                          <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                           <td>
                             {row.courseCode || (
                               <span className="admin-import-invalid">Thiếu mã</span>
@@ -286,7 +286,7 @@ export function CourseImportDialog({
                               <span className="admin-import-invalid">Thiếu tên</span>
                             )}
                           </td>
-                          <td>{row.credits || '—'}</td>
+                          <td style={{ textAlign: 'right' }}>{row.credits || '—'}</td>
                           <td>{row.facultyName || '—'}</td>
                           <td>{row.departmentName || '—'}</td>
                         </tr>
@@ -331,7 +331,7 @@ export function CourseImportDialog({
                   <tbody>
                     {failedItems.map((item) => (
                       <tr key={`${item.rowNumber}-${item.name}`}>
-                        <td>{item.rowNumber}</td>
+                        <td style={{ textAlign: 'right' }}>{item.rowNumber}</td>
                         <td>{item.name || 'Không có'}</td>
                         <td>{item.facultyName || 'Không có'}</td>
                         <td>{catalogErrorMessage(item.errorCode)}</td>

@@ -67,7 +67,8 @@ public sealed class ReportQueryOptimizationTests
             scope.ServiceProvider.GetRequiredService<IMemoryCache>(),
             new SchoolOverviewCacheVersion(),
             new FixedScoringThresholdProvider(),
-            new PublishedSurveyPublicationService());
+            new PublishedSurveyPublicationService(),
+            new FixedUserScopeResolver());
         var overview = await service.GetSchoolSurveyOverviewAsync(semesterId, semesterId);
 
         overview.Should().NotBeNull();

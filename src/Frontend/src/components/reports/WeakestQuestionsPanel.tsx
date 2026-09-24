@@ -64,13 +64,13 @@ export const WeakestQuestionsPanel: React.FC<WeakestQuestionsPanelProps> = ({
             <tbody>
               {questions.map((question, index) => (
                 <tr key={question.questionId}>
-                  <td className="catalog-table__index">{index + 1}</td>
+                  <td className="catalog-table__index" style={{ textAlign: 'right' }}>{index + 1}</td>
                   <td>
                     <span className="catalog-cell-primary">{question.questionText}</span>
                   </td>
                   <td>{question.answerScaleName || '—'}</td>
-                  <td>{formatNumber(question.totalAnswers)}</td>
-                  <td style={{ color: scoreColor(question.averageScore) }}>
+                  <td style={{ textAlign: 'right' }}>{formatNumber(question.totalAnswers)}</td>
+                  <td style={{ color: scoreColor(question.averageScore), textAlign: 'right' }}>
                     {question.averageScore > 0 ? formatDecimal(question.averageScore) : '—'}
                   </td>
                   <td style={{ color: scoreColor(question.averageScore) }}>

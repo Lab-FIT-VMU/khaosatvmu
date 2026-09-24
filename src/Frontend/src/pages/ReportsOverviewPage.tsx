@@ -19,7 +19,10 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../auth/authContext';
+import { canAccessTab, TAB_PERMISSION } from '../auth/modulePermissions';
 import { useSemester } from '../context/semesterContext';
+import { seesAllData } from '../auth/roles';
+import { useSurveyPublication } from '../hooks/useSurveyPublication';
 import { useSetBreadcrumbTrail } from '../context/breadcrumbTrail';
 import { DataTable, type Column, type DataTableSortDirection } from '../components/DataTable';
 import { QuestionAnalysisChart } from '../components/QuestionAnalysisChart';
@@ -33,7 +36,7 @@ import { catalogApi } from '../services/catalogApi';
 import type { ExportColumn, ExportSheet, ExportTable } from '../services/exportDataService';
 import { generateQuestionChartImage, getScoreRatingText } from '../services/exportQuestionAnalysisService';
 import { reportApi } from '../services/reportApi';
-import { surveyApi } from '../services/surveyApi';
+import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import {
   buildReportHash,
   parseReportRoute,
@@ -341,6 +344,19 @@ const workspaceLabels: Record<ReportWorkspace, string> = {
   details: 'Tra cứu chi tiết',
 };
 
+/** Thứ tự tab trên thanh tab; tab đầu tiên được phép là nơi đáp khi tab đang mở bị khoá. */
+const REPORT_WORKSPACE_ORDER: readonly ReportWorkspace[] = [
+  'overview',
+  'faculties',
+  'departments',
+  'courses',
+  'comments',
+  'details',
+];
+
+/** Ba tab con trong tab Tổng quan, cùng thứ tự trên màn hình. */
+const REPORT_ANALYSIS_VIEW_ORDER: readonly ReportAnalysisView[] = ['faculties', 'quality', 'criteria'];
+
 /*
   Ba bảng xếp hạng khai cột RIÊNG, không dùng chung một hàm sinh cột nữa.
 
@@ -418,28 +434,28 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
   },
   {
     key: 'responseRate',
-    header: 'Tỷ lệ phản hồi',
+    header: 'Tỷ lệ phản hồi (%)',
     width: '10%',
     numeric: true,
     sortValue: (item) => item.responseRate,
-    filterValue: (item) => `${formatPercent(item.responseRate, 3)}`,
+    filterValue: (item) => `${formatDecimal(item.responseRate, 3)}`,
     render: (item) => (
       <span
         className="catalog-cell-number"
         style={{ color: completionColor(item.responseRate), fontWeight: 700 }}
       >
-        {formatPercent(item.responseRate, 3)}
+        {formatDecimal(item.responseRate, 3)}
       </span>
     ),
   },
   {
     key: 'validRate',
-    header: 'Tỷ lệ phiếu hợp lệ',
+    header: 'Tỷ lệ phiếu hợp lệ (%)',
     width: '10%',
     numeric: true,
     sortValue: (item) => item.validRate,
-    filterValue: (item) => `${formatPercent(item.validRate, 3)}`,
-    render: (item) => <span className="catalog-cell-number">{formatPercent(item.validRate, 3)}</span>,
+    filterValue: (item) => `${formatDecimal(item.validRate, 3)}`,
+    render: (item) => <span className="catalog-cell-number">{formatDecimal(item.validRate, 3)}</span>,
   },
   {
     key: 'averageScore',
@@ -457,6 +473,7 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
   ...(onOpenDetail ? [{
     key: 'actions',
     header: 'Thao tác',
+    align: 'center',
     width: '7%',
     render: (item: RankedUnit) => (
       <button
@@ -482,8 +499,9 @@ const percentExportColumn = (
   width,
   type: 'string',
   align: 'right',
-  // formatPercent dùng dấu phẩy thập phân theo vi-VN, đúng như ô trên màn hình.
-  format: (val: any) => formatPercent(Number(val), 3),
+  // formatDecimal dùng dấu phẩy thập phân theo vi-VN, đúng như ô trên màn hình;
+  // đơn vị % nằm ở tiêu đề cột.
+  format: (val: any) => formatDecimal(Number(val), 3),
 });
 
 const facultyRankExportColumns: ExportColumn<RankedUnit>[] = [
@@ -493,8 +511,8 @@ const facultyRankExportColumns: ExportColumn<RankedUnit>[] = [
   { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number', align: 'right' },
   { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
   { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number', align: 'right' },
-  percentExportColumn('responseRate', 'Tỷ lệ phản hồi', 14),
-  percentExportColumn('validRate', 'Tỷ lệ phiếu hợp lệ', 16),
+  percentExportColumn('responseRate', 'Tỷ lệ phản hồi (%)', 14),
+  percentExportColumn('validRate', 'Tỷ lệ phiếu hợp lệ (%)', 16),
   {
     key: 'averageScore',
     header: 'Điểm trung bình',
@@ -578,28 +596,28 @@ const departmentRankColumns = (onOpenDetail?: (id: number) => void): Column<Rank
   },
   {
     key: 'responseRate',
-    header: 'Tỷ lệ phản hồi',
+    header: 'Tỷ lệ phản hồi (%)',
     width: '8%',
     numeric: true,
     sortValue: (item) => item.responseRate,
-    filterValue: (item) => `${formatPercent(item.responseRate, 3)}`,
+    filterValue: (item) => `${formatDecimal(item.responseRate, 3)}`,
     render: (item) => (
       <span
         className="catalog-cell-number"
         style={{ color: completionColor(item.responseRate), fontWeight: 700 }}
       >
-        {formatPercent(item.responseRate, 3)}
+        {formatDecimal(item.responseRate, 3)}
       </span>
     ),
   },
   {
     key: 'validRate',
-    header: 'Tỷ lệ phiếu hợp lệ',
+    header: 'Tỷ lệ phiếu hợp lệ (%)',
     width: '8%',
     numeric: true,
     sortValue: (item) => item.validRate,
-    filterValue: (item) => `${formatPercent(item.validRate, 3)}`,
-    render: (item) => <span className="catalog-cell-number">{formatPercent(item.validRate, 3)}</span>,
+    filterValue: (item) => `${formatDecimal(item.validRate, 3)}`,
+    render: (item) => <span className="catalog-cell-number">{formatDecimal(item.validRate, 3)}</span>,
   },
   {
     key: 'averageScore',
@@ -617,6 +635,7 @@ const departmentRankColumns = (onOpenDetail?: (id: number) => void): Column<Rank
   ...(onOpenDetail ? [{
     key: 'actions',
     header: 'Thao tác',
+    align: 'center',
     width: '7%',
     render: (item: RankedUnit) => (
       <button
@@ -639,8 +658,8 @@ const departmentRankExportColumns: ExportColumn<RankedUnit>[] = [
   { key: 'responseCount', header: 'Số phiếu đã thu', width: 16, type: 'number', align: 'right' },
   { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
   { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number', align: 'right' },
-  percentExportColumn('responseRate', 'Tỷ lệ phản hồi', 14),
-  percentExportColumn('validRate', 'Tỷ lệ phiếu hợp lệ', 16),
+  percentExportColumn('responseRate', 'Tỷ lệ phản hồi (%)', 14),
+  percentExportColumn('validRate', 'Tỷ lệ phiếu hợp lệ (%)', 16),
   {
     key: 'averageScore',
     header: 'Điểm trung bình',
@@ -857,28 +876,28 @@ const RankedCourseTable: React.FC<{
     },
     {
       key: 'responseRate',
-      header: 'Tỷ lệ phản hồi',
+      header: 'Tỷ lệ phản hồi (%)',
       width: '6%',
       numeric: true,
       sortValue: (item) => item.responseRate,
-      filterValue: (item) => `${formatPercent(item.responseRate, 3)}`,
+      filterValue: (item) => `${formatDecimal(item.responseRate, 3)}`,
       render: (item) => (
         <span
           className="catalog-cell-number"
           style={{ color: completionColor(item.responseRate), fontWeight: 700 }}
         >
-          {formatPercent(item.responseRate, 3)}
+          {formatDecimal(item.responseRate, 3)}
         </span>
       ),
     },
     {
       key: 'validRate',
-      header: 'Tỷ lệ phiếu hợp lệ',
+      header: 'Tỷ lệ phiếu hợp lệ (%)',
       width: '6%',
       numeric: true,
       sortValue: (item) => item.validRate,
-      filterValue: (item) => `${formatPercent(item.validRate, 3)}`,
-      render: (item) => <span className="catalog-cell-number">{formatPercent(item.validRate, 3)}</span>,
+      filterValue: (item) => `${formatDecimal(item.validRate, 3)}`,
+      render: (item) => <span className="catalog-cell-number">{formatDecimal(item.validRate, 3)}</span>,
     },
     {
       key: 'averageScore',
@@ -896,6 +915,7 @@ const RankedCourseTable: React.FC<{
     {
       key: 'actions',
       header: 'Thao tác',
+      align: 'center',
       width: '7 %',
       render: (item) => (
         <button
@@ -932,19 +952,19 @@ const RankedCourseTable: React.FC<{
       { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number' as const, align: 'right' as const },
       {
         key: 'responseRate',
-        header: 'Tỷ lệ phản hồi',
+        header: 'Tỷ lệ phản hồi (%)',
         width: 14,
         type: 'string' as const,
         align: 'right' as const,
-        format: (val: any) => formatPercent(Number(val), 3),
+        format: (val: any) => formatDecimal(Number(val), 3),
       },
       {
         key: 'validRate',
-        header: 'Tỷ lệ phiếu hợp lệ',
+        header: 'Tỷ lệ phiếu hợp lệ (%)',
         width: 16,
         type: 'string' as const,
         align: 'right' as const,
-        format: (val: any) => formatPercent(Number(val), 3),
+        format: (val: any) => formatDecimal(Number(val), 3),
       },
       {
         key: 'averageScore',
@@ -977,7 +997,7 @@ const RankedCourseTable: React.FC<{
 export const ReportsOverviewPage: React.FC = () => {
   const initialRoute = useMemo(() => parseReportRoute(), []);
   const thresholds = useScoringThresholds();
-  const { access } = useAuth();
+  const { access, activeProfile } = useAuth();
   const {
     academicYears,
     activeSemesterId,
@@ -1007,6 +1027,23 @@ export const ReportsOverviewPage: React.FC = () => {
   const canViewReports = access?.permissions.includes('REPORTS_ACCESS') === true;
   const canLoadCatalog = canViewReports;
 
+  // Trưởng khoa, trưởng bộ môn, giảng viên chỉ thấy số của đợt đã phát hành. API báo cáo
+  // lặng lẽ bỏ đợt chưa phát hành nên bảng chỉ trống trơn; phải tự hỏi trạng thái để
+  // nói rõ lý do, giống dòng báo đỏ của trang Bảng dữ liệu khảo sát.
+  const waitsForPublication = !seesAllData(activeProfile?.roleCode);
+
+  // Tab nào hiện do quản trị bật tắt ở trang Phân quyền Module, theo vai trò đang dùng.
+  const allowedWorkspaces = useMemo(
+    () => REPORT_WORKSPACE_ORDER.filter((item) =>
+      canAccessTab(access?.permissions, TAB_PERMISSION.reports[item])),
+    [access?.permissions],
+  );
+  const allowedAnalysisViews = useMemo(
+    () => REPORT_ANALYSIS_VIEW_ORDER.filter((item) =>
+      canAccessTab(access?.permissions, TAB_PERMISSION.reportsOverview[item])),
+    [access?.permissions],
+  );
+
   // Danh sách lựa chọn bộ lọc.
   const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -1021,6 +1058,8 @@ export const ReportsOverviewPage: React.FC = () => {
   const [semesterSurveyId, setSemesterSurveyId] = useState<number | undefined>(
     initialRoute.semesterSurveyId ?? (Number(getActiveSemesterSurveyId()) || undefined),
   );
+  const publication = useSurveyPublication(waitsForPublication ? semesterSurveyId ?? null : null);
+  const resultsNotPublished = publication !== null && !publication.isPublished;
   // Tăng lên sau mỗi lần Cập nhật điểm: các khối số liệu của trang theo dõi số này
   // để nạp lại, các khối con dùng nó làm key để dựng lại từ đầu.
   const [reloadToken, setReloadToken] = useState(0);
@@ -1329,6 +1368,20 @@ export const ReportsOverviewPage: React.FC = () => {
       window.history.replaceState(null, '', canonicalHash);
     }
   }, [lecturer, routeFromState, scope, surveyId, workspace]);
+
+  // Đường dẫn cũ hay nút quay lại có thể trỏ vào một tab vai trò này bị khoá: đưa về
+  // tab đầu tiên được mở. Trang chi tiết lớp, giảng viên, phạm vi không nằm trên thanh
+  // tab nên để nguyên — chúng mượn `workspace` chỉ để biết khi đóng thì về đâu.
+  useEffect(() => {
+    if (surveyId !== null || lecturer !== null || scope !== null) return;
+    if (allowedWorkspaces.length === 0 || allowedWorkspaces.includes(workspace)) return;
+    setWorkspace(allowedWorkspaces[0]);
+  }, [allowedWorkspaces, lecturer, scope, surveyId, workspace]);
+
+  useEffect(() => {
+    if (allowedAnalysisViews.length === 0 || allowedAnalysisViews.includes(analysisView)) return;
+    setAnalysisView(allowedAnalysisViews[0]);
+  }, [allowedAnalysisViews, analysisView]);
 
   // Nạp danh mục để dựng bộ lọc.
   useEffect(() => {
@@ -1772,13 +1825,13 @@ export const ReportsOverviewPage: React.FC = () => {
         key: 'code',
         header: 'Mã',
         width: 8,
-        align: 'center',
+        align: 'left',
         format: (_value: any, row: QuestionRating) => `C${row.questionOrder}`,
       },
       { key: 'questionText', header: 'Nội dung câu hỏi khảo sát', width: 60 },
       ...levels.map((level) => ({
         key: `level-${level.value}`,
-        header: `Mức ${level.value}`,
+        header: `Số lượng lựa chọn ${level.value}`,
         width: 16,
         align: 'right' as const,
         format: (_value: any, row: QuestionRating) => {
@@ -1868,10 +1921,10 @@ export const ReportsOverviewPage: React.FC = () => {
                 { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 14, type: 'number', align: 'right' },
                 {
                   key: 'validResponseRate',
-                  header: 'Tỷ lệ phiếu hợp lệ',
+                  header: 'Tỷ lệ phiếu hợp lệ (%)',
                   width: 14,
                   align: 'right',
-                  format: (value: any) => formatPercent(Number(value), 3),
+                  format: (value: any) => formatDecimal(Number(value), 3),
                 },
                 {
                   key: 'averageScore',
@@ -1911,8 +1964,8 @@ export const ReportsOverviewPage: React.FC = () => {
           columns: [
             { key: 'departmentName', header: 'Bộ môn', width: 24 },
             { key: 'courseName', header: 'Học phần', width: 30 },
-            { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'center' },
-            { key: 'sectionName', header: 'Lớp học phần', width: 14, align: 'center' },
+            { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'left' },
+            { key: 'sectionName', header: 'Lớp học phần', width: 14, align: 'left' },
             { key: 'lecturerName', header: 'Giảng viên', width: 24 },
             { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 12, type: 'number', align: 'right' },
             { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number', align: 'right' },
@@ -1920,19 +1973,19 @@ export const ReportsOverviewPage: React.FC = () => {
             { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 16, type: 'number', align: 'right' },
             {
               key: 'responseRate',
-              header: 'Tỷ lệ phản hồi',
+              header: 'Tỷ lệ phản hồi (%)',
               width: 14,
               align: 'right',
               format: (_value: any, row: SurveyResultDetail) =>
-                formatPercent(responseRateOf(row.responseCount, row.classSize), 3),
+                formatDecimal(responseRateOf(row.responseCount, row.classSize), 3),
             },
             {
               key: 'validRate',
-              header: 'Tỷ lệ phiếu hợp lệ',
+              header: 'Tỷ lệ phiếu hợp lệ (%)',
               width: 14,
               align: 'right',
               format: (_value: any, row: SurveyResultDetail) =>
-                formatPercent(validRateOf(row.validResponseCount, row.responseCount), 3),
+                formatDecimal(validRateOf(row.validResponseCount, row.responseCount), 3),
             },
             {
               key: 'averageScore',
@@ -2065,6 +2118,8 @@ export const ReportsOverviewPage: React.FC = () => {
   const isLecturerMode = !isSurveyMode && lecturer !== null;
   // Trang chi tiết theo phạm vi đứng riêng một cấp, không nằm trong thanh tab.
   const isScopeMode = !isSurveyMode && !isLecturerMode && scope !== null;
+  // Tab đang mở mà bị khoá thì chưa vẽ gì, chờ hiệu ứng ở trên chuyển sang tab được mở.
+  const activeWorkspace = allowedWorkspaces.includes(workspace) ? workspace : null;
 
   const renderQuestionAnalysis = (questions: LecturerPerformanceReport['questionRatings']) => {
     const lecturerExportMetadata: QuestionAnalysisExportMetadata = {
@@ -2232,7 +2287,7 @@ export const ReportsOverviewPage: React.FC = () => {
         Dòng phụ "x/y hợp lệ" bỏ đi vì đã có cột Số phiếu hợp lệ riêng.
       */
       key: 'responseRate',
-      header: 'Tỷ lệ phản hồi',
+      header: 'Tỷ lệ phản hồi (%)',
       sortValue: (item) => responseRateOf(item.responseCount, item.classSize),
       filterValue: (item) => String(Math.round(responseRateOf(item.responseCount, item.classSize))),
       numeric: true,
@@ -2244,21 +2299,21 @@ export const ReportsOverviewPage: React.FC = () => {
             className="catalog-cell-number"
             style={{ color: completionColor(rate), fontWeight: 700 }}
           >
-            {formatPercent(rate, 3)}
+            {formatDecimal(rate, 3)}
           </span>
         );
       },
     },
     {
       key: 'validRate',
-      header: 'Tỷ lệ phiếu hợp lệ',
+      header: 'Tỷ lệ phiếu hợp lệ (%)',
       sortValue: (item) => validRateOf(item.validResponseCount, item.responseCount),
-      filterValue: (item) => `${formatPercent(validRateOf(item.validResponseCount, item.responseCount), 3)}`,
+      filterValue: (item) => `${formatDecimal(validRateOf(item.validResponseCount, item.responseCount), 3)}`,
       numeric: true,
       width: '5%',
       render: (item) => (
         <span className="catalog-cell-number">
-          {formatPercent(validRateOf(item.validResponseCount, item.responseCount), 3)}
+          {formatDecimal(validRateOf(item.validResponseCount, item.responseCount), 3)}
         </span>
       ),
     },
@@ -2278,6 +2333,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'actions',
       header: 'Thao tác',
+      align: 'center',
       width: '7%',
       render: (item) => (
         <button
@@ -2361,7 +2417,7 @@ export const ReportsOverviewPage: React.FC = () => {
     },
     {
       key: 'completionRate',
-      header: 'Hoàn thành',
+      header: 'Hoàn thành (%)',
       width: '15%',
       numeric: true,
       sortValue: (item) => item.completionRate,
@@ -2373,7 +2429,7 @@ export const ReportsOverviewPage: React.FC = () => {
               <span style={{ width: `${Math.min(100, item.completionRate)}%`, background: completionColor(item.completionRate) }} />
             </span>
             <span style={{ color: completionColor(item.completionRate), fontWeight: 700, fontSize: 13 }}>
-              {formatPercent(item.completionRate, 3)}
+              {formatDecimal(item.completionRate, 3)}
             </span>
           </span>
           <span className="catalog-secondary-value reports-progress-sub">
@@ -2398,6 +2454,7 @@ export const ReportsOverviewPage: React.FC = () => {
     {
       key: 'actions',
       header: 'Thao tác',
+      align: 'center',
       width: '11%',
       render: (item) => (
         <button
@@ -2480,6 +2537,13 @@ export const ReportsOverviewPage: React.FC = () => {
       {/* Ngưỡng quyết định lớp nào được gộp vào mọi con số của trang này, nên in
           thẳng ra thay vì để người xem đoán vì sao thiếu lớp. */}
       <ScoringConfigNote />
+
+      {resultsNotPublished && (
+        <div className="operations-feedback operations-feedback--error" role="alert">
+          <CircleAlert aria-hidden="true" />
+          <span>{surveyErrorMessage('SURVEY_RESULTS_NOT_PUBLISHED')}</span>
+        </div>
+      )}
 
       {/* Breadcrumb chỉ có việc khi đã đi sâu vào giảng viên / bài khảo sát; ở mức
           danh sách nó chỉ lặp lại đúng những gì thanh tab và ô chọn kỳ đã nói. */}
@@ -2592,21 +2656,21 @@ export const ReportsOverviewPage: React.FC = () => {
                   // "Hoàn thành" dạng thanh tiến độ và cột Thao tác (là nút bấm): cột
                   // số của thanh đó vẫn xuất kèm con số tỷ lệ y như đang hiển thị.
                   columns: [
-                    { key: 'courseCode', header: 'Mã Học phần', width: 12, align: 'center' as const },
+                    { key: 'courseCode', header: 'Mã Học phần', width: 12, align: 'left' as const },
                     { key: 'courseName', header: 'Tên học phần', width: 30 },
-                    { key: 'sectionName', header: 'Nhóm lớp', width: 12, align: 'center' as const },
+                    { key: 'sectionName', header: 'Nhóm lớp', width: 12, align: 'left' as const },
                     { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 12, type: 'number' as const, align: 'right' as const },
                     { key: 'responseCount', header: 'Số phiếu đã thu', width: 12, type: 'number' as const, align: 'right' as const },
                     { key: 'invalidResponseCount', header: 'Phiếu lỗi', width: 10, type: 'number' as const, align: 'right' as const },
                     {
                       key: 'completionRate',
-                      header: 'Hoàn thành',
+                      header: 'Hoàn thành (%)',
                       width: 14,
                       type: 'string' as const,
                       align: 'right' as const,
                       // Lấy thẳng con số backend trả về, không tự tính lại: màn hình
                       // cũng in đúng con số đó với 3 chữ số thập phân.
-                      format: (val: any) => formatPercent(Number(val ?? 0), 3),
+                      format: (val: any) => formatDecimal(Number(val ?? 0), 3),
                     },
                     {
                       key: 'averageScore',
@@ -2644,86 +2708,105 @@ export const ReportsOverviewPage: React.FC = () => {
       {!isLecturerMode && !isSurveyMode && !isScopeMode && (
         <div className="reports-overview">
           <nav className="reports-workspace-tabs" aria-label="Chế độ xem báo cáo" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspace === 'overview'}
-              className={`reports-workspace-tab${workspace === 'overview' ? ' is-active' : ''}`}
-              title="Chỉ số và xu hướng toàn trường"
-              onClick={() => navigateToWorkspace('overview')}
-            >
-              <LayoutDashboard className="operation-icon" aria-hidden="true" />
-              <strong>Tổng quan</strong>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspace === 'faculties'}
-              className={`reports-workspace-tab${workspace === 'faculties' ? ' is-active' : ''}`}
-              onClick={() => navigateToWorkspace('faculties')}
-            >
-              <Building2 className="operation-icon" aria-hidden="true" />
-              <strong>Theo Khoa/Viện</strong>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspace === 'departments'}
-              className={`reports-workspace-tab${workspace === 'departments' ? ' is-active' : ''}`}
-              onClick={() => navigateToWorkspace('departments')}
-            >
-              <Network className="operation-icon" aria-hidden="true" />
-              <strong>Theo Bộ môn</strong>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspace === 'courses'}
-              className={`reports-workspace-tab${workspace === 'courses' ? ' is-active' : ''}`}
-              onClick={() => navigateToWorkspace('courses')}
-            >
-              <BookOpen className="operation-icon" aria-hidden="true" />
-              <strong>Theo Học phần</strong>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspace === 'comments'}
-              className={`reports-workspace-tab${workspace === 'comments' ? ' is-active' : ''}`}
-              title="Phân tích và tổng hợp ý kiến mở do sinh viên đóng góp"
-              onClick={() => navigateToWorkspace('comments')}
-            >
-              <MessageSquareText className="operation-icon" aria-hidden="true" />
-              <strong>Phân tích ý kiến mở</strong>
-            </button>
+            {allowedWorkspaces.includes('overview') && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace === 'overview'}
+                className={`reports-workspace-tab${workspace === 'overview' ? ' is-active' : ''}`}
+                title="Chỉ số và xu hướng toàn trường"
+                onClick={() => navigateToWorkspace('overview')}
+              >
+                <LayoutDashboard className="operation-icon" aria-hidden="true" />
+                <strong>Tổng quan</strong>
+              </button>
+            )}
+            {allowedWorkspaces.includes('faculties') && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace === 'faculties'}
+                className={`reports-workspace-tab${workspace === 'faculties' ? ' is-active' : ''}`}
+                onClick={() => navigateToWorkspace('faculties')}
+              >
+                <Building2 className="operation-icon" aria-hidden="true" />
+                <strong>Theo Khoa/Viện</strong>
+              </button>
+            )}
+            {allowedWorkspaces.includes('departments') && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace === 'departments'}
+                className={`reports-workspace-tab${workspace === 'departments' ? ' is-active' : ''}`}
+                onClick={() => navigateToWorkspace('departments')}
+              >
+                <Network className="operation-icon" aria-hidden="true" />
+                <strong>Theo Bộ môn</strong>
+              </button>
+            )}
+            {allowedWorkspaces.includes('courses') && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace === 'courses'}
+                className={`reports-workspace-tab${workspace === 'courses' ? ' is-active' : ''}`}
+                onClick={() => navigateToWorkspace('courses')}
+              >
+                <BookOpen className="operation-icon" aria-hidden="true" />
+                <strong>Theo Học phần</strong>
+              </button>
+            )}
+            {allowedWorkspaces.includes('comments') && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace === 'comments'}
+                className={`reports-workspace-tab${workspace === 'comments' ? ' is-active' : ''}`}
+                title="Phân tích và tổng hợp ý kiến mở do sinh viên đóng góp"
+                onClick={() => navigateToWorkspace('comments')}
+              >
+                <MessageSquareText className="operation-icon" aria-hidden="true" />
+                <strong>Phân tích ý kiến mở</strong>
+              </button>
+            )}
             {/* Ba tab trên là ba cách gộp số liệu; tab này là bảng từng dòng lớp để
                 lọc và mở chi tiết nên đứng cuối cùng. */}
-            <button
-              type="button"
-              role="tab"
-              aria-selected={workspace === 'details'}
-              className={`reports-workspace-tab${workspace === 'details' ? ' is-active' : ''}`}
-              title="Lọc và mở kết quả từng lớp"
-              onClick={() => navigateToWorkspace('details')}
-            >
-              <ListFilter className="operation-icon" aria-hidden="true" />
-              <strong>Tra cứu chi tiết</strong>
-            </button>
+            {allowedWorkspaces.includes('details') && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={workspace === 'details'}
+                className={`reports-workspace-tab${workspace === 'details' ? ' is-active' : ''}`}
+                title="Lọc và mở kết quả từng lớp"
+                onClick={() => navigateToWorkspace('details')}
+              >
+                <ListFilter className="operation-icon" aria-hidden="true" />
+                <strong>Tra cứu chi tiết</strong>
+              </button>
+            )}
           </nav>
 
+          {allowedWorkspaces.length === 0 && (
+            <div className="reports-chart-empty" role="status" style={{ padding: '32px 16px', textAlign: 'center', color: '#68737d' }}>
+              Vai trò này chưa được mở tab nào trong Thống kê &amp; Báo cáo. Liên hệ Quản trị viên để được cấp quyền.
+            </div>
+          )}
+
           {/* Bảng tổng quan toàn trường (executive dashboard) */}
-          {workspace === 'overview' && selectedSemesterId !== undefined && (
+          {activeWorkspace === 'overview' && selectedSemesterId !== undefined && (
             <SchoolSurveyOverview
               key={`${selectedSemesterId}-${reloadToken}`}
               semesterId={selectedSemesterId}
               semesterSurveyId={semesterSurveyId}
               analysisView={analysisView}
               onAnalysisViewChange={changeAnalysisView}
+              allowedAnalysisViews={allowedAnalysisViews}
               onDrillDown={handleOverviewDrillDown}
             />
           )}
 
-          {workspace === 'faculties' && (
+          {activeWorkspace === 'faculties' && (
             <div className="reports-aggregate-workspace" role="tabpanel">
               <RankedUnitTable
                 title="Kết quả theo Khoa/Viện"
@@ -2740,7 +2823,7 @@ export const ReportsOverviewPage: React.FC = () => {
             </div>
           )}
 
-          {workspace === 'departments' && (
+          {activeWorkspace === 'departments' && (
             <div className="reports-aggregate-workspace" role="tabpanel">
               <RankedUnitTable
                 title="Kết quả theo Bộ môn"
@@ -2756,7 +2839,7 @@ export const ReportsOverviewPage: React.FC = () => {
             </div>
           )}
 
-          {workspace === 'courses' && (
+          {activeWorkspace === 'courses' && (
             <div className="reports-aggregate-workspace" role="tabpanel">
               <RankedCourseTable
                 data={courseRankings}
@@ -2766,7 +2849,7 @@ export const ReportsOverviewPage: React.FC = () => {
             </div>
           )}
 
-          {workspace === 'comments' && (
+          {activeWorkspace === 'comments' && (
             selectedSemesterId !== undefined ? (
               <OpenCommentAnalysis
                 key={`${selectedSemesterId}-${semesterSurveyId}-${reloadToken}`}
@@ -2797,7 +2880,7 @@ export const ReportsOverviewPage: React.FC = () => {
             "Đã thu nộp" không có cột nào cùng tên, mà "Đã thu nộp" lại đang cộng
             phiếu hợp lệ chứ không phải phiếu đã thu.
           */}
-          {workspace === 'details' && (
+          {activeWorkspace === 'details' && (
           <div id="reports-detail-workspace" className="reports-kpi-band" aria-label="Tổng quan kết quả đang lọc">
             <span className="reports-kpi-item" title="Số lớp học phần trong bộ lọc">
               Số lớp khảo sát
@@ -2828,7 +2911,7 @@ export const ReportsOverviewPage: React.FC = () => {
 
           {/* Tổng hợp kết quả theo Khoa / Viện và Bộ môn */}
           {/* Bảng kết quả chi tiết */}
-          {workspace === 'details' && (
+          {activeWorkspace === 'details' && (
           <section
             className="reports-table-section"
             id="reports-results"
@@ -2867,8 +2950,8 @@ export const ReportsOverviewPage: React.FC = () => {
                       { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
                       { key: 'departmentName', header: 'Bộ môn', width: 20 },
                       { key: 'courseName', header: 'Học phần', width: 28 },
-                      { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'center' as const },
-                      { key: 'sectionName', header: 'Lớp học phần', width: 10, align: 'center' as const },
+                      { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'left' as const },
+                      { key: 'sectionName', header: 'Lớp học phần', width: 10, align: 'left' as const },
                       { key: 'lecturerName', header: 'Giảng viên', width: 22 },
                       { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
                       { key: 'responseCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
@@ -2876,19 +2959,19 @@ export const ReportsOverviewPage: React.FC = () => {
                       { key: 'invalidResponseCount', header: 'Số phiếu không hợp lệ', width: 18, type: 'number' as const, align: 'right' as const },
                       {
                         key: 'responseRate',
-                        header: 'Tỷ lệ phản hồi',
+                        header: 'Tỷ lệ phản hồi (%)',
                         width: 14,
                         type: 'string' as const,
                         align: 'right' as const,
-                        format: (val: any) => formatPercent(Number(val), 3),
+                        format: (val: any) => formatDecimal(Number(val), 3),
                       },
                       {
                         key: 'validRate',
-                        header: 'Tỷ lệ phiếu hợp lệ',
+                        header: 'Tỷ lệ phiếu hợp lệ (%)',
                         width: 16,
                         type: 'string' as const,
                         align: 'right' as const,
-                        format: (val: any) => formatPercent(Number(val), 3),
+                        format: (val: any) => formatDecimal(Number(val), 3),
                       },
                       {
                         key: 'averageScore',
@@ -2906,7 +2989,7 @@ export const ReportsOverviewPage: React.FC = () => {
                     title: '2. DANH SÁCH LỚP CÓ ĐIỂM TRUNG BÌNH THẤP (< 3,50)',
                     subtitle: 'Các lớp cần ban chủ nhiệm khoa và bộ môn phối hợp rà soát',
                     columns: [
-                      { key: 'sectionCode', header: 'Mã lớp HP', width: 14, align: 'center' as const },
+                      { key: 'sectionCode', header: 'Mã lớp HP', width: 14, align: 'left' as const },
                       { key: 'courseName', header: 'Tên học phần', width: 28 },
                       { key: 'lecturerName', header: 'Giảng viên', width: 22 },
                       { key: 'departmentName', header: 'Bộ môn', width: 20 },

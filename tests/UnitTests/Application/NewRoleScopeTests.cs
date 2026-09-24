@@ -69,13 +69,11 @@ public class NewRoleScopeTests
         broken.CanAddSurveyScope.Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(RoleCodes.DepartmentManager)]
-    [InlineData(RoleCodes.DeputyDepartmentManager)]
-    public void DepartmentLeadershipRoles_ScopeByDepartmentAndHaveTheSameActions(string roleCode)
+    [Fact]
+    public void DepartmentManager_ScopesByDepartment()
     {
         var departmentManager = new UserScope(
-            roleCode, 10, 20, 30, SeesEverything: false);
+            RoleCodes.DepartmentManager, 10, 20, 30, SeesEverything: false);
 
         departmentManager.SeesWholeFaculty.Should().BeFalse();
         departmentManager.SeesNothing.Should().BeFalse();
@@ -86,8 +84,8 @@ public class NewRoleScopeTests
 
     [Theory]
     [InlineData(RoleCodes.BoardOfDirectors, "Ban Giám hiệu", "GH")]
-    [InlineData(RoleCodes.FacultyManager, "Trưởng khoa/viện", "KV")]
-    [InlineData(RoleCodes.DeputyDepartmentManager, "Phó trưởng bộ môn", "PB")]
+    [InlineData(RoleCodes.FacultyManager, "Quản lý khoa", "KV")]
+    [InlineData(RoleCodes.DepartmentManager, "Quản lý bộ môn", "BM")]
     public void ProfileNaming_CoversNewRoles(string roleCode, string name, string suffix)
     {
         // Thiếu dòng nào ở đây là cấp hồ sơ cho vai trò đó ném KeyNotFoundException.

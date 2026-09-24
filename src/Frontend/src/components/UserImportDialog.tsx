@@ -169,7 +169,7 @@ export function UserImportDialog({ isOpen, onClose, onImported }: UserImportDial
                     <tbody>
                       {rows.map((row) => (
                         <tr key={row.rowNumber}>
-                          <td>{row.rowNumber}</td>
+                          <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                           <td>{row.email || <span className="admin-import-invalid">Thiếu email</span>}</td>
                           <td>{row.displayName || 'Không cung cấp'}</td>
                         </tr>
@@ -214,7 +214,7 @@ export function UserImportDialog({ isOpen, onClose, onImported }: UserImportDial
                   <tbody>
                     {failedItems.map((item) => (
                       <tr key={`${item.rowNumber}-${item.email}`}>
-                        <td>{item.rowNumber}</td>
+                        <td style={{ textAlign: 'right' }}>{item.rowNumber}</td>
                         <td>{item.email || 'Không có'}</td>
                         <td>{importErrorMessages[item.errorCode ?? ''] ?? 'Dữ liệu không hợp lệ'}</td>
                       </tr>

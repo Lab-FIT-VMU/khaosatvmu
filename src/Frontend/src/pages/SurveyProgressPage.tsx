@@ -15,10 +15,11 @@ import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import type { CourseSectionSurvey, SemesterSurvey } from '../types';
-import {
-  COMPLETED_COMPLETION_RATE,
-  LAGGING_COMPLETION_RATE,
-} from '../utils/reportThresholds';
+import { toast } from 'sonner';
+import { useAuth } from '../auth/authContext';
+import { isUnrestrictedRole } from '../auth/roles';
+import { COMPLETED_COMPLETION_RATE } from '../utils/reportThresholds';
+import { surveyApi } from '../services/surveyApi';
 import '../styles/survey-operations.css';
 // Thanh chọn học kỳ / đợt dùng .statistics-toolbar nằm trong tệp này.
 import '../styles/survey-statistics.css';
@@ -247,14 +248,14 @@ interface ProgressItem {
   actualCount: number;
   /** Số phiếu đã thu chia tổng số phiếu phải thu. */
   rate: number;
-  status: 'Đạt chỉ tiêu' | 'Đang thu' | 'Chậm tiến độ';
+  status: 'Đạt chỉ tiêu' | 'Đang thu' | 'Không đạt chỉ tiêu';
 }
 
 const progressColumns = [
   { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
   { key: 'departmentName', header: 'Bộ môn', width: 20 },
   { key: 'name', header: 'Học phần', width: 28 },
-  { key: 'code', header: 'Lớp học phần', width: 14, align: 'center' as const },
+  { key: 'code', header: 'Lớp học phần', width: 14, align: 'left' as const },
   { key: 'lecturerName', header: 'Giảng viên', width: 24 },
   { key: 'targetCount', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
   { key: 'actualCount', header: 'Số phiếu đã thu', width: 14, type: 'number' as const, align: 'right' as const },
@@ -265,13 +266,13 @@ const progressColumns = [
     // Không có số lẻ: bảng trên màn hình in tỷ lệ đã làm tròn thành số nguyên ("77%"),
     // để '0.000"%"' thì tệp lại hiện "77.000%" — hai nơi nói hai con số khác nhau.
     key: 'rate',
-    header: 'Tỷ lệ phản hồi',
+    header: 'Tỷ lệ phản hồi (%)',
     width: 12,
     type: 'number' as const,
     align: 'right' as const,
-    numberFormat: '0"%"',
+    numberFormat: '0',
   },
-  { key: 'status', header: 'Trạng thái', width: 14, align: 'center' as const },
+  { key: 'status', header: 'Trạng thái', width: 14, align: 'left' as const },
 ];
 
 export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
@@ -288,6 +289,84 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
   } = useSemester();
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>(getActiveSemesterSurveyId);
   const [search, setSearch] = useState('');
+  /**
+   * Chỉ tiêu tỷ lệ phản hồi của RIÊNG trang này, lưu trên máy chủ và dùng chung cho mọi
+   * người xem: chỉ quyết định nhãn trạng thái, không đụng tới ngưỡng tính điểm hay trang
+   * nào khác. Chỉ quản trị hệ thống và quản trị khảo sát được đổi.
+   */
+  const { activeProfile } = useAuth();
+  const canSetTarget = isUnrestrictedRole(activeProfile?.roleCode);
+  const [targetRate, setTargetRate] = useState<number>(COMPLETED_COMPLETION_RATE);
+  /** Số đang lưu trên máy chủ, để biết rời ô có cần lưu không và lưu hỏng thì trả về đâu. */
+  const [savedTargetRate, setSavedTargetRate] = useState<number>(COMPLETED_COMPLETION_RATE);
+  // Chữ đang gõ trong ô, tách khỏi số đang áp: xoá trắng ô để gõ lại thì bảng không nhảy
+  // nhãn theo từng phím, ô chưa hợp lệ thì vẫn giữ chỉ tiêu cũ.
+  const [targetRateInput, setTargetRateInput] = useState<string>(String(COMPLETED_COMPLETION_RATE));
+  /** Đợt đã hết thời gian thu phiếu VÀ đã phát hành điểm: không còn thu thêm được nữa. */
+  const [collectionClosed, setCollectionClosed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    surveyApi
+      .progressTarget()
+      .then(({ responseRate }) => {
+        if (cancelled) return;
+        setTargetRate(responseRate);
+        setSavedTargetRate(responseRate);
+        setTargetRateInput(String(responseRate));
+      })
+      .catch(() => {
+        // Không đọc được thì dùng mặc định của hệ thống.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Gõ tới đâu nhãn trên bảng đổi tới đó để quản trị xem trước; chỉ lưu khi rời ô.
+  const changeTargetRateInput = (value: string) => {
+    setTargetRateInput(value);
+    const next = Number(value);
+    if (value.trim() === '' || !Number.isFinite(next) || next <= 0 || next > 100) return;
+    setTargetRate(next);
+  };
+
+  const saveTargetRate = async () => {
+    // Rời ô khi đang để trống hay gõ sai thì trả ô về chỉ tiêu đang áp.
+    setTargetRateInput(String(targetRate));
+    if (targetRate === savedTargetRate) return;
+    try {
+      const saved = await surveyApi.updateProgressTarget(targetRate);
+      setSavedTargetRate(saved.responseRate);
+      toast.success('Đã lưu chỉ tiêu tỷ lệ phản hồi', {
+        description: `Lớp có tỷ lệ phản hồi từ ${saved.responseRate}% trở lên được gắn nhãn Đạt chỉ tiêu.`,
+      });
+    } catch {
+      setTargetRate(savedTargetRate);
+      setTargetRateInput(String(savedTargetRate));
+      toast.error('Không lưu được chỉ tiêu tỷ lệ phản hồi');
+    }
+  };
+
+  useEffect(() => {
+    setCollectionClosed(false);
+    if (!selectedSurveyId) return;
+    let cancelled = false;
+    surveyApi
+      .surveyPublication(Number(selectedSurveyId))
+      .then((publication) => {
+        if (!cancelled) setCollectionClosed(publication.isPublished && publication.hasEnded);
+      })
+      .catch(() => {
+        // Không đọc được thì coi như đợt còn mở: chỉ mất nhãn Không đạt chỉ tiêu.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSurveyId]);
+
+  /** Nhãn của lớp chưa tới chỉ tiêu: còn thu được thì "Đang thu", hết đợt thì "Không đạt". */
+  const pendingStatus: ProgressItem['status'] = collectionClosed ? 'Không đạt chỉ tiêu' : 'Đang thu';
 
   const semesterOptions = useMemo(
     () =>
@@ -335,14 +414,12 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
         targetCount: section.classSize,
         actualCount: section.responseCount,
         rate,
-        status: rate >= COMPLETED_COMPLETION_RATE
-          ? 'Đạt chỉ tiêu'
-          : rate >= LAGGING_COMPLETION_RATE
-            ? 'Đang thu'
-            : 'Chậm tiến độ',
+        // Chỉ hai nấc theo chỉ tiêu đặt ở ô trên thanh công cụ. Đợt đã kết thúc và
+        // phát hành điểm thì lớp chưa tới chỉ tiêu không còn "đang thu" nữa.
+        status: rate >= targetRate ? 'Đạt chỉ tiêu' : pendingStatus,
       };
     });
-  }, [displayedSections]);
+  }, [displayedSections, targetRate, pendingStatus]);
 
   // Calculate Overall Progress Metrics
   const totalTarget = progressItems.reduce((acc, curr) => acc + curr.targetCount, 0);
@@ -350,7 +427,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
   const overallRate = Math.round((totalActual / (totalTarget || 1)) * 100);
 
   const completedCount = progressItems.filter((i) => i.status === 'Đạt chỉ tiêu').length;
-  const laggingCount = progressItems.filter((i) => i.status === 'Chậm tiến độ').length;
+  const pendingCount = progressItems.length - completedCount;
   const openCommentCount = displayedSections.reduce(
     (total, section) => total + (Number(section.openCommentCount) || 0),
     0
@@ -367,7 +444,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
   );
 
   const exportConfig = useMemo(() => {
-    const laggingItems = progressItems.filter((i) => i.status === 'Chậm tiến độ');
+    const pendingItems = progressItems.filter((i) => i.status !== 'Đạt chỉ tiêu');
     const completedItems = progressItems.filter((i) => i.status === 'Đạt chỉ tiêu');
 
     return {
@@ -381,11 +458,12 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
         'Tổng số lớp khảo sát': progressItems.length,
         'Tổng số phiếu phải thu': totalTarget,
         'Số phiếu đã thu': `${totalActual} (đạt ${overallRate}%)`,
-        [`Lớp đạt chỉ tiêu (≥${COMPLETED_COMPLETION_RATE}%)`]: completedCount,
-        [`Lớp chậm tiến độ (<${LAGGING_COMPLETION_RATE}%)`]: laggingCount,
+        [`Lớp đạt chỉ tiêu (≥${targetRate}%)`]: completedCount,
+        [`Lớp ${pendingStatus.toLowerCase()} (<${targetRate}%)`]: pendingCount,
       },
       summaryNotes: [
         'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu.',
+        `Chỉ tiêu tỷ lệ phản hồi của báo cáo này: ${targetRate}%, chỉ dùng để gắn nhãn trạng thái.`,
         'Báo cáo này chỉ theo dõi tiến độ thu phiếu, không xét phiếu hợp lệ hay bị bộ lọc loại.',
       ],
       sheets: [
@@ -397,18 +475,26 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
           columns: progressColumns,
           data: filtered,
         },
-        {
-          sheetName: 'Lop cham tien do',
-          title: `2. DANH SÁCH LỚP CHẬM TIẾN ĐỘ CẦN ĐÔN ĐỐC (${laggingItems.length} LỚP)`,
-          subtitle: `Các lớp có tỷ lệ phản hồi dưới ${LAGGING_COMPLETION_RATE}% - cần gửi thông báo nhắc nhở`,
-          columns: progressColumns,
-          data: laggingItems,
-          summaryNotes: ['Đề nghị các Khoa/Viện và Bộ môn thông báo đến giảng viên nhắc nhở sinh viên tham gia khảo sát.'],
-        },
+        collectionClosed
+          ? {
+            sheetName: 'Lop khong dat chi tieu',
+            title: `2. DANH SÁCH LỚP KHÔNG ĐẠT CHỈ TIÊU (${pendingItems.length} LỚP)`,
+            subtitle: `Đợt đã kết thúc và phát hành điểm, các lớp có tỷ lệ phản hồi dưới ${targetRate}%`,
+            columns: progressColumns,
+            data: pendingItems,
+          }
+          : {
+            sheetName: 'Lop dang thu',
+            title: `2. DANH SÁCH LỚP ĐANG THU CẦN ĐÔN ĐỐC (${pendingItems.length} LỚP)`,
+            subtitle: `Các lớp có tỷ lệ phản hồi dưới ${targetRate}% - cần gửi thông báo nhắc nhở`,
+            columns: progressColumns,
+            data: pendingItems,
+            summaryNotes: ['Đề nghị các Khoa/Viện và Bộ môn thông báo đến giảng viên nhắc nhở sinh viên tham gia khảo sát.'],
+          },
         {
           sheetName: 'Lop da hoan thanh',
           title: `3. DANH SÁCH LỚP ĐẠT CHỈ TIÊU XUẤT SẮC (${completedItems.length} LỚP)`,
-          subtitle: `Các lớp đã đạt tỷ lệ phản hồi từ ${COMPLETED_COMPLETION_RATE}% trở lên`,
+          subtitle: `Các lớp đã đạt tỷ lệ phản hồi từ ${targetRate}% trở lên`,
           columns: progressColumns,
           data: completedItems,
         },
@@ -421,7 +507,10 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
     totalActual,
     overallRate,
     completedCount,
-    laggingCount,
+    pendingCount,
+    pendingStatus,
+    collectionClosed,
+    targetRate,
     selectedSurvey?.surveyName,
     activeSemesterLabel,
   ]);
@@ -471,7 +560,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
       width: '5%',
       filterValue: (item) => String(item.targetCount),
       numeric: true,
-      render: (item) => <span className="operations-primary-text">{item.targetCount}</span>,
+      render: (item) => <span className="operations-primary-text" style={{ justifyContent: 'flex-end' }}>{item.targetCount}</span>,
     },
     {
       key: 'actualCount',
@@ -479,41 +568,36 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
       width: '7%',
       filterValue: (item) => String(item.actualCount),
       numeric: true,
-      render: (item) => <span className="operations-primary-text">{item.actualCount}</span>,
+      render: (item) => <span className="operations-primary-text" style={{ justifyContent: 'flex-end' }}>{item.actualCount}</span>,
     },
     {
       key: 'progress',
-      header: 'Tỷ lệ phản hồi',
+      header: 'Tỷ lệ phản hồi (%)',
       width: '10%',
       filterValue: (item) => String(item.rate),
       numeric: true,
       quickFilters: [
         {
-          label: `Đạt chỉ tiêu (≥${COMPLETED_COMPLETION_RATE}%)`,
-          match: (value) => Number(value) >= COMPLETED_COMPLETION_RATE,
+          label: `Đạt chỉ tiêu (≥${targetRate}%)`,
+          match: (value) => Number(value) >= targetRate,
         },
         {
-          label: `Đang thu (${LAGGING_COMPLETION_RATE}-${COMPLETED_COMPLETION_RATE - 1}%)`,
-          match: (value) =>
-            Number(value) >= LAGGING_COMPLETION_RATE
-            && Number(value) < COMPLETED_COMPLETION_RATE,
-        },
-        {
-          label: `Chậm tiến độ (<${LAGGING_COMPLETION_RATE}%)`,
-          match: (value) => Number(value) < LAGGING_COMPLETION_RATE,
+          label: `${pendingStatus} (<${targetRate}%)`,
+          match: (value) => Number(value) < targetRate,
         },
       ],
       render: (item) => {
-        const progressClass = item.rate >= COMPLETED_COMPLETION_RATE
+        // Thanh đỏ (lớp mặc định) chỉ dành cho lớp đã chốt là không đạt.
+        const progressClass = item.status === 'Đạt chỉ tiêu'
           ? 'operations-progress-fill--success'
-          : item.rate >= LAGGING_COMPLETION_RATE
+          : item.status === 'Đang thu'
             ? 'operations-progress-fill--warning'
             : '';
 
         return (
           <div className="operations-progress">
             <div className="operations-progress-meta">
-              <strong>{item.rate}%</strong>
+              <strong>{item.rate}</strong>
               <span>{item.actualCount}/{item.targetCount} phiếu</span>
             </div>
             <div
@@ -620,7 +704,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
             </div>
             <div className="operation-metric operation-metric--warning">
               <span className="operation-metric-icon"><CheckCircle2 className="operation-icon" aria-hidden="true" /></span>
-              <span className="operation-metric-label">Nhóm đạt chỉ tiêu (≥ {COMPLETED_COMPLETION_RATE}%)</span>
+              <span className="operation-metric-label">Nhóm đạt chỉ tiêu (≥ {targetRate}%)</span>
               <strong className="operation-metric-value">{completedCount} / {progressItems.length}</strong>
               <span className="operation-metric-note">Nhóm đạt chỉ tiêu thu phiếu</span>
             </div>
@@ -640,6 +724,41 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
             onSearchChange={setSearch}
             searchPlaceholder="Tìm mã lớp HP, nhóm N01/N02, tên môn hoặc giảng viên..."
             exportConfig={exportConfig}
+            // Chỉ tiêu của riêng trang này, đặt sát bảng vì nó chỉ quyết định nhãn
+            // trạng thái của từng lớp bên dưới.
+            toolbarActions={(
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 650 }}>
+                <span style={{ whiteSpace: 'nowrap' }}>Tỷ lệ phản hồi (%)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={targetRateInput}
+                  // Vai trò khác vẫn thấy chỉ tiêu đang áp nhưng không sửa được.
+                  disabled={!canSetTarget}
+                  onChange={(event) => changeTargetRateInput(event.target.value)}
+                  onBlur={() => void saveTargetRate()}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') event.currentTarget.blur();
+                  }}
+                  title={canSetTarget
+                    ? 'Lớp có tỷ lệ phản hồi từ mức này trở lên được gắn nhãn Đạt chỉ tiêu. Chỉ áp cho trang này, lưu khi rời ô.'
+                    : 'Chỉ quản trị hệ thống và quản trị khảo sát được đặt chỉ tiêu này.'}
+                  style={{
+                    width: 80,
+                    minHeight: 34,
+                    padding: '6px 10px',
+                    border: '1px solid var(--field-border)',
+                    background: canSetTarget ? '#ffffff' : '#f4f6f8',
+                    color: '#000000',
+                    fontSize: 13,
+                    fontWeight: 400,
+                    textAlign: 'right',
+                  }}
+                />
+              </label>
+            )}
             emptyMessage="Chưa có lớp học phần nào được phát phiếu khảo sát."
             keyExtractor={(item) => item.id}
             showIndex={false}

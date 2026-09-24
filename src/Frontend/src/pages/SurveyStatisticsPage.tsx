@@ -30,7 +30,7 @@ import { foldVietnamese } from '../utils/vietnamese';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
-import { formatDecimal, formatDecimalOrDash, formatPercent } from '../utils/formatNumber';
+import { formatDecimal, formatDecimalOrDash } from '../utils/formatNumber';
 import {
   campaignPlaceholder,
   getActiveSemesterSurveyId,
@@ -403,13 +403,13 @@ export const SurveyStatisticsPage: React.FC = () => {
         // Tỷ lệ phản hồi = số phiếu đã thu ÷ tổng số phiếu phải thu. Cột completionRate của API tính
         // theo phiếu hợp lệ nên không dùng lại được, phải tự tính.
         key: 'responseRate',
-        value: (row) => `${formatPercent(responseRateOf(row.totalResponseCount, row.classSize), 3)}`,
+        value: (row) => `${formatDecimal(responseRateOf(row.totalResponseCount, row.classSize), 3)}`,
         sortValue: (row) => responseRateOf(row.totalResponseCount, row.classSize),
       },
       {
         key: 'validRate',
         value: (row) =>
-          `${formatPercent(validRateOf(row.validResponseCount, row.totalResponseCount), 3)}`,
+          `${formatDecimal(validRateOf(row.validResponseCount, row.totalResponseCount), 3)}`,
         sortValue: (row) => validRateOf(row.validResponseCount, row.totalResponseCount),
       },
       {
@@ -510,8 +510,8 @@ export const SurveyStatisticsPage: React.FC = () => {
           title: `BẢNG DỮ LIỆU KHẢO SÁT (${filteredRows.length} LỚP)`,
           columns: [
             { key: 'courseName', header: 'Học phần', width: 28 },
-            { key: 'courseCode', header: 'Mã học phần', width: 12, align: 'center' as const },
-            { key: 'sectionName', header: 'Lớp học phần', width: 12, align: 'center' as const },
+            { key: 'courseCode', header: 'Mã học phần', width: 12, align: 'left' as const },
+            { key: 'sectionName', header: 'Lớp học phần', width: 12, align: 'left' as const },
             { key: 'facultyName', header: 'Khoa / Viện', width: 24 },
             { key: 'departmentName', header: 'Bộ môn', width: 22 },
             { key: 'lecturerName', header: 'Giảng viên', width: 26 },
@@ -523,21 +523,21 @@ export const SurveyStatisticsPage: React.FC = () => {
               // Xuất SỐ kèm mã định dạng, không xuất chuỗi "18.2%": ô chữ thì Excel
               // sắp theo bảng chữ cái, "100.0%" rơi xuống dưới "18.2%".
               key: 'responseRate',
-              header: 'Tỷ lệ phản hồi',
+              header: 'Tỷ lệ phản hồi (%)',
               width: 12,
               type: 'number' as const,
               align: 'right' as const,
-              numberFormat: '0.000"%"',
+              numberFormat: '0.000',
               format: (_: unknown, row: SectionStatisticsRow) =>
                 Number(responseRateOf(row.totalResponseCount, row.classSize).toFixed(3)),
             },
             {
               key: 'validRate',
-              header: 'Tỷ lệ phiếu hợp lệ',
+              header: 'Tỷ lệ phiếu hợp lệ (%)',
               width: 12,
               type: 'number' as const,
               align: 'right' as const,
-              numberFormat: '0.000"%"',
+              numberFormat: '0.000',
               format: (_: unknown, row: SectionStatisticsRow) =>
                 Number(validRateOf(row.validResponseCount, row.totalResponseCount).toFixed(3)),
             },
@@ -583,7 +583,7 @@ export const SurveyStatisticsPage: React.FC = () => {
           sheetName: 'Danh sach cau hoi',
           title: 'DANH SÁCH CÂU HỎI ỨNG VỚI CÁC CỘT C',
           columns: [
-            { key: 'order', header: 'Mã câu', width: 10, align: 'center' as const, format: (value: unknown) => `C${value}` },
+            { key: 'order', header: 'Mã câu', width: 10, align: 'left' as const, format: (value: unknown) => `C${value}` },
             { key: 'questionText', header: 'Nội dung câu hỏi', width: 90 },
           ],
           data: columns,
@@ -638,13 +638,6 @@ export const SurveyStatisticsPage: React.FC = () => {
         </div>
 
         <div className="statistics-toolbar-actions">
-          {exportOptions && rows.length > 0 && (
-            <ExportDropdown
-              buttonLabel="Xuất bảng dữ liệu"
-              size="sm"
-              options={exportOptions}
-            />
-          )}
           <UpdateScoresButton semesterSurveyId={semesterSurveyId} onUpdated={loadStatistics} />
           {/* Phát hành nằm ở đúng trang này vì đây là chỗ quản trị chốt số liệu cuối
               đợt: xem bảng, bấm Cập nhật điểm, rồi mới mở cho đơn vị xem. */}
@@ -757,6 +750,16 @@ export const SurveyStatisticsPage: React.FC = () => {
               </label>
             ))}
           </div>
+          {/* Nút xuất đứng cùng hàng với ô tìm kiếm, dồn sát mép phải, ngay trên bảng nó xuất. */}
+          {exportOptions && rows.length > 0 && (
+            <div style={{ marginLeft: 'auto' }}>
+              <ExportDropdown
+                buttonLabel="Xuất bảng dữ liệu"
+                size="sm"
+                options={exportOptions}
+              />
+            </div>
+          )}
         </div>
 
         {orderedRows.length === 0 ? (
@@ -806,14 +809,14 @@ export const SurveyStatisticsPage: React.FC = () => {
                   scope="col"
                   title={`Số phiếu đã thu chia tổng số phiếu phải thu. Vòng 1: cần ≥ ${thresholds.minimumResponseRate}%`}
                 >
-                  {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi')}
+                  {filters.filterHeader('responseRate', 'Tỷ lệ phản hồi (%)')}
                 </th>
                 <th
                   className="col-metric"
                   scope="col"
                   title={`Số phiếu hợp lệ chia số phiếu đã thu. Vòng 2: cần ≥ ${thresholds.minimumValidRate}%`}
                 >
-                  {filters.filterHeader('validRate', 'Tỷ lệ phiếu hợp lệ')}
+                  {filters.filterHeader('validRate', 'Tỷ lệ phiếu hợp lệ (%)')}
                 </th>
                 {columns.map((column) => (
                   <th
@@ -910,10 +913,10 @@ export const SurveyStatisticsPage: React.FC = () => {
                       {row.invalidResponseCount}
                     </td>
                     <td className={`num col-metric${responseRate < thresholds.minimumResponseRate ? ' is-flagged' : ''}`}>
-                      {formatPercent(responseRate, 3)}
+                      {formatDecimal(responseRate, 3)}
                     </td>
                     <td className={`num col-metric${validRate < thresholds.minimumValidRate ? ' is-flagged' : ''}`}>
-                      {formatPercent(validRate, 3)}
+                      {formatDecimal(validRate, 3)}
                     </td>
                     {columns.map((column) => {
                       const score = scoreByQuestion.get(column.questionId);

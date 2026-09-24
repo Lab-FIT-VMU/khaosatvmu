@@ -1166,6 +1166,12 @@ public static class SurveyErrorCodes
     /// mã này thay vì số liệu; endpoint trả 403.
     /// </summary>
     public const string ResultsNotPublished = "SURVEY_RESULTS_NOT_PUBLISHED";
+
+    /// <summary>
+    /// Đợt đã phát hành kết quả nên không cập nhật điểm được nữa: số đơn vị đang xem phải
+    /// đứng yên. Thu hồi phát hành rồi mới tính lại. Endpoint trả 409.
+    /// </summary>
+    public const string ResultsPublishedLocked = "SURVEY_RESULTS_PUBLISHED_LOCKED";
     /// <summary>Tên đợt để trống hoặc chỉ có khoảng trắng.</summary>
     public const string SemesterSurveyNameRequired = "SURVEY_SEMESTER_SURVEY_NAME_REQUIRED";
     /// <summary>Kiểu phạm vi không nằm trong <see cref="SurveyScopeTypes"/>.</summary>

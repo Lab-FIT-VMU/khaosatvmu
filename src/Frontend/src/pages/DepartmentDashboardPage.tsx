@@ -280,9 +280,9 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                     ],
                     data: [
                       {
-                        metricName: 'Tiến độ thu phiếu khảo sát',
-                        deptValue: formatRate(metrics.completionRate),
-                        schoolValue: formatRate(metrics.schoolCompletionRate),
+                        metricName: 'Tiến độ thu phiếu khảo sát (%)',
+                        deptValue: formatDecimal(metrics.completionRate, 3),
+                        schoolValue: formatDecimal(metrics.schoolCompletionRate, 3),
                       },
                       {
                         metricName: 'Điểm hài lòng trung bình',
@@ -314,9 +314,9 @@ export const DepartmentDashboardPage: React.FC<DepartmentDashboardPageProps> = (
                       // Khai đúng những trường thật của lớp chưa gắn giảng viên; trước
                       // đây hai cột trỏ vào trường không tồn tại nên tệp xuất ra cột trắng.
                       columns: [
-                        { key: 'courseCode', header: 'Mã học phần', width: 16, align: 'center' as const },
+                        { key: 'courseCode', header: 'Mã học phần', width: 16, align: 'left' as const },
                         { key: 'courseName', header: 'Tên học phần', width: 30 },
-                        { key: 'sectionName', header: 'Nhóm lớp', width: 12, align: 'center' as const },
+                        { key: 'sectionName', header: 'Nhóm lớp', width: 12, align: 'left' as const },
                         { key: 'lecturerName', header: 'Giảng viên đọc từ tệp', width: 24 },
                         { key: 'credits', header: 'Số tín chỉ', width: 12, type: 'number' as const, align: 'right' as const },
                         { key: 'classSize', header: 'Tổng số phiếu phải thu', width: 14, type: 'number' as const, align: 'right' as const },

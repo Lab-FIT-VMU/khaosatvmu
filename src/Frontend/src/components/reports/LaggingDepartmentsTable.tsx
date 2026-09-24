@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { DepartmentOverview } from '../../types';
 import { completionColor, scoreColor } from './theme';
-import { formatDecimal, formatPercent } from '../../utils/formatNumber';
+import { formatDecimal } from '../../utils/formatNumber';
 
 interface LaggingDepartmentsTableProps {
   departments: DepartmentOverview[];
@@ -99,7 +99,7 @@ export const LaggingDepartmentsTable: React.FC<LaggingDepartmentsTableProps> = (
             <th>{sortableHeader('departmentName', 'Bộ môn')}</th>
             <th>{sortableHeader('facultyName', 'Thuộc Khoa')}</th>
             <th className="reports-lagging-num">{sortableHeader('sectionCount', 'Lớp')}</th>
-            <th className="reports-lagging-progress-col">{sortableHeader('completionRate', 'Tiến độ')}</th>
+            <th className="reports-lagging-progress-col">{sortableHeader('completionRate', 'Tiến độ (%)')}</th>
             <th className="reports-lagging-num">{sortableHeader('averageScore', 'Điểm TB')}</th>
           </tr>
         </thead>
@@ -139,7 +139,7 @@ export const LaggingDepartmentsTable: React.FC<LaggingDepartmentsTableProps> = (
                   />
                 </div>
                 <span style={{ color: completionColor(dept.completionRate), fontWeight: 700 }}>
-                  {formatPercent(dept.completionRate, 3)}
+                  {formatDecimal(dept.completionRate, 3)}
                 </span>
               </td>
               <td className="report-number-cell" style={{ color: scoreColor(dept.averageScore) }}>

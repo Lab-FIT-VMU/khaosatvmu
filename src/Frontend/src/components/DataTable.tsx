@@ -26,6 +26,8 @@ export interface Column<T> {
   quickFilters?: { label: string; match: (value: string) => boolean }[];
   /** Đặt true cho cột số để sắp xếp danh sách giá trị theo trị số. */
   numeric?: boolean;
+  /** Căn lề ô dữ liệu: chữ căn trái, số căn phải, nút bấm căn giữa. Tiêu đề không đổi. */
+  align?: 'left' | 'right' | 'center';
   width?: string;
   /** Tùy chọn hàm định dạng riêng khi xuất Excel / Word / PDF */
   exportFormat?: (item: T) => string | number | boolean | null | undefined;
@@ -480,12 +482,16 @@ export function DataTable<T>({
                   style={onRowClick ? { cursor: 'pointer' } : undefined}
                 >
                   {showIndex && (
-                    <td className="catalog-table__index">{firstIndex + index + 1}</td>
+                    <td className="catalog-table__index" style={{ textAlign: 'right' }}>{firstIndex + index + 1}</td>
                   )}
                   {columns.map((column) => (
                     // Cột số căn phải để hàng đơn vị thẳng cột, dễ so số dài ngắn.
                     // Chỉ ô dữ liệu; tiêu đề vẫn căn giữa như mọi cột khác.
-                    <td key={column.key} className={column.numeric ? 'catalog-cell-numeric' : undefined}>
+                    <td
+                      key={column.key}
+                      className={column.numeric ? 'catalog-cell-numeric' : undefined}
+                      style={column.align ? { textAlign: column.align } : undefined}
+                    >
                       {column.render
                         ? column.render(item)
                         : (item as Record<string, unknown>)[column.key] as ReactNode}

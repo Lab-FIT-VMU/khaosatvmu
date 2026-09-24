@@ -46,7 +46,8 @@ public sealed class OpenCommentAnalysisReportTests
             scope.ServiceProvider.GetRequiredService<IMemoryCache>(),
             new SchoolOverviewCacheVersion(),
             new FixedScoringThresholdProvider(),
-            new PublishedSurveyPublicationService());
+            new PublishedSurveyPublicationService(),
+            new FixedUserScopeResolver());
 
         var report = await service.GetOpenCommentAnalysisAsync(
             null, null, null, null, null, null, null);

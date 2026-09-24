@@ -314,7 +314,7 @@ export function CourseSectionImportDialog({
                     <tbody>
                       {rows.map((row) => (
                         <tr key={row.rowNumber}>
-                          <td>{row.rowNumber}</td>
+                          <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                           <td>
                             {row.courseCode || (
                               <span className="admin-import-invalid">Thiếu mã</span>
@@ -326,7 +326,7 @@ export function CourseSectionImportDialog({
                               <span className="admin-import-invalid">Thiếu nhóm</span>
                             )}
                           </td>
-                          <td>{row.classSize || '0'}</td>
+                          <td style={{ textAlign: 'right' }}>{row.classSize || '0'}</td>
                           <td>{row.departmentCode || row.departmentName || '—'}</td>
                           <td>{row.lecturerFullName || '—'}</td>
                           <td>
@@ -428,7 +428,7 @@ export function CourseSectionImportDialog({
                     <tbody>
                       {unidentifiedLecturers.map((lecturer) => (
                         <tr key={`${lecturer.rowNumber}-${lecturer.fullName}`}>
-                          <td>{lecturer.rowNumber}</td>
+                          <td style={{ textAlign: 'right' }}>{lecturer.rowNumber}</td>
                           <td>{lecturer.fullName}</td>
                           <td>{lecturer.departmentName || '—'}</td>
                           <td>{lecturer.facultyName || '—'}</td>
@@ -458,7 +458,7 @@ export function CourseSectionImportDialog({
                   <tbody>
                     {failedItems.map((item) => (
                       <tr key={`${item.rowNumber}-${item.name}`}>
-                        <td>{item.rowNumber}</td>
+                        <td style={{ textAlign: 'right' }}>{item.rowNumber}</td>
                         <td>{item.name || 'Không có'}</td>
                         <td>{item.facultyName || 'Không có'}</td>
                         <td>{catalogErrorMessage(item.errorCode)}</td>

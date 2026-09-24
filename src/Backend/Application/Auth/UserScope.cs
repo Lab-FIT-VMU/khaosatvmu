@@ -13,13 +13,13 @@ public static class RoleCodes
     public const string BoardOfDirectors = "BOARD_OF_DIRECTORS";
 
     /// <summary>
-    /// Trưởng khoa/viện: như trưởng bộ môn nhưng phạm vi là CẢ KHOA, tức mọi bộ môn
-    /// thuộc khoa của mình.
+    /// Quản lý khoa: như quản lý bộ môn nhưng phạm vi là CẢ KHOA, tức mọi bộ môn thuộc
+    /// khoa của mình. Cấp tự động cho chức vụ Trưởng khoa và Phó trưởng khoa.
     /// </summary>
     public const string FacultyManager = "FACULTY_MANAGER";
 
+    /// <summary>Quản lý bộ môn. Cấp tự động cho chức vụ Trưởng bộ môn và Phó bộ môn.</summary>
     public const string DepartmentManager = "DEPARTMENT_MANAGER";
-    public const string DeputyDepartmentManager = "DEPUTY_DEPARTMENT_MANAGER";
     public const string Lecturer = "LECTURER";
 }
 
@@ -98,10 +98,9 @@ public sealed record UserScope(
     public bool CanResolveCourseSectionLecturer =>
         ManagesEverything || (ManagesOwnUnit && !SeesNothing);
 
-    /// <summary>Hai vai trò quản lý cấp đơn vị: trưởng bộ môn và trưởng khoa/viện.</summary>
+    /// <summary>Hai vai trò quản lý cấp đơn vị: quản lý bộ môn và quản lý khoa.</summary>
     private bool ManagesOwnUnit =>
         RoleCode is RoleCodes.DepartmentManager
-            or RoleCodes.DeputyDepartmentManager
             or RoleCodes.FacultyManager;
 
     /// <summary>
