@@ -11,15 +11,28 @@ const BASE_ACADEMIC_YEAR_START = 2018;
 const BASE_COHORT_NUMBER = 59;
 const STANDARD_PROGRAM_YEARS = 4;
 
-const isOnTime = (cohortCode: string, academicYearStart: number) => {
+const isOnTime = (
+  cohortCode: string,
+  academicYearStart: number,
+  month: number | null,
+  year: number | null,
+) => {
   const digits = (cohortCode ?? '').replace(/\D/g, '');
   if (!digits) return false;
   const cohortYearStart = BASE_ACADEMIC_YEAR_START + (Number(digits) - BASE_COHORT_NUMBER);
+  if (month !== null && year !== null) {
+    return year * 12 + month <= (cohortYearStart + STANDARD_PROGRAM_YEARS + 1) * 12 + 1;
+  }
   return academicYearStart - cohortYearStart === STANDARD_PROGRAM_YEARS - 1;
 };
 
-const statusLabel = (cohortCode: string, academicYearStart: number, isWorkStudy: boolean) =>
-  `${isOnTime(cohortCode, academicYearStart) ? 'Đúng hạn' : 'Quá hạn'}${isWorkStudy ? ' · VLVH' : ''}`;
+const statusLabel = (
+  cohortCode: string,
+  academicYearStart: number,
+  month: number | null,
+  year: number | null,
+  isWorkStudy: boolean,
+) => `${isOnTime(cohortCode, academicYearStart, month, year) ? 'Đúng hạn' : 'Quá hạn'}${isWorkStudy ? ' · VLVH' : ''}`;
 
 interface GraduationSavedPreviewDialogProps {
   period: GraduationManagedPeriod | null;
@@ -93,7 +106,7 @@ export function GraduationSavedPreviewDialog({
         {preview.warnings.map((warning) => <div className="graduation-warning" role="status" key={`${warning.code}-${warning.classCode}`}>
           <AlertTriangle size={17} /><div><strong>{warning.message}</strong><span>Sheet {warning.sourceSheetName}, dòng {warning.sourceRowNumbers.join(', ')}. Dòng này không tham gia bất kỳ KPI nào.</span></div>
         </div>)}
-        <div className="graduation-preview"><table><thead><tr><th>Khoa</th><th>Chuyên ngành</th><th>Khóa</th><th>Trạng thái</th><th>Số lượng</th></tr></thead><tbody>{preview.aggregates.slice(0, 150).map((row, index) => <tr key={`${row.facultyKey}-${row.programKey}-${row.cohortCode}-${row.graduationRank}-${row.isWorkStudy}-${index}`}><td>{row.facultyNameRaw}</td><td>{row.programNameRaw}</td><td>{row.cohortCode}</td><td>{statusLabel(row.cohortCode, period?.academicYearStart ?? 0, row.isWorkStudy)}</td><td>{row.studentCount}</td></tr>)}</tbody></table></div>
+        <div className="graduation-preview"><table><thead><tr><th>Khoa</th><th>Chuyên ngành</th><th>Khóa</th><th>Trạng thái</th><th>Số lượng</th></tr></thead><tbody>{preview.aggregates.slice(0, 150).map((row, index) => <tr key={`${row.facultyKey}-${row.programKey}-${row.cohortCode}-${row.graduationRank}-${row.isWorkStudy}-${index}`}><td>{row.facultyNameRaw}</td><td>{row.programNameRaw}</td><td>{row.cohortCode}</td><td>{statusLabel(row.cohortCode, period?.academicYearStart ?? 0, period?.reviewMonth ?? null, period?.reviewYear ?? null, row.isWorkStudy)}</td><td>{row.studentCount}</td></tr>)}</tbody></table></div>
         {preview.aggregates.length > 150 && <p className="graduation-note">Hiển thị 150/{preview.aggregates.length} tổ hợp tổng hợp.</p>}
       </>}
     </div>

@@ -18,6 +18,8 @@ public static class CohortErrorCodes
     public const string MajorRequired = "COHORT_MAJOR_MAJOR_REQUIRED";
     public const string MajorNotFound = "COHORT_MAJOR_MAJOR_NOT_FOUND";
     public const string StudentCountInvalid = "COHORT_MAJOR_STUDENT_COUNT_INVALID";
+    public const string ImportMultipleCohorts = "COHORT_MAJOR_IMPORT_MULTIPLE_COHORTS";
+    public const string ImportCohortMismatch = "COHORT_MAJOR_IMPORT_COHORT_MISMATCH";
 }
 
 public sealed record CohortDto(
@@ -56,7 +58,7 @@ public sealed record SaveCohortMajorCommand(
     int StudentCount);
 
 /// <summary>
-/// Một dòng của tệp Excel khoá ngành đào tạo: tên khoá ngành, tên ngành, sĩ số.
+/// Một dòng của tệp Excel khoá ngành đào tạo: tên khoá ngành, tên ngành, số sinh viên đầu vào.
 /// Khoá học không nằm trong tệp mà chọn một lần cho cả lần import.
 /// </summary>
 public sealed record ImportCohortMajorRowCommand(

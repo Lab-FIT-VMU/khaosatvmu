@@ -623,8 +623,8 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
     const chartDescription = `${isDisplayedCumulativeCombo
       ? 'Cột: riêng từng đợt · Đường: tổng tích lũy'
       : displayedChartSeries
-        ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}`
-        : 'Không phân chuỗi'} · Tỷ lệ trên ${usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}`;
+        ? `Nhóm phụ theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}`
+        : 'Không chia nhóm phụ'} · Tỷ lệ trên ${usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số sinh viên đầu vào'}`;
     const kpiInfo = Object.fromEntries(explore.kpis.map((kpi) => [
       kpi.label,
       `${formatNumber(kpi.count)} (${formatRate(kpi.rate)})`,
@@ -632,10 +632,16 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
     const hasSeriesColumn = Boolean(displayedChartSeries) || chartModel.series.length > 1;
     const tableColumns = [
       { key: 'group', header: selectedChartDimension.label },
-      ...(hasSeriesColumn ? [{ key: 'series', header: 'Phân chuỗi' }] : []),
+      ...(hasSeriesColumn ? [{ key: 'series', header: 'Nhóm phụ' }] : []),
       { key: 'rate', header: 'Tỷ lệ (%)', numeric: true },
       { key: 'count', header: 'Số lượng', numeric: true },
-      { key: 'denominator', header: 'Mẫu số', numeric: true },
+      {
+        key: 'denominator',
+        header: usesGraduatedDenominator(displayedChartMetric)
+          ? 'Số sinh viên đã tốt nghiệp'
+          : 'Số sinh viên đầu vào',
+        numeric: true,
+      },
     ];
     const tableRows = chartModel.data.flatMap((row) => {
       const values = row as Record<string, string | number | null>;
@@ -868,23 +874,23 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
                       <li>Trong phạm vi tích lũy, <b>Từ đợt</b> và <b>Đến đợt</b> xác định khoảng tính; số tích lũy bắt đầu lại từ đợt đầu khoảng.</li>
                       <li><b>Tiêu chí</b> là số liệu cần xem.</li>
                       <li><b>So sánh theo</b> tạo các nhóm trên biểu đồ.</li>
-                      <li><b>Phân chuỗi</b> tách mỗi nhóm theo một chiều khác.</li>
-                      <li>Để xem tổng quan tích lũy, chọn <b>Đợt tốt nghiệp</b> và phân chuỗi theo <b>Khóa</b>.</li>
-                      <li>Biểu đồ chồng cần phân chuỗi; biểu đồ tròn chỉ dùng khi không phân chuỗi và có tối đa 12 nhóm.</li>
-                      <li>Trong phạm vi tích lũy, đường thể hiện tổng tích lũy; cột (khi không phân chuỗi) thể hiện riêng từng đợt.</li>
+                      <li><b>Nhóm phụ</b> chia mỗi nhóm chính theo một tiêu chí bổ sung.</li>
+                      <li>Để xem tổng quan tích lũy, chọn <b>Đợt tốt nghiệp</b> và nhóm phụ theo <b>Khóa</b>.</li>
+                      <li>Biểu đồ chồng cần nhóm phụ; biểu đồ tròn chỉ dùng khi không chia nhóm phụ và có tối đa 12 nhóm.</li>
+                      <li>Trong phạm vi tích lũy, đường thể hiện tổng tích lũy; cột (khi không chia nhóm phụ) thể hiện riêng từng đợt.</li>
                     </ul>
                   </div>
                 </details>
               </div>
               <label>Tiêu chí<select value={chartMetric} onChange={(event) => setChartMetric(event.target.value as ExploreChartMetric)}>{chartMetrics.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
               <label>So sánh theo<select value={chartGroupBy} onChange={(event) => { const next = event.target.value as ExploreChartDimension; setChartGroupBy(next); if (chartSeriesBy === next || (next === 'program' && chartSeriesBy === 'faculty')) setChartSeriesBy(''); }}>{chartDimensions.map((item) => <option key={item.id} value={item.id} disabled={!availableChartGroups.has(item.id)}>{item.label}</option>)}</select></label>
-              <label>Phân chuỗi<select value={chartSeriesBy} onChange={(event) => setChartSeriesBy(event.target.value as ExploreChartSeries)}><option value="">Không phân chuỗi</option>{chartSeriesDimensions.map((item) => <option key={item.id} value={item.id} disabled={!isChartSeriesAvailable(item.id)}>{item.label}</option>)}</select></label>
+              <label>Nhóm phụ<select value={chartSeriesBy} onChange={(event) => setChartSeriesBy(event.target.value as ExploreChartSeries)}><option value="">Không chia nhóm phụ</option>{chartSeriesDimensions.map((item) => <option key={item.id} value={item.id} disabled={!isChartSeriesAvailable(item.id)}>{item.label}</option>)}</select></label>
               {allChartDimensionsFixed && <p className="graduation-builder__error">Tất cả chiều so sánh đã bị cố định. Hãy bỏ bớt bộ lọc để biểu đồ có nhiều nhóm.</p>}
               <fieldset><legend>Loại biểu đồ</legend><div className="graduation-chart-types">{chartOptions.map((item) => { const Icon = item.icon; const enabled = availableChartTypes.includes(item.id); return <button key={item.id} type="button" disabled={!enabled} className={chartType === item.id ? 'is-selected' : ''} onClick={() => setChartType(item.id)} aria-pressed={chartType === item.id}><Icon aria-hidden="true" /><span>{item.label}</span></button>; })}</div></fieldset>
               <label className="graduation-builder__check"><input type="checkbox" checked={showChartLabels} onChange={(event) => setShowChartLabels(event.target.checked)} /> Hiển thị nhãn giá trị</label>
             </aside>
             <article className="graduation-chart-panel">
-              <header><div><h2>{selectedGraduationChartTitle}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không phân chuỗi'} · Tỷ lệ trên {usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}; số lượng hiển thị trong tooltip</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <div className="graduation-chart-zoom-controls"><button type="button" onClick={() => graduationChartRef.current?.zoomOut()} disabled={!chartZoomAvailable || chartZoomPercent <= 100} title="Thu nhỏ biểu đồ" aria-label="Thu nhỏ biểu đồ"><Minus aria-hidden="true" /></button><span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span><button type="button" onClick={() => graduationChartRef.current?.zoomIn()} disabled={!chartZoomAvailable || chartZoomPercent >= 2000} title="Phóng to biểu đồ" aria-label="Phóng to biểu đồ"><Plus aria-hidden="true" /></button></div>}</div></header>
+              <header><div><h2>{selectedGraduationChartTitle}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Nhóm phụ theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không chia nhóm phụ'} · Tỷ lệ trên {usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số sinh viên đầu vào'}; số lượng hiển thị trong tooltip</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <div className="graduation-chart-zoom-controls"><button type="button" onClick={() => graduationChartRef.current?.zoomOut()} disabled={!chartZoomAvailable || chartZoomPercent <= 100} title="Thu nhỏ biểu đồ" aria-label="Thu nhỏ biểu đồ"><Minus aria-hidden="true" /></button><span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span><button type="button" onClick={() => graduationChartRef.current?.zoomIn()} disabled={!chartZoomAvailable || chartZoomPercent >= 2000} title="Phóng to biểu đồ" aria-label="Phóng to biểu đồ"><Plus aria-hidden="true" /></button></div>}</div></header>
               {chartModel.data.length > 0 ? <div className="graduation-chart"><GraduationEChart ref={graduationChartRef} type={chartType} data={chartModel.data} series={chartModel.series} unit="percent" showLabels={showChartLabels} onZoomChange={setChartZoomPercent} /></div> : <div className="graduation-chart-empty">{Array.isArray(explore.chartPoints) ? 'Không có dữ liệu phù hợp với cấu hình hiện tại.' : 'Backend API đang dùng phiên bản cũ. Hãy khởi động lại API để sử dụng cấu hình này.'}</div>}
             </article>
           </div>

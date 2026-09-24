@@ -113,6 +113,22 @@ function chooseMajor(candidates) {
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0], 'vi'))[0]?.[0] ?? null;
 }
 
+function resolveConflictingMajor(classCode, candidates) {
+  // Trong dữ liệu đào tạo của trường, hậu tố CL trên mã lớp là dấu hiệu ổn định
+  // của chương trình CLC. Một số file tốt nghiệp cũ lại ghi tên ngành là (NC),
+  // nên ưu tiên mã lớp thay vì loại cả lớp khỏi danh mục import.
+  if (classCode.endsWith('CL')) {
+    const clcMajor = [...candidates.keys()].find((name) => /\(CLC\)\s*$/i.test(name));
+    if (clcMajor) {
+      return { majorName: clcMajor, rule: 'Hậu tố CL của mã lớp → chương trình CLC' };
+    }
+  }
+  return {
+    majorName: chooseMajor(candidates),
+    rule: 'Tên ngành xuất hiện nhiều nhất trong dữ liệu nguồn',
+  };
+}
+
 function styleImportSheet(sheet) {
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
   sheet.autoFilter = { from: 'A1', to: 'C1' };
@@ -133,7 +149,7 @@ async function writeCohortWorkbook(cohortCode, items, auditRows, destination) {
   workbook.creator = 'KhaoSatVMU';
   workbook.created = new Date();
   const importSheet = workbook.addWorksheet('Khoa nganh dao tao');
-  importSheet.addRow(['Khoá ngành đào tạo', 'Ngành đào tạo', 'Số lượng sinh viên']);
+  importSheet.addRow(['Khoá ngành đào tạo', 'Ngành đào tạo', 'Số lượng sinh viên đầu vào']);
   for (const item of items) {
     importSheet.addRow([item.classCode, item.majorName, item.studentCount]);
   }
@@ -167,10 +183,12 @@ async function writeCohortWorkbook(cohortCode, items, auditRows, destination) {
   guide.getColumn(1).width = 110;
   guide.addRow(['HƯỚNG DẪN']);
   guide.addRow([`Khi import, chọn đúng ${cohortCode} ở trường “Import vào khoá học”.`]);
+  guide.addRow([`File này chỉ được chứa mã lớp của ${cohortCode}; không ghép dữ liệu của khóa khác vào cùng file.`]);
+  guide.addRow(['Nếu một file chứa từ hai khóa trở lên, hệ thống sẽ từ chối toàn bộ file trước khi import.']);
   guide.addRow(['Sheet “Khoa nganh dao tao” là dữ liệu import; hệ thống chỉ đọc sheet đầu tiên.']);
-  guide.addRow(['Số lượng sinh viên trong file này là số mã sinh viên duy nhất quan sát được trong các file tốt nghiệp nguồn.']);
+  guide.addRow(['Số lượng sinh viên đầu vào trong file này là số mã sinh viên duy nhất quan sát được trong các file tốt nghiệp nguồn.']);
   guide.addRow(['Đây là số tối thiểu đã biết, không phải sĩ số đầu khoá. Cần thay bằng sĩ số đầu khoá chính thức nếu có.']);
-  guide.addRow(['Các dòng có nhiều tên ngành mâu thuẫn không được đưa vào sheet import và nằm trong sheet “Đối chiếu nguồn”.']);
+  guide.addRow(['Các mã lớp có tên ngành nguồn mâu thuẫn vẫn được đưa vào import theo quy tắc mã lớp; chi tiết nằm trong sheet “Đối chiếu nguồn”.']);
   guide.getRow(1).font = { bold: true, size: 14 };
 
   await workbook.xlsx.writeFile(destination);
@@ -209,23 +227,32 @@ async function main() {
   const cohorts = new Map();
   const conflicts = [];
   for (const item of grouped.values()) {
-    const chosenName = chooseMajor(item.majors);
     const isConflict = item.majors.size > 1;
+    const resolution = isConflict
+      ? resolveConflictingMajor(item.classCode, item.majors)
+      : { majorName: chooseMajor(item.majors), rule: null };
+    const chosenName = resolution.majorName;
     const audit = {
       classCode: item.classCode,
-      majorName: isConflict ? null : chosenName,
+      majorName: chosenName,
       studentCount: item.students.size,
       sourceMajorNames: [...item.sourceNames].sort((a, b) => a.localeCompare(b, 'vi')),
-      status: isConflict ? 'Mâu thuẫn ngành — cần xác minh, chưa đưa vào import' : 'Đủ điều kiện import',
+      status: isConflict
+        ? `Mâu thuẫn tên ngành — đã đối chiếu: ${resolution.rule}`
+        : 'Đủ điều kiện import',
     };
     if (!cohorts.has(item.cohortCode)) cohorts.set(item.cohortCode, { imports: [], audits: [] });
     const cohort = cohorts.get(item.cohortCode);
     cohort.audits.push(audit);
     if (isConflict) {
-      conflicts.push({ cohortCode: item.cohortCode, ...audit, counts: Object.fromEntries(item.majors) });
-    } else {
-      cohort.imports.push({ classCode: item.classCode, majorName: chosenName, studentCount: item.students.size });
+      conflicts.push({
+        cohortCode: item.cohortCode,
+        ...audit,
+        resolutionRule: resolution.rule,
+        counts: Object.fromEntries(item.majors),
+      });
     }
+    cohort.imports.push({ classCode: item.classCode, majorName: chosenName, studentCount: item.students.size });
   }
 
   const duplicateMajorMappings = [];
@@ -245,15 +272,24 @@ async function main() {
   const report = {
     sourceFileCount: fs.readdirSync(sourceDirectory).filter((name) => name.toLowerCase().endsWith('.xlsx')).length,
     sourceRowCount: sourceRows.length,
+    sourceClassCount: new Set(sourceRows.map((row) => row.classCode).filter(Boolean)).size,
     cohortCount: cohorts.size,
     importRowCount: [...cohorts.values()].reduce((sum, cohort) => sum + cohort.imports.length, 0),
+    importRowsByCohort: Object.fromEntries([...cohorts.entries()]
+      .sort(([left], [right]) => left.localeCompare(right, 'vi', { numeric: true }))
+      .map(([cohortCode, cohort]) => [cohortCode, cohort.imports.length])),
     conflictCount: conflicts.length,
+    resolvedConflictCount: conflicts.length,
     duplicateMajorMappingCount: duplicateMajorMappings.length,
     unresolvedRowCount: unresolvedRows.length,
     conflicts,
     duplicateMajorMappings,
     unresolved: unresolvedRows.slice(0, 100),
   };
+  report.coveredClassCount = report.importRowCount;
+  report.classCoveragePercent = report.sourceClassCount > 0
+    ? Number((report.coveredClassCount * 100 / report.sourceClassCount).toFixed(2))
+    : 100;
 
   if (!outputDirectory) {
     console.log(JSON.stringify(report, null, 2));

@@ -182,7 +182,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
     }
     const studentCount = Number(form.studentCount);
     if (!Number.isFinite(studentCount) || studentCount < 0) {
-      setValidationError('Số lượng sinh viên phải là số không âm.');
+      setValidationError('Số lượng sinh viên đầu vào phải là số không âm.');
       return;
     }
 
@@ -287,7 +287,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
     },
     {
       key: 'studentCount',
-      header: 'Số lượng sinh viên',
+      header: 'Số lượng sinh viên đầu vào',
       width: '11%',
       numeric: true,
       filterValue: (item) => String(item.studentCount),
@@ -610,7 +610,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
             />
           </div>
           <div className="form-group">
-            <label htmlFor="cohort-major-student-count">Số lượng sinh viên</label>
+            <label htmlFor="cohort-major-student-count">Số lượng sinh viên đầu vào</label>
             <input
               id="cohort-major-student-count"
               type="number"

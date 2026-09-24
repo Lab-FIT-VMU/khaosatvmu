@@ -646,26 +646,12 @@ public sealed partial class EfGraduationAnalyticsV3Service(
         return map;
     }
 
-    /// <summary>Chương trình chuẩn kéo dài bốn năm học.</summary>
-    private const int StandardProgramYears = 4;
-
-    private static bool IsOnTimeRound(int roundAcademicYearStart, string cohortCode)
-    {
-        var digits = new string((cohortCode ?? string.Empty).Where(char.IsDigit).ToArray());
-        if (!int.TryParse(digits, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
-        {
-            return false;
-        }
-        var cohortYearStart = BaseAcademicYearStart + (number - BaseCohortNumber);
-        return roundAcademicYearStart - cohortYearStart == StandardProgramYears - 1;
-    }
-
     /// <summary>Cột tổng ở "CohortMajors" là số dẫn xuất, cộng lại từ mọi đợt.</summary>
     private async Task RecalculateCohortMajorTotalsAsync(CancellationToken cancellationToken)
     {
         var yearStartById = await LoadAcademicYearStartsAsync(cancellationToken);
-        var roundYearStart = (await LoadRoundsAsync(cancellationToken))
-            .ToDictionary(x => x.GraduationRoundId, x => yearStartById.GetValueOrDefault(x.AcademicYearId));
+        var roundById = (await LoadRoundsAsync(cancellationToken))
+            .ToDictionary(x => x.GraduationRoundId);
 
         var rows = await (
             from graduation in db.CohortMajorGraduations.AsNoTracking()
@@ -700,8 +686,12 @@ public sealed partial class EfGraduationAnalyticsV3Service(
                 Average = g.Sum(x => x.AverageCount),
                 WorkStudy = g.Sum(x => x.WorkStudyCount),
                 OnTime = g
-                    .Where(x => IsOnTimeRound(
-                        roundYearStart.GetValueOrDefault(x.GraduationRoundId), x.CohortCode))
+                    .Where(x => roundById.TryGetValue(x.GraduationRoundId, out var round)
+                        && GraduationOnTimePolicy.IsOnTime(
+                            x.CohortCode,
+                            yearStartById.GetValueOrDefault(round.AcademicYearId),
+                            round.ReviewMonth,
+                            round.ReviewYear))
                     .Sum(x => x.GraduatedCount),
             });
 
