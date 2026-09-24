@@ -149,7 +149,7 @@ async function writeCohortWorkbook(cohortCode, items, auditRows, destination) {
   workbook.creator = 'KhaoSatVMU';
   workbook.created = new Date();
   const importSheet = workbook.addWorksheet('Khoa nganh dao tao');
-  importSheet.addRow(['Khoá ngành đào tạo', 'Ngành đào tạo', 'Số lượng sinh viên']);
+  importSheet.addRow(['Khoá ngành đào tạo', 'Ngành đào tạo', 'Số lượng sinh viên đầu vào']);
   for (const item of items) {
     importSheet.addRow([item.classCode, item.majorName, item.studentCount]);
   }
@@ -183,8 +183,10 @@ async function writeCohortWorkbook(cohortCode, items, auditRows, destination) {
   guide.getColumn(1).width = 110;
   guide.addRow(['HƯỚNG DẪN']);
   guide.addRow([`Khi import, chọn đúng ${cohortCode} ở trường “Import vào khoá học”.`]);
+  guide.addRow([`File này chỉ được chứa mã lớp của ${cohortCode}; không ghép dữ liệu của khóa khác vào cùng file.`]);
+  guide.addRow(['Nếu một file chứa từ hai khóa trở lên, hệ thống sẽ từ chối toàn bộ file trước khi import.']);
   guide.addRow(['Sheet “Khoa nganh dao tao” là dữ liệu import; hệ thống chỉ đọc sheet đầu tiên.']);
-  guide.addRow(['Số lượng sinh viên trong file này là số mã sinh viên duy nhất quan sát được trong các file tốt nghiệp nguồn.']);
+  guide.addRow(['Số lượng sinh viên đầu vào trong file này là số mã sinh viên duy nhất quan sát được trong các file tốt nghiệp nguồn.']);
   guide.addRow(['Đây là số tối thiểu đã biết, không phải sĩ số đầu khoá. Cần thay bằng sĩ số đầu khoá chính thức nếu có.']);
   guide.addRow(['Các mã lớp có tên ngành nguồn mâu thuẫn vẫn được đưa vào import theo quy tắc mã lớp; chi tiết nằm trong sheet “Đối chiếu nguồn”.']);
   guide.getRow(1).font = { bold: true, size: 14 };

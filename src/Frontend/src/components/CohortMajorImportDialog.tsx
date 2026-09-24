@@ -11,6 +11,7 @@ import {
 import {
   downloadCohortMajorFailedRows,
   downloadCohortMajorImportTemplate,
+  detectCohortCode,
   parseCohortMajorImportFile,
   CohortMajorImportFileError,
   type CohortMajorImportFileErrorCode,
@@ -44,7 +45,8 @@ const fileErrorMessages: Record<CohortMajorImportFileErrorCode, string> = {
   FILE_EMPTY: 'Tệp Excel không có dữ liệu.',
   CODE_HEADER_MISSING: 'Không tìm thấy cột "Khoá ngành đào tạo" trong hàng tiêu đề.',
   NAME_HEADER_MISSING: 'Không tìm thấy cột "Ngành đào tạo" trong hàng tiêu đề.',
-  STUDENT_COUNT_HEADER_MISSING: 'Không tìm thấy cột "Số lượng sinh viên" trong hàng tiêu đề.',
+  STUDENT_COUNT_HEADER_MISSING: 'Không tìm thấy cột "Số lượng sinh viên đầu vào" trong hàng tiêu đề.',
+  MULTIPLE_COHORTS: 'File chứa mã lớp của từ hai khóa học trở lên. Mỗi file chỉ được import cho một khóa học.',
   NO_DATA_ROWS: 'Tệp Excel chưa có dòng khoá ngành đào tạo nào.',
   READ_FAILED: 'Không thể đọc tệp Excel. Hãy kiểm tra tệp không bị hỏng hoặc đặt mật khẩu.',
 };
@@ -69,6 +71,13 @@ export function CohortMajorImportDialog({
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
   const [templateError, setTemplateError] = useState<string | null>(null);
   const [cohortId, setCohortId] = useState('');
+  const selectedCohort = cohorts.find((cohort) => String(cohort.cohortId) === cohortId) ?? null;
+  const detectedFileCohort = [...new Set(
+    rows.map((row) => detectCohortCode(row.cohortMajorCode)).filter((value): value is string => value !== null)
+  )][0] ?? null;
+  const cohortMismatch = detectedFileCohort !== null
+    && selectedCohort !== null
+    && detectedFileCohort !== selectedCohort.cohortCode.replace(/\D/g, '');
 
   // Tệp không có cột khoá học, nên chọn một lần cho cả lần import.
   useEffect(() => {
@@ -116,6 +125,10 @@ export function CohortMajorImportDialog({
       setRequestError('Vui lòng chọn khoá học để import vào.');
       return;
     }
+    if (cohortMismatch) {
+      setRequestError(`File thuộc K${detectedFileCohort} nhưng bạn đang chọn ${selectedCohort?.cohortName}. Hãy chọn đúng khóa học hoặc dùng file khác.`);
+      return;
+    }
     setImporting(true);
     setRequestError(null);
     try {
@@ -133,7 +146,7 @@ export function CohortMajorImportDialog({
     setDownloadingTemplate(true);
     setTemplateError(null);
     try {
-      await downloadCohortMajorImportTemplate(majors);
+      await downloadCohortMajorImportTemplate(majors, selectedCohort);
     } catch {
       setTemplateError('Không thể tạo tệp mẫu. Hãy thử lại.');
     } finally {
@@ -171,8 +184,8 @@ export function CohortMajorImportDialog({
           <FileSpreadsheet aria-hidden="true" />
           <p>
             Hàng đầu tiên cần có các cột <strong>Khoá ngành đào tạo</strong>,{' '}
-            <strong>Ngành đào tạo</strong> và <strong>Số lượng sinh viên</strong>. Tên khoá ngành
-            đặt tự do; ngành đào tạo tra theo tên trong danh mục.
+            <strong>Ngành đào tạo</strong> và <strong>Số lượng sinh viên đầu vào</strong>. Mỗi file
+            chỉ được chứa <strong>một khóa học</strong>; ngành đào tạo tra theo tên trong danh mục.
           </p>
         </div>
 
@@ -258,6 +271,16 @@ export function CohortMajorImportDialog({
               </div>
             )}
 
+            {cohortMismatch && !requestError && (
+              <div className="admin-alert" role="alert">
+                <CircleAlert aria-hidden="true" />
+                <span>
+                  File thuộc <strong>K{detectedFileCohort}</strong> nhưng khóa đang chọn là{' '}
+                  <strong>{selectedCohort?.cohortName}</strong>. Hệ thống sẽ không cho import sai khóa.
+                </span>
+              </div>
+            )}
+
             {rows.length > 0 && (
               <section className="admin-import-preview" aria-label="Xem trước dữ liệu import">
                 <header>
@@ -271,7 +294,7 @@ export function CohortMajorImportDialog({
                         <th>Dòng</th>
                         <th>Khoá ngành đào tạo</th>
                         <th>Ngành đào tạo</th>
-                        <th>Số lượng sinh viên</th>
+                        <th>Số lượng sinh viên đầu vào</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -374,7 +397,7 @@ export function CohortMajorImportDialog({
                 type="button"
                 className="btn btn-primary"
                 onClick={() => void handleImport()}
-                disabled={rows.length === 0 || parsing || importing || !cohortId}
+                disabled={rows.length === 0 || parsing || importing || !cohortId || cohortMismatch}
               >
                 {importing ? (
                   <LoaderCircle className="auth-spin" aria-hidden="true" />

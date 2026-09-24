@@ -28,6 +28,8 @@ const majorNameHeaders = new Set([
   'major name',
 ]);
 const studentCountHeaders = new Set([
+  'so luong sinh vien dau vao',
+  'so sinh vien dau vao',
   'so luong sinh vien',
   'so sinh vien',
   'si so',
@@ -51,6 +53,7 @@ export type CohortMajorImportFileErrorCode =
   | 'CODE_HEADER_MISSING'
   | 'NAME_HEADER_MISSING'
   | 'STUDENT_COUNT_HEADER_MISSING'
+  | 'MULTIPLE_COHORTS'
   | 'NO_DATA_ROWS'
   | 'READ_FAILED';
 
@@ -94,27 +97,40 @@ export const cohortMajorTemplateFileName = 'mau-import-khoa-nganh-dao-tao.xlsx';
 export const cohortMajorImportColumns = [
   'Khoá ngành đào tạo',
   'Ngành đào tạo',
-  'Số lượng sinh viên',
+  'Số lượng sinh viên đầu vào',
 ];
 const cohortMajorColumnWidths = [24, 40, 20];
 
+export function detectCohortCode(cohortMajorCode: string): string | null {
+  const normalized = cohortMajorCode
+    .normalize('NFKC')
+    .replace(/Ð/g, 'Đ')
+    .replace(/[\s\-_. /]+/g, '')
+    .toUpperCase();
+  const match = normalized.match(/^[\p{L}]{2,10}(\d{2})(?:ĐH|DH|CL|CH)\d{0,2}$/u);
+  return match?.[1] ?? null;
+}
+
 export async function downloadCohortMajorImportTemplate(
-  majors: { majorName: string }[] = []
+  majors: { majorName: string }[] = [],
+  selectedCohort?: { cohortCode: string; cohortName: string } | null
 ): Promise<void> {
+  const cohortCode = selectedCohort?.cohortCode.replace(/\D/g, '') || '63';
+  const cohortLabel = selectedCohort?.cohortName || `Khoá ${cohortCode}`;
   const data: SheetData = [
     templateHeaderRow(cohortMajorImportColumns),
     [
-      { value: 'CNT63CL', type: String },
+      { value: `CNT${cohortCode}CL`, type: String },
       { value: 'Công nghệ thông tin (CLC)', type: String },
       { value: 62, type: Number },
     ],
     [
-      { value: 'KPM66ĐH', type: String },
+      { value: `KPM${cohortCode}ĐH`, type: String },
       { value: 'Công nghệ phần mềm', type: String },
       { value: 84, type: Number },
     ],
     [
-      { value: 'ĐTĐ61ĐH', type: String },
+      { value: `ĐTĐ${cohortCode}ĐH`, type: String },
       { value: 'Điện tự động công nghiệp', type: String },
       { value: 71, type: Number },
     ],
@@ -133,6 +149,18 @@ export async function downloadCohortMajorImportTemplate(
         majors.map((major) => [major.majorName]),
         [50]
       ),
+      {
+        data: [
+          [{ value: 'HƯỚNG DẪN IMPORT', type: String }],
+          [{ value: `File mẫu này dành cho ${cohortLabel}.`, type: String }],
+          [{ value: 'Mỗi file chỉ được chứa dữ liệu của MỘT khóa học.', type: String }],
+          [{ value: `Tất cả mã lớp phải thuộc ${cohortLabel}; không trộn mã của khóa khác trong cùng file.`, type: String }],
+          [{ value: 'Nếu hệ thống phát hiện từ hai khóa trở lên, toàn bộ file sẽ bị từ chối trước khi import.', type: String }],
+          [{ value: 'Số lượng sinh viên đầu vào là quy mô nhập học ban đầu, không phải số sinh viên đã tốt nghiệp.', type: String }],
+        ],
+        sheet: 'Huong dan',
+        columns: [{ width: 110 }],
+      } as never,
     ],
     cohortMajorTemplateFileName
   );
@@ -195,6 +223,13 @@ export async function parseCohortMajorImportFile(file: File): Promise<ImportCoho
 
   if (rows.length === 0) {
     throw new CohortMajorImportFileError('NO_DATA_ROWS');
+  }
+
+  const detectedCohorts = new Set(
+    rows.map((row) => detectCohortCode(row.cohortMajorCode)).filter((value): value is string => value !== null)
+  );
+  if (detectedCohorts.size > 1) {
+    throw new CohortMajorImportFileError('MULTIPLE_COHORTS');
   }
 
   return rows;

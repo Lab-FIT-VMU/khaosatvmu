@@ -371,10 +371,10 @@ export const GraduationEChart = forwardRef<GraduationEChartHandle, GraduationECh
           ? showLabels ? '6%' : '4%'
           : isHorizontal && needsCategoryZoom ? '3%' : showLabels ? '5%' : '2%',
         bottom: !isHorizontal && needsCategoryZoom
-          ? 108
+          ? 34
           : !isHorizontal && categories.length > 6
-            ? 94
-            : xAxisName ? 66 : 54,
+            ? 28
+            : xAxisName ? 30 : 18,
         containLabel: true,
       },
       xAxis: isHorizontal ? valueAxis : categoryAxis,

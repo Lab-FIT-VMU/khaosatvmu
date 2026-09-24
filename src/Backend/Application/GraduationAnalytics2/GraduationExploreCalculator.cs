@@ -4,28 +4,20 @@ namespace Application.GraduationAnalytics2;
 
 public static class GraduationExploreCalculator
 {
-    /// <summary>Năm học 2018-2019 ứng với khóa 59, mỗi năm sau tăng một khóa.</summary>
-    private const int BaseAcademicYearStart = 2018;
-    private const int BaseCohortNumber = 59;
-    private const int StandardProgramYears = 4;
-
     /// <summary>
-    /// Đúng hạn là tốt nghiệp trong năm học thứ tư kể từ khi nhập học. VLVH là
-    /// một chiều cắt ngang độc lập và không quyết định sinh viên có đúng hạn hay không.
+    /// Đúng hạn là tốt nghiệp không muộn hơn tháng 01 ngay sau năm học thứ tư.
+    /// VLVH là một chiều cắt ngang độc lập và không quyết định sinh viên có đúng hạn hay không.
     /// </summary>
     private static bool IsOnTime(
         GraduationExploreCell cell,
         IReadOnlyDictionary<long, GraduationExplorePeriod> periodById)
     {
         if (!periodById.TryGetValue(cell.PeriodId, out var period)) return false;
-        var digits = new string((cell.CohortCode ?? string.Empty).Where(char.IsDigit).ToArray());
-        if (!int.TryParse(digits, System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture, out var cohortNumber))
-        {
-            return false;
-        }
-        var cohortAcademicYearStart = BaseAcademicYearStart + (cohortNumber - BaseCohortNumber);
-        return period.AcademicYearStart - cohortAcademicYearStart == StandardProgramYears - 1;
+        return GraduationOnTimePolicy.IsOnTime(
+            cell.CohortCode,
+            period.AcademicYearStart,
+            period.ReviewMonth,
+            period.ReviewYear);
     }
 
     public static GraduationExploreResultV3Dto Calculate(
@@ -51,6 +43,30 @@ public static class GraduationExploreCalculator
             .OrderBy(x => x.AcademicYearStart)
             .ThenBy(x => x.RoundNumber)
             .ToList();
+        if (mode == GraduationExploreModes.CohortCumulative)
+        {
+            var populationTotal = population.Sum(x => x.StudentCount);
+            var runningGraduated = 0;
+            var completionIndex = -1;
+            for (var index = 0; index < orderedPeriods.Count; index++)
+            {
+                var periodId = orderedPeriods[index].PeriodId;
+                runningGraduated += cells
+                    .Where(x => x.PeriodId == periodId)
+                    .Sum(x => x.StudentCount);
+                if (populationTotal > 0 && runningGraduated >= populationTotal)
+                {
+                    completionIndex = index;
+                    break;
+                }
+            }
+            if (completionIndex >= 0 && completionIndex < orderedPeriods.Count - 1)
+            {
+                orderedPeriods = orderedPeriods.Take(completionIndex + 1).ToList();
+                var retainedPeriodIds = orderedPeriods.Select(x => x.PeriodId).ToHashSet();
+                cells = cells.Where(x => retainedPeriodIds.Contains(x.PeriodId)).ToList();
+            }
+        }
         var periodByIdForOnTime = orderedPeriods.ToDictionary(x => x.PeriodId);
         var total = cells.Sum(x => x.StudentCount);
         // Số sinh viên nhập học vẫn là mẫu số của tỷ lệ Đã tốt nghiệp, chỉ không còn

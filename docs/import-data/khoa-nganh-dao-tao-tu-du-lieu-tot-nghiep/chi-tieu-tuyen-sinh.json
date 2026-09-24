@@ -1,0 +1,113 @@
+{
+  "description": "Chỉ tiêu tuyển sinh dùng làm số sinh viên đầu vào tạm tính; không phải số thực nhập.",
+  "cohorts": {
+    "K50": {
+      "admissionYear": 2009,
+      "sourceUrl": "https://vimaru.edu.vn/ten-subsite/tuyen-sinh-2014",
+      "sourceKind": "official_historical_total_only",
+      "notes": "Nguồn chỉ có tổng chỉ tiêu toàn trường năm 2009 (2.800), không có chỉ tiêu chi tiết theo chương trình; giữ số tốt nghiệp quan sát làm cận dưới.",
+      "quotas": {}
+    },
+    "K56": {
+      "admissionYear": 2015,
+      "sourceUrl": "https://infonet.vietnamnet.vn/chi-tieu-tuyen-sinh-nam-2015-cua-dai-hoc-hang-hai-232139.html",
+      "sourceKind": "secondary_republication",
+      "quotas": { "A409": 100, "D116": 90 }
+    },
+    "K57": {
+      "admissionYear": 2016,
+      "sourceUrl": "https://tuyensinh.vimaru.edu.vn/node/210",
+      "sourceKind": "official_admission_announcement",
+      "quotas": { "D104": 90, "A408": 100, "A409": 100, "D127": 45, "D122": 45, "D119": 45 }
+    },
+    "K58": {
+      "admissionYear": 2017,
+      "sourceUrl": "https://tuyensinh.vimaru.edu.vn/node/236",
+      "sourceKind": "official_admission_announcement",
+      "quotas": {
+        "D101": 180, "D102": 135, "D103": 90, "D104": 90, "D105": 90, "D106": 90,
+        "D107": 45, "D108": 45, "D109": 45, "D110": 90, "D111": 45, "D112": 90,
+        "D113": 45, "D114": 90, "D115": 90, "D116": 90, "D117": 45, "D118": 45,
+        "D119": 45, "D120": 80, "D121": 90, "D122": 45, "D123": 45, "D124": 60,
+        "D125": 60, "D126": 45, "D127": 45, "D128": 30, "D401": 135, "D402": 135,
+        "D403": 90, "D404": 135, "D407": 135, "D410": 45, "D411": 45,
+        "H105": 45, "H114": 45, "H401": 90, "H402": 90, "A403": 45, "A408": 100, "A409": 80
+      }
+    },
+    "K59": {
+      "admissionYear": 2018,
+      "sourceUrl": "https://tuyensinh.vimaru.edu.vn/sites/tuyensinh.vimaru.edu.vn/files/De%20an%20tuyen%20sinh%202018_0.pdf",
+      "sourceKind": "official_admission_proposal",
+      "quotas": {
+        "D101": 180, "D102": 115, "D103": 45, "D104": 90, "D105": 90, "D106": 60,
+        "D107": 45, "D108": 45, "D109": 45, "D110": 45, "D111": 45, "D112": 75,
+        "D113": 45, "D114": 100, "D115": 90, "D116": 90, "D117": 60, "D118": 45,
+        "D119": 45, "D120": 90, "D121": 90, "D122": 60, "D123": 45, "D124": 90,
+        "D125": 90, "D126": 45, "D127": 45, "D128": 45, "D401": 135, "D402": 130,
+        "D403": 80, "D404": 135, "D407": 135, "D410": 60, "D411": 45,
+        "H105": 60, "H114": 60, "H401": 90, "H402": 80, "A403": 80, "A408": 60, "A409": 80
+      }
+    },
+    "K60": {
+      "admissionYear": 2019,
+      "sourceUrl": "https://tuyensinh.vimaru.edu.vn/sites/tuyensinh.vimaru.edu.vn/files/De%20an%20tuyen%20sinh%202019_0.pdf",
+      "sourceKind": "official_admission_proposal",
+      "notes": "Cộng chỉ tiêu của bốn phương thức và chỉ tiêu tuyển thẳng trong đề án; tổng toàn trường 3.200.",
+      "quotas": {
+        "D101": 150, "D102": 115, "D103": 45, "D104": 90, "D105": 90, "D106": 60,
+        "D107": 45, "D108": 45, "D109": 45, "D110": 45, "D111": 45, "D112": 75,
+        "D113": 45, "D114": 100, "D115": 90, "D116": 90, "D117": 60, "D118": 45,
+        "D119": 45, "D120": 90, "D121": 90, "D122": 60, "D123": 45, "D124": 90,
+        "D125": 90, "D126": 45, "D127": 30, "D128": 45, "D129": 30, "D130": 30,
+        "D401": 135, "D402": 130, "D403": 80, "D404": 135, "D407": 135, "D410": 60,
+        "D411": 45, "H105": 60, "H114": 60, "H401": 90, "H402": 80,
+        "A403": 80, "A408": 60, "A409": 80
+      }
+    },
+    "K61": {
+      "admissionYear": 2020,
+      "sourceUrl": "https://tuyensinh.vimaru.edu.vn/sites/tuyensinh.vimaru.edu.vn/files/De%20an%20tuyen%20sinh%202020_0.pdf",
+      "sourceKind": "official_admission_proposal",
+      "quotas": {
+        "D101": 130, "D102": 90, "D103": 45, "D104": 90, "D105": 90, "D106": 45,
+        "D107": 45, "D108": 45, "D109": 45, "D110": 45, "D111": 45, "D112": 75,
+        "D113": 45, "D114": 100, "D115": 90, "D116": 90, "D117": 60, "D118": 45,
+        "D119": 45, "D120": 90, "D121": 90, "D122": 60, "D123": 45, "D124": 90,
+        "D125": 90, "D126": 45, "D127": 30, "D128": 45, "D129": 30, "D130": 30,
+        "D401": 135, "D402": 130, "D403": 80, "D404": 135, "D407": 135, "D410": 60,
+        "D411": 45, "H105": 60, "H114": 60, "H401": 90, "H402": 80,
+        "A403": 80, "A408": 60, "A409": 80, "S101": 30, "S102": 30
+      }
+    },
+    "K62": {
+      "admissionYear": 2021,
+      "sourceUrl": "https://tuyensinh.vimaru.edu.vn/huongdan/2021-thong-bao-tuyen-sinh-he-dai-hoc-chinh-quy-nam-2021.vmu",
+      "sourceKind": "official_admission_announcement",
+      "quotas": {
+        "D101": 130, "D102": 90, "D103": 45, "D104": 90, "D105": 100, "D106": 45,
+        "D107": 45, "D108": 45, "D109": 45, "D110": 45, "D111": 45, "D112": 75,
+        "D113": 45, "D114": 110, "D115": 100, "D116": 100, "D117": 75, "D118": 60,
+        "D119": 60, "D120": 110, "D121": 100, "D122": 75, "D123": 45, "D124": 90,
+        "D125": 90, "D126": 45, "D127": 30, "D128": 60, "D129": 75, "D130": 45,
+        "D131": 30, "D401": 145, "D402": 150, "D403": 90, "D404": 140, "D407": 150,
+        "D410": 90, "D411": 60, "H105": 60, "H114": 60, "H401": 90, "H402": 90,
+        "A403": 90, "A408": 90, "A409": 90, "S101": 30, "S102": 30
+      }
+    },
+    "K63": {
+      "admissionYear": 2022,
+      "sourceUrl": "https://tuyensinh.vimaru.edu.vn/node/374",
+      "sourceKind": "official_admission_announcement",
+      "quotas": {
+        "D101": 130, "D102": 90, "D103": 45, "D104": 90, "D105": 100, "D106": 45,
+        "D107": 45, "D108": 45, "D109": 45, "D110": 45, "D111": 45, "D112": 75,
+        "D113": 45, "D114": 110, "D115": 100, "D116": 100, "D117": 75, "D118": 60,
+        "D119": 60, "D120": 110, "D121": 100, "D122": 75, "D123": 45, "D124": 90,
+        "D125": 90, "D126": 45, "D127": 30, "D128": 60, "D129": 75, "D130": 45,
+        "D131": 30, "D401": 145, "D402": 150, "D403": 90, "D404": 140, "D407": 150,
+        "D410": 90, "D411": 60, "H105": 60, "H114": 60, "H401": 90, "H402": 90,
+        "A403": 90, "A408": 90, "A409": 90, "S101": 30, "S102": 30
+      }
+    }
+  }
+}

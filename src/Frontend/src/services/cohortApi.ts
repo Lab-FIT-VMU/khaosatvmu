@@ -123,7 +123,11 @@ export const cohortErrorMessages: Record<string, string> = {
   COHORT_MAJOR_MAJOR_REQUIRED: 'Vui lòng chọn ngành đào tạo.',
   COHORT_MAJOR_MAJOR_NOT_FOUND:
     'Không tra được ngành đào tạo từ cột "Ngành đào tạo".',
-  COHORT_MAJOR_STUDENT_COUNT_INVALID: 'Số lượng sinh viên phải là số không âm.',
+  COHORT_MAJOR_STUDENT_COUNT_INVALID: 'Số lượng sinh viên đầu vào phải là số không âm.',
+  COHORT_MAJOR_IMPORT_MULTIPLE_COHORTS:
+    'File chứa dữ liệu của từ hai khóa học trở lên. Mỗi file chỉ được import cho một khóa học.',
+  COHORT_MAJOR_IMPORT_COHORT_MISMATCH:
+    'Mã lớp trong file không thuộc khóa học đang chọn. Hãy chọn đúng khóa hoặc dùng file khác.',
 };
 
 export function cohortErrorMessage(errorCode: string | null | undefined): string {

@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using Application.Cohorts;
 using Domain;
 using Infrastructure.Persistence;
@@ -331,9 +332,29 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
         IReadOnlyList<ImportCohortMajorRowCommand> rows,
         CancellationToken cancellationToken = default)
     {
-        if (!await db.Cohorts.AnyAsync(x => x.CohortId == cohortId, cancellationToken))
+        var selectedCohortCode = await db.Cohorts
+            .Where(x => x.CohortId == cohortId)
+            .Select(x => x.CohortCode)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (selectedCohortCode is null)
         {
             return Failed<CohortImportDto>(CohortErrorCodes.CohortNotFound);
+        }
+
+        var detectedCohorts = rows
+            .Select(x => TryExtractCohortCode(x.CohortMajorCode))
+            .Where(x => x is not null)
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (detectedCohorts.Count > 1)
+        {
+            return Failed<CohortImportDto>(CohortErrorCodes.ImportMultipleCohorts);
+        }
+        if (detectedCohorts.Count == 1
+            && !string.Equals(detectedCohorts[0], selectedCohortCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return Failed<CohortImportDto>(CohortErrorCodes.ImportCohortMismatch);
         }
 
         var majors = await db.Majors.AsNoTracking()
@@ -509,6 +530,20 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
     private static string NormalizeCode(string? value) => (value ?? string.Empty).Trim();
 
     private static string NormalizeName(string? value) => (value ?? string.Empty).Trim();
+
+    /// <summary>
+    /// Mã lớp chuẩn có dạng CNT63CL, KPM66ĐH... Hai chữ số đứng giữa là mã khoá.
+    /// Chỉ dùng mã đọc chắc chắn được; mã tự do không bị đoán sai sang một khoá khác.
+    /// </summary>
+    private static string? TryExtractCohortCode(string? value)
+    {
+        var normalized = string.Concat(NormalizeName(value).Where(x => !char.IsWhiteSpace(x) && x is not '-' and not '_' and not '.' and not '/'));
+        var match = Regex.Match(
+            normalized,
+            @"^[\p{L}]{2,10}(\d{2})(?:ĐH|DH|CL|CH)\d{0,2}$",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return match.Success ? match.Groups[1].Value : null;
+    }
 
     private static CohortOperationResult<T> Ok<T>(T value) => new(true, null, value);
 

@@ -1,0 +1,87 @@
+{
+  "reports": [
+    {
+      "cohortCode": "K50",
+      "admissionYear": 2009,
+      "rows": 2,
+      "quotaRows": 0,
+      "lowerBoundRows": 0,
+      "unresolvedRows": [
+        {
+          "classCode": "IBL50ĐH",
+          "programCode": "A409",
+          "observedGraduates": 1
+        },
+        {
+          "classCode": "MKT50ĐH",
+          "programCode": "D102",
+          "observedGraduates": 1
+        }
+      ]
+    },
+    {
+      "cohortCode": "K56",
+      "admissionYear": 2015,
+      "rows": 2,
+      "quotaRows": 2,
+      "lowerBoundRows": 0,
+      "unresolvedRows": []
+    },
+    {
+      "cohortCode": "K57",
+      "admissionYear": 2016,
+      "rows": 6,
+      "quotaRows": 6,
+      "lowerBoundRows": 0,
+      "unresolvedRows": []
+    },
+    {
+      "cohortCode": "K58",
+      "admissionYear": 2017,
+      "rows": 19,
+      "quotaRows": 19,
+      "lowerBoundRows": 0,
+      "unresolvedRows": []
+    },
+    {
+      "cohortCode": "K59",
+      "admissionYear": 2018,
+      "rows": 38,
+      "quotaRows": 38,
+      "lowerBoundRows": 0,
+      "unresolvedRows": []
+    },
+    {
+      "cohortCode": "K60",
+      "admissionYear": 2019,
+      "rows": 43,
+      "quotaRows": 43,
+      "lowerBoundRows": 0,
+      "unresolvedRows": []
+    },
+    {
+      "cohortCode": "K61",
+      "admissionYear": 2020,
+      "rows": 45,
+      "quotaRows": 45,
+      "lowerBoundRows": 1,
+      "unresolvedRows": []
+    },
+    {
+      "cohortCode": "K62",
+      "admissionYear": 2021,
+      "rows": 47,
+      "quotaRows": 47,
+      "lowerBoundRows": 4,
+      "unresolvedRows": []
+    },
+    {
+      "cohortCode": "K63",
+      "admissionYear": 2022,
+      "rows": 39,
+      "quotaRows": 39,
+      "lowerBoundRows": 1,
+      "unresolvedRows": []
+    }
+  ]
+}
