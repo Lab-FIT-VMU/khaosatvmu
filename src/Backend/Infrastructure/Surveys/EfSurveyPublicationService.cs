@@ -51,9 +51,10 @@ public sealed class EfSurveyPublicationService(
         bool publish,
         CancellationToken cancellationToken = default)
     {
-        // Phát hành là mở dữ liệu cả đợt cho hai vai trò khác, nên chỉ quản trị.
+        // Phát hành là mở dữ liệu cả đợt cho các vai trò khác, nên chỉ quản trị.
+        // Ban Giám hiệu xem được cả đợt chưa phát hành nhưng không tự phát hành.
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.SeesEverything)
+        if (!scope.ManagesEverything)
         {
             return new SurveyOperationResult<SurveyPublicationDto>(
                 false, SurveyErrorCodes.OutOfScope, default);

@@ -55,9 +55,31 @@ interface GraduationEChartProps {
 
 export interface GraduationEChartHandle {
   getPngDataUrl: () => string | null;
+  zoomIn: () => void;
+  zoomOut: () => void;
 }
 
 const colors = ['#0788b8', '#e07a2d', '#5b8f3c', '#7557a5', '#c24f6d', '#526d82', '#38a3a5', '#d49b28'];
+
+const adjustChartZoom = (chart: ReturnType<typeof echarts.init>, factor: number) => {
+  const currentOption = chart.getOption() as {
+    dataZoom?: Array<{ start?: number; end?: number }>;
+  };
+  for (const [dataZoomIndex, zoom] of (currentOption.dataZoom ?? []).entries()) {
+    const start = zoom.start ?? 0;
+    const end = zoom.end ?? 100;
+    const currentSpan = Math.max(1, end - start);
+    const nextSpan = Math.min(100, Math.max(5, currentSpan * factor));
+    const center = (start + end) / 2;
+    const nextStart = Math.max(0, Math.min(100 - nextSpan, center - nextSpan / 2));
+    chart.dispatchAction({
+      type: 'dataZoom',
+      dataZoomIndex,
+      start: nextStart,
+      end: nextStart + nextSpan,
+    });
+  }
+};
 
 const formatValue = (value: unknown, unit?: 'count' | 'percent') => {
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -96,6 +118,12 @@ export const GraduationEChart = forwardRef<GraduationEChartHandle, GraduationECh
       backgroundColor: '#ffffff',
       excludeComponents: ['dataZoom', 'toolbox'],
     }) ?? null,
+    zoomIn: () => {
+      if (chartRef.current) adjustChartZoom(chartRef.current, 0.8);
+    },
+    zoomOut: () => {
+      if (chartRef.current) adjustChartZoom(chartRef.current, 1.25);
+    },
   }), []);
   const option = useMemo<EChartsOption>(() => {
     const palette = customColors?.length ? customColors : colors;
@@ -368,23 +396,7 @@ export const GraduationEChart = forwardRef<GraduationEChartHandle, GraduationECh
       event.preventDefault();
       event.stopPropagation();
 
-      const currentOption = chart.getOption() as {
-        dataZoom?: Array<{ id?: string; start?: number; end?: number }>;
-      };
-      for (const [dataZoomIndex, zoom] of (currentOption.dataZoom ?? []).entries()) {
-        const start = zoom.start ?? 0;
-        const end = zoom.end ?? 100;
-        const currentSpan = Math.max(1, end - start);
-        const nextSpan = Math.min(100, Math.max(5, currentSpan * (event.deltaY < 0 ? .85 : 1.18)));
-        const center = (start + end) / 2;
-        const nextStart = Math.max(0, Math.min(100 - nextSpan, center - nextSpan / 2));
-        chart.dispatchAction({
-          type: 'dataZoom',
-          dataZoomIndex,
-          start: nextStart,
-          end: nextStart + nextSpan,
-        });
-      }
+      adjustChartZoom(chart, event.deltaY < 0 ? 0.85 : 1.18);
     };
     observer.observe(host);
     host.addEventListener('wheel', handleWheel, { capture: true, passive: false });

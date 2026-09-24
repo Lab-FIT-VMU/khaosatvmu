@@ -31,7 +31,7 @@ export const NoteModalButton: React.FC<NoteModalButtonProps> = ({ title, label =
         {label && <span>{label}</span>}
       </button>
 
-      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={title} size="compact">
+      <Modal isOpen={isOpen} onClose={() => setIsOpen(false)} title={title} size="note">
         <div className="note-modal-body">{children}</div>
       </Modal>
     </>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
@@ -6,15 +6,22 @@ import {
   ChevronDown,
   CircleAlert,
   LoaderCircle,
-  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../auth/authContext';
-import { isReadOnlyRole, isUnrestrictedRole } from '../auth/roles';
+import { seesAllData, seesOnlyOwnSections } from '../auth/roles';
+import {
+  formatDecimal,
+  formatDecimalOrDash,
+  formatPercent,
+  formatSigned,
+} from '../utils/formatNumber';
 import { useSemester } from '../context/semesterContext';
+import { useSetBreadcrumbTrail } from '../context/breadcrumbTrail';
 import { TablePagination } from '../components/TablePagination';
 import { usePaginatedItems } from '../hooks/usePaginatedItems';
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
 import { NoteModalButton } from '../components/NoteModalButton';
+import { Formula, FormulaDefs, FormulaTable, TeX } from '../components/FormulaBlock';
 import { useScoringThresholds } from '../hooks/useScoringThresholds';
 import { ExportDropdown } from '../components/ExportDropdown';
 import type { ExportColumn } from '../services/exportDataService';
@@ -31,12 +38,13 @@ import type {
   SemesterSurveyNormalization,
   SurveyAnalysisScopeType,
 } from '../services/surveyApi';
-import type { SemesterSurvey } from '../types';
+import { useSemesterSurveys } from '../hooks/useSemesterSurveys';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/reports.css';
 import '../styles/catalogs.css';
 import {
+  campaignPlaceholder,
   getActiveSemesterSurveyId,
   selectAvailableSemesterSurveyId,
   setActiveSemesterSurveyId,
@@ -52,10 +60,12 @@ import {
   bên ngoài thì lần đầu vào trang ô chọn bung ra không còn hình hài gì.
 */
 const campaignSelectCss = `
-.campaign-select { position: relative; flex: 0 0 460px; min-width: 0; }
+/* Co lại được: cố định 460px thì khi phóng to trình duyệt, thanh công cụ hết chỗ
+   và nút Cập nhật điểm bị đẩy xuống dòng thứ hai. */
+.campaign-select { position: relative; flex: 0 1 380px; min-width: 200px; }
 .campaign-select__trigger {
   width: 100%; min-height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border: 1px solid #d7dee2; background: #fff; color: #000000;
+  padding: 6px 10px; border: 1px solid var(--field-border); background: #fff; color: #000000;
   font: inherit; font-size: 13px; text-align: left; cursor: pointer;
 }
 .campaign-select__trigger:disabled { background: #f4f6f8; color: #8c969f; cursor: not-allowed; }
@@ -64,7 +74,7 @@ const campaignSelectCss = `
 .campaign-select__caret { flex: 0 0 auto; width: 14px; height: 14px; color: #000000; }
 .campaign-select__list {
   position: fixed; z-index: 1000; margin: 0; padding: 4px 0; list-style: none;
-  overflow-y: auto; border: 1px solid #d7dee2; background: #fff;
+  overflow-y: auto; border: 1px solid var(--field-border); background: #fff;
   box-shadow: 0 8px 24px rgba(15,30,45,.16);
 }
 .campaign-select__option {
@@ -86,7 +96,7 @@ const campaignSelectCss = `
 }
 .campaign-select__empty { padding: 10px 12px; color: #000000; font-size: 13px; text-align: center; }
 .campaign-select__hint {
-  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid #d7dee2;
+  position: fixed; z-index: 1001; padding: 9px 12px; border: 1px solid var(--field-border);
   background: #fff; box-shadow: 0 8px 22px rgba(15,30,45,.2); color: #000000;
   font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; pointer-events: none;
 }
@@ -353,6 +363,20 @@ function scoreClass(score: number | null): string {
   return 'num score-band score-band--good';
 }
 
+/**
+ * Giảng viên chỉ dạy MỘT lớp thì ba cột điểm cuối của bảng Báo cáo giảng viên không
+ * so được với cái gì: điểm trung bình, lớp thấp nhất và lớp cao nhất đều là số của
+ * đúng lớp đó. Trả null để cả ba cột in "—".
+ */
+function comparableScore(sectionCount: number, score: number | null | undefined): number | null {
+  return sectionCount > 1 && typeof score === 'number' ? score : null;
+}
+
+/** Điểm in ra bảng: hai chữ số, không có số thì "—". */
+function scoreText(score: number | null): string {
+  return formatDecimalOrDash(score, 3);
+}
+
 /** Biên độ rộng thì tô đỏ — đó chính là tín hiệu để đọc bảng này. */
 function spreadClass(spread: number): string {
   return spread >= 0.8 ? 'num is-flagged' : 'num';
@@ -377,54 +401,272 @@ function zTierClass(value: number | null): string {
   return 'num';
 }
 
-/** Công thức và bốn bậc của cột Nhận định, đọc trong hộp thoại chú thích. */
-const FormulaNotes: React.FC<{ notes: string[] }> = ({ notes }) => (
+/**
+ * Một mục trong hộp Chú thích.
+ *
+ * `display` là bản dựng bằng JSX để công thức có phân số, dấu căn, chỉ số dưới; `plain`
+ * là bản chữ một dòng in vào ghi chú của tệp xuất — tệp .xlsx/.docx/.pdf không xếp
+ * được phân số nên phải có bản chữ, và cả hai cùng nằm một chỗ để sửa là sửa cả hai.
+ */
+interface FormulaNote {
+  title?: string;
+  display: ReactNode;
+  plain: string[];
+}
+
+/**
+ * Công thức và bốn bậc của cột Nhận định, đọc trong hộp thoại chú thích.
+ *
+ * Mỗi mục là một khối riêng: tiêu đề đánh số, công thức đứng giữa một dải nền, rồi
+ * bảng ký hiệu. Trước đây ba phần này là anh em ruột trong một dải flex nằm ngang
+ * nên chúng xếp cạnh nhau, đọc không ra đâu là công thức của mục nào.
+ */
+const FormulaNotes: React.FC<{ notes: FormulaNote[] }> = ({ notes }) => (
   <>
     {notes.map((note) => (
-      <p className="z-legend__note" key={note}>
-        {note}
-      </p>
+      <section className="formula-note" key={note.plain[0] ?? note.title}>
+        {note.title && <h4 className="formula-note__title">{note.title}</h4>}
+        {note.display}
+      </section>
     ))}
   </>
 );
 
 /**
  * Công thức tính riêng của từng tab. Trang cha ghép chúng vào sau dòng mô tả tab
- * trong cùng một hộp Chú thích, và in lại vào phần ghi chú của tệp xuất — một nguồn
- * chữ cho cả hai để tệp xuất không lệch chú thích trên màn hình.
+ * trong cùng một hộp Chú thích, và in bản chữ của chúng vào ghi chú của tệp xuất.
  */
-const tabFormulaNotes: Partial<Record<TabId, string[]>> = {
+const tabFormulaNotes: Partial<Record<TabId, FormulaNote[]>> = {
   normalization: [
-    'Độ lệch chuẩn = √( Tổng bình phương (Điểm từng lớp − Điểm trung bình khoa) ÷ (Số lớp − 1) )',
-    'Z-Score = (Điểm trung bình khoa − Trung bình toàn trường)'
-      + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp)',
+    {
+      title: '1. Độ lệch chuẩn',
+      display: (
+        <>
+          <Formula tex={String.raw`\sigma = \sqrt{\dfrac{\displaystyle\sum_{i=1}^{n}\left(x_i - \bar{x}\right)^2}{n - 1}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`x_i`, meaning: 'Điểm trung bình của lớp thứ i.' },
+              { tex: String.raw`\bar{x}`, meaning: 'Điểm trung bình của khoa/viện.' },
+              { tex: String.raw`n`, meaning: 'Số lớp.' },
+              { tex: String.raw`\sigma`, meaning: 'Độ lệch chuẩn của điểm trung bình các lớp.' },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Độ lệch chuẩn σ = √( Σ(xᵢ − x̄)² ÷ (n − 1) ).'
+          + ' Trong đó xᵢ là điểm trung bình của lớp thứ i, x̄ là điểm trung bình của khoa/viện,'
+          + ' n là số lớp, σ là độ lệch chuẩn của điểm trung bình các lớp.',
+      ],
+    },
+    {
+      title: '2. Z-Score',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{khoa}} - \bar{x}_{\text{toàn trường}}}{\dfrac{\sigma_{\text{toàn trường}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{khoa}}`, meaning: 'Điểm trung bình của khoa/viện.' },
+              { tex: String.raw`\bar{x}_{\text{toàn trường}}`, meaning: 'Điểm trung bình của toàn trường.' },
+              { tex: String.raw`\sigma_{\text{toàn trường}}`, meaning: 'Độ lệch chuẩn của toàn trường.' },
+              { tex: String.raw`n`, meaning: 'Số lớp.' },
+              { tex: String.raw`\dfrac{\sigma_{\text{toàn trường}}}{\sqrt{n}}`, meaning: 'Sai số chuẩn.' },
+              {
+                tex: String.raw`Z`,
+                meaning: 'Mức chênh lệch giữa điểm trung bình của khoa/viện và toàn trường, tính theo đơn vị sai số chuẩn.',
+              },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Z-Score = (Điểm trung bình khoa − Trung bình toàn trường)'
+          + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp).'
+          + ' Trong đó x̄ khoa là điểm trung bình của khoa/viện, x̄ toàn trường là điểm trung bình của toàn trường,'
+          + ' σ toàn trường là độ lệch chuẩn của toàn trường, n là số lớp,'
+          + ' σ toàn trường ÷ √n là sai số chuẩn.',
+      ],
+    },
+    {
+      title: '3. Phân loại theo độ lệch chuẩn',
+      display: (
+        <FormulaTable
+          headers={['|Z|', 'Phân loại']}
+          rows={[
+            [<TeX key="z1" tex={String.raw`\left|Z\right| \le 1`} />, 'Trong khoảng 1σ'],
+            [<TeX key="z2" tex={String.raw`1 < \left|Z\right| \le 2`} />, 'Trong khoảng 2σ'],
+            [<TeX key="z3" tex={String.raw`2 < \left|Z\right| \le 3`} />, 'Trong khoảng 3σ'],
+          ]}
+        />
+      ),
+      plain: [
+        'Phân loại theo |Z|: |Z| ≤ 1 trong khoảng 1σ; 1 < |Z| ≤ 2 trong khoảng 2σ;'
+          + ' 2 < |Z| ≤ 3 trong khoảng 3σ.',
+      ],
+    },
   ],
   normalizationSections: [
-    'Z-Score so với toàn trường = (Điểm lớp − Trung bình toàn trường) ÷ Độ lệch chuẩn toàn trường',
-    'Z-Score so với khoa = (Điểm lớp − Điểm trung bình khoa) ÷ Độ lệch chuẩn khoa',
+    {
+      title: '1. Z-Score so với toàn trường',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\text{Điểm lớp} - \bar{x}_{\text{toàn trường}}}{\sigma_{\text{toàn trường}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\text{Điểm lớp}`, meaning: 'Điểm trung bình của lớp đang xét.' },
+              { tex: String.raw`\bar{x}_{\text{toàn trường}}`, meaning: 'Điểm trung bình của toàn trường.' },
+              { tex: String.raw`\sigma_{\text{toàn trường}}`, meaning: 'Độ lệch chuẩn của toàn trường.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Z-Score so với toàn trường = (Điểm lớp − Trung bình toàn trường) ÷ Độ lệch chuẩn toàn trường.'],
+    },
+    {
+      title: '2. Z-Score so với khoa',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\text{Điểm lớp} - \bar{x}_{\text{khoa}}}{\sigma_{\text{khoa}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{khoa}}`, meaning: 'Điểm trung bình của khoa/viện chủ quản lớp.' },
+              { tex: String.raw`\sigma_{\text{khoa}}`, meaning: 'Độ lệch chuẩn điểm các lớp trong khoa.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Z-Score so với khoa = (Điểm lớp − Điểm trung bình khoa) ÷ Độ lệch chuẩn khoa.'],
+    },
   ],
   departments: [
-    'Mỗi dòng gộp toàn bộ lớp của một bộ môn trong đợt khảo sát.',
-    'Độ lệch chuẩn = độ lệch chuẩn điểm các lớp của bộ môn.',
-    'Z-Score so với toàn trường = (Điểm trung bình bộ môn − Trung bình toàn trường)'
-      + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp)',
-    'Z-Score so với khoa = (Điểm trung bình bộ môn − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
-      + ' Để trống khi khoa có dưới 2 lớp.',
+    {
+      title: '1. Độ lệch chuẩn của bộ môn',
+      display: (
+        <>
+          <Formula tex={String.raw`\sigma = \sqrt{\dfrac{\displaystyle\sum_{i=1}^{n}\left(x_i - \bar{x}\right)^2}{n - 1}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`x_i`, meaning: 'Điểm trung bình của lớp thứ i trong bộ môn.' },
+              { tex: String.raw`\bar{x}`, meaning: 'Điểm trung bình của bộ môn.' },
+              { tex: String.raw`n`, meaning: 'Số lớp của bộ môn.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Độ lệch chuẩn = độ lệch chuẩn điểm các lớp của bộ môn (công thức như tab theo khoa/viện).'],
+    },
+    {
+      title: '2. Z-Score so với toàn trường',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{bộ môn}} - \bar{x}_{\text{toàn trường}}}{\dfrac{\sigma_{\text{toàn trường}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{bộ môn}}`, meaning: 'Điểm trung bình của bộ môn.' },
+              { tex: String.raw`\bar{x}_{\text{toàn trường}}`, meaning: 'Điểm trung bình của toàn trường.' },
+              { tex: String.raw`n`, meaning: 'Số lớp của bộ môn.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Z-Score so với toàn trường = (Điểm trung bình bộ môn − Trung bình toàn trường) ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp).'],
+    },
+    {
+      title: '3. Z-Score so với khoa',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{bộ môn}} - \bar{x}_{\text{khoa}}}{\dfrac{\sigma_{\text{khoa}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{khoa}}`, meaning: 'Điểm trung bình của khoa/viện chủ quản.' },
+              { tex: String.raw`\sigma_{\text{khoa}}`, meaning: 'Độ lệch chuẩn điểm các lớp trong khoa.' },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Z-Score so với khoa = (Điểm trung bình bộ môn − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
+          + ' Để trống khi khoa có dưới 2 lớp.',
+      ],
+    },
   ],
   courses: [
-    'Bảng này so các lớp TRONG CÙNG một học phần với nhau.',
-    'Chênh lệch giữa các lớp = Điểm lớp cao nhất − Điểm lớp thấp nhất.',
-    'Z-Score so với toàn trường = (Điểm trung bình học phần − Trung bình toàn trường)'
-      + ' ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp)',
-    'Z-Score so với khoa = (Điểm trung bình học phần − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
-      + ' Để trống khi khoa có dưới 2 lớp.',
+    {
+      title: '1. Chênh lệch giữa các lớp',
+      display: (
+        <Formula tex={String.raw`\text{Chênh lệch} = \text{Điểm lớp cao nhất} - \text{Điểm lớp thấp nhất}`} />
+      ),
+      plain: ['Bảng này so các lớp TRONG CÙNG một học phần với nhau. Chênh lệch giữa các lớp = Điểm lớp cao nhất − Điểm lớp thấp nhất.'],
+    },
+    {
+      title: '2. Z-Score so với toàn trường',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{học phần}} - \bar{x}_{\text{toàn trường}}}{\dfrac{\sigma_{\text{toàn trường}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{học phần}}`, meaning: 'Điểm trung bình của học phần.' },
+              { tex: String.raw`n`, meaning: 'Số lớp của học phần.' },
+            ]}
+          />
+        </>
+      ),
+      plain: ['Z-Score so với toàn trường = (Điểm trung bình học phần − Trung bình toàn trường) ÷ (Độ lệch chuẩn toàn trường ÷ √Số lớp).'],
+    },
+    {
+      title: '3. Z-Score so với khoa',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\bar{x}_{\text{học phần}} - \bar{x}_{\text{khoa}}}{\dfrac{\sigma_{\text{khoa}}}{\sqrt{n}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{khoa}}`, meaning: 'Điểm trung bình của khoa/viện chủ quản học phần.' },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Z-Score so với khoa = (Điểm trung bình học phần − Điểm trung bình khoa) ÷ (Độ lệch chuẩn khoa ÷ √Số lớp).'
+          + ' Để trống khi khoa có dưới 2 lớp.',
+      ],
+    },
   ],
   lecturer: [
-    'Z-Score = (Điểm lớp − Trung bình nhóm so) ÷ Độ lệch chuẩn nhóm so.'
-      + ' Ba cột Z dùng ba nhóm: toàn trường, các lớp cùng khoa, các lớp cùng bộ môn.',
-    'Chênh so học phần = Điểm lớp − Điểm trung bình học phần.'
-      + ' Để trống khi học phần chỉ có đúng lớp này, không có ai để so.',
-    'Lớp cảnh báo = số lớp có điểm thấp hơn trung bình từ 1 độ lệch chuẩn trở lên (Z-Score ≤ −1).',
+    {
+      title: '1. Z-Score',
+      display: (
+        <>
+          <Formula tex={String.raw`Z = \dfrac{\text{Điểm lớp} - \bar{x}_{\text{nhóm so}}}{\sigma_{\text{nhóm so}}}`} />
+          <FormulaDefs
+            items={[
+              { tex: String.raw`\bar{x}_{\text{nhóm so}}`, meaning: 'Điểm trung bình của nhóm đem ra so.' },
+              {
+                tex: String.raw`\sigma_{\text{nhóm so}}`,
+                meaning: 'Độ lệch chuẩn của nhóm so. Ba cột Z dùng ba nhóm: toàn trường, các lớp cùng khoa, các lớp cùng bộ môn.',
+              },
+            ]}
+          />
+        </>
+      ),
+      plain: [
+        'Z-Score = (Điểm lớp − Trung bình nhóm so) ÷ Độ lệch chuẩn nhóm so.'
+          + ' Ba cột Z dùng ba nhóm: toàn trường, các lớp cùng khoa, các lớp cùng bộ môn.',
+      ],
+    },
+    {
+      title: '2. Chênh so học phần',
+      display: (
+        <Formula tex={String.raw`\text{Chênh so học phần} = \text{Điểm lớp} - \bar{x}_{\text{học phần}}`} />
+      ),
+      plain: ['Chênh so học phần = Điểm lớp − Điểm trung bình học phần. Để trống khi học phần chỉ có đúng lớp này, không có ai để so.'],
+    },
+    {
+      title: '3. Lớp cảnh báo',
+      display: (
+        <Formula tex={String.raw`\text{Lớp cảnh báo}: Z \le -1`} />
+      ),
+      plain: ['Lớp cảnh báo = số lớp có điểm thấp hơn trung bình từ 1 độ lệch chuẩn trở lên (Z-Score ≤ −1).'],
+    },
   ],
 };
 
@@ -441,7 +683,7 @@ type MaybeNumber = number | null | undefined;
 const fixedOrDash = (value: MaybeNumber, digits: number) =>
   value === undefined ? undefined : value === null ? '—' : value.toFixed(digits);
 const signedOrDash = (value: MaybeNumber) =>
-  value === undefined ? undefined : value === null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(2)}`;
+  value === undefined ? undefined : value === null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(3)}`;
 const percentOf = (part: number, whole: number) => (whole === 0 ? null : (part / whole) * 100);
 
 const textColumn = (key: string, header: string, width: number): ExportColumn => ({ key, header, width });
@@ -458,16 +700,16 @@ const rateColumn = (key: string, header: string, width = 12): ExportColumn => ({
   width,
   type: 'number',
   align: 'right',
-  numberFormat: '0.0"%"',
-  format: (value: MaybeNumber) => fixedOrDash(value, 1),
+  numberFormat: '0.000"%"',
+  format: (value: MaybeNumber) => fixedOrDash(value, 3),
 });
-const scoreColumn = (key: string, header: string, digits = 2, width = 12): ExportColumn => ({
+const scoreColumn = (key: string, header: string, digits = 3, width = 12): ExportColumn => ({
   key,
   header,
   width,
   type: 'number',
   align: 'right',
-  numberFormat: digits === 3 ? '0.000' : '0.00',
+  numberFormat: '0.000',
   format: (value: MaybeNumber) => fixedOrDash(value, digits),
 });
 const zColumn = (key: string, header: string, width = 14): ExportColumn => ({
@@ -476,7 +718,7 @@ const zColumn = (key: string, header: string, width = 14): ExportColumn => ({
   width,
   type: 'number',
   align: 'right',
-  numberFormat: '+0.00;-0.00;0.00',
+  numberFormat: '+0.000;-0.000;0.000',
   format: signedOrDash,
 });
 
@@ -499,7 +741,11 @@ export const SurveyAnalysisPage: React.FC = () => {
     }
   }, [activeSemesterId]);
 
-  const [semesterSurveys, setSemesterSurveys] = useState<SemesterSurvey[]>([]);
+  const {
+    semesterSurveys,
+    loading: campaignsLoading,
+    error: campaignsError,
+  } = useSemesterSurveys(semesterId);
   const [semesterSurveyId, setSemesterSurveyId] = useState<string>(
     initialRoute.semesterSurveyId
       ? String(initialRoute.semesterSurveyId)
@@ -565,37 +811,24 @@ export const SurveyAnalysisPage: React.FC = () => {
   }, [applyRoute]);
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      if (!semesterId) {
-        setSemesterSurveys([]);
-        setSemesterSurveyId('');
-        return;
-      }
-      try {
-        const next = await surveyApi.semesterSurveys(Number(semesterId));
-        if (cancelled) return;
-        setSemesterSurveys(next);
-        setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(next, current));
-        setLoadError(null);
-      } catch (error) {
-        if (!cancelled) setLoadError(messageFrom(error));
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [semesterId]);
+    setSemesterSurveyId((current) => selectAvailableSemesterSurveyId(semesterSurveys, current));
+  }, [semesterSurveys]);
+
+  useEffect(() => {
+    if (campaignsError) setLoadError(messageFrom(campaignsError));
+  }, [campaignsError]);
 
   const campaignCacheRef = useRef<Map<number, {
     normalization?: SemesterSurveyNormalization;
     /** Chuẩn hoá tính theo riêng một mục câu hỏi, khoá là SectionId. */
     sectionNormalizations?: Record<number, SemesterSurveyNormalization>;
-    departments?: SemesterSurveyDepartmentSummary;
-    courses?: SemesterSurveyCourseDiagnosis;
+    /** Khoá là SectionId, 0 là toàn bộ bài khảo sát — mỗi mục một bản số liệu riêng. */
+    departments?: Record<number, SemesterSurveyDepartmentSummary>;
+    courses?: Record<number, SemesterSurveyCourseDiagnosis>;
     lecturers?: LecturerOption[];
   }>>(new Map());
+  /** Khoá cache theo mục đang chọn; 0 dành cho toàn bộ bài khảo sát. */
+  const sectionCacheKey = questionSectionId ?? 0;
   const analysisGenRef = useRef(0);
 
   const loadAnalysis = useCallback(async (force = false) => {
@@ -619,8 +852,13 @@ export const SurveyAnalysisPage: React.FC = () => {
       campaignCacheRef.current.set(campaignId, cacheEntry);
     }
 
+    // Hai tab Khoa/viện và Lớp học phần đọc CÙNG một bản chuẩn hoá, chỉ hiện hai
+    // phần khác nhau của nó, nên cùng đi theo mục đang chọn. Trước đây chỉ tab Lớp
+    // học phần nạp bản theo mục, nên chọn mục ở tab Khoa/viện là bảng trống trơn.
+    const usesNormalization = tab === 'normalization' || tab === 'normalizationSections';
+
     // Nếu tab đã có trong cache của campaign này, load ngay lập tức
-    if (tab === 'normalizationSections' && questionSectionId !== null) {
+    if (usesNormalization && questionSectionId !== null) {
       const cached = cacheEntry.sectionNormalizations?.[questionSectionId];
       if (cached) {
         setSectionNormalization(cached);
@@ -628,7 +866,7 @@ export const SurveyAnalysisPage: React.FC = () => {
         setLoading(false);
         return;
       }
-    } else if (tab === 'normalization' || tab === 'normalizationSections') {
+    } else if (usesNormalization) {
       if (cacheEntry.normalization) {
         setNormalization(cacheEntry.normalization);
         setLoadError(null);
@@ -636,15 +874,17 @@ export const SurveyAnalysisPage: React.FC = () => {
         return;
       }
     } else if (tab === 'departments') {
-      if (cacheEntry.departments) {
-        setDepartments(cacheEntry.departments);
+      const cached = cacheEntry.departments?.[sectionCacheKey];
+      if (cached) {
+        setDepartments(cached);
         setLoadError(null);
         setLoading(false);
         return;
       }
     } else if (tab === 'courses') {
-      if (cacheEntry.courses) {
-        setCourses(cacheEntry.courses);
+      const cached = cacheEntry.courses?.[sectionCacheKey];
+      if (cached) {
+        setCourses(cached);
         setLoadError(null);
         setLoading(false);
         return;
@@ -660,7 +900,7 @@ export const SurveyAnalysisPage: React.FC = () => {
 
     setLoading(true);
     try {
-      if (tab === 'normalizationSections' && questionSectionId !== null) {
+      if (usesNormalization && questionSectionId !== null) {
         const sectionRes = await surveyApi.semesterSurveyNormalization(campaignId, questionSectionId);
         if (generation !== analysisGenRef.current) return;
         cacheEntry.sectionNormalizations = {
@@ -668,20 +908,20 @@ export const SurveyAnalysisPage: React.FC = () => {
           [questionSectionId]: sectionRes,
         };
         setSectionNormalization(sectionRes);
-      } else if (tab === 'normalization' || tab === 'normalizationSections') {
+      } else if (usesNormalization) {
         const normRes = await surveyApi.semesterSurveyNormalization(campaignId);
         if (generation !== analysisGenRef.current) return;
         cacheEntry.normalization = normRes;
         setNormalization(normRes);
       } else if (tab === 'departments') {
-        const deptRes = await surveyApi.semesterSurveyDepartmentSummary(campaignId);
+        const deptRes = await surveyApi.semesterSurveyDepartmentSummary(campaignId, questionSectionId);
         if (generation !== analysisGenRef.current) return;
-        cacheEntry.departments = deptRes;
+        cacheEntry.departments = { ...cacheEntry.departments, [sectionCacheKey]: deptRes };
         setDepartments(deptRes);
       } else if (tab === 'courses') {
-        const courseRes = await surveyApi.semesterSurveyCourseDiagnosis(campaignId);
+        const courseRes = await surveyApi.semesterSurveyCourseDiagnosis(campaignId, questionSectionId);
         if (generation !== analysisGenRef.current) return;
-        cacheEntry.courses = courseRes;
+        cacheEntry.courses = { ...cacheEntry.courses, [sectionCacheKey]: courseRes };
         setCourses(courseRes);
       } else if (tab === 'lecturer') {
         const lecRes = await surveyApi.semesterSurveyLecturers(campaignId);
@@ -699,7 +939,7 @@ export const SurveyAnalysisPage: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [semesterSurveyId, tab, questionSectionId]);
+  }, [semesterSurveyId, tab, questionSectionId, sectionCacheKey]);
 
   // Dữ liệu của tab Phân tích theo lớp học phần: toàn bài, hoặc bản tính theo mục đang
   // chọn. Bản theo mục chỉ dùng khi đúng là của mục đó, tránh lóe số của mục trước.
@@ -708,6 +948,16 @@ export const SurveyAnalysisPage: React.FC = () => {
     : sectionNormalization?.questionSectionId === questionSectionId
       ? sectionNormalization
       : null;
+  // Cùng lý do với `sectionTabData`: chỉ hiện số khi đúng là của mục đang chọn.
+  const departmentTabData = departments?.questionSectionId === questionSectionId ? departments : null;
+  const courseTabData = courses?.questionSectionId === questionSectionId ? courses : null;
+  // Danh sách mục để dựng ô chọn: lấy từ bất kỳ bản số liệu nào đã tải của đợt, kể cả
+  // bản của mục khác — mục nào cũng trả về cùng danh sách, nên ô chọn không bị mất.
+  const questionSectionOptions = (sectionTabData ?? normalization)?.questionSections
+    ?? sectionNormalization?.questionSections
+    ?? departments?.questionSections
+    ?? courses?.questionSections
+    ?? [];
   const selectQuestionSection = useCallback((sectionId: number | null) => {
     setQuestionSectionSelection(
       sectionId === null ? null : { semesterSurveyId, sectionId },
@@ -733,8 +983,10 @@ export const SurveyAnalysisPage: React.FC = () => {
   // nên chỗ này tự tính lại, không cần theo dõi gì thêm.
   const visibleTabs = useMemo(() => {
     const roleCode = activeProfile?.roleCode;
-    if (isUnrestrictedRole(roleCode)) return tabs;
-    if (isReadOnlyRole(roleCode)) return tabs.filter((item) => item.minimumRole === 'all');
+    // Ban Giám hiệu xem ngang quản trị nên phải hỏi seesAllData TRƯỚC: họ cũng là vai
+    // trò chỉ đọc, xét nhầm thứ tự là mất sạch tab ngoài mức "all".
+    if (seesAllData(roleCode)) return tabs;
+    if (seesOnlyOwnSections(roleCode)) return tabs.filter((item) => item.minimumRole === 'all');
     return tabs.filter((item) => item.minimumRole !== 'unrestricted');
   }, [activeProfile?.roleCode]);
 
@@ -803,6 +1055,20 @@ export const SurveyAnalysisPage: React.FC = () => {
   }, []);
   const [lecturerReport, setLecturerReport] = useState<LecturerReport | null>(null);
 
+  /*
+    Đường dẫn điều hướng trên thanh trên cùng: mục đầu là tên tab đang mở, đi sâu vào
+    báo cáo của một giảng viên thì nối thêm tên người đó.
+  */
+  const breadcrumbTrail = useMemo(() => {
+    const segments = [tabs.find((item) => item.id === tab)?.label ?? 'Phân tích chuyên sâu'];
+    if (tab === 'lecturer' && selectedLecturerId !== null
+      && lecturerReport?.lecturerId === selectedLecturerId) {
+      segments.push(lecturerReport.fullName);
+    }
+    return segments;
+  }, [lecturerReport, selectedLecturerId, tab]);
+  useSetBreadcrumbTrail(breadcrumbTrail);
+
   // Tệp xuất đi đúng những gì tab đang hiện: cùng cột, cùng thứ tự, cùng các dòng sau
   // bộ lọc, kèm dòng tổng nếu bảng có, và phần ghi chú in lại nội dung Chú thích.
   const exportAnalysisOptions = useMemo(() => {
@@ -833,7 +1099,8 @@ export const SurveyAnalysisPage: React.FC = () => {
 
     const notesFor = (tabId: TabId, shown: number, total: number, extra: string[] = []) => [
       tabs.find((item) => item.id === tabId)?.hint ?? '',
-      ...(tabFormulaNotes[tabId] ?? []),
+      // Bản chữ một dòng của công thức: tệp xuất không xếp được phân số.
+      ...(tabFormulaNotes[tabId] ?? []).flatMap((note) => note.plain),
       ...extra,
       `Số liệu chỉ gộp lớp qua cả hai tiêu chí: tỷ lệ phản hồi ≥ ${thresholds.minimumResponseRate}%`
         + ` và tỷ lệ phiếu hợp lệ ≥ ${thresholds.minimumValidRate}%.`,
@@ -848,25 +1115,50 @@ export const SurveyAnalysisPage: React.FC = () => {
     const metadataOf = (title: string, info: Record<string, string | number | undefined>, summaryNotes: string[]) => ({
       title,
       subtitle,
-      subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+      breadcrumb: ['Phân tích chuyên sâu'],
       info: { ...baseInfo, ...info },
       summaryNotes,
     });
 
-    if (tab === 'normalization' && normalization) {
-      const data = normalization;
+    /**
+     * Dòng "Tính điểm và Z-Score theo" cùng ghi chú đi kèm, dùng chung cho mọi tab có
+     * ô chọn mục — tệp xuất phải nói rõ số đang tính trên mục nào, không thì mở ra
+     * không biết bảng này là của toàn bài hay của một mục.
+     */
+    const scopeOf = (source: {
+      questionSections: NormalizationQuestionSection[];
+      questionSectionId: number | null;
+    }) => {
+      const selected = source.questionSections.find((item) => item.sectionId === source.questionSectionId);
+      const totalQuestions = source.questionSections.reduce((sum, item) => sum + item.questionCount, 0);
+      return {
+        label: selected
+          ? `${selected.sectionName} (${selected.questionCount} câu)`
+          : source.questionSections.length > 0
+            ? `Toàn bộ bài khảo sát (${totalQuestions} câu)`
+            : 'Toàn bộ bài khảo sát',
+        notes: selected
+          ? [`Điểm và Z-Score chỉ tính từ các câu của mục "${selected.sectionName}", không tính câu bẫy.`]
+          : [],
+      };
+    };
+
+    if (tab === 'normalization' && sectionTabData) {
+      const data = sectionTabData;
       const rows = shownRows('normalization', data.groups);
+      const scope = scopeOf(data);
 
       return {
         fileName: `phan-tich-theo-khoa-vien-${fileSuffix}`,
         metadata: metadataOf(
           'PHÂN TÍCH THEO KHOA/VIỆN',
           {
-            'Trung bình toàn trường': data.schoolAverageScore.toFixed(3),
+            'Tính điểm và Z-Score theo': scope.label,
+            'Trung bình toàn trường': formatDecimal(data.schoolAverageScore, 3),
             'Số lớp có phiếu': data.schoolSectionCount,
             'Số khoa/viện': data.groups.length,
           },
-          notesFor('normalization', rows.length, data.groups.length),
+          notesFor('normalization', rows.length, data.groups.length, scope.notes),
         ),
         sheets: [
           {
@@ -894,34 +1186,21 @@ export const SurveyAnalysisPage: React.FC = () => {
     if (tab === 'normalizationSections' && sectionTabData) {
       const data = sectionTabData;
       const rows = shownRows('normalizationSections', data.sections);
-      const selectedSection = data.questionSections.find((item) => item.sectionId === data.questionSectionId);
-      const totalQuestions = data.questionSections.reduce((sum, item) => sum + item.questionCount, 0);
-      const scopeLabel = selectedSection
-        ? `${selectedSection.sectionName} (${selectedSection.questionCount} câu)`
-        : data.questionSections.length > 0
-          ? `Toàn bộ bài khảo sát (${totalQuestions} câu)`
-          : 'Toàn bộ bài khảo sát';
+      const scope = scopeOf(data);
 
       return {
         fileName: `phan-tich-theo-lop-hoc-phan-${fileSuffix}`,
         metadata: metadataOf(
           'PHÂN TÍCH THEO LỚP HỌC PHẦN',
           {
-            'Tính điểm và Z-Score theo': scopeLabel,
-            'Trung bình toàn trường': data.schoolAverageScore.toFixed(3),
+            'Tính điểm và Z-Score theo': scope.label,
+            'Trung bình toàn trường': formatDecimal(data.schoolAverageScore, 3),
             'Độ lệch chuẩn':
-              data.schoolStandardDeviation === null ? '—' : data.schoolStandardDeviation.toFixed(3),
+              formatDecimalOrDash(data.schoolStandardDeviation, 3),
             'Số lớp có phiếu': data.schoolSectionCount,
             'Số khoa/viện': data.groups.length,
           },
-          notesFor(
-            'normalizationSections',
-            rows.length,
-            data.sections.length,
-            selectedSection
-              ? [`Điểm và Z-Score chỉ tính từ các câu của mục "${selectedSection.sectionName}", không tính câu bẫy.`]
-              : [],
-          ),
+          notesFor('normalizationSections', rows.length, data.sections.length, scope.notes),
         ),
         sheets: [
           {
@@ -939,7 +1218,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm', 2, 8),
+              scoreColumn('averageScore', 'Điểm', 3, 8),
               zColumn('zSchool', 'Z-Score so với toàn trường'),
               zColumn('zFaculty', 'Z-Score so với khoa'),
             ],
@@ -949,16 +1228,18 @@ export const SurveyAnalysisPage: React.FC = () => {
       };
     }
 
-    if (tab === 'departments' && departments) {
-      const data = departments;
+    if (tab === 'departments' && departmentTabData) {
+      const data = departmentTabData;
       const rows = shownRows('departments', data.rows);
       const isScoped = data.rows.length < data.schoolDepartmentCount;
+      const scope = scopeOf(data);
 
       return {
         fileName: `phan-tich-theo-bo-mon-${fileSuffix}`,
         metadata: metadataOf(
           'PHÂN TÍCH THEO BỘ MÔN',
           {
+            'Tính điểm và Z-Score theo': scope.label,
             'Số bộ môn': isScoped
               ? `${data.rows.length} bộ môn của bạn · toàn trường ${data.schoolDepartmentCount} bộ môn`
               : data.rows.length,
@@ -968,7 +1249,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               ? `${data.schoolWarningCount} lớp thấp hơn trung bình toàn trường từ 1 độ lệch chuẩn trở lên`
               : undefined,
           },
-          notesFor('departments', rows.length, data.rows.length),
+          notesFor('departments', rows.length, data.rows.length, scope.notes),
         ),
         sheets: [
           {
@@ -995,19 +1276,28 @@ export const SurveyAnalysisPage: React.FC = () => {
       };
     }
 
-    if (tab === 'courses' && courses) {
-      const data = courses;
-      const rows = shownRows('courses', data.rows);
+    if (tab === 'courses' && courseTabData) {
+      const data = courseTabData;
+      // Tệp xuất phải giống hệt bảng: học phần một lớp cũng để trống bốn cột so sánh.
+      const rows = shownRows('courses', data.rows).map((row) => ({
+        ...row,
+        averageScore: comparableScore(row.sectionCount, row.averageScore),
+        minScore: comparableScore(row.sectionCount, row.minScore),
+        maxScore: comparableScore(row.sectionCount, row.maxScore),
+        spread: comparableScore(row.sectionCount, row.spread),
+      }));
+      const scope = scopeOf(data);
 
       return {
         fileName: `phan-tich-theo-hoc-phan-${fileSuffix}`,
         metadata: metadataOf(
           'PHÂN TÍCH THEO HỌC PHẦN',
           {
+            'Tính điểm và Z-Score theo': scope.label,
             'Số học phần thu được phiếu': data.rows.length,
             'Học phần có từ 2 lớp trở lên': data.rows.filter((row) => row.sectionCount > 1).length,
           },
-          notesFor('courses', rows.length, data.rows.length),
+          notesFor('courses', rows.length, data.rows.length, scope.notes),
         ),
         sheets: [
           {
@@ -1025,10 +1315,10 @@ export const SurveyAnalysisPage: React.FC = () => {
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm trung bình', 2, 8),
+              scoreColumn('averageScore', 'Điểm trung bình', 3, 8),
               scoreColumn('minScore', 'Lớp thấp nhất'),
               scoreColumn('maxScore', 'Lớp cao nhất'),
-              scoreColumn('spread', 'Chênh lệch giữa các lớp', 2, 14),
+              scoreColumn('spread', 'Chênh lệch giữa các lớp', 3, 14),
               zColumn('meanZScore', 'Z-Score so với toàn trường'),
               zColumn('facultyMeanZScore', 'Z-Score so với khoa'),
             ],
@@ -1055,8 +1345,8 @@ export const SurveyAnalysisPage: React.FC = () => {
             'Bộ môn': report.departmentName,
             'Khoa / Viện': report.facultyName,
             'Số lớp': `${report.sectionCount} lớp · tổng số phiếu phải thu ${classSize.toLocaleString('vi-VN')}`,
-            'Điểm trung bình': report.averageScore.toFixed(2),
-            'Số phiếu đã thu': `${report.totalResponseCount.toLocaleString('vi-VN')} phiếu (${responseRate.toFixed(1)}%)`,
+            'Điểm trung bình': formatDecimal(report.averageScore, 3),
+            'Số phiếu đã thu': `${report.totalResponseCount.toLocaleString('vi-VN')} phiếu (${formatPercent(responseRate, 3)})`,
           },
           notesFor('lecturer', rows.length, report.sections.length, [
             'Điểm trung bình học phần = trung bình mọi lớp cùng học phần, kể cả lớp người khác dạy.',
@@ -1075,8 +1365,8 @@ export const SurveyAnalysisPage: React.FC = () => {
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm', 2, 8),
-              scoreColumn('courseAverageScore', 'Điểm trung bình học phần', 2, 14),
+              scoreColumn('averageScore', 'Điểm', 3, 8),
+              scoreColumn('courseAverageScore', 'Điểm trung bình học phần', 3, 14),
               zColumn('differenceFromCourse', 'Chênh so học phần'),
               zColumn('zSchool', 'Z-Score so với toàn trường'),
               zColumn('zFaculty', 'Z-Score so với khoa'),
@@ -1089,7 +1379,13 @@ export const SurveyAnalysisPage: React.FC = () => {
     }
 
     if (tab === 'lecturer' && lecturers.length > 0) {
-      const rows = shownRows('lecturer', lecturers);
+      // Tệp xuất phải giống hệt bảng: giảng viên một lớp cũng để trống ba cột điểm.
+      const rows = shownRows('lecturer', lecturers).map((row) => ({
+        ...row,
+        averageScore: comparableScore(row.sectionCount, row.averageScore),
+        minScore: comparableScore(row.sectionCount, row.minScore),
+        maxScore: comparableScore(row.sectionCount, row.maxScore),
+      }));
       const totalSections = lecturers.reduce((sum, row) => sum + row.sectionCount, 0);
       const classSize = lecturers.reduce((sum, row) => sum + row.totalClassSize, 0);
       const responses = lecturers.reduce((sum, row) => sum + row.responseCount, 0);
@@ -1112,9 +1408,9 @@ export const SurveyAnalysisPage: React.FC = () => {
             'Số giảng viên thu được phiếu': lecturers.length,
             'Số lớp giảng dạy': totalSections,
             'Tổng số phiếu phải thu': classSize.toLocaleString('vi-VN'),
-            'Số phiếu đã thu': `${responses.toLocaleString('vi-VN')} (${(responseRate ?? 0).toFixed(1)}%)`,
-            'Số phiếu hợp lệ': `${validResponses.toLocaleString('vi-VN')} (${(validRate ?? 0).toFixed(1)}%)`,
-            'Điểm trung bình chung': overallScore === null ? '—' : overallScore.toFixed(2),
+            'Số phiếu đã thu': `${responses.toLocaleString('vi-VN')} (${formatPercent(responseRate ?? 0, 3)})`,
+            'Số phiếu hợp lệ': `${validResponses.toLocaleString('vi-VN')} (${formatPercent(validRate ?? 0, 3)})`,
+            'Điểm trung bình chung': formatDecimalOrDash(overallScore, 3),
             'Giảng viên có lớp cảnh báo': lecturersWithWarning > 0
               ? `${lecturersWithWarning} giảng viên (${totalWarnings} lớp Z-Score ≤ −1)`
               : undefined,
@@ -1137,7 +1433,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               countColumn('validResponseCount', 'Số phiếu hợp lệ', 12),
               rateColumn('responseRate', 'Tỷ lệ phản hồi'),
               rateColumn('validResponseRate', 'Tỷ lệ phiếu hợp lệ'),
-              scoreColumn('averageScore', 'Điểm trung bình', 2, 8),
+              scoreColumn('averageScore', 'Điểm trung bình', 3, 8),
               scoreColumn('minScore', 'Lớp thấp nhất'),
               scoreColumn('maxScore', 'Lớp cao nhất'),
             ],
@@ -1150,10 +1446,9 @@ export const SurveyAnalysisPage: React.FC = () => {
     return null;
   }, [
     tab,
-    normalization,
     sectionTabData,
-    departments,
-    courses,
+    departmentTabData,
+    courseTabData,
     lecturers,
     selectedLecturerId,
     lecturerReport,
@@ -1216,7 +1511,7 @@ export const SurveyAnalysisPage: React.FC = () => {
             id="analysis-campaign-select"
             value={semesterSurveyId}
             disabled={semesterSurveys.length === 0}
-            placeholder={semesterSurveys.length === 0 ? 'Chưa có đợt nào' : 'Chọn đợt khảo sát'}
+            placeholder={campaignPlaceholder(campaignsLoading, semesterSurveys.length)}
             onChange={(nextCampaignId) => {
               setSemesterSurveyId(nextCampaignId);
               setActiveSemesterSurveyId(nextCampaignId);
@@ -1234,16 +1529,6 @@ export const SurveyAnalysisPage: React.FC = () => {
         </div>
 
         <div className="statistics-toolbar-actions">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => void loadAnalysis(true)}
-            disabled={loading || !semesterSurveyId}
-            title="Tải lại toàn bộ số liệu phân tích"
-          >
-            <RefreshCw className={loading ? 'operation-icon auth-spin' : 'operation-icon'} />
-            Tải lại
-          </button>
           <UpdateScoresButton
             semesterSurveyId={semesterSurveyId}
             onUpdated={() => loadAnalysis(true)}
@@ -1251,9 +1536,7 @@ export const SurveyAnalysisPage: React.FC = () => {
         </div>
       </div>
 
-      <ScoringConfigNote>
-        Chỉ sử dụng dữ liệu của các lớp, bộ môn và khoa/viện hợp lệ.
-      </ScoringConfigNote>
+      <ScoringConfigNote />
 
       <nav className="analysis-tabs" aria-label="Các góc nhìn phân tích">
         {visibleTabs.map((item) => (
@@ -1281,6 +1564,19 @@ export const SurveyAnalysisPage: React.FC = () => {
         </div>
       )}
 
+      {/*
+        Ô chọn mục dùng chung cho bốn tab tính điểm; Báo cáo giảng viên không có vì
+        bảng đó gộp theo giảng viên chứ không theo mục. Đặt ngoài khối nội dung để
+        đang tải vẫn thấy mục đang chọn và đổi lại được.
+      */}
+      {tab !== 'lecturer' && (
+        <QuestionSectionPicker
+          sections={questionSectionOptions}
+          selectedId={questionSectionId}
+          onSelect={selectQuestionSection}
+        />
+      )}
+
       {loading ? (
         <div className="operations-empty" role="status">
           <LoaderCircle className="operation-icon auth-spin" aria-hidden="true" />
@@ -1288,7 +1584,8 @@ export const SurveyAnalysisPage: React.FC = () => {
         </div>
       ) : tab === 'normalization' ? (
         <NormalizationGroupTab
-          data={normalization}
+          data={sectionTabData}
+          selectedQuestionSectionId={questionSectionId}
           note={tabNote}
           onVisibleRowsChange={reportVisibleRows.normalization}
           onOpenDetail={openScopeDetail}
@@ -1296,11 +1593,7 @@ export const SurveyAnalysisPage: React.FC = () => {
       ) : tab === 'normalizationSections' ? (
         <NormalizationSectionTab
           data={sectionTabData}
-          // Danh sách mục lấy cả từ bản toàn bài: bản theo mục lỗi hay rỗng thì vẫn còn
-          // ô chọn để quay về.
-          questionSections={(sectionTabData ?? normalization)?.questionSections ?? []}
           selectedQuestionSectionId={questionSectionId}
-          onSelectQuestionSection={selectQuestionSection}
           note={tabNote}
           onVisibleRowsChange={reportVisibleRows.normalizationSections}
           onOpenSurvey={(courseSectionSurveyId) => {
@@ -1310,14 +1603,14 @@ export const SurveyAnalysisPage: React.FC = () => {
         />
       ) : tab === 'departments' ? (
         <DepartmentTab
-          data={departments}
+          data={departmentTabData}
           note={tabNote}
           onVisibleRowsChange={reportVisibleRows.departments}
           onOpenDetail={openScopeDetail}
         />
       ) : tab === 'courses' ? (
         <CourseDiagnosisTab
-          data={courses}
+          data={courseTabData}
           note={tabNote}
           onVisibleRowsChange={reportVisibleRows.courses}
           onOpenDetail={openScopeDetail}
@@ -1361,18 +1654,18 @@ const NormalizationSummary: React.FC<{
 }> = ({ data, showStandardDeviation = false, note }) => (
   <section className="statistics-summary">
     <span>
-      Trung bình toàn trường: <strong>{data.schoolAverageScore.toFixed(3)}</strong>
+      Trung bình toàn trường: <strong>{formatDecimal(data.schoolAverageScore, 3)}</strong>
     </span>
     {showStandardDeviation && (
       <span>
         Độ lệch chuẩn:{' '}
         <strong>
-          {data.schoolStandardDeviation === null ? '—' : data.schoolStandardDeviation.toFixed(3)}
+          {formatDecimalOrDash(data.schoolStandardDeviation, 3)}
         </strong>
       </span>
     )}
     <span>
-      {data.schoolSectionCount} lớp có phiếu · {data.groups.length} khoa/viện
+      {data.schoolSectionCount} lớp có phiếu: {data.groups.length} khoa/viện
     </span>
     {note}
   </section>
@@ -1395,24 +1688,26 @@ const emptyWithNote = (note: React.ReactNode, message: string) => (
 
 const NormalizationGroupTab: React.FC<{
   data: SemesterSurveyNormalization | null;
+  /** Null là toàn bộ bài khảo sát; chỉ dùng để chọn câu chữ của dòng "chưa có số". */
+  selectedQuestionSectionId: number | null;
   onOpenDetail: (selection: AnalysisScopeTarget) => void;
   note?: React.ReactNode;
   /** Báo lên các dòng đang hiện (sau bộ lọc cột) để file xuất đúng bằng bảng. */
   onVisibleRowsChange?: (rows: readonly unknown[]) => void;
-}> = ({ data, onOpenDetail, note, onVisibleRowsChange }) => {
+}> = ({ data, selectedQuestionSectionId, onOpenDetail, note, onVisibleRowsChange }) => {
   const groups = useMemo(() => data?.groups ?? [], [data]);
   const groupColumns = useMemo<FilterableColumn<(typeof groups)[number]>[]>(() => [
     { key: 'facultyName', value: (row) => row.facultyName },
     { key: 'sectionCount', value: (row) => String(row.sectionCount), numeric: true },
-    { key: 'averageScore', value: (row) => row.averageScore.toFixed(3), numeric: true },
+    { key: 'averageScore', value: (row) => formatDecimal(row.averageScore, 3), numeric: true },
     {
       key: 'standardDeviation',
-      value: (row) => (row.standardDeviation === null ? '—' : row.standardDeviation.toFixed(3)),
+      value: (row) => (formatDecimalOrDash(row.standardDeviation, 3)),
       sortValue: (row) => row.standardDeviation,
     },
     {
       key: 'meanZScore',
-      value: (row) => (row.meanZScore === null ? '—' : row.meanZScore.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.meanZScore, 3)),
       sortValue: (row) => row.meanZScore,
     },
     { key: 'lecturerCount', value: (row) => String(row.lecturerCount), numeric: true },
@@ -1421,12 +1716,12 @@ const NormalizationGroupTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => `${row.validResponseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
   ], []);
@@ -1437,7 +1732,12 @@ const NormalizationGroupTab: React.FC<{
   }, [groupFilters.visibleRows, onVisibleRowsChange]);
 
   if (!data || data.sections.length === 0) {
-    return emptyWithNote(note, 'Đợt này chưa có lớp nào thu được phiếu hợp lệ.');
+    return emptyWithNote(
+      note,
+      selectedQuestionSectionId === null
+        ? 'Đợt này chưa có lớp nào thu được phiếu hợp lệ.'
+        : 'Chưa có lớp nào có điểm cho mục này.',
+    );
   }
 
   return (
@@ -1521,18 +1821,18 @@ const NormalizationGroupTab: React.FC<{
                   <td className="num">{group.totalClassSize}</td>
                   <td className="num">{group.responseCount}</td>
                   <td className="num">{group.validResponseCount}</td>
-                  <td className="num">{group.responseRate.toFixed(1)}%</td>
-                  <td className="num">{group.validResponseRate.toFixed(1)}%</td>
+                  <td className="num">{formatPercent(group.responseRate, 3)}</td>
+                  <td className="num">{formatPercent(group.validResponseRate, 3)}</td>
                   {/* Tô theo bậc Z chứ không theo thang điểm tuyệt đối: cả bảng này
                       đọc bằng một thước duy nhất là 68-95-99.7. */}
-                  <td className={zTierClass(group.meanZScore)}>{group.averageScore.toFixed(3)}</td>
+                  <td className={zTierClass(group.meanZScore)}>{formatDecimal(group.averageScore, 3)}</td>
                   <td className="num">
-                    {group.standardDeviation === null ? '—' : group.standardDeviation.toFixed(3)}
+                    {formatDecimalOrDash(group.standardDeviation, 3)}
                   </td>
                   <td className={zTierClass(group.meanZScore)}>
                     {group.meanZScore === null
                       ? '—'
-                      : `${group.meanZScore > 0 ? '+' : ''}${group.meanZScore.toFixed(2)}`}
+                      : formatSigned(group.meanZScore)}
                   </td>
                 </tr>
               );
@@ -1576,12 +1876,15 @@ const QuestionSectionPicker: React.FC<{
   ];
 
   return (
-    <div className="analysis-section-picker" role="group" aria-label="Tính điểm và Z-Score theo">
+    // Radio chứ không phải checkbox: mỗi lần chỉ tính theo ĐÚNG một phạm vi, ô vuông
+    // làm người dùng tưởng chọn được nhiều mục cùng lúc.
+    <div className="analysis-section-picker" role="radiogroup" aria-label="Tính điểm và Z-Score theo">
       <span className="analysis-section-picker__label">Tính điểm và Z-Score theo:</span>
       {options.map((option) => (
         <label key={option.id ?? 'all'} className="analysis-section-picker__option">
           <input
-            type="checkbox"
+            type="radio"
+            name="analysis-question-section"
             checked={option.id === selectedId}
             onChange={() => onSelect(option.id)}
           />
@@ -1594,20 +1897,15 @@ const QuestionSectionPicker: React.FC<{
 
 const NormalizationSectionTab: React.FC<{
   data: SemesterSurveyNormalization | null;
-  /** Các mục của bộ câu hỏi, để dựng ô chọn tính theo mục. */
-  questionSections: NormalizationQuestionSection[];
-  /** Null là toàn bộ bài khảo sát. */
+  /** Null là toàn bộ bài khảo sát; chỉ dùng để chọn câu chữ của dòng "chưa có số". */
   selectedQuestionSectionId: number | null;
-  onSelectQuestionSection: (sectionId: number | null) => void;
   onOpenSurvey: (courseSectionSurveyId: number) => void;
   note?: React.ReactNode;
   /** Báo lên các dòng đang hiện (sau bộ lọc cột) để file xuất đúng bằng bảng. */
   onVisibleRowsChange?: (rows: readonly unknown[]) => void;
 }> = ({
   data,
-  questionSections,
   selectedQuestionSectionId,
-  onSelectQuestionSection,
   onOpenSurvey,
   note,
   onVisibleRowsChange,
@@ -1625,23 +1923,23 @@ const NormalizationSectionTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => `${row.validResponseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
-    { key: 'averageScore', value: (row) => row.averageScore.toFixed(2), numeric: true },
+    { key: 'averageScore', value: (row) => formatDecimal(row.averageScore, 3), numeric: true },
     {
       key: 'zSchool',
-      value: (row) => (row.zSchool === null ? '—' : row.zSchool.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.zSchool, 3)),
       sortValue: (row) => row.zSchool,
     },
     {
       key: 'zFaculty',
-      value: (row) => (row.zFaculty === null ? '—' : row.zFaculty.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.zFaculty, 3)),
       sortValue: (row) => row.zFaculty,
     },
   ], []);
@@ -1651,32 +1949,17 @@ const NormalizationSectionTab: React.FC<{
     onVisibleRowsChange?.(sectionFilters.visibleRows);
   }, [sectionFilters.visibleRows, onVisibleRowsChange]);
 
-  // Ô chọn luôn hiện, kể cả khi mục đang chọn chưa có số, để còn chọn lại được.
-  const picker = (
-    <QuestionSectionPicker
-      sections={questionSections}
-      selectedId={selectedQuestionSectionId}
-      onSelect={onSelectQuestionSection}
-    />
-  );
-
   if (!data || data.sections.length === 0) {
-    return (
-      <>
-        {picker}
-        {emptyWithNote(
-          note,
-          selectedQuestionSectionId === null
-            ? 'Đợt này chưa có lớp nào thu được phiếu hợp lệ.'
-            : 'Chưa có lớp nào có điểm cho mục này.',
-        )}
-      </>
+    return emptyWithNote(
+      note,
+      selectedQuestionSectionId === null
+        ? 'Đợt này chưa có lớp nào thu được phiếu hợp lệ.'
+        : 'Chưa có lớp nào có điểm cho mục này.',
     );
   }
 
   return (
     <>
-      {picker}
       <NormalizationSummary data={data} showStandardDeviation note={note} />
 
       <div className="statistics-table-scroll" tabIndex={0} aria-label="Chi tiết chuẩn hoá từng lớp">
@@ -1701,7 +1984,7 @@ const NormalizationSectionTab: React.FC<{
               <th scope="col" style={{ width: '14%' }}>
                 {sectionFilters.filterHeader('lecturerName', 'Giảng viên')}
               </th>
-              <th scope="col" style={{ width: '3%' }}>
+              <th scope="col" style={{ width: '4%' }}>
                 {sectionFilters.filterHeader('classSize', 'Tổng số phiếu phải thu')}
               </th>
               <th scope="col" style={{ width: '5%' }}>
@@ -1755,20 +2038,20 @@ const NormalizationSectionTab: React.FC<{
                 <td className="num">{section.classSize}</td>
                 <td className="num">{section.responseCount}</td>
                 <td className="num">{section.validResponseCount}</td>
-                <td className="num">{section.responseRate.toFixed(1)}%</td>
-                <td className="num">{section.validResponseRate.toFixed(1)}%</td>
+                <td className="num">{formatPercent(section.responseRate, 3)}</td>
+                <td className="num">{formatPercent(section.validResponseRate, 3)}</td>
                 <td className={zTierClass(section.zFaculty)}>
-                  {section.averageScore.toFixed(2)}
+                  {formatDecimal(section.averageScore, 3)}
                 </td>
                 <td className={zTierClass(section.zSchool)}>
                   {section.zSchool === null
                     ? '—'
-                    : `${section.zSchool > 0 ? '+' : ''}${section.zSchool.toFixed(2)}`}
+                    : formatSigned(section.zSchool)}
                 </td>
                 <td className={zTierClass(section.zFaculty)}>
                   {section.zFaculty === null
                     ? '—'
-                    : `${section.zFaculty > 0 ? '+' : ''}${section.zFaculty.toFixed(2)}`}
+                    : formatSigned(section.zFaculty)}
                 </td>
               </tr>
             ))}
@@ -1806,32 +2089,32 @@ const DepartmentTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => `${row.validResponseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
     {
       key: 'averageScore',
-      value: (row) => (row.averageScore === null ? '—' : row.averageScore.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.averageScore, 3)),
       sortValue: (row) => row.averageScore,
     },
     {
       key: 'standardDeviation',
-      value: (row) => (row.standardDeviation === null ? '—' : row.standardDeviation.toFixed(3)),
+      value: (row) => (formatDecimalOrDash(row.standardDeviation, 3)),
       sortValue: (row) => row.standardDeviation,
     },
     {
       key: 'meanZScore',
-      value: (row) => (row.meanZScore === null ? '—' : row.meanZScore.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.meanZScore, 3)),
       sortValue: (row) => row.meanZScore,
     },
     {
       key: 'facultyMeanZScore',
-      value: (row) => (row.facultyMeanZScore === null ? '—' : row.facultyMeanZScore.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.facultyMeanZScore, 3)),
       sortValue: (row) => row.facultyMeanZScore,
     },
   ], []);
@@ -1847,7 +2130,6 @@ const DepartmentTab: React.FC<{
 
   const totalSections = data.schoolSectionCount;
   const totalResponses = data.schoolResponseCount;
-  const totalWarnings = data.schoolWarningCount;
   const isScoped = data.rows.length < data.schoolDepartmentCount;
 
   return (
@@ -1857,17 +2139,11 @@ const DepartmentTab: React.FC<{
           {isScoped
             ? `${data.rows.length} bộ môn của bạn · toàn trường ${data.schoolDepartmentCount} bộ môn`
             : `${data.rows.length} bộ môn`}
-          {' · '}{totalSections} lớp có phiếu
+          {': '}{totalSections} lớp có phiếu
         </span>
         <span>
           Tổng phiếu toàn trường: <strong>{totalResponses}</strong>
         </span>
-        {totalWarnings > 0 && (
-          <span className="statistics-trap-note">
-            <strong>{totalWarnings} lớp</strong> thấp hơn trung bình toàn trường từ 1 độ lệch
-            chuẩn trở lên (Z-Score ≤ −1)
-          </span>
-        )}
         {note}
       </section>
 
@@ -1957,23 +2233,23 @@ const DepartmentTab: React.FC<{
                 <td className="num">{row.totalClassSize}</td>
                 <td className="num">{row.responseCount}</td>
                 <td className="num">{row.validResponseCount}</td>
-                <td className="num">{row.responseRate.toFixed(1)}%</td>
-                <td className="num">{row.validResponseRate.toFixed(1)}%</td>
+                <td className="num">{formatPercent(row.responseRate, 3)}</td>
+                <td className="num">{formatPercent(row.validResponseRate, 3)}</td>
                 <td className={scoreClass(row.averageScore)}>
-                  {row.averageScore === null ? '—' : row.averageScore.toFixed(2)}
+                  {formatDecimalOrDash(row.averageScore, 3)}
                 </td>
                 <td className="num">
-                  {row.standardDeviation === null ? '—' : row.standardDeviation.toFixed(3)}
+                  {formatDecimalOrDash(row.standardDeviation, 3)}
                 </td>
                 <td className={zTierClass(row.meanZScore)}>
                   {row.meanZScore === null
                     ? '—'
-                    : `${row.meanZScore > 0 ? '+' : ''}${row.meanZScore.toFixed(2)}`}
+                    : formatSigned(row.meanZScore)}
                 </td>
                 <td className={zTierClass(row.facultyMeanZScore)}>
                   {row.facultyMeanZScore === null
                     ? '—'
-                    : `${row.facultyMeanZScore > 0 ? '+' : ''}${row.facultyMeanZScore.toFixed(2)}`}
+                    : formatSigned(row.facultyMeanZScore)}
                 </td>
               </tr>
             ))}
@@ -2014,26 +2290,44 @@ const CourseDiagnosisTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => `${row.validResponseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
-    { key: 'averageScore', value: (row) => row.averageScore.toFixed(2), numeric: true },
-    { key: 'minScore', value: (row) => row.minScore.toFixed(2), numeric: true },
-    { key: 'maxScore', value: (row) => row.maxScore.toFixed(2), numeric: true },
-    { key: 'spread', value: (row) => row.spread.toFixed(2), numeric: true },
+    // Học phần chỉ có MỘT lớp thì bốn cột này không so được với gì: điểm trung bình,
+    // lớp thấp nhất, lớp cao nhất đều là số của đúng lớp đó và chênh lệch luôn bằng 0.
+    {
+      key: 'averageScore',
+      value: (row) => scoreText(comparableScore(row.sectionCount, row.averageScore)),
+      sortValue: (row) => comparableScore(row.sectionCount, row.averageScore),
+    },
+    {
+      key: 'minScore',
+      value: (row) => scoreText(comparableScore(row.sectionCount, row.minScore)),
+      sortValue: (row) => comparableScore(row.sectionCount, row.minScore),
+    },
+    {
+      key: 'maxScore',
+      value: (row) => scoreText(comparableScore(row.sectionCount, row.maxScore)),
+      sortValue: (row) => comparableScore(row.sectionCount, row.maxScore),
+    },
+    {
+      key: 'spread',
+      value: (row) => scoreText(comparableScore(row.sectionCount, row.spread)),
+      sortValue: (row) => comparableScore(row.sectionCount, row.spread),
+    },
     {
       key: 'meanZScore',
-      value: (row) => (row.meanZScore === null ? '—' : row.meanZScore.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.meanZScore, 3)),
       sortValue: (row) => row.meanZScore,
     },
     {
       key: 'facultyMeanZScore',
-      value: (row) => (row.facultyMeanZScore === null ? '—' : row.facultyMeanZScore.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.facultyMeanZScore, 3)),
       sortValue: (row) => row.facultyMeanZScore,
     },
   ], []);
@@ -2162,21 +2456,29 @@ const CourseDiagnosisTab: React.FC<{
                 <td className="num">{row.totalClassSize}</td>
                 <td className="num">{row.responseCount}</td>
                 <td className="num">{row.validResponseCount}</td>
-                <td className="num">{row.responseRate.toFixed(1)}%</td>
-                <td className="num">{row.validResponseRate.toFixed(1)}%</td>
-                <td className={scoreClass(row.averageScore)}>{row.averageScore.toFixed(2)}</td>
-                <td className={scoreClass(row.minScore)}>{row.minScore.toFixed(2)}</td>
-                <td className={scoreClass(row.maxScore)}>{row.maxScore.toFixed(2)}</td>
-                <td className={spreadClass(row.spread)}>{row.spread.toFixed(2)}</td>
+                <td className="num">{formatPercent(row.responseRate, 3)}</td>
+                <td className="num">{formatPercent(row.validResponseRate, 3)}</td>
+                <td className={scoreClass(comparableScore(row.sectionCount, row.averageScore))}>
+                  {scoreText(comparableScore(row.sectionCount, row.averageScore))}
+                </td>
+                <td className={scoreClass(comparableScore(row.sectionCount, row.minScore))}>
+                  {scoreText(comparableScore(row.sectionCount, row.minScore))}
+                </td>
+                <td className={scoreClass(comparableScore(row.sectionCount, row.maxScore))}>
+                  {scoreText(comparableScore(row.sectionCount, row.maxScore))}
+                </td>
+                <td className={row.sectionCount > 1 ? spreadClass(row.spread) : 'num'}>
+                  {scoreText(comparableScore(row.sectionCount, row.spread))}
+                </td>
                 <td className={zTierClass(row.meanZScore)}>
                   {row.meanZScore === null
                     ? '—'
-                    : `${row.meanZScore > 0 ? '+' : ''}${row.meanZScore.toFixed(2)}`}
+                    : formatSigned(row.meanZScore)}
                 </td>
                 <td className={zTierClass(row.facultyMeanZScore)}>
                   {row.facultyMeanZScore === null
                     ? '—'
-                    : `${row.facultyMeanZScore > 0 ? '+' : ''}${row.facultyMeanZScore.toFixed(2)}`}
+                    : formatSigned(row.facultyMeanZScore)}
                 </td>
               </tr>
             ))}
@@ -2266,28 +2568,30 @@ const LecturerTab: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => `${row.validResponseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
+    // Ba cột điểm đi qua comparableScore để giảng viên một lớp cũng lọc và sắp xếp
+    // theo đúng cái đang hiện trên bảng, không phải theo con số đã bị giấu đi.
     {
       key: 'averageScore',
-      value: (row) => (row.averageScore === null ? '—' : row.averageScore.toFixed(2)),
-      sortValue: (row) => row.averageScore,
+      value: (row) => scoreText(comparableScore(row.sectionCount, row.averageScore)),
+      sortValue: (row) => comparableScore(row.sectionCount, row.averageScore),
     },
     {
       key: 'minScore',
-      value: (row) => (typeof row.minScore === 'number' ? row.minScore.toFixed(2) : '—'),
-      sortValue: (row) => row.minScore,
+      value: (row) => scoreText(comparableScore(row.sectionCount, row.minScore)),
+      sortValue: (row) => comparableScore(row.sectionCount, row.minScore),
     },
     {
       key: 'maxScore',
-      value: (row) => (typeof row.maxScore === 'number' ? row.maxScore.toFixed(2) : '—'),
-      sortValue: (row) => row.maxScore,
+      value: (row) => scoreText(comparableScore(row.sectionCount, row.maxScore)),
+      sortValue: (row) => comparableScore(row.sectionCount, row.maxScore),
     },
   ], []);
 
@@ -2298,8 +2602,6 @@ const LecturerTab: React.FC<{
   }, [filters.visibleRows, onVisibleRowsChange]);
 
   const totalSections = useMemo(() => lecturers.reduce((sum, r) => sum + r.sectionCount, 0), [lecturers]);
-  const totalWarnings = useMemo(() => lecturers.reduce((sum, r) => sum + (r.warningSectionCount ?? 0), 0), [lecturers]);
-  const lecturersWithWarning = useMemo(() => lecturers.filter((r) => r.warningSectionCount > 0).length, [lecturers]);
   const overallAvgScore = useMemo(() => {
     const scored = lecturers.filter(
       (row) => typeof row.averageScore === 'number' && (row.validResponseCount ?? 0) > 0,
@@ -2353,17 +2655,12 @@ const LecturerTab: React.FC<{
             dòng tổng cuối bảng, để cả ra đây thì nút Chú thích và nút xuất bị đẩy
             xuống dòng thứ hai. */}
         <span>
-          <strong>{lecturers.length}</strong> giảng viên · <strong>{totalSections}</strong> lớp giảng dạy
+          <strong>{lecturers.length}</strong> giảng viên: <strong>{totalSections}</strong> lớp giảng dạy
         </span>
         <span>
           Điểm trung bình chung:{' '}
-          <strong>{overallAvgScore !== null ? overallAvgScore.toFixed(2) : '—'}</strong>
+          <strong>{formatDecimalOrDash(overallAvgScore, 3)}</strong>
         </span>
-        {lecturersWithWarning > 0 && (
-          <span className="statistics-trap-note">
-            <strong>{lecturersWithWarning} giảng viên</strong> có lớp cảnh báo ({totalWarnings} lớp)
-          </span>
-        )}
         {note}
       </section>
 
@@ -2434,16 +2731,16 @@ const LecturerTab: React.FC<{
                 <td className="num">{row.totalClassSize}</td>
                 <td className="num">{row.responseCount}</td>
                 <td className="num">{row.validResponseCount}</td>
-                <td className="num">{(row.responseRate ?? 0).toFixed(1)}%</td>
-                <td className="num">{(row.validResponseRate ?? 0).toFixed(1)}%</td>
-                <td className={scoreClass(row.averageScore)}>
-                  {typeof row.averageScore === 'number' ? row.averageScore.toFixed(2) : '—'}
+                <td className="num">{formatPercent(row.responseRate, 3)}</td>
+                <td className="num">{formatPercent(row.validResponseRate, 3)}</td>
+                <td className={scoreClass(comparableScore(row.sectionCount, row.averageScore))}>
+                  {scoreText(comparableScore(row.sectionCount, row.averageScore))}
                 </td>
-                <td className={scoreClass(row.minScore)}>
-                  {typeof row.minScore === 'number' ? row.minScore.toFixed(2) : '—'}
+                <td className={scoreClass(comparableScore(row.sectionCount, row.minScore))}>
+                  {scoreText(comparableScore(row.sectionCount, row.minScore))}
                 </td>
-                <td className={scoreClass(row.maxScore)}>
-                  {typeof row.maxScore === 'number' ? row.maxScore.toFixed(2) : '—'}
+                <td className={scoreClass(comparableScore(row.sectionCount, row.maxScore))}>
+                  {scoreText(comparableScore(row.sectionCount, row.maxScore))}
                 </td>
               </tr>
             ))}
@@ -2478,38 +2775,38 @@ const LecturerReportView: React.FC<{
     { key: 'validResponseCount', value: (row) => String(row.validResponseCount), numeric: true },
     {
       key: 'responseRate',
-      value: (row) => `${row.responseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.responseRate, 3),
       sortValue: (row) => row.responseRate,
     },
     {
       key: 'validResponseRate',
-      value: (row) => `${row.validResponseRate.toFixed(1)}%`,
+      value: (row) => formatPercent(row.validResponseRate, 3),
       sortValue: (row) => row.validResponseRate,
     },
-    { key: 'averageScore', value: (row) => row.averageScore.toFixed(2), numeric: true },
+    { key: 'averageScore', value: (row) => formatDecimal(row.averageScore, 3), numeric: true },
     {
       key: 'courseAverageScore',
-      value: (row) => (row.courseAverageScore === null ? '—' : row.courseAverageScore.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.courseAverageScore, 3)),
       sortValue: (row) => row.courseAverageScore,
     },
     {
       key: 'differenceFromCourse',
-      value: (row) => (row.differenceFromCourse === null ? '—' : row.differenceFromCourse.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.differenceFromCourse, 3)),
       sortValue: (row) => row.differenceFromCourse,
     },
     {
       key: 'zSchool',
-      value: (row) => (row.zSchool === null ? '—' : row.zSchool.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.zSchool, 3)),
       sortValue: (row) => row.zSchool,
     },
     {
       key: 'zFaculty',
-      value: (row) => (row.zFaculty === null ? '—' : row.zFaculty.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.zFaculty, 3)),
       sortValue: (row) => row.zFaculty,
     },
     {
       key: 'zDepartment',
-      value: (row) => (row.zDepartment === null ? '—' : row.zDepartment.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.zDepartment, 3)),
       sortValue: (row) => row.zDepartment,
     },
   ], []);
@@ -2543,9 +2840,9 @@ const LecturerReportView: React.FC<{
         </div>
         <div className="section-responses-stats">
           <span>{report.sectionCount} lớp · tổng số phiếu phải thu {totalClassSize.toLocaleString('vi-VN')}</span>
-          <span>Điểm trung bình {report.averageScore.toFixed(2)}</span>
+          <span>Điểm trung bình {formatDecimal(report.averageScore, 3)}</span>
           <span>
-            {report.totalResponseCount.toLocaleString('vi-VN')} phiếu đã thu ({overallRate.toFixed(1)}%)
+            {report.totalResponseCount.toLocaleString('vi-VN')} phiếu đã thu ({formatPercent(overallRate, 3)})
           </span>
         </div>
       </section>
@@ -2612,15 +2909,15 @@ const LecturerReportView: React.FC<{
                     <td className="num">{section.classSize}</td>
                     <td className="num">{section.responseCount}</td>
                     <td className="num">{section.validResponseCount}</td>
-                    <td className="num">{section.responseRate.toFixed(1)}%</td>
-                    <td className="num">{section.validResponseRate.toFixed(1)}%</td>
+                    <td className="num">{formatPercent(section.responseRate, 3)}</td>
+                    <td className="num">{formatPercent(section.validResponseRate, 3)}</td>
                     <td className={zTierClass(section.zDepartment)}>
-                      {section.averageScore.toFixed(2)}
+                      {formatDecimal(section.averageScore, 3)}
                     </td>
                     <td className="num">
                       {section.courseAverageScore === null
                         ? '—'
-                        : section.courseAverageScore.toFixed(2)}
+                        : formatDecimal(section.courseAverageScore, 3)}
                     </td>
                     <td className="num">
                       {section.differenceFromCourse === null ? (
@@ -2636,24 +2933,24 @@ const LecturerReportView: React.FC<{
                           }
                         >
                           {section.differenceFromCourse > 0 ? '+' : ''}
-                          {section.differenceFromCourse.toFixed(2)}
+                          {formatDecimal(section.differenceFromCourse, 3)}
                         </span>
                       )}
                     </td>
                     <td className={zTierClass(section.zSchool)}>
                       {section.zSchool === null
                         ? '—'
-                        : `${section.zSchool > 0 ? '+' : ''}${section.zSchool.toFixed(2)}`}
+                        : formatSigned(section.zSchool)}
                     </td>
                     <td className={zTierClass(section.zFaculty)}>
                       {section.zFaculty === null
                         ? '—'
-                        : `${section.zFaculty > 0 ? '+' : ''}${section.zFaculty.toFixed(2)}`}
+                        : formatSigned(section.zFaculty)}
                     </td>
                     <td className={zTierClass(section.zDepartment)}>
                       {section.zDepartment === null
                         ? '—'
-                        : `${section.zDepartment > 0 ? '+' : ''}${section.zDepartment.toFixed(2)}`}
+                        : formatSigned(section.zDepartment)}
                     </td>
                   </tr>
                 );

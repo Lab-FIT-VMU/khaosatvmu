@@ -16,6 +16,16 @@ export function setActiveSemesterSurveyId(value: string | number | null | undefi
   }
 }
 
+/**
+ * Chữ trong ô chọn Đợt khảo sát khi chưa chọn gì. Phải tách "đang tải" khỏi "không
+ * có đợt nào": danh sách rỗng lúc mới mở trang là vì API chưa trả về, ghi ngay
+ * "Chưa có đợt nào" là báo sai rồi một nhịp sau lại hiện đầy đủ.
+ */
+export function campaignPlaceholder(loading: boolean, campaignCount: number): string {
+  if (loading) return 'Đang tải đợt khảo sát...';
+  return campaignCount === 0 ? 'Chưa có đợt nào' : 'Chọn đợt khảo sát';
+}
+
 export function selectAvailableSemesterSurveyId<T extends { semesterSurveyId: number }>(
   surveys: readonly T[],
   preferred?: string | number | null,

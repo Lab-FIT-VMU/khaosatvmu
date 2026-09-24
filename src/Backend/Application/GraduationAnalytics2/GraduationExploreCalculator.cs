@@ -53,15 +53,14 @@ public static class GraduationExploreCalculator
             .ToList();
         var periodByIdForOnTime = orderedPeriods.ToDictionary(x => x.PeriodId);
         var total = cells.Sum(x => x.StudentCount);
+        // Số sinh viên nhập học vẫn là mẫu số của tỷ lệ Đã tốt nghiệp, chỉ không còn
+        // đứng thành thẻ chỉ số riêng; thẻ Chưa tốt nghiệp cũng bỏ theo.
         var studentTotal = population.Sum(x => x.StudentCount);
-        var notGraduated = Math.Max(0, studentTotal - total);
         var workStudy = cells.Where(x => x.IsWorkStudy).Sum(x => x.StudentCount);
         var onTime = cells.Where(x => IsOnTime(x, periodByIdForOnTime)).Sum(x => x.StudentCount);
         var kpis = new[]
         {
-            new GraduationKpiDto("studentTotal", "Số sinh viên nhập học", studentTotal, Percentage(studentTotal, studentTotal)),
             new GraduationKpiDto("graduated", "Đã tốt nghiệp", total, Percentage(total, studentTotal)),
-            new GraduationKpiDto("notGraduated", "Chưa tốt nghiệp", notGraduated, Percentage(notGraduated, studentTotal)),
             new GraduationKpiDto("onTime", "Tốt nghiệp đúng hạn", onTime, Percentage(onTime, total)),
             new GraduationKpiDto("workStudy", "Hệ VLVH", workStudy, Percentage(workStudy, total)),
         };
@@ -444,7 +443,7 @@ public static class GraduationExploreCalculator
         cells.Where(x => x.GraduationRank == rank).Sum(x => x.StudentCount);
 
     private static decimal Percentage(int count, int total) =>
-        total == 0 ? 0 : Math.Round(count * 100m / total, 2, MidpointRounding.AwayFromZero);
+        total == 0 ? 0 : Math.Round(count * 100m / total, 3, MidpointRounding.AwayFromZero);
 
     private static string PeriodLabel(GraduationExplorePeriod period) =>
         period.ReviewMonth is { } month && period.ReviewYear is { } year

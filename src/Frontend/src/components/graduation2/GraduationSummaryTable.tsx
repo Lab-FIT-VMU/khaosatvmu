@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { ColumnFilterMenu } from '../ColumnFilterMenu';
 import { ExportDropdown } from '../ExportDropdown';
+import { TablePagination } from '../TablePagination';
+import { usePaginatedItems } from '../../hooks/usePaginatedItems';
 import type { GraduationExploreResultV3 } from '../../types/graduationAnalytics2';
 import { formatCohortCode } from '../../utils/formatCohortCode';
 
@@ -22,6 +24,9 @@ type SortKey = keyof Pick<
   | 'average'
 >;
 type SortDirection = 'asc' | 'desc';
+
+/** Cùng cỡ trang với các bảng báo cáo khác trong hệ thống. */
+const summaryPageSize = 20;
 
 interface GraduationSummaryTableProps {
   rows: SummaryRow[];
@@ -74,6 +79,10 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
       .map((item) => item.row);
   }, [filteredRows, sortDirection, sortKey]);
 
+  // Bảng này gộp theo khoa × chuyên ngành × khóa nên rất dài; cắt trang để không
+  // phải cuộn hết cả nghìn dòng. Nút Xuất số liệu vẫn xuất toàn bộ dòng sau bộ lọc.
+  const pagination = usePaginatedItems(sortedRows, summaryPageSize);
+
   const changeSort = (nextKey: SortKey, direction: SortDirection) => {
     setSortKey(nextKey);
     setSortDirection(direction);
@@ -125,6 +134,7 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
               metadata: {
                 title: 'THỐNG KÊ KẾT QUẢ TỐT NGHIỆP',
                 subtitle,
+                breadcrumb: ['Thống kê chi tiết'],
               },
               columns: [
                 { key: 'facultyName', header: 'Khoa', width: 24 },
@@ -178,7 +188,7 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
             </tr>
           </thead>
           <tbody>
-            {sortedRows.length === 0 ? <tr><td className="graduation-table-empty" colSpan={columns.length}>Không có dữ liệu phù hợp với bộ lọc.</td></tr> : sortedRows.map((row) => (
+            {sortedRows.length === 0 ? <tr><td className="graduation-table-empty" colSpan={columns.length}>Không có dữ liệu phù hợp với bộ lọc.</td></tr> : pagination.visibleItems.map((row) => (
               <tr key={`${row.facultyKey}-${row.programKey}-${row.cohortCode}`}>
                 <td>{row.facultyName}</td>
                 <td>{row.programName}</td>
@@ -197,6 +207,14 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
           </tbody>
         </table>
       </div>
+      {/* Ngoài khung cuộn của bảng, để thanh phân trang luôn nhìn thấy. */}
+      <TablePagination
+        page={pagination.page}
+        pageSize={summaryPageSize}
+        totalItems={sortedRows.length}
+        itemLabel="dòng"
+        onPageChange={pagination.setPage}
+      />
     </article>
   );
 }

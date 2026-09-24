@@ -16,6 +16,7 @@ import type {
 import { scoreBandClass, scoreDeltaClass } from '../../utils/reportThresholds';
 import { toVietnameseFileSlug } from '../../utils/vietnamese';
 import type { QuestionAnalysisExportMetadata } from '../../services/exportQuestionAnalysisService';
+import { formatDecimal, formatDecimalOrDash, formatPercent, formatSigned } from '../../utils/formatNumber';
 
 /** Phạm vi đang mở trang chi tiết: một khoa/viện, một bộ môn hay một học phần. */
 export interface ScopeSelection {
@@ -190,19 +191,19 @@ const ScopeRowsTable: React.FC<{
     },
     {
       key: 'validRate',
-      value: (row) => (row.validRate == null ? '—' : `${row.validRate.toFixed(1)}%`),
+      value: (row) => (row.validRate == null ? '—' : `${formatPercent(row.validRate, 3)}`),
       sortValue: (row) => row.validRate ?? null,
     },
     {
       key: 'averageScore',
-      value: (row) => (row.averageScore === null ? '—' : row.averageScore.toFixed(2)),
+      value: (row) => (formatDecimalOrDash(row.averageScore, 3)),
       sortValue: (row) => row.averageScore,
     },
     {
       key: 'delta',
       value: (row) => {
         const delta = deltaOf(row.averageScore, scopeAverageScore);
-        return delta === null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(2)}`;
+        return delta === null ? '—' : formatSigned(delta);
       },
       sortValue: (row) => deltaOf(row.averageScore, scopeAverageScore),
     },
@@ -349,14 +350,14 @@ const ScopeRowsTable: React.FC<{
                   {showsValidResponses && <td className="num">{row.validResponseCount}</td>}
                   {showsValidRate && (
                     <td className="num">
-                      {row.validRate == null ? '—' : `${row.validRate.toFixed(1)}%`}
+                      {row.validRate == null ? '—' : `${formatPercent(row.validRate, 3)}`}
                     </td>
                   )}
                   <td className={scoreBandClass(row.averageScore)}>
-                    {row.averageScore === null ? '—' : row.averageScore.toFixed(2)}
+                    {formatDecimalOrDash(row.averageScore, 3)}
                   </td>
                   <td className={scoreDeltaClass(delta)}>
-                    {delta === null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(2)}`}
+                    {delta === null ? '—' : formatSigned(delta)}
                   </td>
                 </tr>
               );
@@ -423,6 +424,8 @@ export const ScopeAnalysisDetail: React.FC<{
     return {
       title: 'BÁO CÁO PHÂN TÍCH KẾT QUẢ CÂU HỎI KHẢO SÁT',
       subtitle: data.templateName,
+      // Đi từ mô-đun xuống tận đơn vị đang xem, giống đường dẫn trên thanh trên cùng.
+      breadcrumb: ['Thống kê & Báo cáo', scopeLabels[data.scopeType], data.scopeName],
       fileName: `bao-cao-cau-hoi-${data.scopeType}-${toVietnameseFileSlug(data.scopeName)}`,
       info: {
         'Phạm vi': `${scopeLabels[data.scopeType]} - ${data.scopeName}`,
@@ -431,7 +434,7 @@ export const ScopeAnalysisDetail: React.FC<{
         'Số lớp học phần': data.sectionCount,
         'Tổng số phiếu phải thu': data.totalClassSize.toLocaleString('vi-VN'),
         'Số phiếu hợp lệ': data.responseCount.toLocaleString('vi-VN'),
-        'Điểm trung bình': `${data.averageScore.toFixed(2)} / 5.0`,
+        'Điểm trung bình': `${formatDecimal(data.averageScore, 3)} / 5,0`,
       },
     };
   }, [data]);
@@ -487,7 +490,7 @@ export const ScopeAnalysisDetail: React.FC<{
         <div className="section-responses-stats">
           <span>{data.sectionCount} lớp · tổng số phiếu phải thu {data.totalClassSize.toLocaleString('vi-VN')}</span>
           <span title="Mốc để tính cột Chênh lệch ở bảng bên dưới">
-            Điểm trung bình {data.averageScore.toFixed(2)}
+            Điểm trung bình {formatDecimal(data.averageScore, 3)}
           </span>
           <span>{data.responseCount.toLocaleString('vi-VN')} phiếu hợp lệ</span>
         </div>

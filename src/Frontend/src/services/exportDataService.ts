@@ -31,6 +31,15 @@ export interface ExportMetadata {
   institution?: string;
   /** Đơn vị / Phòng ban phụ trách (ví dụ: PHÒNG ĐẢM BẢO CHẤT LƯỢNG) */
   subInstitution?: string;
+  /**
+   * Đường dẫn điều hướng tới chỗ có số liệu, in ở dòng thứ hai của tệp — cùng kiểu
+   * với thanh trên cùng của hệ thống: đi vào trang nào thì hiện trang đó, vào sâu
+   * hơn thì nối thêm cấp dưới. Khai rồi thì dòng thứ hai là đường dẫn này, không
+   * dùng `subInstitution` nữa.
+   *
+   * Ví dụ: ['Thống kê & Báo cáo', 'Theo Khoa/Viện', 'Công ty IMET'].
+   */
+  breadcrumb?: string[];
   /** Tiêu đề chính của báo cáo / danh mục */
   title: string;
   /** Tiêu đề phụ (ví dụ: Học kỳ 1 - Năm học 2025-2026) */
@@ -43,6 +52,33 @@ export interface ExportMetadata {
   orientation?: 'portrait' | 'landscape';
 }
 
+/**
+ * Một bảng trong sheet.
+ *
+ * Sheet một bảng thì khai thẳng `columns` / `data`; sheet gom nhiều bảng — ví dụ
+ * một sheet cho mỗi khoa/viện, trong đó có bảng điểm theo câu, bảng bộ môn, bảng
+ * lớp — thì khai ở `tables` để các bảng in nối tiếp trong cùng một tab.
+ */
+export interface ExportTable<T = any> {
+  /** Tiêu đề in ngay trên bảng, ví dụ "Danh sách các bộ môn". */
+  title?: string;
+  columns: ExportColumn<T>[];
+  data: T[];
+  /** Ghi chú in ngay dưới bảng này. */
+  summaryNotes?: string[];
+}
+
+/**
+ * Ảnh biểu đồ chèn vào sheet, ngay dưới phần thông tin của sheet và trên bảng đầu
+ * tiên — đúng vị trí biểu đồ đứng trên màn hình. Ảnh là PNG dạng data URL (sinh từ
+ * canvas) kèm kích thước gốc để giữ đúng tỷ lệ.
+ */
+export interface ExportChart {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
 /** Cấu hình cho 1 bảng / 1 Sheet */
 export interface ExportSheet<T = any> {
   /** Tên hiển thị trên tab Excel (tối đa 31 ký tự) */
@@ -50,10 +86,28 @@ export interface ExportSheet<T = any> {
   /** Tiêu đề phân mục bảng (Word / PDF hoặc đầu sheet) */
   title?: string;
   subtitle?: string;
+  /** Đường dẫn điều hướng riêng của sheet, in ở dòng thứ hai; thiếu thì lấy của tệp. */
+  breadcrumb?: string[];
   info?: Record<string, string | number | undefined | null>;
-  columns: ExportColumn<T>[];
-  data: T[];
+  /** Ảnh biểu đồ của sheet, in ngay trên bảng đầu tiên. */
+  chart?: ExportChart;
+  /** Bảng duy nhất của sheet. Để trống khi sheet gom nhiều bảng ở `tables`. */
+  columns?: ExportColumn<T>[];
+  data?: T[];
+  /** Nhiều bảng trong cùng một sheet, in nối tiếp theo thứ tự khai báo. */
+  tables?: ExportTable<any>[];
   summaryNotes?: string[];
+}
+
+/** Các bảng thật sự của sheet, đã san phẳng hai cách khai báo về một dạng. */
+export function tablesOfSheet(sheet: ExportSheet): ExportTable[] {
+  if (sheet.tables && sheet.tables.length > 0) return sheet.tables;
+  return [{ columns: sheet.columns ?? [], data: sheet.data ?? [] }];
+}
+
+/** Số cột rộng nhất của sheet, dùng để chọn hướng trang và bề rộng vùng tiêu đề. */
+export function widestTableOf(sheet: ExportSheet): number {
+  return Math.max(...tablesOfSheet(sheet).map((table) => table.columns.length), 0);
 }
 
 /** Tùy chọn xuất 1 Sheet đơn */
@@ -112,6 +166,17 @@ function downloadBlob(blob: Blob, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Ảnh biểu đồ là PNG dạng data URL; bản Word nhận mảng byte chứ không nhận chuỗi. */
+function chartImageBytes(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
 function sanitizeFileName(name: string, ext: string): string {
   const targetExt = ext.startsWith('.') ? ext : `.${ext}`;
   const baseName = name.toLowerCase().endsWith(targetExt.toLowerCase())
@@ -159,14 +224,23 @@ export function applyNumberFormat(value: string | number, numberFormat?: string)
   // Mã một nhánh tự mang dấu âm; mã nhiều nhánh đã viết sẵn dấu nên chỉ lấy trị tuyệt đối.
   const target = sections.length === 1 ? parsed : Math.abs(parsed);
   const decimals = pattern.includes('.') ? pattern.split('.')[1].length : 0;
+  // Mã định dạng của Excel luôn viết dấu chấm cho phần thập phân, còn bản Word/PDF
+  // in thẳng chuỗi nên phải đổi sang dấu phẩy cho khớp bảng trên màn hình — màn hình
+  // dùng Intl vi-VN, ô Excel cũng hiển thị theo locale của máy.
   const digits = pattern.includes(',')
     ? target.toLocaleString('vi-VN', {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     })
-    : target.toFixed(decimals);
+    : target.toFixed(decimals).replace('.', ',');
 
   return section.replace(pattern, digits).replace(/"([^"]*)"/g, '$1');
+}
+
+/** Nối các cấp của đường dẫn điều hướng thành một dòng, giống breadcrumb trên web. */
+function breadcrumbLine(segments?: string[]): string | undefined {
+  const parts = (segments ?? []).map((part) => part.trim()).filter(Boolean);
+  return parts.length > 0 ? parts.join(' › ') : undefined;
 }
 
 function formatCurrentDateTime(): string {
@@ -176,29 +250,31 @@ function formatCurrentDateTime(): string {
   }).format(new Date());
 }
 
+/** Sheet đã dựng xong phần dòng, sẵn sàng ghi ra tệp. */
+interface BuiltExcelSheet {
+  sheetName: string;
+  rows: any[];
+  columnWidths: { width: number }[];
+  /** Số dòng đầu của sheet (cơ quan, tiêu đề, thông tin, ngày xuất) trước bảng đầu. */
+  headerRowCount: number;
+  chart?: ExportChart;
+}
+
 /**
- * Xuất dữ liệu ra file Excel (.xlsx) hỗ trợ nhiều Sheet/Tab với định dạng chuẩn VMU.
+ * Dựng toàn bộ dòng của một sheet: phần đầu trang, rồi từng bảng và ghi chú.
+ *
+ * Tách khỏi hàm ghi tệp vì có hai đường ghi: `write-excel-file` cho sheet thường và
+ * ExcelJS cho sheet có ảnh biểu đồ (`write-excel-file` không chèn được ảnh). Cả hai
+ * đường dùng chung đúng bộ dòng này nên bản Excel vẫn một kiểu trình bày.
  */
-export async function exportToExcel(options: AnyExportOptions): Promise<void> {
-  const { default: writeXlsxFile } = await import('write-excel-file/browser');
-
-  const multi = normalizeToMultiSheet(options);
-  const { fileName, metadata, sheets } = multi;
-
-  const excelSheets: any[] = [];
-  const usedSheetNames = new Set<string>();
-
-  for (let sheetIdx = 0; sheetIdx < sheets.length; sheetIdx++) {
-    const sheet = sheets[sheetIdx];
-    let sheetName = sanitizeSheetName(sheet.sheetName || `Sheet${sheetIdx + 1}`);
-    if (usedSheetNames.has(sheetName)) {
-      sheetName = sanitizeSheetName(`${sheetName}_${sheetIdx + 1}`);
-    }
-    usedSheetNames.add(sheetName);
-
-    const columns = sheet.columns;
-    const data = sheet.data;
-    const colCount = Math.max(columns.length, 4);
+async function buildExcelSheet(
+  sheet: ExportSheet<any>,
+  metadata: ExportMetadata,
+  sheetIdx: number,
+  sheetCount: number,
+): Promise<BuiltExcelSheet> {
+  const tables = tablesOfSheet(sheet);
+  const colCount = Math.max(...tables.map((table) => table.columns.length + 1), 4);
 
     const rows: any[] = [];
 
@@ -213,11 +289,14 @@ export async function exportToExcel(options: AnyExportOptions): Promise<void> {
     };
     rows.push(instRow);
 
-    // Dòng 2: Phòng ban / Phân hệ
-    if (metadata.subInstitution) {
+    // Dòng 2: đường dẫn điều hướng tới chỗ có số liệu, hoặc đơn vị phụ trách nếu
+    // chỗ gọi chưa khai đường dẫn.
+    const secondLine = breadcrumbLine(sheet.breadcrumb ?? metadata.breadcrumb)
+      ?? metadata.subInstitution;
+    if (secondLine) {
       const subInstRow = new Array(colCount).fill({ value: '', type: String });
       subInstRow[0] = {
-        value: metadata.subInstitution.toUpperCase(),
+        value: secondLine.toUpperCase(),
         type: String,
         fontWeight: 'bold',
         fontSize: 10,
@@ -230,7 +309,7 @@ export async function exportToExcel(options: AnyExportOptions): Promise<void> {
     rows.push(new Array(colCount).fill({ value: '', type: String }));
 
     // Dòng tiêu đề Sheet
-    const sheetTitle = sheet.title || (sheets.length > 1 ? `${metadata.title} — ${sheet.sheetName}` : metadata.title);
+    const sheetTitle = sheet.title || (sheetCount > 1 ? `${metadata.title} — ${sheet.sheetName}` : metadata.title);
     const titleRow = new Array(colCount).fill({ value: '', type: String });
     titleRow[0] = {
       value: sheetTitle.toUpperCase(),
@@ -279,118 +358,172 @@ export async function exportToExcel(options: AnyExportOptions): Promise<void> {
     };
     rows.push(dateRow);
 
-    // Dòng trống trước bảng
-    rows.push(new Array(colCount).fill({ value: '', type: String }));
-
-    // Header của bảng dữ liệu. Nền sáng chữ đậm thay vì nền xanh đặc chữ trắng:
-    // bảng rộng mấy chục cột mà cả dải tiêu đề tối om thì nhìn nặng và in ra tốn
-    // mực. Viền dưới đậm là đủ để tách tiêu đề khỏi phần dữ liệu.
-    const headerFill = '#e3edf5';
-    const headerText = '#14415c';
-    const headerRow = [
-      {
-        value: 'STT',
-        type: String,
-        fontWeight: 'bold',
-        align: 'center',
-        backgroundColor: headerFill,
-        color: headerText,
-        bottomBorderColor: '#0f4c81',
-        bottomBorderStyle: 'medium',
-      },
-      ...columns.map((col) => ({
-        value: col.header,
-        type: String,
-        fontWeight: 'bold',
-        align: col.align || (col.type === 'number' ? 'right' : 'left'),
-        backgroundColor: headerFill,
-        color: headerText,
-        bottomBorderColor: '#0f4c81',
-        bottomBorderStyle: 'medium',
-        wrap: true,
-      })),
-    ];
-    rows.push(headerRow);
-
     // Bề rộng thật của từng cột, đo dần ngay trong vòng lặp dựng dòng để không
-    // phải quét lại toàn bộ dữ liệu lần thứ hai. Khởi tạo bằng độ dài tiêu đề.
-    const measuredWidths = columns.map((col) => col.header.length);
+    // phải quét lại toàn bộ dữ liệu lần thứ hai. Khởi tạo bằng 0 rồi cộng dồn
+    // qua từng bảng, vì các bảng trong cùng sheet dùng chung một hệ cột.
+    const measuredWidths: number[] = new Array(Math.max(0, colCount - 1)).fill(0);
+    // `col.width` khai báo sẵn là mức SÀN, lấy mức lớn nhất trong các bảng cùng sheet.
+    const declaredWidths: number[] = [];
+    tables.forEach((table) => {
+      table.columns.forEach((col, colIndex) => {
+        declaredWidths[colIndex] = Math.max(declaredWidths[colIndex] ?? 0, col.width ?? 0);
+      });
+    });
 
-    // Dòng dữ liệu
-    for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
-      if (rowIndex > 0 && rowIndex % 300 === 0) {
-        await yieldToMain();
+    const headerRowCount = rows.length;
+
+    for (let tableIdx = 0; tableIdx < tables.length; tableIdx++) {
+      const table = tables[tableIdx];
+      const columns = table.columns;
+      const data = table.data;
+
+      // Dòng trống trước bảng
+      rows.push(new Array(colCount).fill({ value: '', type: String }));
+
+      // Tiêu đề phân mục. Sheet gom nhiều bảng thì mỗi bảng phải nói rõ mình là
+      // phần nào; sheet một bảng đã có tiêu đề của chính sheet ở trên.
+      if (table.title && tables.length > 1) {
+        const tableTitleRow = new Array(colCount).fill({ value: '', type: String });
+        tableTitleRow[0] = {
+          value: table.title.toUpperCase(),
+          type: String,
+          fontWeight: 'bold',
+          fontSize: 11,
+          color: '#14415c',
+        };
+        rows.push(tableTitleRow);
       }
-      const row = data[rowIndex];
-      const isEven = rowIndex % 2 === 1;
-      const bgColor = isEven ? '#f8fafc' : '#ffffff';
 
-      const dataRow = [
+      // Header của bảng dữ liệu. Nền sáng chữ đậm thay vì nền xanh đặc chữ trắng:
+      // bảng rộng mấy chục cột mà cả dải tiêu đề tối om thì nhìn nặng và in ra tốn
+      // mực. Viền dưới đậm là đủ để tách tiêu đề khỏi phần dữ liệu.
+      const headerFill = '#e3edf5';
+      const headerText = '#14415c';
+      const headerRow = [
         {
-          value: rowIndex + 1,
-          type: Number,
+          value: 'STT',
+          type: String,
+          fontWeight: 'bold',
           align: 'center',
-          backgroundColor: bgColor,
+          backgroundColor: headerFill,
+          color: headerText,
+          bottomBorderColor: '#0f4c81',
+          bottomBorderStyle: 'medium',
         },
-        ...columns.map((col, colIndex) => {
-          let rawVal = (row as any)[col.key];
-          if (col.format) {
-            rawVal = col.format(rawVal, row, rowIndex);
-          }
+        ...columns.map((col) => ({
+          value: col.header,
+          type: String,
+          fontWeight: 'bold',
+          align: col.align || (col.type === 'number' ? 'right' : 'left'),
+          backgroundColor: headerFill,
+          color: headerText,
+          bottomBorderColor: '#0f4c81',
+          bottomBorderStyle: 'medium',
+          wrap: true,
+        })),
+      ];
+      rows.push(headerRow);
 
-          // Ô số hiển thị theo numberFormat nên chuỗi hiện ra có thể dài hơn giá
-          // trị thô (thêm dấu %, thêm số lẻ). Cộng thêm phần đuôi của mã định dạng
-          // để cột không bị hụt đúng vài ký tự.
-          const displayLength = rawVal === null || rawVal === undefined
-            ? 0
-            : String(rawVal).length + (col.numberFormat ? 1 : 0);
-          if (displayLength > measuredWidths[colIndex]) {
-            measuredWidths[colIndex] = displayLength;
-          }
+      columns.forEach((col, colIndex) => {
+        measuredWidths[colIndex] = Math.max(measuredWidths[colIndex] ?? 0, col.header.length);
+      });
 
-          let cellType: any = String;
-          let cellVal: any = rawVal;
-          const align = col.align || (col.type === 'number' ? 'right' : 'left');
+      // Dòng dữ liệu
+      for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
+        if (rowIndex > 0 && rowIndex % 300 === 0) {
+          await yieldToMain();
+        }
+        const row = data[rowIndex];
+        const isEven = rowIndex % 2 === 1;
+        const bgColor = isEven ? '#f8fafc' : '#ffffff';
 
-          if (rawVal === null || rawVal === undefined) {
-            cellVal = '';
-          } else if (typeof rawVal === 'number') {
-            cellType = Number;
-          } else if (typeof rawVal === 'boolean') {
-            cellVal = rawVal ? 'Có' : 'Không';
-          } else if (col.type === 'number') {
-            const num = Number(rawVal);
-            if (!isNaN(num)) {
+        const dataRow = [
+          {
+            value: rowIndex + 1,
+            type: Number,
+            align: 'center',
+            backgroundColor: bgColor,
+          },
+          ...columns.map((col, colIndex) => {
+            let rawVal = (row as any)[col.key];
+            if (col.format) {
+              rawVal = col.format(rawVal, row, rowIndex);
+            }
+
+            // Ô số hiển thị theo numberFormat nên chuỗi hiện ra có thể dài hơn giá
+            // trị thô (thêm dấu %, thêm số lẻ). Cộng thêm phần đuôi của mã định dạng
+            // để cột không bị hụt đúng vài ký tự.
+            const displayLength = rawVal === null || rawVal === undefined
+              ? 0
+              : String(rawVal).length + (col.numberFormat ? 1 : 0);
+            if (displayLength > (measuredWidths[colIndex] ?? 0)) {
+              measuredWidths[colIndex] = displayLength;
+            }
+
+            let cellType: any = String;
+            let cellVal: any = rawVal;
+            const align = col.align || (col.type === 'number' ? 'right' : 'left');
+
+            if (rawVal === null || rawVal === undefined) {
+              cellVal = '';
+            } else if (typeof rawVal === 'number') {
               cellType = Number;
-              cellVal = num;
+            } else if (typeof rawVal === 'boolean') {
+              cellVal = rawVal ? 'Có' : 'Không';
+            } else if (col.type === 'number') {
+              const num = Number(rawVal);
+              if (!isNaN(num)) {
+                cellType = Number;
+                cellVal = num;
+              } else {
+                cellVal = String(rawVal);
+              }
             } else {
               cellVal = String(rawVal);
             }
-          } else {
-            cellVal = String(rawVal);
-          }
 
-          return {
-            value: cellVal,
-            type: cellType,
-            align,
-            backgroundColor: bgColor,
-            // Chỉ ô số mới nhận mã định dạng; gắn vào ô chữ là Excel báo hỏng tệp.
-            ...(cellType === Number && col.numberFormat
-              ? { format: col.numberFormat }
-              : {}),
+            return {
+              value: cellVal,
+              type: cellType,
+              align,
+              backgroundColor: bgColor,
+              // Chỉ ô số mới nhận mã định dạng; gắn vào ô chữ là Excel báo hỏng tệp.
+              ...(cellType === Number && col.numberFormat
+                ? { format: col.numberFormat }
+                : {}),
+            };
+          }),
+        ];
+        rows.push(dataRow);
+      }
+
+      // Ghi chú riêng của bảng này, in ngay dưới bảng.
+      if (table.summaryNotes && table.summaryNotes.length > 0) {
+        table.summaryNotes.forEach((note) => {
+          const noteRow = new Array(colCount).fill({ value: '', type: String });
+          noteRow[0] = {
+            value: `* ${note}`,
+            type: String,
+            fontStyle: 'italic',
+            fontSize: 9,
+            color: '#666666',
           };
-        }),
-      ];
-      rows.push(dataRow);
+          rows.push(noteRow);
+        });
+      }
+
+      // Ngăn cách giữa hai bảng trong cùng sheet.
+      if (tableIdx < tables.length - 1) {
+        rows.push(new Array(colCount).fill({ value: '', type: String }));
+      }
     }
 
     // Ghi chú chân trang nếu có
-    const summaryNotes = sheet.summaryNotes || (sheetIdx === sheets.length - 1 ? metadata.summaryNotes : undefined);
+    const summaryNotes = sheet.summaryNotes || (sheetIdx === sheetCount - 1 ? metadata.summaryNotes : undefined);
     if (summaryNotes && summaryNotes.length > 0) {
-      rows.push(new Array(colCount + 1).fill({ value: '', type: String }));
+      rows.push(new Array(colCount).fill({ value: '', type: String }));
       summaryNotes.forEach((note) => {
-        const noteRow = new Array(colCount + 1).fill({ value: '', type: String });
+        const noteRow = new Array(colCount).fill({ value: '', type: String });
         noteRow[0] = {
           value: `* ${note}`,
           type: String,
@@ -406,25 +539,39 @@ export async function exportToExcel(options: AnyExportOptions): Promise<void> {
     // nên cột chứa tên học phần dài luôn bị cắt, còn tiêu đề dài như "Phiếu hợp
     // lệ" thì bị xuống dòng dù dữ liệu bên dưới chỉ có hai chữ số.
     //
-    // `col.width` khai báo sẵn không còn là con số cuối cùng mà thành mức SÀN, để
-    // các cột hẹp không dính sát nhau. Chặn trên 46 ký tự: ô ghi chú dài lê thê
-    // mà cho nở tự do thì kéo cả trang giấy in ra ngoài khổ.
+    // Chặn trên 46 ký tự: ô ghi chú dài lê thê mà cho nở tự do thì kéo cả trang
+    // giấy in ra ngoài khổ.
     const columnWidths = [
       { width: 6 }, // STT
-      ...columns.map((col, colIndex) => ({
-        width: Math.min(
-          46,
-          Math.max(measuredWidths[colIndex] + 2, col.width ?? 0, 8)
-        ),
+      ...measuredWidths.map((measured, colIndex) => ({
+        width: Math.min(46, Math.max(measured + 2, declaredWidths[colIndex] ?? 0, 8)),
       })),
     ];
 
-    excelSheets.push({
-      sheet: sheetName,
-      columns: columnWidths,
-      data: rows,
-    });
-  }
+    return {
+      sheetName: sanitizeSheetName(sheet.sheetName || `Sheet${sheetIdx + 1}`),
+      rows,
+      columnWidths,
+      headerRowCount,
+      chart: sheet.chart,
+    };
+}
+
+/** Ghi một sheet đã dựng sẵn bằng `write-excel-file`. */
+async function writeExcelWithPlainWriter(
+  fileName: string,
+  built: BuiltExcelSheet[],
+): Promise<void> {
+  const { default: writeXlsxFile } = await import('write-excel-file/browser');
+
+  const excelSheets = built.map((item, index) => {
+    let sheetName = item.sheetName;
+    const isDuplicate = built
+      .slice(0, index)
+      .some((previous) => previous.sheetName === sheetName);
+    if (isDuplicate) sheetName = sanitizeSheetName(`${sheetName}_${index + 1}`);
+    return { sheet: sheetName, columns: item.columnWidths, data: item.rows };
+  });
 
   if (excelSheets.length === 1) {
     await (writeXlsxFile as any)(excelSheets[0].data, {
@@ -434,6 +581,144 @@ export async function exportToExcel(options: AnyExportOptions): Promise<void> {
   } else {
     await (writeXlsxFile as any)(excelSheets).toFile(sanitizeFileName(fileName, '.xlsx'));
   }
+}
+
+/** Đổi '#rrggbb' sang ARGB mà ExcelJS chờ đợi. */
+const toArgb = (color: string): string =>
+  `FF${color.replace('#', '').toUpperCase()}`;
+
+/**
+ * Ghi tệp Excel bằng ExcelJS — dùng khi sheet có ảnh biểu đồ, vì `write-excel-file`
+ * không chèn được ảnh. Bộ dòng vẫn do `buildExcelSheet` dựng nên hai đường ghi cho
+ * ra cùng một cách trình bày.
+ */
+async function writeExcelWithImages(
+  fileName: string,
+  built: BuiltExcelSheet[],
+): Promise<void> {
+  const ExcelJS = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'VMU Survey System';
+  workbook.lastModifiedBy = 'VMU Survey System';
+  workbook.created = new Date();
+  workbook.modified = new Date();
+
+  const usedSheetNames = new Set<string>();
+
+  for (let sheetIdx = 0; sheetIdx < built.length; sheetIdx++) {
+    const item = built[sheetIdx];
+    let sheetName = item.sheetName;
+    if (usedSheetNames.has(sheetName)) {
+      sheetName = sanitizeSheetName(`${sheetName}_${sheetIdx + 1}`);
+    }
+    usedSheetNames.add(sheetName);
+
+    const ws = workbook.addWorksheet(sheetName, { views: [{ showGridLines: true }] });
+    item.columnWidths.forEach((column, index) => {
+      ws.getColumn(index + 1).width = column.width;
+    });
+
+    const styleRow = (cells: any[], rowNumber: number) => {
+      // Dòng dữ liệu là dòng có nền xen kẽ hoặc mã định dạng số; dòng tiêu đề, dòng
+      // trống và dòng ghi chú không có hai thứ đó nên không bị kẻ viền thành ô rỗng.
+      const isDataRow = cells.some((cell) => Boolean(cell?.backgroundColor || cell?.format));
+      const row = ws.getRow(rowNumber);
+      cells.forEach((cell, cellIndex) => {
+        const target = row.getCell(cellIndex + 1);
+        target.value = cell?.value ?? '';
+        const font: Record<string, unknown> = { name: 'Arial' };
+        if (cell?.fontSize) font.size = cell.fontSize; else font.size = 10;
+        if (cell?.fontWeight === 'bold') font.bold = true;
+        if (cell?.fontStyle === 'italic') font.italic = true;
+        if (cell?.color) font.color = { argb: toArgb(cell.color) };
+        target.font = font as any;
+        target.alignment = {
+          horizontal: cell?.align === 'right' ? 'right' : cell?.align === 'center' ? 'center' : 'left',
+          vertical: 'middle',
+          wrapText: Boolean(cell?.wrap),
+        };
+        if (cell?.backgroundColor && cell.backgroundColor !== '#ffffff') {
+          target.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: toArgb(cell.backgroundColor) },
+          };
+        }
+        if (cell?.bottomBorderStyle === 'medium') {
+          target.border = {
+            bottom: { style: 'medium', color: { argb: toArgb(cell.bottomBorderColor || '#0f4c81') } },
+          };
+        } else if (isDataRow) {
+          target.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          };
+        }
+        if (cell?.format) target.numFmt = cell.format;
+      });
+      return row;
+    };
+
+    // Phần đầu trang, rồi tới ảnh biểu đồ (nếu có), rồi mới tới các bảng.
+    let cursor = 1;
+    for (const row of item.rows.slice(0, item.headerRowCount)) {
+      styleRow(row, cursor);
+      cursor += 1;
+    }
+
+    if (item.chart) {
+      const imageId = workbook.addImage({
+        base64: item.chart.dataUrl,
+        extension: 'png',
+      });
+      const chartWidth = 900;
+      const chartHeight = Math.round(chartWidth * (item.chart.height / item.chart.width));
+      ws.addImage(imageId, {
+        // Ảnh neo vào dòng đang trống; ảnh nằm đè lên các dòng phía dưới nên phải
+        // nhảy con trỏ qua đủ số dòng mà ảnh chiếm (mỗi dòng ~20px).
+        tl: { col: 0, row: cursor - 1 },
+        ext: { width: chartWidth, height: chartHeight },
+        editAs: 'oneCell',
+      });
+      cursor += Math.ceil(chartHeight / 20) + 2;
+    }
+
+    for (const row of item.rows.slice(item.headerRowCount)) {
+      styleRow(row, cursor);
+      cursor += 1;
+    }
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  downloadBlob(
+    new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }),
+    sanitizeFileName(fileName, '.xlsx'),
+  );
+}
+
+/**
+ * Xuất dữ liệu ra file Excel (.xlsx) hỗ trợ nhiều Sheet/Tab với định dạng chuẩn VMU.
+ */
+export async function exportToExcel(options: AnyExportOptions): Promise<void> {
+  const multi = normalizeToMultiSheet(options);
+  const { fileName, metadata, sheets } = multi;
+
+  const built: BuiltExcelSheet[] = [];
+  for (let sheetIdx = 0; sheetIdx < sheets.length; sheetIdx++) {
+    built.push(await buildExcelSheet(sheets[sheetIdx], metadata, sheetIdx, sheets.length));
+  }
+
+  // Sheet có ảnh biểu đồ thì phải đi đường ExcelJS; còn lại giữ nguyên đường cũ.
+  if (built.some((item) => item.chart)) {
+    await writeExcelWithImages(fileName, built);
+    return;
+  }
+
+  await writeExcelWithPlainWriter(fileName, built);
 }
 
 /**
@@ -457,13 +742,15 @@ export async function exportToWord(options: AnyExportOptions): Promise<void> {
     Footer,
     PageNumber,
     PageOrientation,
+    ImageRun,
   } = docx;
 
   const multi = normalizeToMultiSheet(options);
   const { fileName, metadata, sheets } = multi;
 
-  // Xác định hướng trang: nếu có sheet nào > 6 cột thì chọn landscape
-  const maxCols = Math.max(...sheets.map((s) => s.columns.length));
+  // Xác định hướng trang: nếu có bảng nào > 6 cột thì chọn landscape. Sheet gom
+  // nhiều bảng thì tính theo bảng rộng nhất của sheet.
+  const maxCols = Math.max(...sheets.map(widestTableOf), 0);
   const isLandscape =
     metadata.orientation === 'landscape' ||
     (!metadata.orientation && maxCols > 6);
@@ -485,13 +772,15 @@ export async function exportToWord(options: AnyExportOptions): Promise<void> {
     })
   );
 
-  if (metadata.subInstitution) {
+  // Dòng 2: đường dẫn điều hướng tới chỗ có số liệu, hoặc đơn vị phụ trách.
+  const documentBreadcrumb = breadcrumbLine(metadata.breadcrumb) ?? metadata.subInstitution;
+  if (documentBreadcrumb) {
     docChildren.push(
       new Paragraph({
         alignment: AlignmentType.LEFT,
         children: [
           new TextRun({
-            text: metadata.subInstitution.toUpperCase(),
+            text: documentBreadcrumb.toUpperCase(),
             bold: true,
             size: 18, // 9pt
             color: '555555',
@@ -622,104 +911,183 @@ export async function exportToWord(options: AnyExportOptions): Promise<void> {
       );
     }
 
-    const columns = sheet.columns;
-    const data = sheet.data;
+    // Sheet có thể gom nhiều bảng: mỗi bảng in một tiêu đề nhỏ rồi tới bảng dữ liệu.
+    const tables = tablesOfSheet(sheet);
 
-    // Header bảng
-    const headerRow = new TableRow({
-      tableHeader: true,
-      children: [
-        new TableCell({
-          shading: { fill: '0F4C81', type: ShadingType.CLEAR },
+    // Sheet nhiều phân mục (mỗi khoa một phân mục) thì in đường dẫn riêng của phân
+    // mục đó; tệp một phân mục đã có đường dẫn chung ở đầu tệp rồi.
+    const sheetBreadcrumb = breadcrumbLine(sheet.breadcrumb);
+    if (sheetBreadcrumb && sheets.length > 1) {
+      docChildren.push(
+        new Paragraph({
+          spacing: { after: 80 },
           children: [
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              children: [
-                new TextRun({ text: 'STT', bold: true, color: 'FFFFFF', size: 17 }),
-              ],
-            }),
-          ],
-        }),
-        // Tên cột luôn căn giữa, không theo căn lề của dữ liệu bên dưới: cột số căn
-        // phải làm tên cột dạt hẳn sang mép, nhìn như lệch hàng.
-        ...columns.map((col) => new TableCell({
-          shading: { fill: '0F4C81', type: ShadingType.CLEAR },
-          children: [
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              children: [
-                new TextRun({ text: col.header, bold: true, color: 'FFFFFF', size: 17 }),
-              ],
-            }),
-          ],
-        })),
-      ],
-    });
-
-    // Dòng dữ liệu
-    const dataRows: any[] = [];
-    for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
-      if (rowIndex > 0 && rowIndex % 300 === 0) {
-        await yieldToMain();
-      }
-      const row = data[rowIndex];
-      const isEven = rowIndex % 2 === 1;
-      const fill = isEven ? 'F8FAFC' : 'FFFFFF';
-
-      dataRows.push(
-        new TableRow({
-          children: [
-            new TableCell({
-              shading: { fill, type: ShadingType.CLEAR },
-              children: [
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  children: [new TextRun({ text: String(rowIndex + 1), size: 17 })],
-                }),
-              ],
-            }),
-            ...columns.map((col) => {
-              let val = (row as any)[col.key];
-              if (col.format) {
-                val = col.format(val, row, rowIndex);
-              }
-              const displayVal = val === null || val === undefined
-                ? ''
-                : applyNumberFormat(val as string | number, col.numberFormat);
-
-              const alignment =
-                col.align === 'center'
-                  ? AlignmentType.CENTER
-                  : col.align === 'right' || col.type === 'number'
-                  ? AlignmentType.RIGHT
-                  : AlignmentType.LEFT;
-
-              return new TableCell({
-                shading: { fill, type: ShadingType.CLEAR },
-                children: [
-                  new Paragraph({
-                    alignment,
-                    children: [new TextRun({ text: displayVal, size: 17 })],
-                  }),
-                ],
-              });
+            new TextRun({
+              text: sheetBreadcrumb,
+              italics: true,
+              size: 18,
+              color: '555555',
             }),
           ],
         })
       );
     }
 
-    const table = new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [headerRow, ...dataRows],
-    });
+    // Ảnh biểu đồ của sheet đứng ngay trên bảng đầu tiên, đúng như trên màn hình.
+    if (sheet.chart) {
+      const chartWidth = 620;
+      const chartHeight = Math.round(chartWidth * (sheet.chart.height / sheet.chart.width));
+      docChildren.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 120, after: 160 },
+          children: [
+            new ImageRun({
+              type: 'png',
+              data: chartImageBytes(sheet.chart.dataUrl),
+              transformation: { width: chartWidth, height: chartHeight },
+            }),
+          ],
+        })
+      );
+    }
 
-    docChildren.push(table);
+    for (const exportTable of tables) {
+      const columns = exportTable.columns;
+      const data = exportTable.data;
 
-    // Ghi chú dưới bảng
-    const summaryNotes = sheet.summaryNotes || (sheetIdx === sheets.length - 1 ? metadata.summaryNotes : undefined);
-    if (summaryNotes && summaryNotes.length > 0) {
-      summaryNotes.forEach((note) => {
+      // Tiêu đề phân mục của bảng trong sheet gom nhiều bảng.
+      if (exportTable.title && tables.length > 1) {
+        docChildren.push(
+          new Paragraph({
+            spacing: { before: 160, after: 60 },
+            children: [
+              new TextRun({
+                text: exportTable.title,
+                bold: true,
+                size: 20,
+                color: '14415C',
+              }),
+            ],
+          })
+        );
+      }
+
+      // Header bảng
+      const headerRow = new TableRow({
+        tableHeader: true,
+        children: [
+          new TableCell({
+            shading: { fill: '0F4C81', type: ShadingType.CLEAR },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: 'STT', bold: true, color: 'FFFFFF', size: 17 }),
+                ],
+              }),
+            ],
+          }),
+          // Tên cột luôn căn giữa, không theo căn lề của dữ liệu bên dưới: cột số căn
+          // phải làm tên cột dạt hẳn sang mép, nhìn như lệch hàng.
+          ...columns.map((col) => new TableCell({
+            shading: { fill: '0F4C81', type: ShadingType.CLEAR },
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({ text: col.header, bold: true, color: 'FFFFFF', size: 17 }),
+                ],
+              }),
+            ],
+          })),
+        ],
+      });
+
+      // Dòng dữ liệu
+      const dataRows: any[] = [];
+      for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
+        if (rowIndex > 0 && rowIndex % 300 === 0) {
+          await yieldToMain();
+        }
+        const row = data[rowIndex];
+        const isEven = rowIndex % 2 === 1;
+        const fill = isEven ? 'F8FAFC' : 'FFFFFF';
+
+        dataRows.push(
+          new TableRow({
+            children: [
+              new TableCell({
+                shading: { fill, type: ShadingType.CLEAR },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [new TextRun({ text: String(rowIndex + 1), size: 17 })],
+                  }),
+                ],
+              }),
+              ...columns.map((col) => {
+                let val = (row as any)[col.key];
+                if (col.format) {
+                  val = col.format(val, row, rowIndex);
+                }
+                const displayVal = val === null || val === undefined
+                  ? ''
+                  : applyNumberFormat(val as string | number, col.numberFormat);
+
+                const alignment =
+                  col.align === 'center'
+                    ? AlignmentType.CENTER
+                    : col.align === 'right' || col.type === 'number'
+                    ? AlignmentType.RIGHT
+                    : AlignmentType.LEFT;
+
+                return new TableCell({
+                  shading: { fill, type: ShadingType.CLEAR },
+                  children: [
+                    new Paragraph({
+                      alignment,
+                      children: [new TextRun({ text: displayVal, size: 17 })],
+                    }),
+                  ],
+                });
+              }),
+            ],
+          })
+        );
+      }
+
+      const table = new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [headerRow, ...dataRows],
+      });
+
+      docChildren.push(table);
+
+      // Ghi chú riêng của bảng, in ngay dưới bảng đó.
+      if (exportTable.summaryNotes && exportTable.summaryNotes.length > 0) {
+        exportTable.summaryNotes.forEach((note) => {
+          docChildren.push(
+            new Paragraph({
+              spacing: { before: 60, after: 40 },
+              children: [
+                new TextRun({
+                  text: `* ${note}`,
+                  italics: true,
+                  size: 16,
+                  color: '666666',
+                }),
+              ],
+            })
+          );
+        });
+      }
+    }
+
+    // Ghi chú chân trang của sheet, in sau khi hết mọi bảng của sheet đó.
+    const sheetNotes = sheet.summaryNotes || (sheetIdx === sheets.length - 1 ? metadata.summaryNotes : undefined);
+    if (sheetNotes && sheetNotes.length > 0) {
+      sheetNotes.forEach((note) => {
         docChildren.push(
           new Paragraph({
             spacing: { before: 60, after: 40 },
@@ -803,7 +1171,8 @@ export async function exportToPdf(options: AnyExportOptions): Promise<void> {
   const multi = normalizeToMultiSheet(options);
   const { fileName, metadata, sheets } = multi;
 
-  const maxCols = Math.max(...sheets.map((s) => s.columns.length));
+  // Sheet gom nhiều bảng thì lấy bảng rộng nhất để chọn hướng trang.
+  const maxCols = Math.max(...sheets.map(widestTableOf), 0);
   const isLandscape =
     metadata.orientation === 'landscape' ||
     (!metadata.orientation && maxCols > 6);
@@ -831,11 +1200,13 @@ export async function exportToPdf(options: AnyExportOptions): Promise<void> {
   doc.text((metadata.institution || 'TRƯỜNG ĐẠI HỌC HÀNG HẢI VIỆT NAM').toUpperCase(), margin, currentY);
   currentY += 5;
 
-  if (metadata.subInstitution) {
+  // Dòng 2: đường dẫn điều hướng tới chỗ có số liệu, hoặc đơn vị phụ trách.
+  const documentBreadcrumb = breadcrumbLine(metadata.breadcrumb) ?? metadata.subInstitution;
+  if (documentBreadcrumb) {
     doc.setFont(activeFont, 'bold');
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
-    doc.text(metadata.subInstitution.toUpperCase(), margin, currentY);
+    doc.text(documentBreadcrumb.toUpperCase(), margin, currentY);
     currentY += 5;
   }
 
@@ -918,83 +1289,44 @@ export async function exportToPdf(options: AnyExportOptions): Promise<void> {
       currentY += 4;
     }
 
-    const columns = sheet.columns;
-    const data = sheet.data;
+    // Sheet có thể gom nhiều bảng: mỗi bảng một autoTable nối tiếp nhau.
+    const tables = tablesOfSheet(sheet);
 
-    const head = [
-      [
-        'STT',
-        ...columns.map((col) => col.header),
-      ],
-    ];
-
-    const body: string[][] = [];
-    for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
-      if (rowIndex > 0 && rowIndex % 300 === 0) {
-        await yieldToMain();
+    // Đường dẫn riêng của phân mục (tệp nhiều phân mục, mỗi khoa một phân mục).
+    const sheetBreadcrumb = breadcrumbLine(sheet.breadcrumb);
+    if (sheetBreadcrumb && sheets.length > 1) {
+      if (currentY + 10 > pageHeight - margin) {
+        doc.addPage();
+        currentY = margin;
       }
-      const row = data[rowIndex];
-      body.push([
-        String(rowIndex + 1),
-        ...columns.map((col) => {
-          let val = (row as any)[col.key];
-          if (col.format) {
-            val = col.format(val, row, rowIndex);
-          }
-          return val === null || val === undefined
-            ? ''
-            : applyNumberFormat(val as string | number, col.numberFormat);
-        }),
-      ]);
+      doc.setFont(activeFont, 'italic');
+      doc.setFontSize(8.5);
+      doc.setTextColor(85, 85, 85);
+      doc.text(sheetBreadcrumb, margin, currentY);
+      currentY += 4;
     }
 
-    const columnStyles: Record<number, any> = {
-      0: { halign: 'center', cellWidth: 10 },
-    };
+    // Ảnh biểu đồ của sheet, chèn ngay trên bảng đầu tiên và tự sang trang nếu hụt chỗ.
+    if (sheet.chart) {
+      const chartWidth = pageWidth - margin * 2;
+      const chartHeight = (sheet.chart.height / sheet.chart.width) * chartWidth;
+      if (currentY + chartHeight > pageHeight - margin) {
+        doc.addPage();
+        currentY = margin;
+      }
+      doc.addImage(sheet.chart.dataUrl, 'PNG', margin, currentY, chartWidth, chartHeight);
+      currentY += chartHeight + 6;
+    }
 
-    columns.forEach((col, idx) => {
-      const colIdx = idx + 1;
-      const halign =
-        col.align === 'center'
-          ? 'center'
-          : col.align === 'right' || col.type === 'number'
-          ? 'right'
-          : 'left';
-      columnStyles[colIdx] = { halign };
-    });
-
-    autoTable(doc, {
-      startY: currentY,
-      head,
-      body,
-      margin: { left: margin, right: margin, bottom: 15 },
-      styles: {
-        font: activeFont,
-        fontSize: 8,
-        cellPadding: 2,
-        overflow: 'linebreak',
-      },
-      headStyles: {
-        fillColor: [15, 76, 129],
-        textColor: [255, 255, 255],
-        font: activeFont,
-        fontStyle: 'bold',
-        halign: 'center',
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-      columnStyles,
-    });
-
-    const summaryNotes = sheet.summaryNotes || (sheetIdx === sheets.length - 1 ? metadata.summaryNotes : undefined);
-    if (summaryNotes && summaryNotes.length > 0) {
+    /** In các dòng ghi chú ngay dưới bảng vừa vẽ, tự sang trang khi hết chỗ. */
+    const printNotes = (notes?: string[]) => {
+      if (!notes || notes.length === 0) return;
       const lastY = (doc as any).lastAutoTable?.finalY || currentY;
       let noteY = lastY + 5;
       doc.setFont(activeFont, 'normal');
       doc.setFontSize(7.5);
       doc.setTextColor(100, 100, 100);
-      summaryNotes.forEach((note) => {
+      notes.forEach((note) => {
         const lines = doc.splitTextToSize(`* ${note}`, pageWidth - margin * 2) as string[];
         const noteHeight = Math.max(lines.length, 1) * 3.2;
         if (noteY + noteHeight > pageHeight - 15) {
@@ -1005,7 +1337,98 @@ export async function exportToPdf(options: AnyExportOptions): Promise<void> {
         noteY += noteHeight + 1.5;
       });
       currentY = noteY;
+    };
+
+    for (const exportTable of tables) {
+      if (exportTable.title && tables.length > 1) {
+        const lastTitleY = (doc as any).lastAutoTable?.finalY;
+        if (lastTitleY && lastTitleY > currentY) currentY = lastTitleY + 6;
+        if (currentY + 15 > pageHeight - margin) {
+          doc.addPage();
+          currentY = margin;
+        }
+        doc.setFont(activeFont, 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(20, 65, 92);
+        doc.text(exportTable.title, margin, currentY);
+        currentY += 4.5;
+      }
+
+      const columns = exportTable.columns;
+      const data = exportTable.data;
+
+      const head = [
+        [
+          'STT',
+          ...columns.map((col) => col.header),
+        ],
+      ];
+
+      const body: string[][] = [];
+      for (let rowIndex = 0; rowIndex < data.length; rowIndex++) {
+        if (rowIndex > 0 && rowIndex % 300 === 0) {
+          await yieldToMain();
+        }
+        const row = data[rowIndex];
+        body.push([
+          String(rowIndex + 1),
+          ...columns.map((col) => {
+            let val = (row as any)[col.key];
+            if (col.format) {
+              val = col.format(val, row, rowIndex);
+            }
+            return val === null || val === undefined
+              ? ''
+              : applyNumberFormat(val as string | number, col.numberFormat);
+          }),
+        ]);
+      }
+
+      const columnStyles: Record<number, any> = {
+        0: { halign: 'center', cellWidth: 10 },
+      };
+
+      columns.forEach((col, idx) => {
+        const colIdx = idx + 1;
+        const halign =
+          col.align === 'center'
+            ? 'center'
+            : col.align === 'right' || col.type === 'number'
+            ? 'right'
+            : 'left';
+        columnStyles[colIdx] = { halign };
+      });
+
+      autoTable(doc, {
+        startY: currentY,
+        head,
+        body,
+        margin: { left: margin, right: margin, bottom: 15 },
+        styles: {
+          font: activeFont,
+          fontSize: 8,
+          cellPadding: 2,
+          overflow: 'linebreak',
+        },
+        headStyles: {
+          fillColor: [15, 76, 129],
+          textColor: [255, 255, 255],
+          font: activeFont,
+          fontStyle: 'bold',
+          halign: 'center',
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles,
+      });
+
+      // Ghi chú riêng của bảng, in ngay dưới bảng đó.
+      printNotes(exportTable.summaryNotes);
     }
+
+    // Ghi chú chân trang của sheet, in sau khi hết mọi bảng của sheet đó.
+    printNotes(sheet.summaryNotes || (sheetIdx === sheets.length - 1 ? metadata.summaryNotes : undefined));
   }
 
   const totalPages = doc.getNumberOfPages();
@@ -1050,7 +1473,11 @@ export async function exportData(
     }
 
     const multi = normalizeToMultiSheet(options);
-    const totalRows = multi.sheets.reduce((acc, s) => acc + s.data.length, 0);
+    // Sheet gom nhiều bảng thì tổng số dòng là tổng của mọi bảng trong sheet.
+    const totalRows = multi.sheets.reduce(
+      (acc, s) => acc + tablesOfSheet(s).reduce((sum, t) => sum + t.data.length, 0),
+      0,
+    );
 
     toast.success(`Đã xuất thành công tệp ${formatLabels[format]}`, {
       id: toastId,

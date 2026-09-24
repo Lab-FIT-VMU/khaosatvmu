@@ -275,9 +275,13 @@ public static class SurveyEndpoints
 
         surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/department-summary", async (
             int semesterSurveyId,
+            int? questionSectionId,
             ISurveyService service,
             CancellationToken cancellationToken) =>
-            ToResult(await service.GetSemesterSurveyDepartmentSummaryAsync(semesterSurveyId, cancellationToken)));
+            ToResult(await service.GetSemesterSurveyDepartmentSummaryAsync(
+                semesterSurveyId,
+                cancellationToken,
+                questionSectionId)));
 
         // Dải chỉ số gọn cho bảng điều khiển riêng của trưởng bộ môn. Số của bộ môn
         // kèm số toàn trường để so; mặt bằng vẫn tính trên toàn bộ dữ liệu.
@@ -295,9 +299,13 @@ public static class SurveyEndpoints
 
         surveyAnalysisGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/course-diagnosis", async (
             int semesterSurveyId,
+            int? questionSectionId,
             ISurveyService service,
             CancellationToken cancellationToken) =>
-            ToResult(await service.GetSemesterSurveyCourseDiagnosisAsync(semesterSurveyId, cancellationToken)));
+            ToResult(await service.GetSemesterSurveyCourseDiagnosisAsync(
+                semesterSurveyId,
+                cancellationToken,
+                questionSectionId)));
 
         // Trang chi tiết theo phạm vi giờ nằm trong module Thống kê & Báo cáo, nên
         // endpoint phải mở cho mọi quyền của nhóm Báo cáo. Nhóm này là hợp của bốn

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { DepartmentOverview } from '../../types';
 import { completionColor, scoreColor } from './theme';
+import { formatDecimal, formatPercent } from '../../utils/formatNumber';
 
 interface LaggingDepartmentsTableProps {
   departments: DepartmentOverview[];
@@ -138,13 +139,13 @@ export const LaggingDepartmentsTable: React.FC<LaggingDepartmentsTableProps> = (
                   />
                 </div>
                 <span style={{ color: completionColor(dept.completionRate), fontWeight: 700 }}>
-                  {dept.completionRate.toFixed(0)}%
+                  {formatPercent(dept.completionRate, 3)}
                 </span>
               </td>
               <td className="report-number-cell" style={{ color: scoreColor(dept.averageScore) }}>
                 <span className="catalog-score">
                   <Star style={{ width: 12, height: 12, fill: 'currentColor' }} aria-hidden="true" />
-                  {dept.averageScore > 0 ? dept.averageScore.toFixed(2) : '—'}
+                  {dept.averageScore > 0 ? formatDecimal(dept.averageScore, 3) : '—'}
                 </span>
               </td>
             </tr>

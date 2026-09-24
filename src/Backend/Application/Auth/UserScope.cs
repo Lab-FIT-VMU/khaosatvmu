@@ -5,7 +5,21 @@ public static class RoleCodes
 {
     public const string Admin = "ADMIN";
     public const string SurveyAdmin = "SURVEY_ADMIN";
+
+    /// <summary>
+    /// Ban Giám hiệu: thấy toàn bộ dữ liệu ngang quản trị khảo sát nhưng CHỈ ĐỌC —
+    /// không phát đợt, không sửa danh mục, không cập nhật điểm.
+    /// </summary>
+    public const string BoardOfDirectors = "BOARD_OF_DIRECTORS";
+
+    /// <summary>
+    /// Trưởng khoa/viện: như trưởng bộ môn nhưng phạm vi là CẢ KHOA, tức mọi bộ môn
+    /// thuộc khoa của mình.
+    /// </summary>
+    public const string FacultyManager = "FACULTY_MANAGER";
+
     public const string DepartmentManager = "DEPARTMENT_MANAGER";
+    public const string DeputyDepartmentManager = "DEPUTY_DEPARTMENT_MANAGER";
     public const string Lecturer = "LECTURER";
 }
 
@@ -51,32 +65,60 @@ public sealed record UserScope(
     public bool SeesOnlyOwn => RoleCode == RoleCodes.Lecturer;
 
     /// <summary>
-    /// Không được ghi bất cứ thứ gì. Giảng viên chỉ đọc, không có ngoại lệ nào phải
-    /// nhớ. Xem congviec3.md mục H3.
+    /// Phạm vi cả khoa: thấy mọi bộ môn thuộc khoa của mình, không chỉ bộ môn gắn với
+    /// hồ sơ giảng viên. Dùng cho trưởng khoa/viện.
+    /// <para>
+    /// Mọi chỗ lọc "không phải SeesEverything thì lọc theo <c>DepartmentId</c>" đều
+    /// phải hỏi cờ này TRƯỚC, nếu không trưởng khoa chỉ thấy đúng bộ môn mình đứng tên.
+    /// </para>
     /// </summary>
-    public bool IsReadOnly => SeesOnlyOwn;
+    public bool SeesWholeFaculty => RoleCode == RoleCodes.FacultyManager;
 
-    public bool CanManageSurveyCampaigns => SeesEverything;
+    /// <summary>
+    /// Không được ghi bất cứ thứ gì. Hai vai trò chỉ đọc: giảng viên (chỉ theo dõi lớp
+    /// mình dạy) và Ban Giám hiệu (thấy toàn trường nhưng không can thiệp số liệu).
+    /// Xem congviec3.md mục H3.
+    /// </summary>
+    public bool IsReadOnly => SeesOnlyOwn || RoleCode == RoleCodes.BoardOfDirectors;
+
+    /// <summary>
+    /// Thấy toàn bộ dữ liệu VÀ được ghi. Ban Giám hiệu thấy toàn trường nhưng chỉ đọc,
+    /// nên mọi chỗ trước đây dùng <see cref="SeesEverything"/> để mở khoá thao tác
+    /// quản trị phải chuyển sang cờ này.
+    /// </summary>
+    public bool ManagesEverything => SeesEverything && !IsReadOnly;
+
+    public bool CanManageSurveyCampaigns => ManagesEverything;
 
     public bool CanAddSurveyScope =>
-        SeesEverything || (RoleCode == RoleCodes.DepartmentManager && !SeesNothing);
+        ManagesEverything || (ManagesOwnUnit && !SeesNothing);
 
-    public bool CanManageCourseSections => SeesEverything;
+    public bool CanManageCourseSections => ManagesEverything;
 
     public bool CanResolveCourseSectionLecturer =>
-        SeesEverything || (RoleCode == RoleCodes.DepartmentManager && !SeesNothing);
+        ManagesEverything || (ManagesOwnUnit && !SeesNothing);
+
+    /// <summary>Hai vai trò quản lý cấp đơn vị: trưởng bộ môn và trưởng khoa/viện.</summary>
+    private bool ManagesOwnUnit =>
+        RoleCode is RoleCodes.DepartmentManager
+            or RoleCodes.DeputyDepartmentManager
+            or RoleCodes.FacultyManager;
 
     /// <summary>
     /// Bị giới hạn phạm vi nhưng lại không biết giới hạn vào đâu. Gặp trường hợp này
     /// thì phải trả về danh sách RỖNG, tuyệt đối không được rơi vào nhánh không lọc —
     /// đó là cách một lỗi phân quyền lọt qua mà nhìn vẫn như chạy đúng.
     /// <para>
-    /// Mỗi mức phạm vi hỏng theo một kiểu: mức bộ môn thì thiếu <c>DepartmentId</c>,
-    /// mức chính mình thì thiếu <c>LecturerId</c>.
+    /// Mỗi mức phạm vi hỏng theo một kiểu: mức khoa thì thiếu <c>FacultyId</c>, mức bộ
+    /// môn thì thiếu <c>DepartmentId</c>, mức chính mình thì thiếu <c>LecturerId</c>.
     /// </para>
     /// </summary>
     public bool SeesNothing => !SeesEverything
-        && (SeesOnlyOwn ? LecturerId is null : DepartmentId is null);
+        && (SeesOnlyOwn
+            ? LecturerId is null
+            : SeesWholeFaculty
+                ? FacultyId is null
+                : DepartmentId is null);
 }
 
 /// <summary>Dựng <see cref="UserScope"/> cho request hiện tại.</summary>

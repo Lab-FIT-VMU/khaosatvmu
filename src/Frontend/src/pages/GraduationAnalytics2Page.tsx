@@ -14,6 +14,7 @@ import {
   History,
   LineChart as LineChartIcon,
   LoaderCircle,
+  Minus,
   PieChart,
   Plus,
   RotateCcw,
@@ -45,6 +46,7 @@ import type {
 } from '../types/graduationAnalytics2';
 import { formatCohortCode } from '../utils/formatCohortCode';
 import '../styles/graduation-analytics.css';
+import { formatNumber, formatPercent } from '../utils/formatNumber';
 
 export type GraduationAnalyticsView = 'explore' | 'manage';
 type ExploreChartMetric = 'studentTotal' | 'graduated' | 'notGraduated' | 'onTime' | 'workStudy' | 'excellent' | 'veryGood' | 'good' | 'average';
@@ -124,9 +126,7 @@ const chartOptions: Array<{ id: GraduationChartType; label: string; icon: typeof
 ];
 
 const chartMetrics: Array<{ id: ExploreChartMetric; label: string }> = [
-  { id: 'studentTotal', label: 'Số sinh viên nhập học' },
   { id: 'graduated', label: 'Đã tốt nghiệp' },
-  { id: 'notGraduated', label: 'Chưa tốt nghiệp' },
   { id: 'onTime', label: 'Tốt nghiệp đúng hạn' },
   { id: 'workStudy', label: 'Hệ VLVH' },
   { id: 'excellent', label: 'Xuất sắc' },
@@ -175,8 +175,8 @@ const currentAcademicYearStart = () => {
   return now.getMonth() + 1 >= 8 ? now.getFullYear() : now.getFullYear() - 1;
 };
 
-const formatNumber = (value: number) => value.toLocaleString('vi-VN');
-const formatRate = (value: number) => `${value.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}%`;
+/** Tỷ lệ tốt nghiệp cũng ba chữ số thập phân như mọi tỷ lệ khác trong hệ thống. */
+const formatRate = (value: number) => formatPercent(value);
 const usesGraduatedDenominator = (metric: ExploreChartMetric) =>
   ['onTime', 'workStudy', 'excellent', 'veryGood', 'good', 'average'].includes(metric);
 const reviewDateLabel = (reviewMonth: number | null, reviewYear: number | null) =>
@@ -281,6 +281,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
   const [showChartLabels, setShowChartLabels] = useState(true);
   const [chartZoomPercent, setChartZoomPercent] = useState(100);
   const graduationChartRef = useRef<GraduationEChartHandle>(null);
+  const chartZoomAvailable = chartType !== 'pie' && chartType !== 'donut';
   const [selectedCohorts, setSelectedCohorts] = useState<string[]>([]);
   const [selectedFacultyKeys, setSelectedFacultyKeys] = useState<string[]>([]);
   const [selectedProgramKeys, setSelectedProgramKeys] = useState<string[]>([]);
@@ -626,9 +627,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
         : 'Không phân chuỗi'} · Tỷ lệ trên ${usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}`;
     const kpiInfo = Object.fromEntries(explore.kpis.map((kpi) => [
       kpi.label,
-      kpi.id === 'studentTotal'
-        ? formatNumber(kpi.count)
-        : `${formatNumber(kpi.count)} (${formatRate(kpi.rate)})`,
+      `${formatNumber(kpi.count)} (${formatRate(kpi.rate)})`,
     ]));
     const hasSeriesColumn = Boolean(displayedChartSeries) || chartModel.series.length > 1;
     const tableColumns = [
@@ -831,9 +830,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
               {explore.kpis.map((kpi) => <div key={kpi.id} data-kpi={kpi.id}>
                 <span>{kpi.label}</span>
                 <strong>{formatNumber(kpi.count)}</strong>
-                <small>{kpi.id === 'studentTotal'
-                  ? 'Từ danh mục Khóa ngành đào tạo'
-                  : `${formatRate(kpi.rate)} ${kpi.id === 'graduated' || kpi.id === 'notGraduated' ? 'số sinh viên nhập học' : 'số sinh viên đã tốt nghiệp'}`}</small>
+                <small>{`${formatRate(kpi.rate)} ${kpi.id === 'graduated' ? 'số sinh viên nhập học' : 'số sinh viên đã tốt nghiệp'}`}</small>
               </div>)}
             </section>
             <section className="graduation-result-summary__ranks" aria-labelledby="graduation-rank-heading">
@@ -887,7 +884,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
               <label className="graduation-builder__check"><input type="checkbox" checked={showChartLabels} onChange={(event) => setShowChartLabels(event.target.checked)} /> Hiển thị nhãn giá trị</label>
             </aside>
             <article className="graduation-chart-panel">
-              <header><div><h2>{selectedGraduationChartTitle}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không phân chuỗi'} · Tỷ lệ trên {usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}; số lượng hiển thị trong tooltip</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span>}</div></header>
+              <header><div><h2>{selectedGraduationChartTitle}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Phân chuỗi theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không phân chuỗi'} · Tỷ lệ trên {usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số nhập học'}; số lượng hiển thị trong tooltip</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <div className="graduation-chart-zoom-controls"><button type="button" onClick={() => graduationChartRef.current?.zoomOut()} disabled={!chartZoomAvailable || chartZoomPercent <= 100} title="Thu nhỏ biểu đồ" aria-label="Thu nhỏ biểu đồ"><Minus aria-hidden="true" /></button><span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span><button type="button" onClick={() => graduationChartRef.current?.zoomIn()} disabled={!chartZoomAvailable || chartZoomPercent >= 2000} title="Phóng to biểu đồ" aria-label="Phóng to biểu đồ"><Plus aria-hidden="true" /></button></div>}</div></header>
               {chartModel.data.length > 0 ? <div className="graduation-chart"><GraduationEChart ref={graduationChartRef} type={chartType} data={chartModel.data} series={chartModel.series} unit="percent" showLabels={showChartLabels} onZoomChange={setChartZoomPercent} /></div> : <div className="graduation-chart-empty">{Array.isArray(explore.chartPoints) ? 'Không có dữ liệu phù hợp với cấu hình hiện tại.' : 'Backend API đang dùng phiên bản cũ. Hãy khởi động lại API để sử dụng cấu hình này.'}</div>}
             </article>
           </div>

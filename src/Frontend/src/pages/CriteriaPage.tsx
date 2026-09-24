@@ -184,7 +184,7 @@ export const CriteriaPage: React.FC<CriteriaPageProps> = ({
           fileName: activeTab === 'Học phần'
             ? 'danh-sach-tieu-chi-danh-gia-hoc-phan'
             : 'danh-sach-tieu-chi-danh-gia-chuong-trinh-dao-tao',
-          subInstitution: 'PHÒNG ĐẢM BẢO CHẤT LƯỢNG',
+          breadcrumb: ['Tiêu chí CTĐT'],
         }}
         emptyMessage="Không tìm thấy tiêu chí phù hợp."
         keyExtractor={(item) => item.id}

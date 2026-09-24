@@ -3,7 +3,7 @@
 # Cài đặt: xem deploy/systemd/README.md
 [Unit]
 Description=Chạy phân tích cảm xúc ý kiến mở theo lịch
-Documentation=file:///opt/khaosatvmu/deploy/systemd/README.md
+Documentation=file:///home/khaosatvmu/deploy/systemd/README.md
 
 [Timer]
 # Ngoài giờ hành chính: máy chủ 2 vCPU không nên suy luận model trong lúc sinh viên đang nộp phiếu.

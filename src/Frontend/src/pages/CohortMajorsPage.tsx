@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import { useAuth } from '../auth/authContext';
-import { canCreateOrDeleteCatalog } from '../auth/roles';
+import { canCreateOrDeleteCatalog, isReadOnlyRole } from '../auth/roles';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { CohortMajorImportDialog } from '../components/CohortMajorImportDialog';
@@ -46,6 +46,8 @@ function errorCodeOf(error: unknown): string | null {
 export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) => {
   const { activeProfile } = useAuth();
   const canManageCatalog = canCreateOrDeleteCatalog(activeProfile?.roleCode);
+  // Vai trò chỉ đọc (giảng viên, Ban Giám hiệu) không sửa được gì, nên ẩn cả nút Sửa.
+  const readOnly = isReadOnlyRole(activeProfile?.roleCode);
 
   const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
@@ -273,6 +275,9 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
       header: 'Ngành đào tạo',
       width: '26%',
       filterValue: (item) => item.majorName,
+      // Ô trên màn hình in hai dòng: tên ngành rồi khoa. Tệp xuất gộp cả hai vào một
+      // ô, thay vì chỉ có tên ngành như trước.
+      exportFormat: (item) => `${item.majorName} · ${item.facultyName}`,
       render: (item) => (
         <div>
           <div className="catalog-cell-primary">{item.majorName}</div>
@@ -312,7 +317,11 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
       filterValue: (item) => String(item.onTimeGraduatedCount),
       render: (item) => item.onTimeGraduatedCount,
     },
-    {
+  ];
+
+  // Bỏ hẳn cả cột cho vai trò chỉ đọc, không để lại một cột trống.
+  if (!readOnly) {
+    columns.push({
       key: 'actions',
       header: 'Hành động',
       width: '12%',
@@ -340,8 +349,8 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
           )}
         </div>
       ),
-    },
-  ];
+    });
+  }
 
   const selectedCohort = cohorts.find((cohort) => cohort.cohortId === selectedCohortId) ?? null;
 
@@ -457,7 +466,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
                 ? `danh-sach-khoa-nganh-dao-tao-${selectedCohort.cohortCode}`
                 : 'danh-sach-khoa-nganh-dao-tao',
               subtitle: selectedCohort?.academicYearName,
-              subInstitution: 'PHÒNG ĐÀO TẠO',
+              breadcrumb: ['Khoá ngành đào tạo'],
             }}
             onAddNew={canManageCatalog ? openCreate : undefined}
             addNewLabel="Thêm khoá ngành"

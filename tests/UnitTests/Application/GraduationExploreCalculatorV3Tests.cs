@@ -1,4 +1,4 @@
-namespace UnitTests.ApplicationTests;
+﻿namespace UnitTests.ApplicationTests;
 
 using Application.GraduationAnalytics2;
 using Domain;
@@ -23,11 +23,12 @@ public sealed class GraduationExploreCalculatorV3Tests
             "graduated",
             "cohort");
 
-        result.Kpis.Single(x => x.Id == "studentTotal").Count.Should().Be(10);
+        // Số nhập học vẫn là mẫu số của tỷ lệ Đã tốt nghiệp, chỉ không còn đứng thành
+        // thẻ chỉ số riêng — bỏ cùng thẻ Chưa tốt nghiệp.
+        result.Kpis.Should().NotContain(x => x.Id == "studentTotal" || x.Id == "notGraduated");
         result.Kpis.Single(x => x.Id == "graduated").Should().Match<GraduationKpiDto>(x => x.Count == 6 && x.Rate == 60m);
-        result.Kpis.Single(x => x.Id == "notGraduated").Should().Match<GraduationKpiDto>(x => x.Count == 4 && x.Rate == 40m);
         result.Kpis.Single(x => x.Id == "onTime").Should().Match<GraduationKpiDto>(x => x.Count == 6 && x.Rate == 100m);
-        result.Kpis.Single(x => x.Id == "workStudy").Should().Match<GraduationKpiDto>(x => x.Count == 2 && x.Rate == 33.33m);
+        result.Kpis.Single(x => x.Id == "workStudy").Should().Match<GraduationKpiDto>(x => x.Count == 2 && x.Rate == 33.333m);
         result.ChartPoints.Should().ContainSingle().Which.Should().Match<GraduationChartPointV3Dto>(
             x => x.Value == 60m && x.Count == 6 && x.Total == 10);
     }

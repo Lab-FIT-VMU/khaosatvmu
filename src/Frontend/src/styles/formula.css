@@ -1,0 +1,147 @@
+/*
+  Công thức trong hộp chú thích. Bản thân công thức do KaTeX dựng (xem
+  components/FormulaBlock.tsx); tệp này chỉ lo cỡ chữ, khoảng cách và phần chữ
+  tiếng Việt quanh nó.
+*/
+
+/*
+  Phông cho chữ tiếng Việt trong \text{}.
+
+  KaTeX_Main chỉ có bảng chữ Latin cơ bản, gặp "toàn trường" hay "bộ môn" là mất
+  dấu. Trình duyệt thay phông theo TỪNG ký tự, nên nếu để phông giao diện (Inter)
+  đứng đầu thì cả cụm chữ thành phông không chân, đứng cạnh công thức có chân trông
+  như hai thứ chắp vào nhau.
+
+  Times New Roman đứng đầu để cả cụm chữ cùng một phông có chân, khớp với dáng chữ
+  của KaTeX. KaTeX_Main vẫn giữ ở sau cho máy nào thiếu Times.
+*/
+.katex .text,
+.katex .mord.text {
+  font-family: 'Times New Roman', 'KaTeX_Main', Cambria, Georgia, serif;
+}
+
+/* ---------------------------------------------------------------------------
+   Một mục công thức: tiêu đề đánh số, công thức đứng giữa, rồi bảng ký hiệu.
+   --------------------------------------------------------------------------- */
+
+.formula-note + .formula-note {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--grid-line);
+}
+
+.formula-note__title {
+  margin: 0;
+  color: #000000;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.formula {
+  margin: 0;
+}
+
+.formula__title {
+  margin: 0 0 4px;
+  color: #000000;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+/*
+  Công thức đứng riêng giữa dòng, nền trắng như trang sách — không đóng khung, không
+  tô nền, để mắt bắt vào chính công thức chứ không vào cái hộp. Cuộn ngang khi màn
+  hẹp, thà kéo còn hơn để KaTeX ngắt biểu thức làm đôi.
+*/
+.formula__body {
+  margin: 14px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  color: #000000;
+}
+
+.formula__body .katex-display {
+  margin: 0;
+}
+
+.formula__body .katex {
+  font-size: 1.85em;
+}
+
+/* ---------------------------------------------------------------------------
+   Bảng ký hiệu dưới mỗi công thức.
+   --------------------------------------------------------------------------- */
+
+.formula-defs {
+  margin: 0;
+  color: #000000;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.formula-defs__lead {
+  margin: 0 0 6px;
+}
+
+.formula-defs__list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.formula-defs__list li {
+  margin-top: 6px;
+}
+
+/* Ký hiệu đọc được mà không phải nheo mắt: x_i, x̄, σ đều nhỏ và có dấu phụ, để
+   bằng cỡ chữ thường thì chỉ số dưới gần như biến mất. Vẫn nhỏ hơn công thức chính
+   để mắt biết đâu là công thức, đâu là phần chú giải. */
+.formula-defs .katex {
+  font-size: 1.4em;
+}
+
+.formula-defs__meaning {
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Bảng nhỏ hai cột, dùng cho bảng phân loại theo độ lệch chuẩn.
+   --------------------------------------------------------------------------- */
+
+.formula-table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  color: #000000;
+  font-size: 16px;
+}
+
+.formula-table th,
+.formula-table td {
+  padding: 9px 14px;
+  border: 1px solid var(--grid-line);
+  text-align: left;
+}
+
+.formula-table th {
+  background: #f2f6f8;
+  font-weight: 650;
+}
+
+/* Cột |Z| là biểu thức toán, để hẹp và căn giữa cho ra dáng cột điều kiện. */
+.formula-table th:first-child,
+.formula-table td:first-child {
+  width: 34%;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .formula__body .katex {
+    font-size: 1.5em;
+  }
+
+  .formula-defs,
+  .formula-table {
+    font-size: 15px;
+  }
+}

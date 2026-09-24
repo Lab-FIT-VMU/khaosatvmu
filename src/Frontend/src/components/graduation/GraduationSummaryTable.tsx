@@ -118,6 +118,7 @@ export function GraduationSummaryTable({ rows, fileName, subtitle }: GraduationS
               metadata: {
                 title: 'THỐNG KÊ KẾT QUẢ TỐT NGHIỆP',
                 subtitle,
+                breadcrumb: ['Thống kê chi tiết'],
               },
               columns: [
                 { key: 'facultyName', header: 'Khoa', width: 24 },

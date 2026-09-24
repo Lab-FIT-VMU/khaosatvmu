@@ -1,4 +1,4 @@
-using Application.Auth;
+﻿using Application.Auth;
 using Application.Surveys;
 using Domain;
 using Infrastructure.Persistence;
@@ -543,7 +543,7 @@ public sealed class EfSurveyService(
         CancellationToken cancellationToken = default)
     {
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.SeesEverything)
+        if (!scope.ManagesEverything)
         {
             return Failed<SemesterSurveyDto>(SurveyErrorCodes.OutOfScope);
         }
@@ -638,7 +638,7 @@ public sealed class EfSurveyService(
         CancellationToken cancellationToken = default)
     {
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.SeesEverything)
+        if (!scope.ManagesEverything)
         {
             return Failed<SemesterSurveyDto>(SurveyErrorCodes.OutOfScope);
         }
@@ -776,7 +776,7 @@ public sealed class EfSurveyService(
         CancellationToken cancellationToken = default)
     {
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.SeesEverything)
+        if (!scope.ManagesEverything)
         {
             return Failed<bool>(SurveyErrorCodes.OutOfScope);
         }
@@ -943,10 +943,7 @@ public sealed class EfSurveyService(
         }
 
         var units = await ResolveSectionUnitsAsync([semesterId], cancellationToken);
-        if (!scope.SeesEverything)
-        {
-            units = units.Where(x => x.DepartmentId == scope.DepartmentId).ToList();
-        }
+        units = UnitsInScope(scope, units);
         var scopedSectionIds = SectionIdsInScope(units, normalized, scopeId);
 
         var newSectionCount = scopedSectionIds.Count;
@@ -1011,10 +1008,7 @@ public sealed class EfSurveyService(
         }
 
         var units = await ResolveSectionUnitsAsync([survey.SemesterId], cancellationToken);
-        if (!scope.SeesEverything)
-        {
-            units = units.Where(x => x.DepartmentId == scope.DepartmentId).ToList();
-        }
+        units = UnitsInScope(scope, units);
         var scopedSectionIds = SectionIdsInScope(units, scopeType, command.ScopeId);
         if (scopedSectionIds.Count == 0)
         {
@@ -1099,6 +1093,14 @@ public sealed class EfSurveyService(
             query = query.Where(x => db.CourseSections
                 .Any(section => section.CourseSectionId == x.CourseSectionId
                                 && section.LecturerId == scope.LecturerId));
+        }
+        else if (scope.SeesWholeFaculty)
+        {
+            query = query.Where(x => db.CourseSections
+                .Any(section => section.CourseSectionId == x.CourseSectionId
+                                && db.Courses.Any(course =>
+                                    course.CourseId == section.CourseId
+                                    && course.FacultyId == scope.FacultyId)));
         }
         else if (!scope.SeesEverything)
         {
@@ -1237,7 +1239,7 @@ public sealed class EfSurveyService(
         CancellationToken cancellationToken = default)
     {
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.SeesEverything)
+        if (!scope.ManagesEverything)
         {
             return Failed<ClearSectionSurveyResponsesDto>(SurveyErrorCodes.OutOfScope);
         }
@@ -1956,7 +1958,7 @@ public sealed class EfSurveyService(
         // Cùng mức quyền với tạo/xoá đợt: trưởng bộ môn không được chốt điểm cho cả
         // trường chỉ vì họ mở được trang bảng dữ liệu.
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.SeesEverything)
+        if (!scope.ManagesEverything)
         {
             return Failed<RecalculateScoresDto>(SurveyErrorCodes.OutOfScope);
         }
@@ -2182,6 +2184,14 @@ public sealed class EfSurveyService(
                 .Any(section => section.CourseSectionId == x.CourseSectionId
                                 && section.LecturerId == scope.LecturerId));
         }
+        else if (scope.SeesWholeFaculty)
+        {
+            sectionSurveyQuery = sectionSurveyQuery.Where(x => db.CourseSections
+                .Any(section => section.CourseSectionId == x.CourseSectionId
+                                && db.Courses.Any(course =>
+                                    course.CourseId == section.CourseId
+                                    && course.FacultyId == scope.FacultyId)));
+        }
         else if (!scope.SeesEverything)
         {
             sectionSurveyQuery = sectionSurveyQuery.Where(x => db.CourseSections
@@ -2320,7 +2330,7 @@ public sealed class EfSurveyService(
                 // Chỉ đếm phiếu hợp lệ: phiếu bị bộ lọc nhiễu loại vẫn là một lượt
                 // nộp nhưng không dùng được vào kết quả nào, tính nó vào tỷ lệ là
                 // tự huyễn hoặc. Cùng cách tính với bảng tiến độ và tra cứu chi tiết.
-                classSize > 0 ? Math.Round((decimal)validResponses / classSize * 100, 1) : 0m,
+                classSize > 0 ? Math.Round((decimal)validResponses / classSize * 100, 3) : 0m,
                 css.AverageScore,
                 css.ScoreCalculatedAt,
                 commentCounts.GetValueOrDefault(css.CourseSectionSurveyId),
@@ -2395,7 +2405,7 @@ public sealed class EfSurveyService(
             responseSum += section.ValidResponseCount;
         }
 
-        return responseSum > 0 ? Math.Round(scoreSum / responseSum, 2) : null;
+        return responseSum > 0 ? Math.Round(scoreSum / responseSum, 3) : null;
     }
 
     /// <summary>
@@ -2411,9 +2421,24 @@ public sealed class EfSurveyService(
     private static List<AnalysedSection> VisibleTo(UserScope scope, List<AnalysedSection> sections) =>
         scope.SeesEverything
             ? sections
-            : scope.DepartmentId is { } departmentId
-                ? sections.Where(x => x.DepartmentId == departmentId).ToList()
-                : [];
+            : scope.SeesWholeFaculty
+                ? scope.FacultyId is { } facultyId
+                    ? sections.Where(x => x.FacultyId == facultyId).ToList()
+                    : []
+                : scope.DepartmentId is { } departmentId
+                    ? sections.Where(x => x.DepartmentId == departmentId).ToList()
+                    : [];
+
+    /// <summary>
+    /// Lọc danh sách lớp của một học kỳ về phạm vi người xem, dùng khi dựng và mở rộng
+    /// phạm vi phát phiếu. Trưởng khoa/viện lấy cả khoa, trưởng bộ môn lấy một bộ môn.
+    /// </summary>
+    private static List<SectionUnit> UnitsInScope(UserScope scope, List<SectionUnit> units) =>
+        scope.SeesEverything
+            ? units
+            : scope.SeesWholeFaculty
+                ? units.Where(x => x.FacultyId == scope.FacultyId).ToList()
+                : units.Where(x => x.DepartmentId == scope.DepartmentId).ToList();
 
     /// <summary>
     /// Đếm giảng viên của một nhóm lớp. Lớp chưa gắn được mã vẫn tính nếu đọc
@@ -2527,7 +2552,7 @@ public sealed class EfSurveyService(
                 tally.TotalCount,
                 tally.ValidCount,
                 tally.ValidTotal,
-                Math.Round(tally.ValidTotal / tally.ValidCount, 2),
+                Math.Round(tally.ValidTotal / tally.ValidCount, 3),
                 facultyId,
                 facultyId is { } fId && faculties.TryGetValue(fId, out var fn) ? fn : "Chưa thuộc khoa",
                 departmentId,
@@ -2599,7 +2624,7 @@ public sealed class EfSurveyService(
     {
         var sd = SampleStandardDeviation(scores);
         return sd is > 0
-            ? Math.Round(scores.Average() - ReportThresholds.NotableZScore * sd.Value, 2)
+            ? Math.Round(scores.Average() - ReportThresholds.NotableZScore * sd.Value, 3)
             : null;
     }
 
@@ -2617,7 +2642,7 @@ public sealed class EfSurveyService(
         }
 
         var mean = groupScores.Average();
-        return score => Math.Round((score - mean) / sd.Value, 2);
+        return score => Math.Round((score - mean) / sd.Value, 3);
     }
 
     /// <summary>
@@ -2676,7 +2701,7 @@ public sealed class EfSurveyService(
     /// cộng tử số và mẫu số của cả nhóm rồi mới chia — lớp đông phải nặng hơn lớp ít.
     /// </summary>
     private static decimal Percentage(int part, int whole) =>
-        whole == 0 ? 0m : Math.Round((decimal)part / whole * 100, 1);
+        whole == 0 ? 0m : Math.Round((decimal)part / whole * 100, 3);
 
     public async Task<SurveyOperationResult<SemesterSurveyNormalizationDto>> GetSemesterSurveyNormalizationAsync(
         int semesterSurveyId,
@@ -2770,10 +2795,10 @@ public sealed class EfSurveyService(
                 // SD bằng 0 nghĩa là mọi lớp cùng điểm: Z không xác định, để null
                 // thay vì chia cho 0.
                 decimal? zSchool = schoolSd is > 0
-                    ? Math.Round((section.AverageScore - schoolAverage) / schoolSd.Value, 2)
+                    ? Math.Round((section.AverageScore - schoolAverage) / schoolSd.Value, 3)
                     : null;
                 decimal? zFaculty = group.CanNormalize && group.StandardDeviation is > 0
-                    ? Math.Round((section.AverageScore - group.AverageScore) / group.StandardDeviation.Value, 2)
+                    ? Math.Round((section.AverageScore - group.AverageScore) / group.StandardDeviation.Value, 3)
                     : null;
 
                 var verdict = Verdict(group, zSchool, zFaculty);
@@ -2791,7 +2816,7 @@ public sealed class EfSurveyService(
                     zSchool,
                     zFaculty,
                     zSchool is not null && zFaculty is not null
-                        ? Math.Round(zFaculty.Value - zSchool.Value, 2)
+                        ? Math.Round(zFaculty.Value - zSchool.Value, 3)
                         : null,
                     verdict,
                     section.ResponseCount,
@@ -2904,7 +2929,7 @@ public sealed class EfSurveyService(
             .Select(x =>
             {
                 var total = totals[x.CourseSectionSurveyId];
-                return x with { AverageScore = Math.Round(total.WeightedScore / total.AnswerCount, 2) };
+                return x with { AverageScore = Math.Round(total.WeightedScore / total.AnswerCount, 3) };
             })
             .ToList();
     }
@@ -2931,7 +2956,8 @@ public sealed class EfSurveyService(
 
     public async Task<SurveyOperationResult<SemesterSurveyDepartmentSummaryDto>> GetSemesterSurveyDepartmentSummaryAsync(
         int semesterSurveyId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? questionSectionId = null)
     {
         // Bảng tổng hợp theo khoa/viện là công cụ của cấp quản lý bộ môn trở lên;
         // giảng viên không có tab này nên chặn luôn ở đây, ẩn nút không phải là khoá.
@@ -2954,7 +2980,20 @@ public sealed class EfSurveyService(
             return Failed<SemesterSurveyDepartmentSummaryDto>(SurveyErrorCodes.ResultsNotPublished);
         }
 
+        // Cùng ô chọn mục với tab Phân tích theo lớp học phần: chọn mục thì điểm của
+        // mỗi lớp chỉ gộp các câu thuộc mục đó, mặt bằng và Z-Score tính lại theo đó.
+        var questionSections = await QuestionSectionsOfTemplateAsync(header.SurveyTemplateId, cancellationToken);
+        if (questionSectionId is { } selectedSectionId
+            && questionSections.All(x => x.SectionId != selectedSectionId))
+        {
+            return Failed<SemesterSurveyDepartmentSummaryDto>(SurveyErrorCodes.SectionNotFound);
+        }
+
         var sections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
+        if (questionSectionId is { } scoredSectionId)
+        {
+            sections = await WithSectionScoresAsync(semesterSurveyId, sections, scoredSectionId, cancellationToken);
+        }
 
         // Mốc cảnh báo tính trên TOÀN BỘ lớp của đợt, không phải trên từng bộ môn:
         // bộ môn nào cũng phải so với cùng một mặt bằng thì cột mới đọc ngang được.
@@ -3009,7 +3048,7 @@ public sealed class EfSurveyService(
         var schoolDepartmentCount = rows.Count;
         var schoolSectionCount = sections.Count;
         var schoolResponseCount = sections.Sum(x => x.ResponseCount);
-        var schoolAverageScore = schoolScores.Count == 0 ? (decimal?)null : Math.Round(schoolScores.Average(), 2);
+        var schoolAverageScore = schoolScores.Count == 0 ? (decimal?)null : Math.Round(schoolScores.Average(), 3);
         var schoolWarningCount = rows.Sum(x => x.WarningSectionCount);
 
         // Trưởng bộ môn xem được mọi bộ môn TRONG KHOA của mình: bảng này sinh ra để
@@ -3036,12 +3075,15 @@ public sealed class EfSurveyService(
             schoolSectionCount,
             schoolResponseCount,
             schoolAverageScore,
-            schoolWarningCount));
+            schoolWarningCount,
+            questionSections,
+            questionSectionId));
     }
 
     public async Task<SurveyOperationResult<SemesterSurveyCourseDiagnosisDto>> GetSemesterSurveyCourseDiagnosisAsync(
         int semesterSurveyId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? questionSectionId = null)
     {
         // Cùng lý do với bảng tổng hợp theo khoa/viện: giảng viên không mở tab này.
         var diagnosisScope = await userScope.ResolveAsync(cancellationToken);
@@ -3063,7 +3105,20 @@ public sealed class EfSurveyService(
             return Failed<SemesterSurveyCourseDiagnosisDto>(SurveyErrorCodes.ResultsNotPublished);
         }
 
+        // Cùng ô chọn mục với tab Phân tích theo lớp học phần: chọn mục thì điểm của
+        // mỗi lớp chỉ gộp các câu thuộc mục đó, và câu yếu nhất cũng chỉ xét trong mục.
+        var questionSections = await QuestionSectionsOfTemplateAsync(header.SurveyTemplateId, cancellationToken);
+        if (questionSectionId is { } selectedSectionId
+            && questionSections.All(x => x.SectionId != selectedSectionId))
+        {
+            return Failed<SemesterSurveyCourseDiagnosisDto>(SurveyErrorCodes.SectionNotFound);
+        }
+
         var sections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
+        if (questionSectionId is { } scoredSectionId)
+        {
+            sections = await WithSectionScoresAsync(semesterSurveyId, sections, scoredSectionId, cancellationToken);
+        }
 
         // Chẩn đoán so các lớp TRONG CÙNG một học phần với nhau, không dùng mặt bằng
         // toàn trường, nên lọc trước khi dựng bảng là đúng. Lọc sau cũng ra cùng kết
@@ -3077,14 +3132,17 @@ public sealed class EfSurveyService(
             diagnosisScores.Count == 0 ? 0m : Math.Round(diagnosisScores.Average(), 3),
             SampleStandardDeviation(diagnosisScores),
             sections,
-            cancellationToken);
+            cancellationToken,
+            questionSectionId);
 
         return Succeeded(new SemesterSurveyCourseDiagnosisDto(
             semesterSurveyId,
             header.TemplateName,
             header.SemesterName,
             header.AcademicYearName,
-            rows));
+            rows,
+            questionSections,
+            questionSectionId));
     }
 
     /// <summary>
@@ -3107,6 +3165,10 @@ public sealed class EfSurveyService(
     /// Mọi lớp của đợt, TRƯỚC khi lọc phạm vi — để tính mặt bằng khoa cho cột Z-Score so
     /// với khoa, cùng lý do với <paramref name="warningCutoff"/>.
     /// </param>
+    /// <param name="questionSectionId">
+    /// Đang xem theo riêng một mục câu hỏi thì cột Câu yếu nhất chỉ xét các câu của mục
+    /// đó — điểm của lớp đã tính theo mục, cột này mà lấy câu ngoài mục là lệch nguồn.
+    /// </param>
     private async Task<List<CourseDiagnosisRowDto>> BuildCourseDiagnosisAsync(
         int surveyTemplateId,
         List<AnalysedSection> sections,
@@ -3114,13 +3176,24 @@ public sealed class EfSurveyService(
         decimal schoolAverageScore,
         decimal? schoolStandardDeviation,
         IReadOnlyList<AnalysedSection> allSections,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? questionSectionId = null)
     {
         if (sections.Count == 0) return [];
 
         var facultyStats = FacultyStatsOf(allSections);
 
         var questionOrder = await QuestionOrderMapAsync(surveyTemplateId, cancellationToken);
+        if (questionSectionId is { } sectionId)
+        {
+            var sectionQuestionIds = await db.SurveyQuestions.AsNoTracking()
+                .Where(x => x.SectionId == sectionId)
+                .Select(x => x.QuestionId)
+                .ToListAsync(cancellationToken);
+            questionOrder = questionOrder
+                .Where(x => sectionQuestionIds.Contains(x.Key))
+                .ToDictionary(x => x.Key, x => x.Value);
+        }
         var cssIds = sections.Select(x => x.CourseSectionSurveyId).ToList();
         var perQuestion = await SectionQuestionStatsAsync(
             cssIds, questionOrder.Keys.ToList(), cancellationToken);
@@ -3150,7 +3223,7 @@ public sealed class EfSurveyService(
                 var scores = g.Select(x => x.AverageScore).ToList();
                 var min = scores.Min();
                 var max = scores.Max();
-                var spread = Math.Round(max - min, 2);
+                var spread = Math.Round(max - min, 3);
                 var first = g.First();
                 var weakest = weakestByCourse.GetValueOrDefault(g.Key);
                 var totalClassSize = g.Sum(x => x.ClassSize);
@@ -3182,7 +3255,7 @@ public sealed class EfSurveyService(
                     max,
                     spread,
                     weakest is null ? null : questionOrder[weakest.QuestionId].Order,
-                    weakest is null ? null : Math.Round(weakest.Score, 2),
+                    weakest is null ? null : Math.Round(weakest.Score, 3),
                     weakest is null ? null : questionOrder[weakest.QuestionId].Text,
                     DiagnoseCourse(min, max, spread, warningCutoff),
                     totalClassSize,
@@ -3243,11 +3316,7 @@ public sealed class EfSurveyService(
         // ngay dưới, sau khi mặt bằng đã tính xong.
         var allSections = await LoadAnalysedSectionsAsync(semesterSurveyId, cancellationToken);
 
-        var mine = scope.SeesEverything
-            ? allSections
-            : scope.DepartmentId is { } departmentId
-                ? allSections.Where(x => x.DepartmentId == departmentId).ToList()
-                : [];
+        var mine = VisibleTo(scope, allSections);
 
         static decimal CompletionRateOf(IReadOnlyList<AnalysedSection> sections)
         {
@@ -3260,7 +3329,7 @@ public sealed class EfSurveyService(
         }
 
         static decimal? AverageScoreOf(IReadOnlyList<AnalysedSection> sections) =>
-            sections.Count == 0 ? null : Math.Round(sections.Average(x => x.AverageScore), 2);
+            sections.Count == 0 ? null : Math.Round(sections.Average(x => x.AverageScore), 3);
 
         var dashboardCutoff = WarningScoreCutoff(allSections.Select(x => x.AverageScore).ToList());
 
@@ -3269,7 +3338,13 @@ public sealed class EfSurveyService(
             header.TemplateName,
             header.SemesterName,
             header.AcademicYearName,
-            scope.SeesEverything ? null : mine.FirstOrDefault()?.DepartmentName,
+            // Trưởng khoa/viện xem cả khoa nên nhãn đơn vị phải là tên khoa, ghi tên
+            // bộ môn của dòng đầu tiên là nói sai phạm vi đang hiển thị.
+            scope.SeesEverything
+                ? null
+                : scope.SeesWholeFaculty
+                    ? mine.FirstOrDefault()?.FacultyName
+                    : mine.FirstOrDefault()?.DepartmentName,
             mine.Count,
             allSections.Count,
             CompletionRateOf(mine),
@@ -3348,7 +3423,7 @@ public sealed class EfSurveyService(
                 return new DashboardQuestionScoreDto(
                     questionOrder[g.Key].Order,
                     questionOrder[g.Key].Text,
-                    Math.Round(g.Sum(x => x.Total) / g.Sum(x => x.AnswerCount), 2),
+                    Math.Round(g.Sum(x => x.Total) / g.Sum(x => x.AnswerCount), 3),
                     // Đếm theo LỚP chứ không theo phiếu: một câu bị nhiều lớp chấm
                     // thấp là vấn đề hệ thống, còn một lớp chấm thấp thì chỉ là cá biệt.
                     cutoff is { } c ? scored.Count(x => x <= c) : 0);
@@ -3386,7 +3461,7 @@ public sealed class EfSurveyService(
             validResponseCount,
             totalClassSize == 0
                 ? 0m
-                : Math.Round((decimal)validResponseCount / totalClassSize * 100, 1),
+                : Math.Round((decimal)validResponseCount / totalClassSize * 100, 3),
             WeightedAverageScore(sections),
             sections.Count,
             questions,
@@ -3397,7 +3472,7 @@ public sealed class EfSurveyService(
             totalClassSize,
             totalClassSize == 0
                 ? 0m
-                : Math.Round((decimal)totalResponseCount / totalClassSize * 100, 1)));
+                : Math.Round((decimal)totalResponseCount / totalClassSize * 100, 3)));
     }
 
     public async Task<SurveyOperationResult<SurveyScopeAnalysisDto>> GetSurveyScopeAnalysisAsync(
@@ -3565,7 +3640,7 @@ public sealed class EfSurveyService(
                                 option.DisplayText,
                                 count,
                                 answeredTotal > 0
-                                    ? Math.Round((decimal)count / answeredTotal * 100, 1)
+                                    ? Math.Round((decimal)count / answeredTotal * 100, 3)
                                     : 0m);
                         })
                         .ToList();
@@ -3575,7 +3650,7 @@ public sealed class EfSurveyService(
                     index + 1,
                     q.QuestionText,
                     stat is not null && stat.TotalAnswers > 0
-                        ? Math.Round(stat.WeightedScore / stat.TotalAnswers, 2)
+                        ? Math.Round(stat.WeightedScore / stat.TotalAnswers, 3)
                         : 0m,
                     stat?.TotalAnswers ?? 0,
                     distribution,
@@ -3690,10 +3765,10 @@ public sealed class EfSurveyService(
                 .Select(section =>
                 {
                     decimal? zSchool = schoolSd is > 0
-                        ? Math.Round((section.AverageScore - schoolAverage) / schoolSd.Value, 2)
+                        ? Math.Round((section.AverageScore - schoolAverage) / schoolSd.Value, 3)
                         : null;
                     decimal? zFaculty = canNormalizeFaculty && facultySd is > 0
-                        ? Math.Round((section.AverageScore - facultyAverage) / facultySd.Value, 2)
+                        ? Math.Round((section.AverageScore - facultyAverage) / facultySd.Value, 3)
                         : null;
 
                     var verdict = Verdict(facultyGroup, zSchool, zFaculty);
@@ -3711,7 +3786,7 @@ public sealed class EfSurveyService(
                         zSchool,
                         zFaculty,
                         zSchool is not null && zFaculty is not null
-                            ? Math.Round(zFaculty.Value - zSchool.Value, 2)
+                            ? Math.Round(zFaculty.Value - zSchool.Value, 3)
                             : null,
                         verdict,
                         section.ResponseCount,
@@ -3734,7 +3809,7 @@ public sealed class EfSurveyService(
             sections.Count,
             sections.Sum(x => x.ClassSize),
             sections.Sum(x => x.ValidResponseCount),
-            Math.Round(sections.Average(x => x.AverageScore), 2),
+            Math.Round(sections.Average(x => x.AverageScore), 3),
             questionRows,
             Departments: scopeDepartments,
             Courses: scopeCourses,
@@ -3793,7 +3868,7 @@ public sealed class EfSurveyService(
                     Percentage(totalResponses, totalClassSize),
                     Percentage(validResponses, totalResponses),
                     validResponses > 0
-                        ? Math.Round(g.Sum(x => x.ValidTotalScore) / validResponses, 2)
+                        ? Math.Round(g.Sum(x => x.ValidTotalScore) / validResponses, 3)
                         : null,
                     g.Min(x => (decimal?)x.AverageScore),
                     g.Max(x => (decimal?)x.AverageScore),
@@ -3843,8 +3918,10 @@ public sealed class EfSurveyService(
         {
             var allowed = scope.SeesOnlyOwn
                 ? scope.LecturerId == lecturerId
-                : scope.DepartmentId is { } departmentId
-                    && mine.All(x => x.DepartmentId == departmentId);
+                : scope.SeesWholeFaculty
+                    ? scope.FacultyId is { } facultyId && mine.All(x => x.FacultyId == facultyId)
+                    : scope.DepartmentId is { } departmentId
+                        && mine.All(x => x.DepartmentId == departmentId);
             if (!allowed)
             {
                 return Failed<LecturerReportDto>(SurveyErrorCodes.LecturerHasNoSections);
@@ -3875,7 +3952,7 @@ public sealed class EfSurveyService(
             .GroupBy(x => courseIdBySection[x.CourseSectionId])
             .ToDictionary(
                 g => g.Key,
-                g => (Count: g.Count(), Mean: Math.Round(g.Average(x => x.AverageScore), 2)));
+                g => (Count: g.Count(), Mean: Math.Round(g.Average(x => x.AverageScore), 3)));
 
         var sectionRows = mine
             .Select(x =>
@@ -3899,7 +3976,7 @@ public sealed class EfSurveyService(
                     Percentage(x.ValidResponseCount, x.ResponseCount),
                     x.AverageScore,
                     courseMean,
-                    courseMean is { } mean ? Math.Round(x.AverageScore - mean, 2) : null,
+                    courseMean is { } mean ? Math.Round(x.AverageScore - mean, 3) : null,
                     schoolZ(x.AverageScore),
                     facultyZ(x.AverageScore),
                     departmentZ(x.AverageScore));
@@ -3915,7 +3992,7 @@ public sealed class EfSurveyService(
             facultyName,
             mine.Count,
             mine.Sum(x => x.ResponseCount),
-            Math.Round(mine.Average(x => x.AverageScore), 2),
+            Math.Round(mine.Average(x => x.AverageScore), 3),
             sectionRows));
     }
 
@@ -4314,7 +4391,7 @@ public sealed class EfSurveyService(
     private static decimal ComputeScore(IReadOnlyList<int> scoredValues) =>
         scoredValues.Count == 0
             ? 0m
-            : Math.Round((decimal)scoredValues.Average(), 2);
+            : Math.Round((decimal)scoredValues.Average(), 3);
 
     private static string NormalizeKey(string value) => value.Trim().ToLowerInvariant();
 

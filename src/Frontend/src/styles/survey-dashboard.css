@@ -117,7 +117,7 @@
 /* Bảng tiêu chí yếu nhất: khung riêng vì nó không nằm trong vùng cuộn chung. */
 .dashboard-table-frame {
   overflow-x: auto;
-  border: 1px solid #dfe4e8;
+  border: 1px solid var(--grid-line-strong);
 }
 
 /* Thẻ đã bỏ padding nên biểu đồ phải tự giữ lề. */
@@ -230,7 +230,7 @@
 .dashboard-warning-filter input,
 .dashboard-warning-filter select {
   height: 30px;
-  border: 1px solid #ccd6dc;
+  border: 1px solid var(--field-border);
   background: #fff;
   color: #20262c;
   padding: 0 8px;

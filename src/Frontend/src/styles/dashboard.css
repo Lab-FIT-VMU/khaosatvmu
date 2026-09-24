@@ -121,8 +121,8 @@
 .dashboard-campaign-table th {
   height: 38px;
   padding: 0 12px;
-  border-right: 1px solid #e1e6e9;
-  border-bottom: 1px solid #d7dde1;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line-strong);
   background: #f7f9fa;
   color: #000000;
   font-size: 13px;
@@ -133,8 +133,8 @@
 .dashboard-campaign-table td {
   height: 52px;
   padding: 7px 12px;
-  border-right: 1px solid #e7ebee;
-  border-bottom: 1px solid #e1e6e9;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
   vertical-align: middle;
 }
 
@@ -684,7 +684,7 @@
   height: 32px;
   max-width: min(320px, 40vw);
   padding: 0 10px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--field-border);
   background: #f8fafc;
   color: #000000;
   font-size: 13px;
@@ -1116,7 +1116,7 @@
 /* Executive Monitoring Table */
 .executive-table-card {
   background: #ffffff;
-  border: 1px solid #dfe4e8;
+  border: 1px solid var(--grid-line-strong);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1137,7 +1137,7 @@
   align-items: center;
   gap: 6px;
   background: #ffffff;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--field-border);
   padding: 4px 8px;
   height: 32px;
   min-width: 240px;
@@ -1192,8 +1192,8 @@
 .executive-grid-table th {
   height: 46px;
   padding: 4px;
-  border-right: 1px solid #e5e9ec;
-  border-bottom: 1px solid #cfd7dc;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line-strong);
   background: #f7f9fa;
   color: #000000;
   font-size: 13px;
@@ -1207,8 +1207,8 @@
 .executive-grid-table td {
   height: 32px;
   padding: 4px 10px;
-  border-right: 1px solid #e8ecef;
-  border-bottom: 1px solid #e3e7ea;
+  border-right: 1px solid var(--grid-line);
+  border-bottom: 1px solid var(--grid-line);
   vertical-align: middle;
   line-height: 1.35;
 }

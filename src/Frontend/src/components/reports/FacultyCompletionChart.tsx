@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { Timer } from 'lucide-react';
 import type { FacultyOverview } from '../../types';
-import { completionColor } from './theme';
+import { completionColor, formatPercent } from './theme';
 import { FacultyNameAxisTick } from './FacultyNameAxisTick';
 import { wrapFacultyName } from './facultyChartLabels';
 import {
@@ -39,7 +39,7 @@ const CompletionTooltip: React.FC<{ active?: boolean; payload?: TooltipPayloadIt
     <div className="reports-chart-tooltip">
       <strong>{f.facultyName}</strong>
       <span style={{ color: completionColor(f.completionRate) }}>
-        {f.completionRate.toFixed(1)}% hoàn thành
+        {formatPercent(f.completionRate)} hoàn thành
       </span>
       <span>
         {f.responseCount.toLocaleString('vi-VN')} / {f.targetResponses.toLocaleString('vi-VN')} phiếu

@@ -830,6 +830,12 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         {
             query = query.Where(x => x.LecturerId == scope.LecturerId);
         }
+        else if (scope.SeesWholeFaculty)
+        {
+            query = query.Where(x => db.Courses
+                .Any(course => course.CourseId == x.CourseId
+                               && course.FacultyId == scope.FacultyId));
+        }
         else if (!scope.SeesEverything)
         {
             query = query.Where(x => db.Courses
@@ -876,7 +882,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<CourseSectionDto>(CatalogErrorCodes.OutOfScope);
         }
         var departmentId = await DepartmentOfCourseAsync(command.CourseId, cancellationToken);
-        if (CheckDepartmentInScope(scope, departmentId) is { } outOfScope)
+        if (await CheckDepartmentInScopeAsync(scope, departmentId, cancellationToken) is { } outOfScope)
         {
             return Failed<CourseSectionDto>(outOfScope);
         }
@@ -925,14 +931,14 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<CourseSectionDto>(CatalogErrorCodes.OutOfScope);
         }
         var currentDepartmentId = await DepartmentOfCourseAsync(section.CourseId, cancellationToken);
-        if (CheckDepartmentInScope(scope, currentDepartmentId) is { } currentOutOfScope)
+        if (await CheckDepartmentInScopeAsync(scope, currentDepartmentId, cancellationToken) is { } currentOutOfScope)
         {
             return Failed<CourseSectionDto>(currentOutOfScope);
         }
         if (command.CourseId != section.CourseId)
         {
             var nextDepartmentId = await DepartmentOfCourseAsync(command.CourseId, cancellationToken);
-            if (CheckDepartmentInScope(scope, nextDepartmentId) is { } nextOutOfScope)
+            if (await CheckDepartmentInScopeAsync(scope, nextDepartmentId, cancellationToken) is { } nextOutOfScope)
             {
                 return Failed<CourseSectionDto>(nextOutOfScope);
             }
@@ -974,7 +980,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<bool>(CatalogErrorCodes.OutOfScope);
         }
         var departmentId = await DepartmentOfCourseAsync(section.CourseId, cancellationToken);
-        if (CheckDepartmentInScope(scope, departmentId) is { } outOfScope)
+        if (await CheckDepartmentInScopeAsync(scope, departmentId, cancellationToken) is { } outOfScope)
         {
             return Failed<bool>(outOfScope);
         }
@@ -1385,7 +1391,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         }
 
         // Đơn vị của lớp đi theo học phần sở hữu, đúng như câu D-b đã chốt.
-        if (!scope.SeesEverything)
+        if (scope.SeesWholeFaculty)
+        {
+            query = query.Where(x => x.FacultyId == scope.FacultyId);
+        }
+        else if (!scope.SeesEverything)
         {
             query = query.Where(x => x.DepartmentId == scope.DepartmentId);
         }
@@ -1464,7 +1474,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<ResolveUnidentifiedLecturerDto>(CatalogErrorCodes.OutOfScope);
         }
         var sectionDepartmentId = await DepartmentOfCourseAsync(section.CourseId, cancellationToken);
-        if (CheckDepartmentInScope(scope, sectionDepartmentId) is { } outOfScope)
+        if (await CheckDepartmentInScopeAsync(scope, sectionDepartmentId, cancellationToken) is { } outOfScope)
         {
             return Failed<ResolveUnidentifiedLecturerDto>(outOfScope);
         }
@@ -1496,9 +1506,30 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         }
 
         // Trưởng bộ môn chỉ được tạo người của bộ môn mình, giống CreateLecturerAsync.
+        // Trưởng khoa/viện rộng hơn một bậc: bộ môn lấy theo học phần của lớp, miễn là
+        // bộ môn đó nằm trong khoa của mình.
         var departmentId = command.DepartmentId;
         var facultyId = command.FacultyId;
-        if (!scope.SeesEverything)
+        if (scope.SeesWholeFaculty)
+        {
+            if (scope.FacultyId is not { } ownFacultyId)
+            {
+                return Failed<ResolveUnidentifiedLecturerDto>(CatalogErrorCodes.OutOfScope);
+            }
+            departmentId = await db.Courses
+                .Where(x => x.CourseId == section.CourseId)
+                .Select(x => x.DepartmentId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (departmentId is { } courseDepartmentId
+                && !await db.Departments.AnyAsync(
+                    x => x.DepartmentId == courseDepartmentId && x.FacultyId == ownFacultyId,
+                    cancellationToken))
+            {
+                return Failed<ResolveUnidentifiedLecturerDto>(CatalogErrorCodes.OutOfScope);
+            }
+            facultyId = ownFacultyId;
+        }
+        else if (!scope.SeesEverything)
         {
             if (scope.DepartmentId is not { } ownDepartmentId)
             {
@@ -1556,9 +1587,13 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             await EnsureUserForLecturerAsync(lecturer, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
         }
-        else if (!scope.SeesEverything && lecturer.DepartmentId != departmentId)
+        else if (!scope.SeesEverything
+                 && (scope.SeesWholeFaculty
+                     ? lecturer.FacultyId != scope.FacultyId
+                     : lecturer.DepartmentId != departmentId))
         {
-            // Trưởng bộ môn không được kéo người của bộ môn khác về lớp của mình.
+            // Trưởng bộ môn không được kéo người của bộ môn khác về lớp của mình;
+            // trưởng khoa cũng vậy, nhưng ranh giới là khoa.
             return Failed<ResolveUnidentifiedLecturerDto>(CatalogErrorCodes.OutOfScope);
         }
 
@@ -1586,6 +1621,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         {
             query = query.Where(x => x.LecturerId == scope.LecturerId);
         }
+        else if (scope.SeesWholeFaculty)
+        {
+            query = query.Where(x => x.FacultyId == scope.FacultyId);
+        }
         else if (!scope.SeesEverything)
         {
             query = query.Where(x => x.DepartmentId == scope.DepartmentId);
@@ -1611,8 +1650,24 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         // Ép bộ môn về bộ môn của chính mình TRƯỚC khi validate, để validate chạy trên
         // đúng giá trị sẽ được lưu. Không ép thì trưởng bộ môn thêm được người vào bộ
         // môn khác, mà thêm xong lại không thấy để sửa.
+        //
+        // Trưởng khoa/viện chọn được bộ môn, nhưng phải là bộ môn trong khoa mình, và
+        // khoa thì ép về khoa của mình.
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.SeesEverything)
+        if (CheckReadOnly(scope) is { } readOnly)
+        {
+            return Failed<LecturerDto>(readOnly);
+        }
+        if (scope.SeesWholeFaculty)
+        {
+            if (await CheckDepartmentInScopeAsync(scope, command.DepartmentId, cancellationToken)
+                is { } facultyOutOfScope)
+            {
+                return Failed<LecturerDto>(facultyOutOfScope);
+            }
+            command = command with { FacultyId = scope.FacultyId };
+        }
+        else if (!scope.SeesEverything)
         {
             if (scope.DepartmentId is not { } ownDepartmentId)
             {
@@ -1662,11 +1717,22 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         // sang bộ môn khác. Thiếu vế thứ hai thì sửa một phát là đẩy người của mình
         // sang bộ môn khác, hoặc kéo người bộ môn khác về mình.
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (CheckDepartmentInScope(scope, lecturer.DepartmentId) is { } outOfScope)
+        if (await CheckDepartmentInScopeAsync(scope, lecturer.DepartmentId, cancellationToken) is { } outOfScope)
         {
             return Failed<LecturerDto>(outOfScope);
         }
-        if (!scope.SeesEverything && command.DepartmentId != lecturer.DepartmentId)
+        // Trưởng khoa/viện được chuyển người giữa các bộ môn TRONG KHOA mình, nên vế
+        // thứ hai của họ là "bộ môn đích cũng phải trong khoa" chứ không phải "y nguyên".
+        if (scope.SeesWholeFaculty)
+        {
+            if (await CheckDepartmentInScopeAsync(scope, command.DepartmentId, cancellationToken)
+                is { } targetOutOfScope)
+            {
+                return Failed<LecturerDto>(targetOutOfScope);
+            }
+            command = command with { FacultyId = scope.FacultyId };
+        }
+        else if (!scope.SeesEverything && command.DepartmentId != lecturer.DepartmentId)
         {
             return Failed<LecturerDto>(CatalogErrorCodes.OutOfScope);
         }
@@ -1873,6 +1939,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 .Any(section => section.CourseId == x.CourseId
                                 && section.LecturerId == scope.LecturerId));
         }
+        else if (scope.SeesWholeFaculty)
+        {
+            query = query.Where(x => x.FacultyId == scope.FacultyId);
+        }
         else if (!scope.SeesEverything)
         {
             query = query.Where(x => x.DepartmentId == scope.DepartmentId);
@@ -1896,9 +1966,23 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         SaveCourseCommand command,
         CancellationToken cancellationToken = default)
     {
-        // Cùng luật với giảng viên: ép bộ môn về bộ môn của mình trước khi validate.
+        // Cùng luật với giảng viên: ép bộ môn về bộ môn của mình trước khi validate;
+        // trưởng khoa/viện chọn được bộ môn miễn là bộ môn đó thuộc khoa mình.
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!scope.SeesEverything)
+        if (CheckReadOnly(scope) is { } readOnly)
+        {
+            return Failed<CourseDto>(readOnly);
+        }
+        if (scope.SeesWholeFaculty)
+        {
+            if (await CheckDepartmentInScopeAsync(scope, command.DepartmentId, cancellationToken)
+                is { } facultyOutOfScope)
+            {
+                return Failed<CourseDto>(facultyOutOfScope);
+            }
+            command = command with { FacultyId = scope.FacultyId };
+        }
+        else if (!scope.SeesEverything)
         {
             if (scope.DepartmentId is not { } ownDepartmentId)
             {
@@ -1948,11 +2032,21 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         // Kiểm hai đầu như khi sửa giảng viên: học phần đang sửa phải thuộc bộ môn
         // mình, và không được đổi sang bộ môn khác.
         var scope = await userScope.ResolveAsync(cancellationToken);
-        if (CheckDepartmentInScope(scope, course.DepartmentId) is { } outOfScope)
+        if (await CheckDepartmentInScopeAsync(scope, course.DepartmentId, cancellationToken) is { } outOfScope)
         {
             return Failed<CourseDto>(outOfScope);
         }
-        if (!scope.SeesEverything && command.DepartmentId != course.DepartmentId)
+        // Trưởng khoa/viện chuyển được học phần giữa các bộ môn trong khoa mình.
+        if (scope.SeesWholeFaculty)
+        {
+            if (await CheckDepartmentInScopeAsync(scope, command.DepartmentId, cancellationToken)
+                is { } targetOutOfScope)
+            {
+                return Failed<CourseDto>(targetOutOfScope);
+            }
+            command = command with { FacultyId = scope.FacultyId };
+        }
+        else if (!scope.SeesEverything && command.DepartmentId != course.DepartmentId)
         {
             return Failed<CourseDto>(CatalogErrorCodes.OutOfScope);
         }
@@ -2274,14 +2368,33 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
     /// <summary>
     /// Bản ghi thuộc <paramref name="departmentId"/> có nằm trong phạm vi của người
     /// đang đăng nhập không. Trả về mã lỗi nếu không, null nếu được phép.
+    /// <para>
+    /// Trưởng khoa/viện phải tra CSDL để biết bộ môn đó có thuộc khoa mình không, nên
+    /// hàm này là async chứ không còn thuần tính toán như trước.
+    /// </para>
     /// </summary>
-    private static string? CheckDepartmentInScope(UserScope scope, int? departmentId)
+    private async Task<string?> CheckDepartmentInScopeAsync(
+        UserScope scope,
+        int? departmentId,
+        CancellationToken cancellationToken)
     {
-        if (scope.SeesEverything) return null;
         // Chặn vai trò chỉ đọc ngay trong hàm này thay vì rải lời gọi ra từng endpoint:
-        // giảng viên vẫn CÓ DepartmentId, nên thiếu dòng này thì chỉ cần quên một chỗ
-        // là họ sửa được bản ghi của bộ môn mình. Gác một chỗ thì không quên được.
+        // giảng viên vẫn CÓ DepartmentId và Ban Giám hiệu thì thấy toàn trường, nên
+        // thiếu dòng này chỉ cần quên một chỗ là họ ghi được. Gác một chỗ thì không quên.
         if (CheckReadOnly(scope) is { } readOnly) return readOnly;
+        if (scope.SeesEverything) return null;
+
+        if (scope.SeesWholeFaculty)
+        {
+            if (scope.FacultyId is not { } allowedFaculty) return CatalogErrorCodes.OutOfScope;
+            if (departmentId is not { } target) return CatalogErrorCodes.OutOfScope;
+            return await db.Departments.AnyAsync(
+                x => x.DepartmentId == target && x.FacultyId == allowedFaculty,
+                cancellationToken)
+                ? null
+                : CatalogErrorCodes.OutOfScope;
+        }
+
         if (scope.DepartmentId is not { } allowed) return CatalogErrorCodes.OutOfScope;
         return departmentId == allowed ? null : CatalogErrorCodes.OutOfScope;
     }
@@ -2290,9 +2403,13 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
     /// Hành động chỉ dành cho quản trị, ví dụ xoá giảng viên hay import theo tệp.
     /// Import bị chặn vì đơn vị của từng dòng lấy từ tệp, người nhập không kiểm soát
     /// được nên rất dễ ghi sang bộ môn khác.
+    /// <para>
+    /// Ban Giám hiệu tuy thấy toàn trường vẫn không qua được hàm này: đây là cổng ghi,
+    /// mà vai trò đó chỉ đọc.
+    /// </para>
     /// </summary>
     private static string? CheckAdminOnly(UserScope scope) =>
-        scope.SeesEverything ? null : CatalogErrorCodes.OutOfScope;
+        scope.ManagesEverything ? null : CatalogErrorCodes.OutOfScope;
 
     /// <summary>Bộ môn sở hữu học phần của một lớp, dùng để quy phạm vi cho lớp.</summary>
     private Task<int?> DepartmentOfCourseAsync(int courseId, CancellationToken cancellationToken) =>
@@ -2306,9 +2423,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
     /// tương ứng. Gọi SAU khi giảng viên đã được lưu, vì trước đó
     /// <c>LecturerId</c> vẫn là 0.
     /// <para>
-    /// Mọi giảng viên có hồ sơ Giảng viên. Trưởng bộ môn và Phó Trưởng bộ môn có
-    /// thêm hồ sơ Trưởng bộ môn; hồ sơ Giảng viên là mặc định nếu tài khoản chưa có
-    /// hồ sơ hoạt động nào.
+    /// Mọi giảng viên có hồ sơ Giảng viên. Trưởng bộ môn có thêm hồ sơ Trưởng bộ môn,
+    /// Phó Trưởng bộ môn có thêm hồ sơ Phó trưởng bộ môn; Trưởng khoa và Phó Trưởng khoa có thêm hồ sơ
+    /// Trưởng khoa/viện. Hồ sơ Giảng viên là mặc định nếu tài khoản chưa có hồ sơ
+    /// hoạt động nào.
     /// </para>
     /// Các truy vấn được gom theo cả mẻ để import không phát sinh một truy vấn tra cứu
     /// tài khoản hay hồ sơ cho từng dòng.
@@ -2409,26 +2527,44 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .ToList();
         if (users.Count == 0) return;
 
-        var lecturerRole = await db.Roles
-            .SingleAsync(x => x.Code == RoleCodes.Lecturer, cancellationToken);
-        var departmentManagerRole = await db.Roles
-            .SingleAsync(x => x.Code == RoleCodes.DepartmentManager, cancellationToken);
+        var roleCodes = new[]
+        {
+            RoleCodes.Lecturer,
+            RoleCodes.DepartmentManager,
+            RoleCodes.DeputyDepartmentManager,
+            RoleCodes.FacultyManager
+        };
+        var rolesByCode = await db.Roles
+            .Where(x => roleCodes.Contains(x.Code))
+            .ToDictionaryAsync(x => x.Code, cancellationToken);
+        var lecturerRole = rolesByCode[RoleCodes.Lecturer];
+        var departmentManagerRole = rolesByCode[RoleCodes.DepartmentManager];
+        var deputyDepartmentManagerRole = rolesByCode[RoleCodes.DeputyDepartmentManager];
+        var facultyManagerRole = rolesByCode[RoleCodes.FacultyManager];
 
-        var managerPositionIds = (await db.Positions
-                .Select(x => new { x.PositionId, x.PositionName })
-                .ToListAsync(cancellationToken))
+        var positions = await db.Positions
+            .Select(x => new { x.PositionId, x.PositionName })
+            .ToListAsync(cancellationToken);
+        var departmentManagerPositionIds = positions
             .Where(x => IsDepartmentManagerPosition(x.PositionName))
+            .Select(x => x.PositionId)
+            .ToHashSet();
+        var deputyDepartmentManagerPositionIds = positions
+            .Where(x => IsDeputyDepartmentManagerPosition(x.PositionName))
+            .Select(x => x.PositionId)
+            .ToHashSet();
+        var facultyManagerPositionIds = positions
+            .Where(x => IsFacultyManagerPosition(x.PositionName))
             .Select(x => x.PositionId)
             .ToHashSet();
 
         var userIds = users.Select(x => x.Id).ToList();
         var existingProfiles = await db.UserProfiles
             .Where(x => userIds.Contains(x.UserId))
-            .Select(x => new { x.UserId, x.RoleId, x.IsActive })
             .ToListAsync(cancellationToken);
-        var existingPairs = existingProfiles
-            .Select(x => (x.UserId, x.RoleId))
-            .ToHashSet();
+        var profilesByRole = existingProfiles
+            .GroupBy(x => (x.UserId, x.RoleId))
+            .ToDictionary(x => x.Key, x => x.First());
         var usersWithActiveProfile = existingProfiles
             .Where(x => x.IsActive)
             .Select(x => x.UserId)
@@ -2439,35 +2575,139 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         {
             if (!userByLecturerId.TryGetValue(lecturer.LecturerId, out var user)) continue;
 
-            if (existingPairs.Add((user.Id, lecturerRole.Id)))
+            if (!profilesByRole.TryGetValue((user.Id, lecturerRole.Id), out var lecturerProfile))
             {
                 var isDefault = !usersWithActiveProfile.Contains(user.Id);
-                await AddAutomaticProfileAsync(
+                lecturerProfile = await AddAutomaticProfileAsync(
                     user,
                     lecturerRole,
                     isDefault,
                     now,
                     cancellationToken);
+                profilesByRole[(user.Id, lecturerRole.Id)] = lecturerProfile;
+                usersWithActiveProfile.Add(user.Id);
+            }
+            else if (!lecturerProfile.IsActive)
+            {
+                lecturerProfile.IsActive = true;
+                lecturerProfile.UpdatedAt = now;
                 usersWithActiveProfile.Add(user.Id);
             }
 
-            if (lecturer.PositionId is not { } positionId
-                || !managerPositionIds.Contains(positionId)
-                || !existingPairs.Add((user.Id, departmentManagerRole.Id)))
-            {
-                continue;
-            }
+            var isDepartmentManager = lecturer.PositionId is { } positionId
+                && departmentManagerPositionIds.Contains(positionId);
+            var isDeputyDepartmentManager = lecturer.PositionId is { } deputyPositionId
+                && deputyDepartmentManagerPositionIds.Contains(deputyPositionId);
 
-            await AddAutomaticProfileAsync(
+            await ReconcileDepartmentLeadershipProfileAsync(
                 user,
+                lecturerProfile,
+                isDepartmentManager ? departmentManagerRole
+                    : isDeputyDepartmentManager ? deputyDepartmentManagerRole
+                    : null,
                 departmentManagerRole,
-                isDefault: false,
+                deputyDepartmentManagerRole,
+                profilesByRole,
                 now,
                 cancellationToken);
+
+            if (lecturer.PositionId is not { } currentPositionId) continue;
+
+            if (facultyManagerPositionIds.Contains(currentPositionId)
+                && !profilesByRole.ContainsKey((user.Id, facultyManagerRole.Id)))
+            {
+                var facultyProfile = await AddAutomaticProfileAsync(
+                    user,
+                    facultyManagerRole,
+                    isDefault: false,
+                    now,
+                    cancellationToken);
+                profilesByRole[(user.Id, facultyManagerRole.Id)] = facultyProfile;
+            }
         }
     }
 
-    private async Task AddAutomaticProfileAsync(
+    private async Task ReconcileDepartmentLeadershipProfileAsync(
+        User user,
+        UserProfile lecturerProfile,
+        Role? desiredRole,
+        Role departmentManagerRole,
+        Role deputyDepartmentManagerRole,
+        IDictionary<(Guid UserId, Guid RoleId), UserProfile> profilesByRole,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        profilesByRole.TryGetValue((user.Id, departmentManagerRole.Id), out var managerProfile);
+        profilesByRole.TryGetValue((user.Id, deputyDepartmentManagerRole.Id), out var deputyProfile);
+
+        if (desiredRole is null)
+        {
+            DeactivateAutomaticLeadershipProfile(managerProfile, lecturerProfile, now);
+            DeactivateAutomaticLeadershipProfile(deputyProfile, lecturerProfile, now);
+            return;
+        }
+
+        var desiredProfile = desiredRole.Id == departmentManagerRole.Id ? managerProfile : deputyProfile;
+        var obsoleteProfile = desiredRole.Id == departmentManagerRole.Id ? deputyProfile : managerProfile;
+
+        if (desiredProfile is null && obsoleteProfile is not null)
+        {
+            var oldKey = (user.Id, obsoleteProfile.RoleId);
+            profilesByRole.Remove(oldKey);
+            obsoleteProfile.RoleId = desiredRole.Id;
+            obsoleteProfile.ProfileName = ProfileNaming.ByRoleCode[desiredRole.Code].Name;
+            obsoleteProfile.ProfileCode = ReplaceProfileSuffix(
+                obsoleteProfile.ProfileCode,
+                ProfileNaming.ByRoleCode[desiredRole.Code].Suffix);
+            obsoleteProfile.IsActive = true;
+            obsoleteProfile.UpdatedAt = now;
+            profilesByRole[(user.Id, desiredRole.Id)] = obsoleteProfile;
+            return;
+        }
+
+        if (desiredProfile is null)
+        {
+            desiredProfile = await AddAutomaticProfileAsync(
+                user,
+                desiredRole,
+                isDefault: false,
+                now,
+                cancellationToken);
+            profilesByRole[(user.Id, desiredRole.Id)] = desiredProfile;
+        }
+        else if (!desiredProfile.IsActive)
+        {
+            desiredProfile.IsActive = true;
+            desiredProfile.UpdatedAt = now;
+        }
+
+        if (obsoleteProfile?.IsDefault == true)
+        {
+            obsoleteProfile.IsDefault = false;
+            desiredProfile.IsDefault = true;
+        }
+        DeactivateAutomaticLeadershipProfile(obsoleteProfile, lecturerProfile, now);
+    }
+
+    private static void DeactivateAutomaticLeadershipProfile(
+        UserProfile? profile,
+        UserProfile lecturerProfile,
+        DateTime now)
+    {
+        if (profile is null || !profile.IsActive) return;
+        if (profile.IsDefault)
+        {
+            profile.IsDefault = false;
+            lecturerProfile.IsDefault = true;
+        }
+        profile.IsActive = false;
+        profile.UpdatedAt = now;
+    }
+
+    private static string ReplaceProfileSuffix(string profileCode, string suffix) =>
+        profileCode.Length >= 2 ? $"{profileCode[..^2]}{suffix}" : $"{profileCode}{suffix}";
+
+    private async Task<UserProfile> AddAutomaticProfileAsync(
         User user,
         Role role,
         bool isDefault,
@@ -2479,7 +2719,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .SqlQueryRaw<long>("SELECT nextval('\"UserProfileCodeSequence\"') AS \"Value\"")
             .SingleAsync(cancellationToken);
 
-        db.UserProfiles.Add(new UserProfile
+        var profile = new UserProfile
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
@@ -2490,12 +2730,24 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             IsDefault = isDefault,
             CreatedAt = now,
             UpdatedAt = now,
-        });
+        };
+        db.UserProfiles.Add(profile);
         user.UpdatedAt = now;
+        return profile;
     }
 
     private static bool IsDepartmentManagerPosition(string positionName) =>
-        NormalizeLooseKey(positionName) is "truong bo mon" or "pho bo mon" or "pho truong bo mon";
+        NormalizeLooseKey(positionName) is "truong bo mon";
+
+    private static bool IsDeputyDepartmentManagerPosition(string positionName) =>
+        NormalizeLooseKey(positionName) is "pho bo mon" or "pho truong bo mon";
+
+    /// <summary>
+    /// Trưởng khoa và Phó trưởng khoa đều nhận hồ sơ Trưởng khoa/viện, giống cách
+    /// Trưởng và Phó khoa cùng nhận hồ sơ Trưởng khoa/viện.
+    /// </summary>
+    private static bool IsFacultyManagerPosition(string positionName) =>
+        NormalizeLooseKey(positionName) is "truong khoa" or "pho khoa" or "pho truong khoa";
 
     private Task EnsureUserForLecturerAsync(
         Lecturer lecturer,
@@ -2879,7 +3131,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
 
         // Khôi phục đi cùng cặp với xoá và cũng chỉ dành cho quản trị.
         var departmentId = await DepartmentOfCourseAsync(section.CourseId, cancellationToken);
-        if (CheckDepartmentInScope(scope, departmentId) is { } outOfScope)
+        if (await CheckDepartmentInScopeAsync(scope, departmentId, cancellationToken) is { } outOfScope)
         {
             return Failed<CourseSectionDto>(outOfScope);
         }

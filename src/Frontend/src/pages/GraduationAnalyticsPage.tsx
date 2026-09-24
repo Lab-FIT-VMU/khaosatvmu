@@ -43,6 +43,7 @@ import type {
   GraduationRevisionV3,
 } from '../types/graduationAnalytics';
 import '../styles/graduation-analytics.css';
+import { formatNumber, formatPercent } from '../utils/formatNumber';
 
 type View = 'explore' | 'manage';
 type ExploreChartMetric = 'graduated' | 'onTime' | 'workStudy' | 'excellent' | 'veryGood' | 'good' | 'average';
@@ -150,8 +151,8 @@ const currentAcademicYearStart = () => {
   return now.getMonth() + 1 >= 8 ? now.getFullYear() : now.getFullYear() - 1;
 };
 
-const formatNumber = (value: number) => value.toLocaleString('vi-VN');
-const formatRate = (value: number) => `${value.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}%`;
+/** Tỷ lệ tốt nghiệp cũng ba chữ số thập phân như mọi tỷ lệ khác trong hệ thống. */
+const formatRate = (value: number) => formatPercent(value);
 const periodOptionLabel = (period: GraduationManagedPeriod) =>
   `Đợt ${period.roundNumber} · ${String(period.reviewMonth).padStart(2, '0')}/${period.reviewYear}`;
 
