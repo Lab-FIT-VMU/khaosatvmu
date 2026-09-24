@@ -9,7 +9,7 @@ import {
 const maximumFileSize = 5 * 1024 * 1024;
 
 /**
- * Sáu vai trò của hệ thống kèm tên tiếng Việt điền vào tệp Excel. Giữ đúng thứ tự
+ * Các vai trò của hệ thống kèm tên tiếng Việt điền vào tệp Excel. Giữ đúng thứ tự
  * này ở cả bảng tra trong tệp mẫu lẫn phần kiểm tra khi đọc tệp, và phải khớp
  * ProfileNaming.ByRoleCode bên backend.
  */
@@ -17,6 +17,7 @@ export const profileRoleOptions: { roleCode: string; label: string }[] = [
   { roleCode: 'ADMIN', label: 'Quản trị hệ thống' },
   { roleCode: 'BOARD_OF_DIRECTORS', label: 'Ban Giám hiệu' },
   { roleCode: 'DEPARTMENT_MANAGER', label: 'Trưởng bộ môn' },
+  { roleCode: 'DEPUTY_DEPARTMENT_MANAGER', label: 'Phó trưởng bộ môn' },
   { roleCode: 'FACULTY_MANAGER', label: 'Trưởng khoa/viện' },
   { roleCode: 'LECTURER', label: 'Giảng viên' },
   { roleCode: 'SURVEY_ADMIN', label: 'Quản trị khảo sát' },

@@ -19,6 +19,7 @@ public static class RoleCodes
     public const string FacultyManager = "FACULTY_MANAGER";
 
     public const string DepartmentManager = "DEPARTMENT_MANAGER";
+    public const string DeputyDepartmentManager = "DEPUTY_DEPARTMENT_MANAGER";
     public const string Lecturer = "LECTURER";
 }
 
@@ -99,7 +100,9 @@ public sealed record UserScope(
 
     /// <summary>Hai vai trò quản lý cấp đơn vị: trưởng bộ môn và trưởng khoa/viện.</summary>
     private bool ManagesOwnUnit =>
-        RoleCode is RoleCodes.DepartmentManager or RoleCodes.FacultyManager;
+        RoleCode is RoleCodes.DepartmentManager
+            or RoleCodes.DeputyDepartmentManager
+            or RoleCodes.FacultyManager;
 
     /// <summary>
     /// Bị giới hạn phạm vi nhưng lại không biết giới hạn vào đâu. Gặp trường hợp này

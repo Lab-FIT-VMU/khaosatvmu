@@ -2423,8 +2423,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
     /// tương ứng. Gọi SAU khi giảng viên đã được lưu, vì trước đó
     /// <c>LecturerId</c> vẫn là 0.
     /// <para>
-    /// Mọi giảng viên có hồ sơ Giảng viên. Trưởng bộ môn và Phó Trưởng bộ môn có
-    /// thêm hồ sơ Trưởng bộ môn; Trưởng khoa và Phó Trưởng khoa có thêm hồ sơ
+    /// Mọi giảng viên có hồ sơ Giảng viên. Trưởng bộ môn có thêm hồ sơ Trưởng bộ môn,
+    /// Phó Trưởng bộ môn có thêm hồ sơ Phó trưởng bộ môn; Trưởng khoa và Phó Trưởng khoa có thêm hồ sơ
     /// Trưởng khoa/viện. Hồ sơ Giảng viên là mặc định nếu tài khoản chưa có hồ sơ
     /// hoạt động nào.
     /// </para>
@@ -2527,12 +2527,19 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .ToList();
         if (users.Count == 0) return;
 
-        var roleCodes = new[] { RoleCodes.Lecturer, RoleCodes.DepartmentManager, RoleCodes.FacultyManager };
+        var roleCodes = new[]
+        {
+            RoleCodes.Lecturer,
+            RoleCodes.DepartmentManager,
+            RoleCodes.DeputyDepartmentManager,
+            RoleCodes.FacultyManager
+        };
         var rolesByCode = await db.Roles
             .Where(x => roleCodes.Contains(x.Code))
             .ToDictionaryAsync(x => x.Code, cancellationToken);
         var lecturerRole = rolesByCode[RoleCodes.Lecturer];
         var departmentManagerRole = rolesByCode[RoleCodes.DepartmentManager];
+        var deputyDepartmentManagerRole = rolesByCode[RoleCodes.DeputyDepartmentManager];
         var facultyManagerRole = rolesByCode[RoleCodes.FacultyManager];
 
         var positions = await db.Positions
@@ -2540,6 +2547,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .ToListAsync(cancellationToken);
         var departmentManagerPositionIds = positions
             .Where(x => IsDepartmentManagerPosition(x.PositionName))
+            .Select(x => x.PositionId)
+            .ToHashSet();
+        var deputyDepartmentManagerPositionIds = positions
+            .Where(x => IsDeputyDepartmentManagerPosition(x.PositionName))
             .Select(x => x.PositionId)
             .ToHashSet();
         var facultyManagerPositionIds = positions
@@ -2550,11 +2561,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var userIds = users.Select(x => x.Id).ToList();
         var existingProfiles = await db.UserProfiles
             .Where(x => userIds.Contains(x.UserId))
-            .Select(x => new { x.UserId, x.RoleId, x.IsActive })
             .ToListAsync(cancellationToken);
-        var existingPairs = existingProfiles
-            .Select(x => (x.UserId, x.RoleId))
-            .ToHashSet();
+        var profilesByRole = existingProfiles
+            .GroupBy(x => (x.UserId, x.RoleId))
+            .ToDictionary(x => x.Key, x => x.First());
         var usersWithActiveProfile = existingProfiles
             .Where(x => x.IsActive)
             .Select(x => x.UserId)
@@ -2565,45 +2575,139 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         {
             if (!userByLecturerId.TryGetValue(lecturer.LecturerId, out var user)) continue;
 
-            if (existingPairs.Add((user.Id, lecturerRole.Id)))
+            if (!profilesByRole.TryGetValue((user.Id, lecturerRole.Id), out var lecturerProfile))
             {
                 var isDefault = !usersWithActiveProfile.Contains(user.Id);
-                await AddAutomaticProfileAsync(
+                lecturerProfile = await AddAutomaticProfileAsync(
                     user,
                     lecturerRole,
                     isDefault,
                     now,
                     cancellationToken);
+                profilesByRole[(user.Id, lecturerRole.Id)] = lecturerProfile;
+                usersWithActiveProfile.Add(user.Id);
+            }
+            else if (!lecturerProfile.IsActive)
+            {
+                lecturerProfile.IsActive = true;
+                lecturerProfile.UpdatedAt = now;
                 usersWithActiveProfile.Add(user.Id);
             }
 
-            if (lecturer.PositionId is not { } positionId) continue;
+            var isDepartmentManager = lecturer.PositionId is { } positionId
+                && departmentManagerPositionIds.Contains(positionId);
+            var isDeputyDepartmentManager = lecturer.PositionId is { } deputyPositionId
+                && deputyDepartmentManagerPositionIds.Contains(deputyPositionId);
 
-            if (departmentManagerPositionIds.Contains(positionId)
-                && existingPairs.Add((user.Id, departmentManagerRole.Id)))
-            {
-                await AddAutomaticProfileAsync(
-                    user,
-                    departmentManagerRole,
-                    isDefault: false,
-                    now,
-                    cancellationToken);
-            }
+            await ReconcileDepartmentLeadershipProfileAsync(
+                user,
+                lecturerProfile,
+                isDepartmentManager ? departmentManagerRole
+                    : isDeputyDepartmentManager ? deputyDepartmentManagerRole
+                    : null,
+                departmentManagerRole,
+                deputyDepartmentManagerRole,
+                profilesByRole,
+                now,
+                cancellationToken);
 
-            if (facultyManagerPositionIds.Contains(positionId)
-                && existingPairs.Add((user.Id, facultyManagerRole.Id)))
+            if (lecturer.PositionId is not { } currentPositionId) continue;
+
+            if (facultyManagerPositionIds.Contains(currentPositionId)
+                && !profilesByRole.ContainsKey((user.Id, facultyManagerRole.Id)))
             {
-                await AddAutomaticProfileAsync(
+                var facultyProfile = await AddAutomaticProfileAsync(
                     user,
                     facultyManagerRole,
                     isDefault: false,
                     now,
                     cancellationToken);
+                profilesByRole[(user.Id, facultyManagerRole.Id)] = facultyProfile;
             }
         }
     }
 
-    private async Task AddAutomaticProfileAsync(
+    private async Task ReconcileDepartmentLeadershipProfileAsync(
+        User user,
+        UserProfile lecturerProfile,
+        Role? desiredRole,
+        Role departmentManagerRole,
+        Role deputyDepartmentManagerRole,
+        IDictionary<(Guid UserId, Guid RoleId), UserProfile> profilesByRole,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        profilesByRole.TryGetValue((user.Id, departmentManagerRole.Id), out var managerProfile);
+        profilesByRole.TryGetValue((user.Id, deputyDepartmentManagerRole.Id), out var deputyProfile);
+
+        if (desiredRole is null)
+        {
+            DeactivateAutomaticLeadershipProfile(managerProfile, lecturerProfile, now);
+            DeactivateAutomaticLeadershipProfile(deputyProfile, lecturerProfile, now);
+            return;
+        }
+
+        var desiredProfile = desiredRole.Id == departmentManagerRole.Id ? managerProfile : deputyProfile;
+        var obsoleteProfile = desiredRole.Id == departmentManagerRole.Id ? deputyProfile : managerProfile;
+
+        if (desiredProfile is null && obsoleteProfile is not null)
+        {
+            var oldKey = (user.Id, obsoleteProfile.RoleId);
+            profilesByRole.Remove(oldKey);
+            obsoleteProfile.RoleId = desiredRole.Id;
+            obsoleteProfile.ProfileName = ProfileNaming.ByRoleCode[desiredRole.Code].Name;
+            obsoleteProfile.ProfileCode = ReplaceProfileSuffix(
+                obsoleteProfile.ProfileCode,
+                ProfileNaming.ByRoleCode[desiredRole.Code].Suffix);
+            obsoleteProfile.IsActive = true;
+            obsoleteProfile.UpdatedAt = now;
+            profilesByRole[(user.Id, desiredRole.Id)] = obsoleteProfile;
+            return;
+        }
+
+        if (desiredProfile is null)
+        {
+            desiredProfile = await AddAutomaticProfileAsync(
+                user,
+                desiredRole,
+                isDefault: false,
+                now,
+                cancellationToken);
+            profilesByRole[(user.Id, desiredRole.Id)] = desiredProfile;
+        }
+        else if (!desiredProfile.IsActive)
+        {
+            desiredProfile.IsActive = true;
+            desiredProfile.UpdatedAt = now;
+        }
+
+        if (obsoleteProfile?.IsDefault == true)
+        {
+            obsoleteProfile.IsDefault = false;
+            desiredProfile.IsDefault = true;
+        }
+        DeactivateAutomaticLeadershipProfile(obsoleteProfile, lecturerProfile, now);
+    }
+
+    private static void DeactivateAutomaticLeadershipProfile(
+        UserProfile? profile,
+        UserProfile lecturerProfile,
+        DateTime now)
+    {
+        if (profile is null || !profile.IsActive) return;
+        if (profile.IsDefault)
+        {
+            profile.IsDefault = false;
+            lecturerProfile.IsDefault = true;
+        }
+        profile.IsActive = false;
+        profile.UpdatedAt = now;
+    }
+
+    private static string ReplaceProfileSuffix(string profileCode, string suffix) =>
+        profileCode.Length >= 2 ? $"{profileCode[..^2]}{suffix}" : $"{profileCode}{suffix}";
+
+    private async Task<UserProfile> AddAutomaticProfileAsync(
         User user,
         Role role,
         bool isDefault,
@@ -2615,7 +2719,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .SqlQueryRaw<long>("SELECT nextval('\"UserProfileCodeSequence\"') AS \"Value\"")
             .SingleAsync(cancellationToken);
 
-        db.UserProfiles.Add(new UserProfile
+        var profile = new UserProfile
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
@@ -2626,16 +2730,21 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             IsDefault = isDefault,
             CreatedAt = now,
             UpdatedAt = now,
-        });
+        };
+        db.UserProfiles.Add(profile);
         user.UpdatedAt = now;
+        return profile;
     }
 
     private static bool IsDepartmentManagerPosition(string positionName) =>
-        NormalizeLooseKey(positionName) is "truong bo mon" or "pho bo mon" or "pho truong bo mon";
+        NormalizeLooseKey(positionName) is "truong bo mon";
+
+    private static bool IsDeputyDepartmentManagerPosition(string positionName) =>
+        NormalizeLooseKey(positionName) is "pho bo mon" or "pho truong bo mon";
 
     /// <summary>
     /// Trưởng khoa và Phó trưởng khoa đều nhận hồ sơ Trưởng khoa/viện, giống cách
-    /// Trưởng và Phó bộ môn cùng nhận hồ sơ Trưởng bộ môn.
+    /// Trưởng và Phó khoa cùng nhận hồ sơ Trưởng khoa/viện.
     /// </summary>
     private static bool IsFacultyManagerPosition(string positionName) =>
         NormalizeLooseKey(positionName) is "truong khoa" or "pho khoa" or "pho truong khoa";

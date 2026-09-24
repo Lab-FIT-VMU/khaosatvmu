@@ -5,6 +5,7 @@ export const ROLE_CODES = {
   boardOfDirectors: 'BOARD_OF_DIRECTORS',
   facultyManager: 'FACULTY_MANAGER',
   departmentManager: 'DEPARTMENT_MANAGER',
+  deputyDepartmentManager: 'DEPUTY_DEPARTMENT_MANAGER',
   lecturer: 'LECTURER',
 } as const;
 
@@ -15,6 +16,7 @@ export const ROLE_NAMES: Readonly<Record<string, string>> = {
   [ROLE_CODES.boardOfDirectors]: 'Ban Giám hiệu',
   [ROLE_CODES.facultyManager]: 'Trưởng khoa/viện',
   [ROLE_CODES.departmentManager]: 'Trưởng bộ môn',
+  [ROLE_CODES.deputyDepartmentManager]: 'Phó trưởng bộ môn',
   [ROLE_CODES.lecturer]: 'Giảng viên',
 };
 
@@ -69,7 +71,9 @@ export function seesOnlyOwnSections(roleCode: string | null | undefined): boolea
  * Hai vai trò này dùng chung bộ module và chung các nút thao tác trong phạm vi.
  */
 export function isUnitManagerRole(roleCode: string | null | undefined): boolean {
-  return roleCode === ROLE_CODES.departmentManager || roleCode === ROLE_CODES.facultyManager;
+  return roleCode === ROLE_CODES.departmentManager
+    || roleCode === ROLE_CODES.deputyDepartmentManager
+    || roleCode === ROLE_CODES.facultyManager;
 }
 
 /**

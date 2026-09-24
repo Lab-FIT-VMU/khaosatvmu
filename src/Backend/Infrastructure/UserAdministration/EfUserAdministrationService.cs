@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Net.Mail;
+using Application.Auth;
 using Application.UserAdministration;
 using Domain;
 using Infrastructure.Persistence;
@@ -601,30 +602,48 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
             }
         }
 
+        var synchronizedRoleIds = new List<Guid> { roleId };
+        if (roleCode is RoleCodes.DepartmentManager or RoleCodes.DeputyDepartmentManager)
+        {
+            var pairedRoleCode = roleCode == RoleCodes.DepartmentManager
+                ? RoleCodes.DeputyDepartmentManager
+                : RoleCodes.DepartmentManager;
+            var pairedRoleId = await db.Roles
+                .AsNoTracking()
+                .Where(x => x.Code == pairedRoleCode)
+                .Select(x => (Guid?)x.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (pairedRoleId is { } id) synchronizedRoleIds.Add(id);
+        }
+
         var existing = await db.RolePermissions
-            .Where(x => x.RoleId == roleId)
+            .Where(x => synchronizedRoleIds.Contains(x.RoleId))
             .ToListAsync(cancellationToken);
 
-        foreach (var grant in grants)
+        foreach (var targetRoleId in synchronizedRoleIds)
         {
-            var record = existing.FirstOrDefault(x => x.PermissionId == grant.PermissionId);
-            if (record is null)
+            foreach (var grant in grants)
             {
-                if (grant.IsGranted)
+                var record = existing.FirstOrDefault(x =>
+                    x.RoleId == targetRoleId && x.PermissionId == grant.PermissionId);
+                if (record is null)
                 {
-                    db.RolePermissions.Add(new Domain.RolePermission
+                    if (grant.IsGranted)
                     {
-                        Id = Guid.NewGuid(),
-                        RoleId = roleId,
-                        PermissionId = grant.PermissionId,
-                        IsGranted = true,
-                        CreatedAt = DateTime.UtcNow
-                    });
+                        db.RolePermissions.Add(new Domain.RolePermission
+                        {
+                            Id = Guid.NewGuid(),
+                            RoleId = targetRoleId,
+                            PermissionId = grant.PermissionId,
+                            IsGranted = true,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
                 }
-            }
-            else
-            {
-                record.IsGranted = grant.IsGranted;
+                else
+                {
+                    record.IsGranted = grant.IsGranted;
+                }
             }
         }
 

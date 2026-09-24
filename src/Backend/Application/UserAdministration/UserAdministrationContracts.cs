@@ -119,6 +119,7 @@ public static class ProfileNaming
             ["ADMIN"] = ("Quản trị hệ thống", "AD"),
             ["BOARD_OF_DIRECTORS"] = ("Ban Giám hiệu", "GH"),
             ["DEPARTMENT_MANAGER"] = ("Trưởng bộ môn", "BM"),
+            ["DEPUTY_DEPARTMENT_MANAGER"] = ("Phó trưởng bộ môn", "PB"),
             ["FACULTY_MANAGER"] = ("Trưởng khoa/viện", "KV"),
             ["LECTURER"] = ("Giảng viên", "GV"),
             ["SURVEY_ADMIN"] = ("Quản trị khảo sát", "QT"),

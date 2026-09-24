@@ -31,6 +31,7 @@ public static class DatabaseSeeder
             (Code: "ADMIN", Name: "Quản trị hệ thống", Description: "Hồ sơ quản trị toàn hệ thống"),
             (Code: "LECTURER", Name: "Giảng viên", Description: "Hồ sơ giảng viên"),
             (Code: "DEPARTMENT_MANAGER", Name: "Trưởng bộ môn", Description: "Hồ sơ quản lý bộ môn"),
+            (Code: "DEPUTY_DEPARTMENT_MANAGER", Name: "Phó trưởng bộ môn", Description: "Hồ sơ phó quản lý bộ môn, có cùng quyền hạn với trưởng bộ môn"),
             (Code: "FACULTY_MANAGER", Name: "Trưởng khoa/viện", Description: "Hồ sơ quản lý khoa/viện, xem mọi bộ môn trong khoa"),
             (Code: "SURVEY_ADMIN", Name: "Quản trị khảo sát", Description: "Hồ sơ quản trị nghiệp vụ khảo sát"),
             (Code: "BOARD_OF_DIRECTORS", Name: "Ban Giám hiệu", Description: "Hồ sơ xem toàn trường, chỉ đọc")
@@ -236,6 +237,13 @@ public static class DatabaseSeeder
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "REPORTS_ACCESS"),
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
+
+            // DEPUTY_DEPARTMENT_MANAGER: cùng quyền và cùng phạm vi với trưởng bộ môn.
+            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "PROGRESS_ACCESS"),
+            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "SURVEY_DASHBOARD_ACCESS"),
+            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "REPORTS_ACCESS"),
+            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
+            (RoleCode: "DEPUTY_DEPARTMENT_MANAGER", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
 
             // FACULTY_MANAGER: cùng bộ module với trưởng bộ môn, khác ở phạm vi dữ liệu.
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "PROGRESS_ACCESS"),

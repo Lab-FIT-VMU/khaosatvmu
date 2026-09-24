@@ -65,6 +65,7 @@ const profileNamingByRole: Record<string, { name: string; suffix: string }> = {
   ADMIN: { name: 'Quản trị hệ thống', suffix: 'AD' },
   BOARD_OF_DIRECTORS: { name: 'Ban Giám hiệu', suffix: 'GH' },
   DEPARTMENT_MANAGER: { name: 'Trưởng bộ môn', suffix: 'BM' },
+  DEPUTY_DEPARTMENT_MANAGER: { name: 'Phó trưởng bộ môn', suffix: 'PB' },
   FACULTY_MANAGER: { name: 'Trưởng khoa/viện', suffix: 'KV' },
   LECTURER: { name: 'Giảng viên', suffix: 'GV' },
   SURVEY_ADMIN: { name: 'Quản trị khảo sát', suffix: 'QT' },
@@ -456,13 +457,14 @@ export function UsersAdminPage() {
       key: 'roles',
       value: roleLabelOf,
       values: rolesOf,
-      // Sáu vai trò cố định của hệ thống, cộng mục cho tài khoản chưa được cấp hồ sơ.
+      // Các vai trò cố định của hệ thống, cộng mục cho tài khoản chưa được cấp hồ sơ.
       options: [
         'Quản trị hệ thống',
         'Quản trị khảo sát',
         'Ban Giám hiệu',
         'Trưởng khoa/viện',
         'Trưởng bộ môn',
+        'Phó trưởng bộ môn',
         'Giảng viên',
         'Chưa có hồ sơ',
       ],
