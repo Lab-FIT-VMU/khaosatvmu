@@ -976,6 +976,8 @@ export const surveyErrorMessages: Record<string, string> = {
     'Kết quả của đợt khảo sát này chưa được phát hành. Quản trị sẽ phát hành sau khi đợt kết thúc.',
   SURVEY_NOT_ENDED:
     'Đợt khảo sát chưa kết thúc nên chưa phát hành kết quả được.',
+  SURVEY_SCORES_OUTDATED:
+    'Còn phiếu chưa được tính điểm. Bấm Cập nhật điểm trước rồi mới phát hành kết quả.',
   SURVEY_RESULTS_PUBLISHED_LOCKED:
     'Đợt đã phát hành kết quả nên không cập nhật điểm được. Thu hồi phát hành rồi mới cập nhật lại.',
   SURVEY_SEMESTER_SURVEY_NAME_REQUIRED: 'Vui lòng đặt tên cho bài khảo sát.',

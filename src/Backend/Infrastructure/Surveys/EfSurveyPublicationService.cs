@@ -81,6 +81,16 @@ public sealed class EfSurveyPublicationService(
                 false, SurveyErrorCodes.SurveyNotEnded, default);
         }
 
+        // Phát hành là chốt bộ điểm cho các đơn vị xem, và sau đó nút Cập nhật điểm bị khoá.
+        // Nên phải chắc bộ điểm đã gồm đủ phiếu: lớp nào chưa từng được tính, hoặc số phiếu
+        // hiện có khác số đã chụp lúc tính (phiếu về sau lần tính, hay phiếu bị huỷ), thì bắt
+        // bấm Cập nhật điểm trước.
+        if (publish && await HasResponsesNotInLatestScoresAsync(semesterSurveyId, cancellationToken))
+        {
+            return new SurveyOperationResult<SurveyPublicationDto>(
+                false, SurveyErrorCodes.ScoresOutdated, default);
+        }
+
         var latest = await LatestAsync(semesterSurveyId, cancellationToken);
         var isPublished = latest?.Kind == ScoringChangeKinds.ResultsPublished;
 
@@ -157,6 +167,22 @@ public sealed class EfSurveyPublicationService(
 
         return published;
     }
+
+    /// <summary>
+    /// Đợt có lớp nào mà bộ điểm đã chốt không còn khớp phiếu thật không. Lần Cập nhật điểm ghi
+    /// cho MỌI lớp của đợt cả thời điểm tính lẫn số phiếu (không đếm phiếu đã huỷ), nên chỉ cần
+    /// so hai thứ đó với hiện tại.
+    /// </summary>
+    private Task<bool> HasResponsesNotInLatestScoresAsync(
+        int semesterSurveyId,
+        CancellationToken cancellationToken) =>
+        db.CourseSectionSurveys.AsNoTracking()
+            .Where(x => x.SemesterSurveyId == semesterSurveyId)
+            .AnyAsync(x => x.ScoreCalculatedAt == null
+                || db.SurveyResponses.Count(response =>
+                    response.CourseSectionSurveyId == x.CourseSectionSurveyId
+                    && !response.IsDeleted) != x.TotalResponseCount,
+                cancellationToken);
 
     /// <summary>Dòng phát hành / thu hồi mới nhất của một đợt; null khi chưa từng bấm.</summary>
     private Task<LatestPublication?> LatestAsync(int semesterSurveyId, CancellationToken cancellationToken) =>

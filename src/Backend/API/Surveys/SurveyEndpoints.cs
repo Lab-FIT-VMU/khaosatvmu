@@ -559,6 +559,7 @@ public static class SurveyEndpoints
             SurveyErrorCodes.ResultsNotPublished => StatusCodes.Status403Forbidden,
             SurveyErrorCodes.SurveyNotEnded => StatusCodes.Status409Conflict,
             SurveyErrorCodes.ResultsPublishedLocked => StatusCodes.Status409Conflict,
+            SurveyErrorCodes.ScoresOutdated => StatusCodes.Status409Conflict,
             SurveyErrorCodes.AnswerScaleNotFound => StatusCodes.Status404NotFound,
             SurveyErrorCodes.TemplateNotFound => StatusCodes.Status404NotFound,
             SurveyErrorCodes.SemesterNotFound => StatusCodes.Status404NotFound,

@@ -1172,6 +1172,12 @@ public static class SurveyErrorCodes
     /// đứng yên. Thu hồi phát hành rồi mới tính lại. Endpoint trả 409.
     /// </summary>
     public const string ResultsPublishedLocked = "SURVEY_RESULTS_PUBLISHED_LOCKED";
+
+    /// <summary>
+    /// Còn phiếu chưa được tính vào lần Cập nhật điểm gần nhất (hoặc đợt chưa từng được tính),
+    /// nên chưa phát hành được. Endpoint trả 409.
+    /// </summary>
+    public const string ScoresOutdated = "SURVEY_SCORES_OUTDATED";
     /// <summary>Tên đợt để trống hoặc chỉ có khoảng trắng.</summary>
     public const string SemesterSurveyNameRequired = "SURVEY_SEMESTER_SURVEY_NAME_REQUIRED";
     /// <summary>Kiểu phạm vi không nằm trong <see cref="SurveyScopeTypes"/>.</summary>
