@@ -37,8 +37,7 @@ internal static class VisibleSurveyScope
     }
 
     /// <summary>
-    /// Thu một truy vấn lớp về phạm vi người xem. Cùng quy tắc với trang Bảng dữ liệu
-    /// khảo sát: lớp thuộc khoa / bộ môn nào là theo học phần của lớp.
+    /// Thu một truy vấn bài khảo sát lớp về phạm vi người xem, theo <see cref="SectionIdsInScope"/>.
     /// </summary>
     public static IQueryable<CourseSectionSurvey> InScope(
         AppDbContext db,
@@ -51,30 +50,76 @@ internal static class VisibleSurveyScope
         // rơi về nhánh không lọc.
         if (scope.SeesNothing) return query.Where(_ => false);
 
+        var sectionIds = SectionIdsInScope(db, scope);
+        return query.Where(x => sectionIds.Contains(x.CourseSectionId));
+    }
+
+    /// <summary>Thu một truy vấn lớp học phần về phạm vi người xem, cùng quy tắc với <see cref="InScope"/>.</summary>
+    public static IQueryable<CourseSection> SectionsInScope(
+        AppDbContext db,
+        IQueryable<CourseSection> query,
+        UserScope scope)
+    {
+        if (scope.SeesEverything) return query;
+        if (scope.SeesNothing) return query.Where(_ => false);
+
+        var sectionIds = SectionIdsInScope(db, scope);
+        return query.Where(x => sectionIds.Contains(x.CourseSectionId));
+    }
+
+    /// <summary>
+    /// Mã các lớp học phần thuộc phạm vi của một người xem bị giới hạn. Đây là MỘT quy tắc
+    /// cho cả hệ thống, trùng khít cách các tab phân tích quy lớp về đơn vị
+    /// (<c>EfSurveyService.LoadAnalysedSectionsAsync</c>):
+    /// <list type="bullet">
+    /// <item>Bộ môn = bộ môn của học phần; học phần không ghi bộ môn thì lấy bộ môn của giảng viên.</item>
+    /// <item>Khoa = khoa của học phần; không ghi thì lấy khoa của bộ môn trên; vẫn không có thì
+    /// lấy khoa của giảng viên.</item>
+    /// <item>Giảng viên chỉ thấy lớp mình dạy.</item>
+    /// </list>
+    /// Trước đây bộ lọc trong cơ sở dữ liệu chỉ nhìn cột của học phần, còn danh sách phân
+    /// tích thì suy tiếp qua bộ môn: học phần thiếu khoa hiện trong danh sách của quản lý
+    /// khoa nhưng mở chi tiết lại báo không tìm thấy.
+    /// </summary>
+    private static IQueryable<int> SectionIdsInScope(AppDbContext db, UserScope scope)
+    {
+        var owned =
+            from section in db.CourseSections
+            join course in db.Courses on section.CourseId equals course.CourseId into courseJoin
+            from course in courseJoin.DefaultIfEmpty()
+            join lecturer in db.Lecturers on section.LecturerId equals (int?)lecturer.LecturerId into lecturerJoin
+            from lecturer in lecturerJoin.DefaultIfEmpty()
+            let departmentId = course != null && course.DepartmentId != null
+                ? course.DepartmentId
+                : lecturer != null ? lecturer.DepartmentId : null
+            join department in db.Departments on departmentId equals (int?)department.DepartmentId into departmentJoin
+            from department in departmentJoin.DefaultIfEmpty()
+            select new
+            {
+                section.CourseSectionId,
+                section.LecturerId,
+                DepartmentId = departmentId,
+                FacultyId = course != null && course.FacultyId != null
+                    ? course.FacultyId
+                    : department != null && department.FacultyId != null
+                        ? department.FacultyId
+                        : lecturer != null ? lecturer.FacultyId : null,
+            };
+
         if (scope.SeesOnlyOwn)
         {
             var lecturerId = scope.LecturerId;
-            return query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && section.LecturerId == lecturerId));
+            return owned.Where(x => x.LecturerId == lecturerId).Select(x => x.CourseSectionId);
         }
 
         if (scope.SeesWholeFaculty)
         {
             var facultyId = scope.FacultyId;
-            return query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.FacultyId == facultyId)));
+            return owned.Where(x => x.FacultyId == facultyId).Select(x => x.CourseSectionId);
         }
 
-        var departmentId = scope.DepartmentId;
-        return query.Where(x => db.CourseSections
-            .Any(section => section.CourseSectionId == x.CourseSectionId
-                            && db.Courses.Any(course =>
-                                course.CourseId == section.CourseId
-                                && course.DepartmentId == departmentId)));
+        var scopeDepartmentId = scope.DepartmentId;
+        return owned.Where(x => x.DepartmentId == scopeDepartmentId).Select(x => x.CourseSectionId);
     }
 
     /// <summary>

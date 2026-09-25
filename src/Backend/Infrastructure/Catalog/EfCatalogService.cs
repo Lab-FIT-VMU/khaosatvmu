@@ -6,6 +6,7 @@ using Application.Catalog;
 using Application.UserAdministration;
 using Domain;
 using Infrastructure.Persistence;
+using Infrastructure.Reports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Catalog;
@@ -823,25 +824,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         }
 
         // Hai mức phạm vi đi theo hai TRỤC khác nhau, không phải cùng một trục xiết
-        // chặt dần. Giảng viên đi theo người dạy; trưởng bộ môn đi theo học phần sở
-        // hữu (câu D-b) nên giảng viên bộ môn A dạy học phần của bộ môn B thì lớp đó
-        // thuộc phạm vi của trưởng bộ môn B. Xem congviec3.md mục H2.
-        if (scope.SeesOnlyOwn)
-        {
-            query = query.Where(x => x.LecturerId == scope.LecturerId);
-        }
-        else if (scope.SeesWholeFaculty)
-        {
-            query = query.Where(x => db.Courses
-                .Any(course => course.CourseId == x.CourseId
-                               && course.FacultyId == scope.FacultyId));
-        }
-        else if (!scope.SeesEverything)
-        {
-            query = query.Where(x => db.Courses
-                .Any(course => course.CourseId == x.CourseId
-                               && course.DepartmentId == scope.DepartmentId));
-        }
+        // chặt dần. Giảng viên đi theo người dạy; quản lý bộ môn / khoa đi theo học phần
+        // sở hữu (câu D-b) nên giảng viên bộ môn A dạy học phần của bộ môn B thì lớp đó
+        // thuộc phạm vi của bộ môn B. Xem congviec3.md mục H2. Cùng một quy tắc với các
+        // trang khảo sát và báo cáo (VisibleSurveyScope).
+        query = VisibleSurveyScope.SectionsInScope(db, query, scope);
 
         var sections = await query.OrderBy(x => x.SectionName).ToListAsync(cancellationToken);
 

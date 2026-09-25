@@ -1085,31 +1085,10 @@ public sealed class EfSurveyService(
                 .Any(s => s.SemesterSurveyId == x.SemesterSurveyId && s.SemesterId == semesterId.Value));
         }
 
-        // Bài khảo sát đi theo lớp, nên thừa hưởng đúng phạm vi của lớp: giảng viên
-        // lấy lớp mình dạy, trưởng bộ môn lấy lớp có học phần thuộc bộ môn mình.
-        // Trang Tiến độ thu phiếu cũng ăn theo hàm này nên lọc một chỗ là xong cả hai.
-        if (scope.SeesOnlyOwn)
-        {
-            query = query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && section.LecturerId == scope.LecturerId));
-        }
-        else if (scope.SeesWholeFaculty)
-        {
-            query = query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.FacultyId == scope.FacultyId)));
-        }
-        else if (!scope.SeesEverything)
-        {
-            query = query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.DepartmentId == scope.DepartmentId)));
-        }
+        // Bài khảo sát đi theo lớp, nên thừa hưởng đúng phạm vi của lớp, theo MỘT quy tắc
+        // chung với các tab phân tích (VisibleSurveyScope). Trang Tiến độ thu phiếu và việc
+        // mở chi tiết một lớp cũng ăn theo hàm này nên lọc một chỗ là xong cả ba.
+        query = VisibleSurveyScope.InScope(db, query, scope);
 
         var sectionSurveys = await query.ToListAsync(cancellationToken);
         if (sectionSurveys.Count == 0)
@@ -2175,39 +2154,14 @@ public sealed class EfSurveyService(
 
         var attentionCheckCount = allQuestions.Count(x => x.AttentionCheckValue != null);
 
-        // Bảng dữ liệu đi theo lớp nên thừa hưởng đúng phạm vi của lớp, giống hệt
-        // GetCourseSectionSurveysAsync: giảng viên chỉ thấy lớp mình dạy, trưởng bộ
-        // môn chỉ thấy lớp có học phần thuộc bộ môn mình. Bảng này không có con số
-        // mặt bằng nào để giữ — dòng "Tổng kết" là tổng của đúng phần đang hiện —
-        // nên lọc thẳng ở đây chứ không phải lọc ở bước cuối như các sheet phân tích.
-        var sectionSurveyQuery = db.CourseSectionSurveys.AsNoTracking()
-            .Where(x => x.SemesterSurveyId == semesterSurveyId);
-        if (scope.SeesNothing)
-        {
-            sectionSurveyQuery = sectionSurveyQuery.Where(_ => false);
-        }
-        else if (scope.SeesOnlyOwn)
-        {
-            sectionSurveyQuery = sectionSurveyQuery.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && section.LecturerId == scope.LecturerId));
-        }
-        else if (scope.SeesWholeFaculty)
-        {
-            sectionSurveyQuery = sectionSurveyQuery.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.FacultyId == scope.FacultyId)));
-        }
-        else if (!scope.SeesEverything)
-        {
-            sectionSurveyQuery = sectionSurveyQuery.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.DepartmentId == scope.DepartmentId)));
-        }
+        // Bảng dữ liệu đi theo lớp nên thừa hưởng đúng phạm vi của lớp, cùng quy tắc với
+        // GetCourseSectionSurveysAsync (VisibleSurveyScope). Bảng này không có con số mặt
+        // bằng nào để giữ — dòng "Tổng kết" là tổng của đúng phần đang hiện — nên lọc thẳng
+        // ở đây chứ không phải lọc ở bước cuối như các sheet phân tích.
+        var sectionSurveyQuery = VisibleSurveyScope.InScope(
+            db,
+            db.CourseSectionSurveys.AsNoTracking().Where(x => x.SemesterSurveyId == semesterSurveyId),
+            scope);
 
         var sectionSurveys = await sectionSurveyQuery.ToListAsync(cancellationToken);
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
@@ -2429,6 +2383,13 @@ public sealed class EfSurveyService(
     private static List<AnalysedSection> VisibleTo(UserScope scope, List<AnalysedSection> sections) =>
         scope.SeesEverything
             ? sections
+            // Giảng viên chỉ lớp mình dạy, đúng như bộ lọc trong cơ sở dữ liệu
+            // (VisibleSurveyScope): trước đây rơi xuống nhánh bộ môn nên danh sách hiện cả
+            // lớp của đồng nghiệp mà mở chi tiết lại không được.
+            : scope.SeesOnlyOwn
+                ? scope.LecturerId is { } lecturerId
+                    ? sections.Where(x => x.LecturerId == lecturerId).ToList()
+                    : []
             : scope.SeesWholeFaculty
                 ? scope.FacultyId is { } facultyId
                     ? sections.Where(x => x.FacultyId == facultyId).ToList()
