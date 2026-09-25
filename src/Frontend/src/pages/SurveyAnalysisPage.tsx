@@ -2354,13 +2354,13 @@ const CourseDiagnosisTab: React.FC<{
         <table className="statistics-table statistics-table--fixed">
           <thead>
             <tr>
-              <th scope="col" style={{ width: '10%' }}>
+              <th scope="col" style={{ width: '8%' }}>
                 {filters.filterHeader('facultyName', 'Khoa / Viện')}
               </th>
-              <th scope="col" style={{ width: '10%' }}>
+              <th scope="col" style={{ width: '19%' }}>
                 {filters.filterHeader('departmentName', 'Bộ môn')}
               </th>
-              <th scope="col" style={{ width: '15%' }}>
+              <th scope="col" style={{ width: '14%' }}>
                 {filters.filterHeader('courseName', 'Học phần')}
               </th>
               <th scope="col" style={{ width: '5%' }}>
@@ -2390,10 +2390,10 @@ const CourseDiagnosisTab: React.FC<{
               <th scope="col" style={{ width: '6%' }}>
                 {filters.filterHeader('averageScore', 'Điểm trung bình')}
               </th>
-              <th scope="col" style={{ width: '4%' }}>
+              <th scope="col" style={{ width: '5%' }}>
                 {filters.filterHeader('minScore', 'Lớp thấp nhất')}
               </th>
-              <th scope="col" style={{ width: '4%' }}>
+              <th scope="col" style={{ width: '5%' }}>
                 {filters.filterHeader('maxScore', 'Lớp cao nhất')}
               </th>
               <th scope="col" style={{ width: '5%' }} title="Điểm lớp cao nhất trừ điểm lớp thấp nhất">
@@ -2401,14 +2401,14 @@ const CourseDiagnosisTab: React.FC<{
               </th>
               <th
                 scope="col"
-                style={{ width: '5%' }}
+                style={{ width: '6%' }}
                 title="Điểm trung bình học phần lệch trung bình toàn trường bao nhiêu lần sai số chuẩn σ/√n"
               >
                 {filters.filterHeader('meanZScore', 'Z-Score so với toàn trường')}
               </th>
               <th
                 scope="col"
-                style={{ width: '5%' }}
+                style={{ width: '6%' }}
                 title="Điểm trung bình học phần lệch trung bình khoa bao nhiêu lần sai số chuẩn σ/√n"
               >
                 {filters.filterHeader('facultyMeanZScore', 'Z-Score so với khoa')}
