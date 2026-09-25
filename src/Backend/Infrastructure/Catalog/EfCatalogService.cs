@@ -7,6 +7,7 @@ using Application.UserAdministration;
 using Domain;
 using Infrastructure.Auth;
 using Infrastructure.Persistence;
+using Infrastructure.Reports;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Catalog;
@@ -825,6 +826,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
 
         // Dùng cùng luật sở hữu hiệu lực với khảo sát và báo cáo. Dữ liệu import thiếu
         // khóa khoa/bộ môn vẫn được suy ra theo học phần, bộ môn rồi giảng viên.
+        // Hai mức phạm vi đi theo hai TRỤC khác nhau, không phải cùng một trục xiết chặt
+        // dần: giảng viên đi theo người dạy, còn quản lý bộ môn / khoa đi theo học phần sở
+        // hữu (câu D-b) nên giảng viên bộ môn A dạy học phần của bộ môn B thì lớp đó thuộc
+        // phạm vi của bộ môn B. Xem congviec3.md mục H2.
         query = AcademicScopeQuery.CourseSectionsInScope(db, query, scope);
 
         var sections = await query.OrderBy(x => x.SectionName).ToListAsync(cancellationToken);

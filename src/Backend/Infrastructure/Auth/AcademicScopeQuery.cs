@@ -21,24 +21,31 @@ internal static class AcademicScopeQuery
 
     private static IQueryable<EffectiveSectionUnit> EffectiveSectionUnits(AppDbContext db) =>
         from section in db.CourseSections.AsNoTracking()
-        join course in db.Courses.AsNoTracking()
-            on section.CourseId equals course.CourseId
+        // LEFT JOIN chứ không INNER: học phần có thể không còn (đã xoá mềm) hoặc lớp trỏ
+        // tới học phần thiếu khóa, khi đó vẫn phải suy được đơn vị qua giảng viên thay vì
+        // làm cả lớp biến mất khỏi phạm vi của người xem.
+        join courseRow in db.Courses.AsNoTracking()
+            on section.CourseId equals courseRow.CourseId into courseRows
+        from course in courseRows.DefaultIfEmpty()
         join lecturerRow in db.Lecturers.AsNoTracking()
             on section.LecturerId equals (int?)lecturerRow.LecturerId into lecturerRows
         from lecturer in lecturerRows.DefaultIfEmpty()
-        let departmentId = course.DepartmentId
-            ?? (lecturer == null ? null : lecturer.DepartmentId)
+        let departmentId = course != null && course.DepartmentId != null
+            ? course.DepartmentId
+            : lecturer == null ? null : lecturer.DepartmentId
         join departmentRow in db.Departments.AsNoTracking()
             on departmentId equals (int?)departmentRow.DepartmentId into departmentRows
         from department in departmentRows.DefaultIfEmpty()
         select new EffectiveSectionUnit
         {
             CourseSectionId = section.CourseSectionId,
-            CourseId = course.CourseId,
+            CourseId = section.CourseId,
             DepartmentId = departmentId,
-            FacultyId = course.FacultyId
-                ?? (department == null ? null : department.FacultyId)
-                ?? (lecturer == null ? null : lecturer.FacultyId),
+            FacultyId = course != null && course.FacultyId != null
+                ? course.FacultyId
+                : department != null && department.FacultyId != null
+                    ? department.FacultyId
+                    : lecturer == null ? null : lecturer.FacultyId,
         };
 
     public static IQueryable<CourseSection> CourseSectionsInScope(

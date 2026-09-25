@@ -1085,7 +1085,9 @@ public sealed class EfSurveyService(
                 .Any(s => s.SemesterSurveyId == x.SemesterSurveyId && s.SemesterId == semesterId.Value));
         }
 
-        // Một nguồn phạm vi dùng chung cho danh sách, chi tiết, tiến độ và báo cáo.
+        // Bài khảo sát đi theo lớp, nên thừa hưởng đúng phạm vi của lớp, theo MỘT quy tắc
+        // chung với các tab phân tích (VisibleSurveyScope). Trang Tiến độ thu phiếu và việc
+        // mở chi tiết một lớp cũng ăn theo hàm này nên lọc một chỗ là xong cả ba.
         query = VisibleSurveyScope.InScope(db, query, scope);
 
         var sectionSurveys = await query.ToListAsync(cancellationToken);
@@ -2152,10 +2154,14 @@ public sealed class EfSurveyService(
 
         var attentionCheckCount = allQuestions.Count(x => x.AttentionCheckValue != null);
 
-        // Bảng dữ liệu dùng đúng cùng nguồn phạm vi với danh sách và trang chi tiết.
-        var sectionSurveyQuery = db.CourseSectionSurveys.AsNoTracking()
-            .Where(x => x.SemesterSurveyId == semesterSurveyId);
-        sectionSurveyQuery = VisibleSurveyScope.InScope(db, sectionSurveyQuery, scope);
+        // Bảng dữ liệu đi theo lớp nên thừa hưởng đúng phạm vi của lớp, cùng quy tắc với
+        // GetCourseSectionSurveysAsync (VisibleSurveyScope). Bảng này không có con số mặt
+        // bằng nào để giữ — dòng "Tổng kết" là tổng của đúng phần đang hiện — nên lọc thẳng
+        // ở đây chứ không phải lọc ở bước cuối như các sheet phân tích.
+        var sectionSurveyQuery = VisibleSurveyScope.InScope(
+            db,
+            db.CourseSectionSurveys.AsNoTracking().Where(x => x.SemesterSurveyId == semesterSurveyId),
+            scope);
 
         var sectionSurveys = await sectionSurveyQuery.ToListAsync(cancellationToken);
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
@@ -2377,6 +2383,13 @@ public sealed class EfSurveyService(
     private static List<AnalysedSection> VisibleTo(UserScope scope, List<AnalysedSection> sections) =>
         scope.SeesEverything
             ? sections
+            // Giảng viên chỉ lớp mình dạy, đúng như bộ lọc trong cơ sở dữ liệu
+            // (VisibleSurveyScope): trước đây rơi xuống nhánh bộ môn nên danh sách hiện cả
+            // lớp của đồng nghiệp mà mở chi tiết lại không được.
+            : scope.SeesOnlyOwn
+                ? scope.LecturerId is { } lecturerId
+                    ? sections.Where(x => x.LecturerId == lecturerId).ToList()
+                    : []
             : scope.SeesWholeFaculty
                 ? scope.FacultyId is { } facultyId
                     ? sections.Where(x => x.FacultyId == facultyId).ToList()
