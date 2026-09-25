@@ -473,8 +473,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.statistics-table .col-metric { width: 78px; min-width: 78px; max-width: 78px; }
-.statistics-table .col-question { width: 56px; min-width: 56px; max-width: 56px; }
+.statistics-table .col-metric { width: 80px; min-width: 80px; max-width: 80px; }
+.statistics-table .col-question { width: 80px; min-width: 80px; max-width: 80px; }
 
 /* Dòng tổng kết ghim đáy bảng. z-index cao hơn ô thân, và ô vừa ghim trái/phải
    vừa ghim đáy thì phải cao hơn nữa để không bị ô thường đè lên. */
