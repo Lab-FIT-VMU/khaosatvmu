@@ -45,6 +45,7 @@ import {
   type ReportResultSortKey,
   type ReportScopeType,
   type ReportWorkspace,
+  type SurveyAnalysisSourceTab,
   type UnidentifiedLecturerRef,
 } from './reportRoute';
 import type {
@@ -366,8 +367,17 @@ const REPORT_ANALYSIS_VIEW_ORDER: readonly ReportAnalysisView[] = ['faculties', 
   nên chỗ cần chỉnh tay cũng khác nhau. Viết thẳng ra từng bảng: dài hơn, nhưng sửa
   một bảng thì chỉ bảng đó đổi.
 
-  Bề rộng mỗi bảng cộng đúng 100%.
+  Cột số chia theo phần trăm, riêng cột Thao tác khai bằng pixel: bảng để
+  `table-layout: fixed` nên bề rộng phần trăm phụ thuộc bề ngang thẻ — trên màn hẹp
+  cột đó co lại dưới 98px của nút "Xem KQ" và nút tràn ra ngoài ô. Khai pixel thì
+  trình duyệt tự bóp các cột phần trăm còn lại cho vừa, bảng vẫn đúng 100% thẻ.
 */
+
+/**
+ * Bề rộng cột "Thao tác" của mọi bảng trong module. Nút "Xem KQ" rộng ~98px;
+ * cộng đệm ngang của ô (6px mỗi bên, xem .reports-rank trong reports.css) là 110px.
+ */
+const actionColumnWidth = '120px';
 
 /** Bảng Theo Khoa/Viện: 1 cột định danh + 8 cột số + Thao tác. */
 const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedUnit>[] => [
@@ -474,7 +484,7 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
     key: 'actions',
     header: 'Thao tác',
     align: 'center' as const,
-    width: '7%',
+    width: actionColumnWidth,
     render: (item: RankedUnit) => (
       <button
         type="button"
@@ -636,7 +646,7 @@ const departmentRankColumns = (onOpenDetail?: (id: number) => void): Column<Rank
     key: 'actions',
     header: 'Thao tác',
     align: 'center' as const,
-    width: '7%',
+    width: actionColumnWidth,
     render: (item: RankedUnit) => (
       <button
         type="button"
@@ -916,7 +926,7 @@ const RankedCourseTable: React.FC<{
       key: 'actions',
       header: 'Thao tác',
       align: 'center',
-      width: '7 %',
+      width: actionColumnWidth,
       render: (item) => (
         <button
           type="button"
@@ -1087,6 +1097,11 @@ export const ReportsOverviewPage: React.FC = () => {
   const [resultSortDirection, setResultSortDirection] = useState<DataTableSortDirection>(
     initialRoute.resultSortDirection ?? 'asc',
   );
+  const [analysisSourceTab, setAnalysisSourceTab] = useState<SurveyAnalysisSourceTab | null>(
+    initialRoute.source === 'survey-analysis'
+      ? initialRoute.sourceTab ?? 'normalization'
+      : null,
+  );
 
   // Kết quả.
   const [results, setResults] = useState<SurveyResultDetail[]>([]);
@@ -1134,12 +1149,15 @@ export const ReportsOverviewPage: React.FC = () => {
       comparisonSemesterId,
       resultSortKey,
       resultSortDirection,
+      source: analysisSourceTab ? 'survey-analysis' : undefined,
+      sourceTab: analysisSourceTab ?? undefined,
       // Chỉ được ghi lên đường dẫn ở trang giảng viên và bài khảo sát, xem buildReportHash.
       unidentifiedLecturer: unidentifiedLecturer ?? undefined,
       ...overrides,
     }),
     [
       analysisView,
+      analysisSourceTab,
       comparisonSemesterId,
       departmentId,
       facultyId,
@@ -1169,15 +1187,21 @@ export const ReportsOverviewPage: React.FC = () => {
       setLecturer(null);
       setLecturerDetail(null);
       setScope(null);
+      setAnalysisSourceTab(null);
       // Đổi tab là rời khỏi chuỗi đi xuống của tab cũ.
       setScopeParents([]);
-      navigateToRoute(routeFromState(nextWorkspace, nextWorkspace === 'details' ? {} : {
+      navigateToRoute(routeFromState(nextWorkspace, nextWorkspace === 'details' ? {
+        source: undefined,
+        sourceTab: undefined,
+      } : {
         facultyId: undefined,
         departmentId: undefined,
         lecturerFilterId: undefined,
         search: undefined,
         resultSortKey: undefined,
         resultSortDirection: undefined,
+        source: undefined,
+        sourceTab: undefined,
       }));
     },
     [navigateToRoute, routeFromState],
@@ -1194,11 +1218,23 @@ export const ReportsOverviewPage: React.FC = () => {
     [navigateToRoute, routeFromState],
   );
 
+  const returnToSurveyAnalysis = useCallback((): boolean => {
+    if (!analysisSourceTab) return false;
+    const query = new URLSearchParams();
+    if (selectedSemesterId) query.set('semester', String(selectedSemesterId));
+    if (semesterSurveyId) query.set('campaign', String(semesterSurveyId));
+    query.set('tab', analysisSourceTab);
+    window.location.hash = `/survey-analysis?${query.toString()}`;
+    return true;
+  }, [analysisSourceTab, selectedSemesterId, semesterSurveyId]);
+
   const backToOverview = useCallback(() => {
+    if (returnToSurveyAnalysis()) return;
     navigateToWorkspace('details');
-  }, [navigateToWorkspace]);
+  }, [navigateToWorkspace, returnToSurveyAnalysis]);
 
   const backToLecturer = useCallback(() => {
+    if (returnToSurveyAnalysis()) return;
     if (lecturer?.lecturerId) {
       navigateToRoute(routeFromState('lecturer', {
         lecturerId: lecturer.lecturerId,
@@ -1209,7 +1245,7 @@ export const ReportsOverviewPage: React.FC = () => {
     } else {
       navigateToWorkspace('details');
     }
-  }, [lecturer?.lecturerId, navigateToRoute, navigateToWorkspace, routeFromState, unidentifiedLecturer]);
+  }, [lecturer?.lecturerId, navigateToRoute, navigateToWorkspace, returnToSurveyAnalysis, routeFromState, unidentifiedLecturer]);
 
   const changeSemester = useCallback(
     (nextSemesterId: number) => {
@@ -1289,6 +1325,9 @@ export const ReportsOverviewPage: React.FC = () => {
       setComparisonSemesterId(route.comparisonSemesterId);
       setResultSortKey(route.resultSortKey);
       setResultSortDirection(route.resultSortDirection ?? 'asc');
+      setAnalysisSourceTab(route.source === 'survey-analysis'
+        ? route.sourceTab ?? 'normalization'
+        : null);
       // Trang chi tiết theo phạm vi không nằm trong thanh tab, nên tách hẳn ra
       // khỏi `workspace`: đóng nó lại là quay về đúng bảng xếp hạng đã mở nó.
       setScope(route.screen === 'scope' && route.scopeType && route.scopeId
@@ -2076,8 +2115,9 @@ export const ReportsOverviewPage: React.FC = () => {
   }, [navigateToRoute, scope, scopeDisplayName, selectedSemesterId, semesterSurveyId]);
 
   const backFromScope = useCallback(() => {
+    if (returnToSurveyAnalysis()) return;
     navigateToWorkspace(scopeParentWorkspace(scope?.type));
-  }, [navigateToWorkspace, scope?.type]);
+  }, [navigateToWorkspace, returnToSurveyAnalysis, scope?.type]);
 
   /*
     Đường dẫn điều hướng in ở thanh trên cùng: mục trên thanh điều hướng do thanh tự
@@ -2334,7 +2374,7 @@ export const ReportsOverviewPage: React.FC = () => {
       key: 'actions',
       header: 'Thao tác',
       align: 'center',
-      width: '7%',
+      width: actionColumnWidth,
       render: (item) => (
         <button
           type="button"
@@ -2455,7 +2495,7 @@ export const ReportsOverviewPage: React.FC = () => {
       key: 'actions',
       header: 'Thao tác',
       align: 'center',
-      width: '11%',
+      width: actionColumnWidth,
       render: (item) => (
         <button
           type="button"

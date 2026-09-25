@@ -1144,6 +1144,17 @@
 }
 
 /*
+  Đệm ngang 6px thay vì 10px: ba bảng này chia bề rộng theo phần trăm trong khung
+  nửa màn hình, mà cột "Thao tác" phải đủ chỗ cho nút "Xem KQ" (~98px). Bớt 4px
+  mỗi bên ô nhường được 80-104px cho cả bảng mà không phải nới bảng ra và kéo thêm
+  thanh cuộn ngang. Xem chú thích ở khai báo cột trong ReportsOverviewPage.tsx.
+*/
+.reports-rank .catalog-table td {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+/*
   Lưới kẻ chạy sát mép thẻ và hàng cuối cũng có nét dưới, cùng kiểu với bảng ở
   trang Bảng dữ liệu khảo sát. Bảng danh mục mặc định bỏ nét phải của cột cuối và
   nét dưới của hàng cuối — hợp lý khi bảng chiếm trọn chiều ngang trang, nhưng đặt

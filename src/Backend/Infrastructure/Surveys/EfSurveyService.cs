@@ -1085,31 +1085,8 @@ public sealed class EfSurveyService(
                 .Any(s => s.SemesterSurveyId == x.SemesterSurveyId && s.SemesterId == semesterId.Value));
         }
 
-        // Bài khảo sát đi theo lớp, nên thừa hưởng đúng phạm vi của lớp: giảng viên
-        // lấy lớp mình dạy, trưởng bộ môn lấy lớp có học phần thuộc bộ môn mình.
-        // Trang Tiến độ thu phiếu cũng ăn theo hàm này nên lọc một chỗ là xong cả hai.
-        if (scope.SeesOnlyOwn)
-        {
-            query = query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && section.LecturerId == scope.LecturerId));
-        }
-        else if (scope.SeesWholeFaculty)
-        {
-            query = query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.FacultyId == scope.FacultyId)));
-        }
-        else if (!scope.SeesEverything)
-        {
-            query = query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.DepartmentId == scope.DepartmentId)));
-        }
+        // Một nguồn phạm vi dùng chung cho danh sách, chi tiết, tiến độ và báo cáo.
+        query = VisibleSurveyScope.InScope(db, query, scope);
 
         var sectionSurveys = await query.ToListAsync(cancellationToken);
         if (sectionSurveys.Count == 0)
@@ -2175,39 +2152,10 @@ public sealed class EfSurveyService(
 
         var attentionCheckCount = allQuestions.Count(x => x.AttentionCheckValue != null);
 
-        // Bảng dữ liệu đi theo lớp nên thừa hưởng đúng phạm vi của lớp, giống hệt
-        // GetCourseSectionSurveysAsync: giảng viên chỉ thấy lớp mình dạy, trưởng bộ
-        // môn chỉ thấy lớp có học phần thuộc bộ môn mình. Bảng này không có con số
-        // mặt bằng nào để giữ — dòng "Tổng kết" là tổng của đúng phần đang hiện —
-        // nên lọc thẳng ở đây chứ không phải lọc ở bước cuối như các sheet phân tích.
+        // Bảng dữ liệu dùng đúng cùng nguồn phạm vi với danh sách và trang chi tiết.
         var sectionSurveyQuery = db.CourseSectionSurveys.AsNoTracking()
             .Where(x => x.SemesterSurveyId == semesterSurveyId);
-        if (scope.SeesNothing)
-        {
-            sectionSurveyQuery = sectionSurveyQuery.Where(_ => false);
-        }
-        else if (scope.SeesOnlyOwn)
-        {
-            sectionSurveyQuery = sectionSurveyQuery.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && section.LecturerId == scope.LecturerId));
-        }
-        else if (scope.SeesWholeFaculty)
-        {
-            sectionSurveyQuery = sectionSurveyQuery.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.FacultyId == scope.FacultyId)));
-        }
-        else if (!scope.SeesEverything)
-        {
-            sectionSurveyQuery = sectionSurveyQuery.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.DepartmentId == scope.DepartmentId)));
-        }
+        sectionSurveyQuery = VisibleSurveyScope.InScope(db, sectionSurveyQuery, scope);
 
         var sectionSurveys = await sectionSurveyQuery.ToListAsync(cancellationToken);
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();

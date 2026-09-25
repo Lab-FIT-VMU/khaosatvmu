@@ -175,6 +175,12 @@ hình đó đều cần đọc danh sách giảng viên để đổ vào ô ch�
 tài nguyên: `GET /api/catalog/lecturers` dùng `LecturersRead`, nhưng `POST` thì phải có
 `LECTURERS_ACCESS`.
 
+Cùng luật đó: `PERMISSION_COURSES_READ` nhận thêm `REPORTS_ACCESS` (trang Thống kê & Báo cáo đọc
+danh mục học phần để đổ bộ lọc, xem `ReportsOverviewPage.tsx`), và `PERMISSION_MAJORS_READ` nhận
+`COHORT_MAJORS_ACCESS` (trang Ngành theo khoá học nhận danh sách ngành qua prop `majors`). Bỏ sót
+một màn hình ở đây thì màn hình vẫn mở được nhưng lời gọi nạp danh mục trả 403 — mà vì frontend
+gọi bốn danh mục trong cùng một `Promise.all`, một lời gọi hỏng làm trắng cả bộ lọc.
+
 ---
 
 ## 4. Ma trận vai trò × quyền: seed nói một đằng, DB đang một nẻo

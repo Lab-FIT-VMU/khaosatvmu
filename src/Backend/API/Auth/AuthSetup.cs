@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace API.Auth;
@@ -23,6 +24,77 @@ public sealed record GoogleAuthConfiguration(
 
 public static class AuthSetup
 {
+    /// <summary>
+    /// Đăng ký toàn bộ policy phân quyền. Tách khỏi Program.cs để bài kiểm thử đọc được ma
+    /// trận quyền, vì lỗi ở đây rất khó thấy khi chạy: policy đọc thiếu một quyền thì màn hình
+    /// tương ứng chỉ nhận 403 ở một lời gọi giữa trang, không phải ở lời gọi mở trang.
+    /// </summary>
+    public static IServiceCollection AddModuleAuthorizationPolicies(this IServiceCollection services)
+    {
+        services.AddAuthorization(options =>
+        {
+            AddPermissionPolicy(AuthPolicies.UserAdminAccess, "USER_ADMIN_ACCESS");
+            AddPermissionPolicy(AuthPolicies.FacultiesAccess, "FACULTIES_ACCESS");
+            AddPermissionPolicy(AuthPolicies.DepartmentsAccess, "DEPARTMENTS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.LecturersAccess, "LECTURERS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.MajorsAccess, "MAJORS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.CoursesAccess, "COURSES_ACCESS");
+            AddPermissionPolicy(AuthPolicies.CourseSectionsAccess, "COURSE_SECTIONS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.CourseQuestionSetsAccess, "COURSE_QUESTION_SETS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.CourseCampaignsAccess, "COURSE_CAMPAIGNS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.ProgramCampaignsAccess, "PROGRAM_CAMPAIGNS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.ProgramCriteriaAccess, "PROGRAM_CRITERIA_ACCESS");
+            AddPermissionPolicy(AuthPolicies.ProgressAccess, "PROGRESS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.ReportsAccess, "REPORTS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.SurveyDashboardAccess, "SURVEY_DASHBOARD_ACCESS");
+            AddPermissionPolicy(AuthPolicies.SurveyStatisticsAccess, "SURVEY_STATISTICS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.SurveyAnalysisAccess, "SURVEY_ANALYSIS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.GraduationAnalyticsAccess, "GRADUATION_ANALYTICS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.GraduationUploadAccess, "GRADUATION_UPLOAD_ACCESS");
+            AddPermissionPolicy(AuthPolicies.CohortMajorsAccess, "COHORT_MAJORS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.OpenCommentSentimentReview, "OPEN_COMMENT_SENTIMENT_REVIEW");
+            AddPermissionPolicy(AuthPolicies.OpenCommentModelAdmin, "OPEN_COMMENT_MODEL_ADMIN");
+            AddAnyPermissionPolicy(AuthPolicies.ReportingRead,
+                "REPORTS_ACCESS", "SURVEY_DASHBOARD_ACCESS", "SURVEY_STATISTICS_ACCESS",
+                "SURVEY_ANALYSIS_ACCESS");
+            options.AddPolicy(AuthPolicies.SurveyOperationalRead, policy =>
+                policy.RequireAuthenticatedUser().AddRequirements(new AnyPermissionRequirement(
+                    "PROGRESS_ACCESS",
+                    "REPORTS_ACCESS",
+                    "SURVEY_DASHBOARD_ACCESS",
+                    "SURVEY_STATISTICS_ACCESS",
+                    "SURVEY_ANALYSIS_ACCESS",
+                    "COURSE_CAMPAIGNS_ACCESS")));
+
+            // Nhóm "một trong nhiều quyền": nhiều màn hình đọc chung một danh mục để đổ vào ô
+            // chọn, nên policy đọc phải nhận quyền mở của TẤT CẢ các màn hình đó — không thì
+            // màn hình bị bỏ sót vẫn mở được nhưng lời gọi nạp danh mục trả 403. Ghi thì vẫn
+            // đòi đúng quyền của tài nguyên, gắn ở từng endpoint POST/PUT/DELETE.
+            AddAnyPermissionPolicy(AuthPolicies.FacultiesRead,
+                "FACULTIES_ACCESS", "DEPARTMENTS_ACCESS", "LECTURERS_ACCESS", "MAJORS_ACCESS",
+                "COURSES_ACCESS", "COURSE_SECTIONS_ACCESS", "REPORTS_ACCESS");
+            AddAnyPermissionPolicy(AuthPolicies.DepartmentsRead,
+                "FACULTIES_ACCESS", "DEPARTMENTS_ACCESS", "LECTURERS_ACCESS", "COURSES_ACCESS",
+                "COURSE_SECTIONS_ACCESS", "REPORTS_ACCESS");
+            AddAnyPermissionPolicy(AuthPolicies.LecturersRead,
+                "DEPARTMENTS_ACCESS", "LECTURERS_ACCESS", "COURSE_SECTIONS_ACCESS", "REPORTS_ACCESS");
+            AddAnyPermissionPolicy(AuthPolicies.MajorsRead,
+                "FACULTIES_ACCESS", "MAJORS_ACCESS", "COHORT_MAJORS_ACCESS");
+            AddAnyPermissionPolicy(AuthPolicies.CoursesRead,
+                "DEPARTMENTS_ACCESS", "COURSES_ACCESS", "COURSE_SECTIONS_ACCESS", "REPORTS_ACCESS");
+
+            void AddPermissionPolicy(string policyName, string permissionCode) =>
+                options.AddPolicy(policyName, policy =>
+                    policy.RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(permissionCode)));
+
+            void AddAnyPermissionPolicy(string policyName, params string[] permissionCodes) =>
+                options.AddPolicy(policyName, policy =>
+                    policy.RequireAuthenticatedUser().AddRequirements(new AnyPermissionRequirement(permissionCodes)));
+        });
+
+        return services;
+    }
+
     public static IServiceCollection AddApplicationAuthentication(
         this IServiceCollection services,
         IConfiguration configuration,

@@ -119,61 +119,8 @@ builder.Services.AddAntiforgery(options =>
         : CookieSecurePolicy.Always;
 });
 
-builder.Services.AddAuthorization(options =>
-{
-    AddPermissionPolicy(AuthPolicies.UserAdminAccess, "USER_ADMIN_ACCESS");
-    AddPermissionPolicy(AuthPolicies.FacultiesAccess, "FACULTIES_ACCESS");
-    AddPermissionPolicy(AuthPolicies.DepartmentsAccess, "DEPARTMENTS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.LecturersAccess, "LECTURERS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.MajorsAccess, "MAJORS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.CoursesAccess, "COURSES_ACCESS");
-    AddPermissionPolicy(AuthPolicies.CourseSectionsAccess, "COURSE_SECTIONS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.CourseQuestionSetsAccess, "COURSE_QUESTION_SETS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.CourseCampaignsAccess, "COURSE_CAMPAIGNS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.ProgramCampaignsAccess, "PROGRAM_CAMPAIGNS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.ProgramCriteriaAccess, "PROGRAM_CRITERIA_ACCESS");
-    AddPermissionPolicy(AuthPolicies.ProgressAccess, "PROGRESS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.ReportsAccess, "REPORTS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.SurveyDashboardAccess, "SURVEY_DASHBOARD_ACCESS");
-    AddPermissionPolicy(AuthPolicies.SurveyStatisticsAccess, "SURVEY_STATISTICS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.SurveyAnalysisAccess, "SURVEY_ANALYSIS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.GraduationAnalyticsAccess, "GRADUATION_ANALYTICS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.GraduationUploadAccess, "GRADUATION_UPLOAD_ACCESS");
-    AddPermissionPolicy(AuthPolicies.CohortMajorsAccess, "COHORT_MAJORS_ACCESS");
-    AddPermissionPolicy(AuthPolicies.OpenCommentSentimentReview, "OPEN_COMMENT_SENTIMENT_REVIEW");
-    AddPermissionPolicy(AuthPolicies.OpenCommentModelAdmin, "OPEN_COMMENT_MODEL_ADMIN");
-    AddAnyPermissionPolicy(AuthPolicies.ReportingRead,
-        "REPORTS_ACCESS", "SURVEY_DASHBOARD_ACCESS", "SURVEY_STATISTICS_ACCESS",
-        "SURVEY_ANALYSIS_ACCESS");
-    options.AddPolicy(AuthPolicies.SurveyOperationalRead, policy =>
-        policy.RequireAuthenticatedUser().AddRequirements(new AnyPermissionRequirement(
-            "PROGRESS_ACCESS",
-            "REPORTS_ACCESS",
-            "SURVEY_DASHBOARD_ACCESS",
-            "SURVEY_STATISTICS_ACCESS",
-            "SURVEY_ANALYSIS_ACCESS",
-            "COURSE_CAMPAIGNS_ACCESS")));
-    AddAnyPermissionPolicy(AuthPolicies.FacultiesRead,
-        "FACULTIES_ACCESS", "DEPARTMENTS_ACCESS", "LECTURERS_ACCESS", "MAJORS_ACCESS",
-        "COURSES_ACCESS", "COURSE_SECTIONS_ACCESS", "REPORTS_ACCESS");
-    AddAnyPermissionPolicy(AuthPolicies.DepartmentsRead,
-        "FACULTIES_ACCESS", "DEPARTMENTS_ACCESS", "LECTURERS_ACCESS", "COURSES_ACCESS",
-        "COURSE_SECTIONS_ACCESS", "REPORTS_ACCESS");
-    AddAnyPermissionPolicy(AuthPolicies.LecturersRead,
-        "DEPARTMENTS_ACCESS", "LECTURERS_ACCESS", "COURSE_SECTIONS_ACCESS", "REPORTS_ACCESS");
-    AddAnyPermissionPolicy(AuthPolicies.MajorsRead,
-        "FACULTIES_ACCESS", "MAJORS_ACCESS");
-    AddAnyPermissionPolicy(AuthPolicies.CoursesRead,
-        "DEPARTMENTS_ACCESS", "COURSES_ACCESS", "COURSE_SECTIONS_ACCESS");
-
-    void AddPermissionPolicy(string policyName, string permissionCode) =>
-        options.AddPolicy(policyName, policy =>
-            policy.RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(permissionCode)));
-
-    void AddAnyPermissionPolicy(string policyName, params string[] permissionCodes) =>
-        options.AddPolicy(policyName, policy =>
-            policy.RequireAuthenticatedUser().AddRequirements(new AnyPermissionRequirement(permissionCodes)));
-});
+// Ma trận quyền nằm ở AuthSetup.AddModuleAuthorizationPolicies để bài kiểm thử đọc được.
+builder.Services.AddModuleAuthorizationPolicies();
 
 builder.Services.AddHttpClient<IAgentMemoryService, AgentMemoryService>();
 builder.Services.AddScoped<IAuthService, EfAuthService>();

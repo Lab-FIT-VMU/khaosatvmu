@@ -259,10 +259,27 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       },
       {
         key: 'courseName',
-        header: 'Lớp học phần',
+        header: 'Học phần',
         width: '150px',
-        sortValue: (item) => `${item.courseCode} ${item.courseName} ${item.sectionName}`,
-        filterValue: (item) => `${item.courseCode} - ${item.courseName} (${item.sectionName})`,
+        sortValue: (item) => `${item.courseCode} ${item.courseName}`,
+        filterValue: (item) => `${item.courseCode} - ${item.courseName}`,
+        render: (item) => (
+          <span className="operations-primary-text" style={{ display: 'block', lineHeight: 1.35 }}>
+            {item.courseName}
+          </span>
+        ),
+      },
+      {
+        // Tách khỏi cột học phần: một học phần có nhiều nhóm lớp, và tên nhóm mới là
+        // thứ mở được trang chi tiết — trước đây hai giá trị nằm chung một ô nên
+        // không lọc/sắp xếp riêng theo nhóm lớp được.
+        // Bề rộng vừa đủ 3 ký tự kiểu "N02" (26,9px) cộng đệm ngang của ô; mọi nhóm
+        // lớp trong CSDL đều đúng 3 ký tự nên không có giá trị nào bị cắt.
+        key: 'sectionName',
+        header: 'Lớp',
+        width: '52px',
+        sortValue: (item) => item.sectionName,
+        filterValue: (item) => item.sectionName,
         render: (item) => (
           onOpenSurvey ? (
             <button
@@ -282,15 +299,13 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
               }}
             >
               <strong style={{ display: 'block', lineHeight: 1.35, color: '#0788b8', fontWeight: 650 }}>
-                {item.courseName} {item.sectionName}
+                {item.sectionName}
               </strong>
             </button>
           ) : (
-            <div>
-              <strong className="operations-primary-text" style={{ display: 'block', lineHeight: 1.35 }}>
-                {item.courseName} {item.sectionName}
-              </strong>
-            </div>
+            <strong className="operations-primary-text" style={{ display: 'block', lineHeight: 1.35 }}>
+              {item.sectionName}
+            </strong>
           )
         ),
       },
@@ -346,19 +361,6 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
 
           return <span style={{ fontWeight: 600 }}>{item.lecturerName}</span>;
         },
-      },
-      {
-        key: 'score',
-        header: 'Điểm của phiếu khảo sát',
-        width: '90px',
-        align: 'right',
-        numeric: true,
-        sortValue: (item) => item.score,
-        render: (item) => (
-          <span style={{ fontWeight: 650, color: item.score >= 4 ? '#0f6b47' : item.score >= 3 ? '#b54708' : '#b42318' }}>
-            {item.score > 0 ? formatDecimal(item.score, 3) : '—'}
-          </span>
-        ),
       },
       {
         key: 'sentiment',
@@ -435,22 +437,12 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         { key: 'departmentName', header: 'Bộ môn', width: 22 },
         { key: 'courseCode', header: 'Mã học phần', width: 14, align: 'left' as const },
         { key: 'courseName', header: 'Tên học phần', width: 28 },
-        { key: 'sectionName', header: 'Nhóm lớp', width: 14, align: 'left' as const },
+        { key: 'sectionName', header: 'Lớp', width: 14, align: 'left' as const },
         {
           key: 'lecturerName',
           header: 'Giảng viên',
           width: 24,
           format: (val: unknown) => (val ? String(val) : 'Chưa phân công'),
-        },
-        {
-          key: 'score',
-          header: 'Điểm của phiếu khảo sát',
-          width: 18,
-          type: 'number' as const,
-          align: 'right' as const,
-          // Trang bảng in "—" khi phiếu chưa có điểm; in ra 0 thì người đọc tệp hiểu
-          // thành phiếu bị chấm 0 điểm.
-          format: (val: unknown) => (Number(val) > 0 ? formatDecimal(Number(val), 3) : '—'),
         },
         { key: 'isValid', header: 'Tính hợp lệ', width: 14, align: 'left' as const, format: (val: unknown) => (val ? 'Hợp lệ' : 'Bị bộ lọc loại') },
         { key: 'sentimentLabel', header: 'Phân loại cảm xúc', width: 18, align: 'left' as const, format: (val: unknown) => (val ? String(val) : 'Chưa phân tích') },

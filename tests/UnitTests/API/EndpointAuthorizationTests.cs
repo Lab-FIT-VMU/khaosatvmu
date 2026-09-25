@@ -109,6 +109,37 @@ public sealed class EndpointAuthorizationTests
             .Should().Contain(data => data.Policy == AuthPolicies.GraduationAnalyticsAccess);
     }
 
+    /// <summary>
+    /// Policy đọc một danh mục dùng chung phải nhận quyền mở của MỌI màn hình đọc danh mục đó.
+    /// Bài này ghim đúng lỗi đã gặp ở trang Thống kê &amp; Báo cáo: trưởng khoa chỉ có
+    /// <c>REPORTS_ACCESS</c> nạp bộ lọc thì <c>/api/catalog/courses</c> trả 403 vì
+    /// <c>CoursesRead</c> thiếu <c>REPORTS_ACCESS</c>, và cả bốn danh mục trắng trơn vì chúng
+    /// nằm chung một <c>Promise.all</c> ở frontend.
+    /// </summary>
+    [Theory]
+    [InlineData(AuthPolicies.FacultiesRead, "REPORTS_ACCESS")]
+    [InlineData(AuthPolicies.DepartmentsRead, "REPORTS_ACCESS")]
+    [InlineData(AuthPolicies.LecturersRead, "REPORTS_ACCESS")]
+    [InlineData(AuthPolicies.CoursesRead, "REPORTS_ACCESS")]
+    [InlineData(AuthPolicies.MajorsRead, "COHORT_MAJORS_ACCESS")]
+    public async Task CatalogReadPolicies_AdmitThePermissionOfEveryScreenThatReadsTheList(
+        string policyName,
+        string requiredPermission)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddModuleAuthorizationPolicies();
+        var app = builder.Build();
+        var policyProvider = app.Services.GetRequiredService<IAuthorizationPolicyProvider>();
+
+        var policy = await policyProvider.GetPolicyAsync(policyName);
+
+        policy.Should().NotBeNull();
+        policy!.Requirements
+            .OfType<AnyPermissionRequirement>()
+            .SelectMany(requirement => requirement.PermissionCodes)
+            .Should().Contain(requiredPermission);
+    }
+
     [Theory]
     [InlineData("/api/catalog/faculties", "GET", AuthPolicies.FacultiesRead)]
     [InlineData("/api/catalog/faculties", "POST", AuthPolicies.FacultiesAccess)]

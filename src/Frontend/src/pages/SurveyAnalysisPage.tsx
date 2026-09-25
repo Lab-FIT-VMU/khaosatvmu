@@ -790,11 +790,22 @@ export const SurveyAnalysisPage: React.FC = () => {
   const openScopeDetail = useCallback((target: AnalysisScopeTarget) => {
     if (!semesterSurveyId) return;
     window.location.hash = `/reports/scope/${target.type}/${target.id}`
-      + `?semester=${semesterId}&campaign=${semesterSurveyId}`;
-  }, [semesterId, semesterSurveyId]);
+      + `?semester=${semesterId}&campaign=${semesterSurveyId}`
+      + `&from=survey-analysis&fromTab=${tab}`;
+  }, [semesterId, semesterSurveyId, tab]);
+
+  const openSurveyDetail = useCallback((courseSectionSurveyId: number) => {
+    if (!semesterSurveyId) return;
+    window.location.hash = `/reports/surveys/${courseSectionSurveyId}`
+      + `?semester=${semesterId}&campaign=${semesterSurveyId}`
+      + `&from=survey-analysis&fromTab=${tab}`;
+  }, [semesterId, semesterSurveyId, tab]);
 
   useEffect(() => {
-    const handleRouteChange = () => applyRoute(parseAnalysisRoute());
+    const handleRouteChange = () => {
+      if (!window.location.hash.replace(/^#\/?/, '').startsWith('survey-analysis')) return;
+      applyRoute(parseAnalysisRoute());
+    };
     window.addEventListener('popstate', handleRouteChange);
     window.addEventListener('hashchange', handleRouteChange);
     return () => {
@@ -1590,10 +1601,7 @@ export const SurveyAnalysisPage: React.FC = () => {
           selectedQuestionSectionId={questionSectionId}
           note={tabNote}
           onVisibleRowsChange={reportVisibleRows.normalizationSections}
-          onOpenSurvey={(courseSectionSurveyId) => {
-            window.location.hash = `/reports/surveys/${courseSectionSurveyId}`
-              + `?semester=${semesterId}&campaign=${semesterSurveyId}`;
-          }}
+          onOpenSurvey={openSurveyDetail}
         />
       ) : tab === 'departments' ? (
         <DepartmentTab
@@ -1627,10 +1635,7 @@ export const SurveyAnalysisPage: React.FC = () => {
               lecturerId: id ?? undefined,
             });
           }}
-          onOpenSurvey={(courseSectionSurveyId) => {
-            window.location.hash = `/reports/surveys/${courseSectionSurveyId}`
-              + `?semester=${semesterId}&campaign=${semesterSurveyId}`;
-          }}
+          onOpenSurvey={openSurveyDetail}
         />
       )}
     </div>

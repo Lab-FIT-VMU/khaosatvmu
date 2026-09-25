@@ -1,5 +1,11 @@
 export type ReportWorkspace = 'overview' | 'details' | 'faculties' | 'departments' | 'courses' | 'comments';
 export type ReportAnalysisView = 'faculties' | 'quality' | 'criteria';
+export type SurveyAnalysisSourceTab =
+  | 'normalization'
+  | 'normalizationSections'
+  | 'departments'
+  | 'courses'
+  | 'lecturer';
 /**
  * Ba cấp của trang chi tiết mở từ nút "Xem KQ" trên các bảng xếp hạng. Cấp trên
  * là phạm vi đang xem, cấp dưới là danh sách nằm trong phạm vi đó:
@@ -60,7 +66,17 @@ export interface ReportRouteState {
   comparisonSemesterId?: number;
   resultSortKey?: ReportResultSortKey;
   resultSortDirection?: 'asc' | 'desc';
+  source?: 'survey-analysis';
+  sourceTab?: SurveyAnalysisSourceTab;
 }
+
+const surveyAnalysisSourceTabs: readonly SurveyAnalysisSourceTab[] = [
+  'normalization',
+  'normalizationSections',
+  'departments',
+  'courses',
+  'lecturer',
+];
 
 const positiveInt = (value: string | null | undefined): number | undefined => {
   if (!value) return undefined;
@@ -131,6 +147,11 @@ export const parseReportRoute = (hash = window.location.hash): ReportRouteState 
     analysis === 'quality' || analysis === 'faculties' || analysis === 'criteria' ? analysis : undefined;
   const sort = query.get('sort');
   const resultSortKey = reportResultSortKeys.find((key) => key === sort);
+  const source = query.get('from') === 'survey-analysis' ? 'survey-analysis' : undefined;
+  const rawSourceTab = query.get('fromTab');
+  const sourceTab = source && surveyAnalysisSourceTabs.includes(rawSourceTab as SurveyAnalysisSourceTab)
+    ? rawSourceTab as SurveyAnalysisSourceTab
+    : undefined;
 
   return {
     screen,
@@ -150,6 +171,8 @@ export const parseReportRoute = (hash = window.location.hash): ReportRouteState 
     comparisonSemesterId: positiveInt(query.get('compare')),
     resultSortKey,
     resultSortDirection: resultSortKey && query.get('direction') === 'desc' ? 'desc' : 'asc',
+    source,
+    sourceTab,
   };
 };
 
@@ -191,6 +214,10 @@ export const buildReportHash = (route: ReportRouteState): string => {
   if (route.resultSortKey) {
     query.set('sort', route.resultSortKey);
     if (route.resultSortDirection === 'desc') query.set('direction', 'desc');
+  }
+  if (route.source === 'survey-analysis') {
+    query.set('from', route.source);
+    if (route.sourceTab) query.set('fromTab', route.sourceTab);
   }
 
   const queryString = query.toString();

@@ -1,6 +1,7 @@
 using Application.Auth;
 using Application.Surveys;
 using Domain;
+using Infrastructure.Auth;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,39 +44,8 @@ internal static class VisibleSurveyScope
     public static IQueryable<CourseSectionSurvey> InScope(
         AppDbContext db,
         IQueryable<CourseSectionSurvey> query,
-        UserScope scope)
-    {
-        if (scope.SeesEverything) return query;
-
-        // Bị giới hạn mà không biết giới hạn vào đâu thì không thấy gì, tuyệt đối không
-        // rơi về nhánh không lọc.
-        if (scope.SeesNothing) return query.Where(_ => false);
-
-        if (scope.SeesOnlyOwn)
-        {
-            var lecturerId = scope.LecturerId;
-            return query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && section.LecturerId == lecturerId));
-        }
-
-        if (scope.SeesWholeFaculty)
-        {
-            var facultyId = scope.FacultyId;
-            return query.Where(x => db.CourseSections
-                .Any(section => section.CourseSectionId == x.CourseSectionId
-                                && db.Courses.Any(course =>
-                                    course.CourseId == section.CourseId
-                                    && course.FacultyId == facultyId)));
-        }
-
-        var departmentId = scope.DepartmentId;
-        return query.Where(x => db.CourseSections
-            .Any(section => section.CourseSectionId == x.CourseSectionId
-                            && db.Courses.Any(course =>
-                                course.CourseId == section.CourseId
-                                && course.DepartmentId == departmentId)));
-    }
+        UserScope scope) =>
+        AcademicScopeQuery.SectionSurveysInScope(db, query, scope);
 
     /// <summary>
     /// Nhãn phạm vi để ghép vào khoá cache: hai người khác phạm vi, hoặc khác tập đợt đã

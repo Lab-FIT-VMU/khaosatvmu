@@ -5,6 +5,7 @@ using Application.Auth;
 using Application.Catalog;
 using Application.UserAdministration;
 using Domain;
+using Infrastructure.Auth;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -822,26 +823,9 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             query = query.Where(x => x.SemesterId == id);
         }
 
-        // Hai mức phạm vi đi theo hai TRỤC khác nhau, không phải cùng một trục xiết
-        // chặt dần. Giảng viên đi theo người dạy; trưởng bộ môn đi theo học phần sở
-        // hữu (câu D-b) nên giảng viên bộ môn A dạy học phần của bộ môn B thì lớp đó
-        // thuộc phạm vi của trưởng bộ môn B. Xem congviec3.md mục H2.
-        if (scope.SeesOnlyOwn)
-        {
-            query = query.Where(x => x.LecturerId == scope.LecturerId);
-        }
-        else if (scope.SeesWholeFaculty)
-        {
-            query = query.Where(x => db.Courses
-                .Any(course => course.CourseId == x.CourseId
-                               && course.FacultyId == scope.FacultyId));
-        }
-        else if (!scope.SeesEverything)
-        {
-            query = query.Where(x => db.Courses
-                .Any(course => course.CourseId == x.CourseId
-                               && course.DepartmentId == scope.DepartmentId));
-        }
+        // Dùng cùng luật sở hữu hiệu lực với khảo sát và báo cáo. Dữ liệu import thiếu
+        // khóa khoa/bộ môn vẫn được suy ra theo học phần, bộ môn rồi giảng viên.
+        query = AcademicScopeQuery.CourseSectionsInScope(db, query, scope);
 
         var sections = await query.OrderBy(x => x.SectionName).ToListAsync(cancellationToken);
 
@@ -1365,12 +1349,19 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return new UnidentifiedLecturerReportDto(0, 0, [], []);
         }
 
+        var sectionQuery = db.CourseSections.AsNoTracking()
+            .Where(section => section.LecturerId == null
+                && section.UnidentifiedLecturerName != null
+                && section.UnidentifiedLecturerName != string.Empty);
+        if (semesterId is { } filteredSemesterId)
+        {
+            sectionQuery = sectionQuery.Where(x => x.SemesterId == filteredSemesterId);
+        }
+        sectionQuery = AcademicScopeQuery.CourseSectionsInScope(db, sectionQuery, scope);
+
         var query =
-            from section in db.CourseSections.AsNoTracking()
+            from section in sectionQuery
             join course in db.Courses.AsNoTracking() on section.CourseId equals course.CourseId
-            where section.LecturerId == null
-                  && section.UnidentifiedLecturerName != null
-                  && section.UnidentifiedLecturerName != string.Empty
             select new
             {
                 section.CourseSectionId,
@@ -1385,33 +1376,25 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 course.FacultyId,
             };
 
-        if (semesterId is { } filteredSemesterId)
-        {
-            query = query.Where(x => x.SemesterId == filteredSemesterId);
-        }
-
-        // Đơn vị của lớp đi theo học phần sở hữu, đúng như câu D-b đã chốt.
-        if (scope.SeesWholeFaculty)
-        {
-            query = query.Where(x => x.FacultyId == scope.FacultyId);
-        }
-        else if (!scope.SeesEverything)
-        {
-            query = query.Where(x => x.DepartmentId == scope.DepartmentId);
-        }
-
         var rows = await query
             .OrderBy(x => x.CourseCode)
             .ThenBy(x => x.SectionName)
             .ToListAsync(cancellationToken);
 
-        var departmentNames = await db.Departments.AsNoTracking()
-            .ToDictionaryAsync(x => x.DepartmentId, x => x.DepartmentName, cancellationToken);
+        var departments = await db.Departments.AsNoTracking()
+            .ToDictionaryAsync(x => x.DepartmentId, x => x, cancellationToken);
         var facultyNames = await db.Faculties.AsNoTracking()
             .ToDictionaryAsync(x => x.FacultyId, x => x.FacultyName, cancellationToken);
 
         string? DepartmentNameOf(int? id) =>
-            id is { } value && departmentNames.TryGetValue(value, out var name) ? name : null;
+            id is { } value && departments.TryGetValue(value, out var department)
+                ? department.DepartmentName
+                : null;
+        int? EffectiveFacultyId(int? facultyId, int? departmentId) =>
+            facultyId ?? (departmentId is { } value
+                && departments.TryGetValue(value, out var department)
+                    ? department.FacultyId
+                    : null);
         string? FacultyNameOf(int? id) =>
             id is { } value && facultyNames.TryGetValue(value, out var name) ? name : null;
 
@@ -1425,7 +1408,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 x.ClassSize,
                 x.DepartmentId,
                 DepartmentNameOf(x.DepartmentId),
-                FacultyNameOf(x.FacultyId),
+                FacultyNameOf(EffectiveFacultyId(x.FacultyId, x.DepartmentId)),
                 x.Credits))
             .ToList();
 
@@ -1612,24 +1595,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var scope = await userScope.ResolveAsync(cancellationToken);
         if (scope.SeesNothing) return [];
 
-        var query = db.Lecturers.AsQueryable();
+        var query = AcademicScopeQuery.LecturersInScope(db, db.Lecturers.AsQueryable(), scope);
         // Giảng viên không vào được trang Giảng viên, nhưng vẫn gọi được endpoint này
         // vì trang Lớp học phần cần nó để đọc tên người dạy. Mọi lớp của họ đều do
         // chính họ dạy nên chỉ cần đúng một bản ghi — trả cả bộ môn là lộ thừa 14 hồ
         // sơ kèm email cho một vai trò chỉ đọc.
-        if (scope.SeesOnlyOwn)
-        {
-            query = query.Where(x => x.LecturerId == scope.LecturerId);
-        }
-        else if (scope.SeesWholeFaculty)
-        {
-            query = query.Where(x => x.FacultyId == scope.FacultyId);
-        }
-        else if (!scope.SeesEverything)
-        {
-            query = query.Where(x => x.DepartmentId == scope.DepartmentId);
-        }
-
         return await query
             .OrderBy(x => x.FullName)
             .Select(x => new LecturerDto(
@@ -1928,25 +1898,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var scope = await userScope.ResolveAsync(cancellationToken);
         if (scope.SeesNothing) return [];
 
-        var query = db.Courses.AsQueryable();
-        // Giảng viên đi theo lớp mình dạy chứ không theo bộ môn — câu H-b đã chốt.
-        // Nhờ vậy hai trang Học phần và Lớp học phần luôn khớp nhau: mọi học phần
-        // hiện ở đây đều có ít nhất một lớp của mình ở trang bên cạnh, kể cả lớp dạy
-        // chéo sang học phần của bộ môn khác. Xem congviec3.md mục H2.
-        if (scope.SeesOnlyOwn)
-        {
-            query = query.Where(x => db.CourseSections
-                .Any(section => section.CourseId == x.CourseId
-                                && section.LecturerId == scope.LecturerId));
-        }
-        else if (scope.SeesWholeFaculty)
-        {
-            query = query.Where(x => x.FacultyId == scope.FacultyId);
-        }
-        else if (!scope.SeesEverything)
-        {
-            query = query.Where(x => x.DepartmentId == scope.DepartmentId);
-        }
+        var query = AcademicScopeQuery.CoursesInScope(db, db.Courses.AsQueryable(), scope);
+        // Cùng nguồn phạm vi với danh sách lớp, báo cáo và chi tiết khảo sát.
 
         return await query
             .OrderBy(x => x.CourseCode)
