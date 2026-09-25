@@ -473,7 +473,7 @@ const facultyRankColumns = (onOpenDetail?: (id: number) => void): Column<RankedU
   ...(onOpenDetail ? [{
     key: 'actions',
     header: 'Thao tác',
-    align: 'center',
+    align: 'center' as const,
     width: '7%',
     render: (item: RankedUnit) => (
       <button
@@ -635,7 +635,7 @@ const departmentRankColumns = (onOpenDetail?: (id: number) => void): Column<Rank
   ...(onOpenDetail ? [{
     key: 'actions',
     header: 'Thao tác',
-    align: 'center',
+    align: 'center' as const,
     width: '7%',
     render: (item: RankedUnit) => (
       <button
