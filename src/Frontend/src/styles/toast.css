@@ -3,8 +3,10 @@
   font-family: var(--font-family, 'Inter', system-ui, sans-serif);
 }
 
+/* Không ghi đè `position`: sonner xếp chồng thông báo bằng `position: absolute` rồi dịch
+   từng cái xuống đúng chiều cao cái trên + gap. Đặt `relative` thì mỗi thông báo vừa chiếm
+   chỗ trong luồng vừa bị dịch thêm, hai thông báo cách nhau gấp đôi. */
 .app-toaster [data-sonner-toast].app-toast {
-  position: relative;
   width: var(--width);
   min-height: 54px;
   display: grid;

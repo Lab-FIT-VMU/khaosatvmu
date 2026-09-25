@@ -239,6 +239,8 @@ interface ProgressItem {
   id: string;
   code: string;
   name: string;
+  /** Mã học phần, để ô tìm kiếm tìm được theo mã (vd 29101). */
+  courseCode: string;
   groupCode: string;
   lecturerName: string;
   departmentName: string;
@@ -404,6 +406,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
       return {
         id: String(section.courseSectionSurveyId),
         code: section.sectionName,
+        courseCode: section.courseCode,
         name: section.courseName,
         groupCode: section.sectionName,
         // API đã trả sẵn tên đọc từ tệp import cho lớp chưa gắn được mã giảng viên,
@@ -433,11 +436,15 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
     0
   );
 
+  // Bỏ dấu cả hai phía: trước đây chỉ bỏ dấu dữ liệu, gõ "Kỹ năng" có dấu thì không khớp
+  // "ky nang" nên tìm theo tên học phần chỉ ra khi gõ không dấu.
+  const searchKey = foldVietnamese(search);
   const filtered = progressItems.filter(
     (item) =>
-      foldVietnamese(item.code).includes(search.toLowerCase()) ||
-      foldVietnamese(item.name).includes(search.toLowerCase()) ||
-      foldVietnamese(item.lecturerName).includes(search.toLowerCase())
+      foldVietnamese(item.code).includes(searchKey) ||
+      foldVietnamese(item.courseCode).includes(searchKey) ||
+      foldVietnamese(item.name).includes(searchKey) ||
+      foldVietnamese(item.lecturerName).includes(searchKey)
   );
   const selectedSurvey = semesterSurveys.find(
     (survey) => String(survey.semesterSurveyId) === selectedSurveyId
@@ -722,7 +729,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
             data={filtered}
             searchValue={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Tìm mã lớp HP, nhóm N01/N02, tên môn hoặc giảng viên..."
+            searchPlaceholder="Tìm tên học phần, mã học phần, nhóm N01/N02 hoặc giảng viên..."
             exportConfig={exportConfig}
             // Chỉ tiêu của riêng trang này, đặt sát bảng vì nó chỉ quyết định nhãn
             // trạng thái của từng lớp bên dưới.
