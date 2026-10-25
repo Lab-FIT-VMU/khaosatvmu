@@ -27,7 +27,7 @@ import { TablePagination } from '../components/TablePagination';
 import { useSemester } from '../context/semesterContext';
 import { ApiError } from '../services/apiClient';
 import { catalogApi } from '../services/catalogApi';
-import { cohortApi, type Cohort, type CohortMajor } from '../services/cohortApi';
+import { cohortApi, type Cohort } from '../services/cohortApi';
 import {
   surveyApi,
   surveyErrorMessage,
@@ -96,10 +96,8 @@ const unitNounOf: Record<UnitSurveyType, string> = {
 
 const scopeOptionsOf: Record<UnitSurveyType, { value: SurveyScopeType; label: string }[]> = {
   PROGRAM: [
-    { value: 'all', label: 'Mọi khoá ngành' },
     { value: 'faculty', label: 'Khoá ngành thuộc một khoa' },
     { value: 'cohort', label: 'Mọi khoá ngành của một khoá học' },
-    { value: 'cohort-major', label: 'Một khoá ngành' },
   ],
   LECTURER: [
     { value: 'all', label: 'Mọi khoa / viện' },
@@ -328,7 +326,6 @@ export const UnitSurveysPage: React.FC<UnitSurveysPageProps> = ({
   const [adding, setAdding] = useState(false);
   const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
-  const [cohortMajors, setCohortMajors] = useState<CohortMajor[]>([]);
 
   const typeLabel = surveyTypeLabels[surveyType];
 
@@ -523,7 +520,7 @@ export const UnitSurveysPage: React.FC<UnitSurveysPageProps> = ({
 
   const openAdd = async (survey: SemesterSurvey) => {
     setAddTarget(survey);
-    setAddScopeType('all');
+    setAddScopeType(scopeOptionsOf[surveyType][0].value);
     setAddScopeId('');
     setAddSchedule({
       startTime: toLocalInput(survey.startTime),
@@ -531,14 +528,12 @@ export const UnitSurveysPage: React.FC<UnitSurveysPageProps> = ({
     });
     setAddError(null);
     try {
-      const [nextFaculties, nextCohorts, nextCohortMajors] = await Promise.all([
+      const [nextFaculties, nextCohorts] = await Promise.all([
         catalogApi.faculties(),
         surveyType === 'PROGRAM' ? cohortApi.cohorts() : Promise.resolve([]),
-        surveyType === 'PROGRAM' ? cohortApi.cohortMajors() : Promise.resolve([]),
       ]);
       setFaculties(nextFaculties);
       setCohorts(nextCohorts);
-      setCohortMajors(nextCohortMajors);
     } catch (error) {
       setAddError(messageFrom(error));
     }
@@ -554,14 +549,8 @@ export const UnitSurveysPage: React.FC<UnitSurveysPageProps> = ({
         label: `${item.cohortName} (${item.academicYearName})`,
       }));
     }
-    if (addScopeType === 'cohort-major') {
-      return cohortMajors.map((item) => ({
-        value: String(item.cohortMajorId),
-        label: `${item.cohortMajorCode} – ${item.majorName}`,
-      }));
-    }
     return [];
-  }, [addScopeType, faculties, cohorts, cohortMajors]);
+  }, [addScopeType, faculties, cohorts]);
 
   const handleAdd = async (event: React.FormEvent) => {
     event.preventDefault();

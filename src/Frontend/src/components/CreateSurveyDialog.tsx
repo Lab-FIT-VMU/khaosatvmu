@@ -6,7 +6,7 @@ import { SurveyFormDesigner } from './SurveyFormDesigner';
 import type { SurveyPreviewData } from './SurveyFormPreview';
 import { ApiError } from '../services/apiClient';
 import { catalogApi } from '../services/catalogApi';
-import { cohortApi, type Cohort, type CohortMajor } from '../services/cohortApi';
+import { cohortApi, type Cohort } from '../services/cohortApi';
 import {
   surveyApi,
   surveyErrorMessage,
@@ -66,10 +66,8 @@ const typeOptions: { type: SurveyType; icon: React.ReactNode; description: strin
 const scopeOptionsOf: Record<SurveyType, { value: SurveyScopeType; label: string }[]> = {
   COURSE: [],
   PROGRAM: [
-    { value: 'all', label: 'Mọi khoá ngành' },
     { value: 'faculty', label: 'Khoá ngành thuộc một khoa' },
     { value: 'cohort', label: 'Mọi khoá ngành của một khoá học' },
-    { value: 'cohort-major', label: 'Một khoá ngành' },
   ],
   LECTURER: [
     { value: 'all', label: 'Mọi khoa / viện' },
@@ -123,7 +121,6 @@ export const CreateSurveyDialog: React.FC<CreateSurveyDialogProps> = ({
 
   const [faculties, setFaculties] = useState<Faculty[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
-  const [cohortMajors, setCohortMajors] = useState<CohortMajor[]>([]);
   /** Số đơn vị sẽ được phát link; null là đang đếm hoặc đếm hụt. */
   const [unitCount, setUnitCount] = useState<number | null>(null);
 
@@ -146,15 +143,13 @@ export const CreateSurveyDialog: React.FC<CreateSurveyDialogProps> = ({
     let cancelled = false;
     const load = async () => {
       try {
-        const [nextFaculties, nextCohorts, nextCohortMajors] = await Promise.all([
+        const [nextFaculties, nextCohorts] = await Promise.all([
           catalogApi.faculties(),
           surveyType === 'PROGRAM' ? cohortApi.cohorts() : Promise.resolve([]),
-          surveyType === 'PROGRAM' ? cohortApi.cohortMajors() : Promise.resolve([]),
         ]);
         if (cancelled) return;
         setFaculties(nextFaculties);
         setCohorts(nextCohorts);
-        setCohortMajors(nextCohortMajors);
       } catch (loadError) {
         if (!cancelled) setError(messageFrom(loadError));
       }
@@ -204,20 +199,10 @@ export const CreateSurveyDialog: React.FC<CreateSurveyDialogProps> = ({
         label: `${cohort.cohortName} (${cohort.academicYearName})`,
       }));
     }
-    if (scopeType === 'cohort-major') {
-      return cohortMajors.map((cohortMajor) => ({
-        value: String(cohortMajor.cohortMajorId),
-        label: `${cohortMajor.cohortMajorCode} – ${cohortMajor.majorName}`,
-      }));
-    }
     return [];
-  }, [scopeType, faculties, cohorts, cohortMajors]);
+  }, [scopeType, faculties, cohorts]);
 
-  const scopeUnitLabel = scopeType === 'faculty'
-    ? 'Khoa / Viện'
-    : scopeType === 'cohort'
-      ? 'Khoá học'
-      : 'Khoá ngành';
+  const scopeUnitLabel = scopeType === 'cohort' ? 'Khoá học' : 'Khoa / Viện';
 
   /** Bộ câu hỏi thật đưa vào màn soạn, để xem trước đúng phiếu sẽ phát. */
   const designerData = useMemo((): SurveyPreviewData | undefined => {
@@ -326,7 +311,8 @@ export const CreateSurveyDialog: React.FC<CreateSurveyDialogProps> = ({
                   className={`survey-type-option${surveyType === option.type ? ' is-selected' : ''}`}
                   onClick={() => {
                     setSurveyType(option.type);
-                    setScopeType('all');
+                    // Phạm vi mặc định là lựa chọn đầu của loại; CTĐT không có "toàn trường".
+                    setScopeType(scopeOptionsOf[option.type][0]?.value ?? 'all');
                     setScopeId('');
                     setError(null);
                   }}
