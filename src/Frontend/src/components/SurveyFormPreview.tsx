@@ -9,7 +9,7 @@ import {
   Send,
   UserRound,
 } from 'lucide-react';
-import type { SurveyFormConfig } from '../types';
+import type { SurveyFormConfig, SurveyType } from '../types';
 import {
   coverStyleOf,
   isFieldVisible,
@@ -52,7 +52,23 @@ export interface SurveyPreviewData {
     questions: { questionText: string; options: { value: number; displayText: string }[] }[];
   }[];
   questionCount: number;
+  /** Loại đợt, để phần thông tin đơn vị mẫu khớp loại. Thiếu thì coi là học phần. */
+  surveyType?: SurveyType;
 }
+
+/**
+ * Dòng tên đơn vị và dòng chi tiết mẫu theo loại, cùng quy tắc với phiếu thật: công tắc
+ * "học phần" hiện dòng tên, công tắc "lớp học phần" hiện dòng chi tiết.
+ */
+const sampleUnitOf = (surveyType: SurveyType | undefined) => {
+  if (surveyType === 'PROGRAM') {
+    return { isCourse: false, headline: 'CNT63CL – Công nghệ thông tin', detailLabel: 'Khoá', detailValue: 'Khoá 63' };
+  }
+  if (surveyType === 'LECTURER') {
+    return { isCourse: false, headline: 'Khoa Hàng hải', detailLabel: '', detailValue: '' };
+  }
+  return { isCourse: true, headline: 'MÃ HP – Tên học phần', detailLabel: 'Lớp học phần', detailValue: 'N01' };
+};
 
 /** Câu mặc định của hệ thống; vừa để hiện khi đợt bỏ trống, vừa để nhận ra "không tuỳ biến". */
 const defaultNoticeHeading = 'Lưu ý';
@@ -143,6 +159,7 @@ export const SurveyFormPreview: React.FC<{
   const questionCount = data?.questionCount ?? sample.questionCount;
   const sections = data?.sections?.length ? data.sections : sample.sections;
   const title = textOr(config.title, surveyName);
+  const unit = sampleUnitOf(data?.surveyType);
 
   // Số thứ tự chạy suốt phiếu, không reset theo mục — giống phiếu sinh viên.
   let order = 0;
@@ -251,9 +268,9 @@ export const SurveyFormPreview: React.FC<{
 
   if (screen === 'intro') {
     const metaItems = [
-      isFieldVisible(config, 'section')
-        && metaItem(<ClipboardList aria-hidden="true" />, 'Lớp học phần', sample.sectionName),
-      isFieldVisible(config, 'lecturer')
+      isFieldVisible(config, 'section') && unit.detailLabel
+        && metaItem(<ClipboardList aria-hidden="true" />, unit.detailLabel, unit.detailValue),
+      isFieldVisible(config, 'lecturer') && unit.isCourse
         && metaItem(<UserRound aria-hidden="true" />, 'Giảng viên', sample.lecturerName),
       isFieldVisible(config, 'semester')
         && metaItem(
@@ -261,11 +278,11 @@ export const SurveyFormPreview: React.FC<{
           'Học kỳ',
           `${sample.semesterName} (${sample.academicYearName})`,
         ),
-      isFieldVisible(config, 'credits')
+      isFieldVisible(config, 'credits') && unit.isCourse
         && metaItem(<ClipboardList aria-hidden="true" />, 'Số tín chỉ', String(sample.credits)),
       isFieldVisible(config, 'faculty')
         && metaItem(<ClipboardList aria-hidden="true" />, 'Khoa', sample.facultyName),
-      isFieldVisible(config, 'department')
+      isFieldVisible(config, 'department') && unit.isCourse
         && metaItem(<ClipboardList aria-hidden="true" />, 'Bộ môn', sample.departmentName),
       isFieldVisible(config, 'questionCount')
         && metaItem(
@@ -292,11 +309,7 @@ export const SurveyFormPreview: React.FC<{
               {isFieldVisible(config, 'templateName') && (
                 <p className="public-intro-template">{templateName}</p>
               )}
-              {isFieldVisible(config, 'course') && (
-                <p>
-                  {sample.courseCode} – {sample.courseName}
-                </p>
-              )}
+              {isFieldVisible(config, 'course') && <p>{unit.headline}</p>}
             </header>
 
             {metaItems.length > 0 && <dl className="public-intro-meta">{metaItems}</dl>}
@@ -359,22 +372,19 @@ export const SurveyFormPreview: React.FC<{
             <h1 style={titleStyleOf(config)}>{title}</h1>
 
             <dl className="public-quiz-meta">
-              {(isFieldVisible(config, 'course') || isFieldVisible(config, 'section')) && (
+              {(isFieldVisible(config, 'course')
+                || (isFieldVisible(config, 'section') && unit.detailLabel)) && (
                 <div className="public-quiz-meta-item">
                   <BookOpen aria-hidden="true" />
                   <div>
-                    {isFieldVisible(config, 'course') && (
-                      <dt>
-                        {sample.courseCode} – {sample.courseName}
-                      </dt>
-                    )}
-                    {isFieldVisible(config, 'section') && (
-                      <dd>Lớp học phần: {sample.sectionName}</dd>
+                    {isFieldVisible(config, 'course') && <dt>{unit.headline}</dt>}
+                    {isFieldVisible(config, 'section') && unit.detailLabel && (
+                      <dd>{unit.detailLabel}: {unit.detailValue}</dd>
                     )}
                   </div>
                 </div>
               )}
-              {isFieldVisible(config, 'lecturer') && (
+              {isFieldVisible(config, 'lecturer') && unit.isCourse && (
                 <div className="public-quiz-meta-item">
                   <UserRound aria-hidden="true" />
                   <div>

@@ -4,7 +4,6 @@ import {
   Building2,
   ChartColumn,
   ClipboardCheck,
-  FileCheck2,
   Gauge,
   GraduationCap,
   LayoutDashboard,
@@ -78,10 +77,15 @@ export const menuStructure: SidebarMenuGroup[] = [
     ],
   },
   {
-    section: 'KHẢO SÁT CHƯƠNG TRÌNH',
+    section: 'KHẢO SÁT CHƯƠNG TRÌNH ĐÀO TẠO',
     items: [
       { id: 'program-campaigns', label: 'Đợt khảo sát CTĐT', icon: School },
-      { id: 'program-criteria', label: 'Tiêu chí CTĐT', icon: FileCheck2 },
+    ],
+  },
+  {
+    section: 'KHẢO SÁT GIẢNG VIÊN',
+    items: [
+      { id: 'lecturer-campaigns', label: 'Đợt khảo sát giảng viên', icon: Presentation },
     ],
   },
   {

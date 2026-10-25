@@ -417,7 +417,7 @@ public class SurveySectionScopeTests
                 .Where(x => x.SemesterSurveyId == semesterSurveyId)
                 .Select(x => x.CourseSectionId)
                 .ToListAsync();
-            createdSectionIds.Should().OnlyContain(id => slice.SectionIds.Contains(id));
+            createdSectionIds.Should().OnlyContain(id => id != null && slice.SectionIds.Contains(id.Value));
         });
     }
 

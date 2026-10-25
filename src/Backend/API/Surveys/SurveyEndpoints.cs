@@ -102,11 +102,30 @@ public static class SurveyEndpoints
 
         // ------------------------------------------- Đợt khảo sát theo học kỳ
 
+        // Không truyền surveyType thì chỉ trả đợt học phần: mọi màn hình viết trước khi có
+        // ba loại khảo sát đều gọi không tham số và không biết đọc đợt loại khác.
         operationalReadGroup.MapGet("/semester-surveys", async (
             int? semesterId,
+            string? surveyType,
             ISurveyService service,
             CancellationToken cancellationToken) =>
-            Results.Ok(await service.GetSemesterSurveysAsync(semesterId, cancellationToken)));
+        {
+            var type = string.IsNullOrWhiteSpace(surveyType)
+                ? SurveyTypes.Course
+                : surveyType.Trim().ToUpperInvariant();
+            if (!SurveyTypes.IsValid(type))
+            {
+                return ToResult(new SurveyOperationResult<bool>(false, SurveyErrorCodes.SurveyTypeInvalid, false));
+            }
+            return Results.Ok(await service.GetSemesterSurveysAsync(semesterId, type, cancellationToken));
+        });
+
+        // Link và số phiếu theo từng khoá ngành / khoa của đợt CTĐT hoặc khảo sát giảng viên.
+        operationalReadGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/units", async (
+            int semesterSurveyId,
+            ISurveyService service,
+            CancellationToken cancellationToken) =>
+            ToResult(await service.GetSurveyUnitsAsync(semesterSurveyId, cancellationToken)));
 
         campaignGroup.MapPost("/semester-surveys", async (
             CreateSemesterSurveyRequest request,
@@ -205,6 +224,7 @@ public static class SurveyEndpoints
             string scopeType,
             int? scopeId,
             int? semesterSurveyId,
+            string? surveyType,
             ISurveyService service,
             CancellationToken cancellationToken) =>
             ToResult(await service.PreviewSectionScopeAsync(
@@ -212,6 +232,7 @@ public static class SurveyEndpoints
                 scopeType,
                 scopeId,
                 semesterSurveyId,
+                string.IsNullOrWhiteSpace(surveyType) ? SurveyTypes.Course : surveyType,
                 cancellationToken)));
 
         // Bổ sung lớp vào đợt đã có theo phạm vi tự chọn: cả kỳ, một khoa/viện, một
@@ -663,7 +684,9 @@ public static class SurveyEndpoints
         string? ScopeType,
         int? ScopeId,
         /// <summary>Hình thức phiếu; bỏ trống thì dùng mẫu mặc định.</summary>
-        SurveyFormConfigDto? FormConfig = null)
+        SurveyFormConfigDto? FormConfig = null,
+        /// <summary>Loại khảo sát; giao diện bắt buộc chọn, client cũ không gửi thì là học phần.</summary>
+        string? SurveyType = null)
     {
         public CreateSemesterSurveyCommand ToCommand() =>
             new(
@@ -675,7 +698,8 @@ public static class SurveyEndpoints
                 // Client cũ không gửi phạm vi thì giữ nguyên hành vi cũ: phát cả kỳ.
                 ScopeType ?? SurveyScopeTypes.All,
                 ScopeId,
-                FormConfig);
+                FormConfig,
+                SurveyType ?? Domain.SurveyTypes.Course);
     }
 
     public sealed record UpdateSemesterSurveyRequest(

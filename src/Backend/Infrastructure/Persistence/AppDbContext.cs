@@ -634,11 +634,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<SemesterSurvey>(entity =>
         {
             entity.ToTable("SemesterSurveys", table =>
+            {
                 table.HasCheckConstraint(
                     "CK_SemesterSurveys_TimeRange",
-                    "\"EndTime\" > \"StartTime\""));
+                    "\"EndTime\" > \"StartTime\"");
+                table.HasCheckConstraint(
+                    "CK_SemesterSurveys_SurveyType",
+                    $"\"SurveyType\" IN ('{SurveyTypes.Course}', '{SurveyTypes.Program}', '{SurveyTypes.Lecturer}')");
+            });
             entity.HasKey(x => x.SemesterSurveyId);
             entity.Property(x => x.SurveyName).IsRequired();
+            entity.Property(x => x.SurveyType)
+                .HasMaxLength(20)
+                .IsRequired()
+                .HasDefaultValue(SurveyTypes.Course);
+            entity.HasIndex(x => new { x.SemesterId, x.SurveyType });
             // Hình thức phiếu, ghi một lần lúc tạo đợt. Để 'jsonb' cho Postgres kiểm
             // tra cú pháp ngay lúc ghi; null là dùng mẫu mặc định.
             entity.Property(x => x.FormConfigJson).HasColumnType("jsonb");
@@ -657,9 +667,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<CourseSectionSurvey>(entity =>
         {
             entity.ToTable("CourseSectionSurveys", table =>
+            {
                 table.HasCheckConstraint(
                     "CK_CourseSectionSurveys_TimeRange",
-                    "\"EndTime\" > \"StartTime\""));
+                    "\"EndTime\" > \"StartTime\"");
+                // Đúng một đơn vị cho mỗi link. Loại của đợt quyết định là cột nào, nhưng
+                // ràng buộc chéo bảng thì để tầng service kiểm.
+                table.HasCheckConstraint(
+                    "CK_CourseSectionSurveys_SingleUnit",
+                    "num_nonnulls(\"CourseSectionId\", \"CohortMajorId\", \"FacultyId\") = 1");
+            });
             entity.HasKey(x => x.CourseSectionSurveyId);
             entity.Property(x => x.LinkToken).IsRequired();
             // Ảnh chụp điểm của lần bấm tính gần nhất, không tự cập nhật.
@@ -669,7 +686,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.InvalidResponseCount).HasDefaultValue(0);
             entity.HasIndex(x => x.LinkToken).IsUnique();
             entity.HasIndex(x => new { x.SemesterSurveyId, x.CourseSectionId }).IsUnique();
+            entity.HasIndex(x => new { x.SemesterSurveyId, x.CohortMajorId })
+                .IsUnique()
+                .HasFilter("\"CohortMajorId\" IS NOT NULL");
+            entity.HasIndex(x => new { x.SemesterSurveyId, x.FacultyId })
+                .IsUnique()
+                .HasFilter("\"FacultyId\" IS NOT NULL");
             entity.HasIndex(x => x.CourseSectionId);
+            entity.HasIndex(x => x.CohortMajorId);
+            entity.HasIndex(x => x.FacultyId);
             entity.HasOne<SemesterSurvey>()
                 .WithMany()
                 .HasForeignKey(x => x.SemesterSurveyId)
@@ -678,6 +703,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.CourseSectionId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // RESTRICT chứ không CASCADE: khoá ngành và khoa chỉ bị xoá mềm, còn xoá cứng
+            // mà kéo theo link thì kéo theo luôn phiếu đã thu.
+            entity.HasOne<CohortMajor>()
+                .WithMany()
+                .HasForeignKey(x => x.CohortMajorId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Faculty>()
+                .WithMany()
+                .HasForeignKey(x => x.FacultyId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Điểm từng câu đã gộp sẵn của mỗi lớp. Ghi lại trọn vẹn mỗi lần bấm tính

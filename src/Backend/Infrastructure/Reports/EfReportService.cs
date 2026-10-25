@@ -1,4 +1,4 @@
-﻿using Application.Auth;
+using Application.Auth;
 using Application.Reports;
 using Application.Surveys;
 using Domain;
@@ -304,7 +304,7 @@ public sealed class EfReportService(
 
         foreach (var ss in sectionSurveys)
         {
-            var sec = sectionById.GetValueOrDefault(ss.CourseSectionId);
+            var sec = sectionById.GetValueOrDefault(ss.CourseSectionId ?? 0);
             var crs = sec is null ? null : courseById.GetValueOrDefault(sec.CourseId);
             var lec = sec?.LecturerId is { } lecturerId
                 ? lecturerById.GetValueOrDefault(lecturerId)
@@ -411,7 +411,7 @@ public sealed class EfReportService(
             .ToDictionaryAsync(x => x.CourseId, x => x, cancellationToken);
 
         var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
-            .Where(x => sectionIds.Contains(x.CourseSectionId))
+            .Where(x => sectionIds.Contains(x.CourseSectionId!.Value))
             .ToListAsync(cancellationToken);
 
         // Người xem bị giới hạn phạm vi chỉ thấy lớp nằm trong phạm vi: số lớp của giảng
@@ -432,7 +432,7 @@ public sealed class EfReportService(
         var sectionsByLecturerId = sections
             .Where(x => x.LecturerId.HasValue)
             .ToLookup(x => x.LecturerId!.Value);
-        var sectionSurveysBySectionId = sectionSurveys.ToLookup(x => x.CourseSectionId);
+        var sectionSurveysBySectionId = sectionSurveys.ToLookup(x => x.CourseSectionId ?? 0);
 
         var reports = new List<LecturerPerformanceReportDto>();
 
@@ -495,7 +495,7 @@ public sealed class EfReportService(
         var sectionSummaries = new List<LecturerSectionSummaryDto>();
         foreach (var css in sectionSurveys)
         {
-            var sec = sectionById.GetValueOrDefault(css.CourseSectionId);
+            var sec = sectionById.GetValueOrDefault(css.CourseSectionId ?? 0);
             var crs = sec != null && courses.TryGetValue(sec.CourseId, out var c) ? c : null;
 
             var tally = responseStats.GetValueOrDefault(css.CourseSectionSurveyId, ResponseTally.Empty);
@@ -586,7 +586,7 @@ public sealed class EfReportService(
 
         var sectionIds = sections.Select(x => x.CourseSectionId).ToList();
         var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
-            .Where(x => sectionIds.Contains(x.CourseSectionId))
+            .Where(x => sectionIds.Contains(x.CourseSectionId!.Value))
             .ToListAsync(cancellationToken);
 
         // Cùng luật với giảng viên đã gắn mã: người xem bị giới hạn chỉ thấy lớp trong
@@ -604,7 +604,7 @@ public sealed class EfReportService(
             cancellationToken);
         var summary = SummariseLecturerSections(
             sections,
-            sectionSurveys.ToLookup(x => x.CourseSectionId),
+            sectionSurveys.ToLookup(x => x.CourseSectionId ?? 0),
             courses,
             responseStats);
 
@@ -672,7 +672,7 @@ public sealed class EfReportService(
         CancellationToken cancellationToken)
     {
         var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
-            .Where(x => sectionIds.Contains(x.CourseSectionId))
+            .Where(x => sectionIds.Contains(x.CourseSectionId!.Value))
             .ToListAsync(cancellationToken);
         var cssIds = sectionSurveys.Select(x => x.CourseSectionSurveyId).ToList();
         if (cssIds.Count == 0) return report;
@@ -790,7 +790,7 @@ public sealed class EfReportService(
         var sections = await sectionQuery.ToListAsync(cancellationToken);
 
         var sectionSurveys = await (await VisibleSectionSurveysAsync(cancellationToken))
-            .Where(x => sections.Select(s => s.CourseSectionId).Contains(x.CourseSectionId))
+            .Where(x => sections.Select(s => s.CourseSectionId).Contains(x.CourseSectionId!.Value))
             .ToListAsync(cancellationToken);
 
         // Người xem bị giới hạn: chỉ khoa của mình, chỉ bộ môn trong phạm vi (trưởng khoa
@@ -816,7 +816,7 @@ public sealed class EfReportService(
         var sectionsByLecturerId = sections
             .Where(x => x.LecturerId.HasValue)
             .ToLookup(x => x.LecturerId!.Value);
-        var sectionSurveysBySectionId = sectionSurveys.ToLookup(x => x.CourseSectionId);
+        var sectionSurveysBySectionId = sectionSurveys.ToLookup(x => x.CourseSectionId ?? 0);
         var classSizeBySectionId = sections.ToDictionary(x => x.CourseSectionId, x => x.ClassSize);
 
         // Lớp chưa qua hai vòng lọc vẫn được đếm vào tiến độ nhưng không góp vào điểm.
@@ -847,7 +847,7 @@ public sealed class EfReportService(
                 var tally = responseStats.GetValueOrDefault(css.CourseSectionSurveyId, ResponseTally.Empty);
                 facResponses += tally.TotalCount;
                 facValidResponses += tally.ValidCount;
-                if (CountsTowardScore(css.CourseSectionId, tally))
+                if (CountsTowardScore(css.CourseSectionId ?? 0, tally))
                 {
                     facScoredResponses += tally.ValidCount;
                     facValidScoreSum += tally.ValidTotalScore;
@@ -876,7 +876,7 @@ public sealed class EfReportService(
                 {
                     var tally = responseStats.GetValueOrDefault(css.CourseSectionSurveyId, ResponseTally.Empty);
                     deptResponses += tally.TotalCount;
-                    if (CountsTowardScore(css.CourseSectionId, tally))
+                    if (CountsTowardScore(css.CourseSectionId ?? 0, tally))
                     {
                         deptScoredResponses += tally.ValidCount;
                         deptValidScoreSum += tally.ValidTotalScore;
@@ -1247,7 +1247,7 @@ public sealed class EfReportService(
             var templateName = semesterSurvey != null && templates.TryGetValue(semesterSurvey.SurveyTemplateId, out var tn)
                 ? tn
                 : string.Empty;
-            var sec = sectionById.GetValueOrDefault(css.CourseSectionId);
+            var sec = sectionById.GetValueOrDefault(css.CourseSectionId ?? 0);
             var crs = sec != null && courses.TryGetValue(sec.CourseId, out var c) ? c : null;
             var lec = sec?.LecturerId is { } sectionLecturerId
                 ? lecturerById.GetValueOrDefault(sectionLecturerId)
@@ -1512,7 +1512,7 @@ public sealed class EfReportService(
 
         foreach (var ss in sectionSurveys)
         {
-            var sec = sectionById.GetValueOrDefault(ss.CourseSectionId);
+            var sec = sectionById.GetValueOrDefault(ss.CourseSectionId ?? 0);
             var lec = sec?.LecturerId is { } sectionLecturerId
                 ? lecturerById.GetValueOrDefault(sectionLecturerId)
                 : null;
@@ -1634,7 +1634,7 @@ public sealed class EfReportService(
         // Tổng hợp trực tiếp từ toàn bộ bài khảo sát lớp. Không cộng ngược từ Khoa vì các lớp
         // chưa ánh xạ đơn vị vẫn phải nằm trong mẫu số của tiến độ toàn trường.
         int totalTarget = sectionSurveys.Sum(x =>
-            sectionById.TryGetValue(x.CourseSectionId, out var section) ? section.ClassSize : 0);
+            sectionById.TryGetValue(x.CourseSectionId ?? 0, out var section) ? section.ClassSize : 0);
         // Tiến độ (mẫu số ở đây) đếm MỌI lớp, kể cả lớp chưa đủ ngưỡng — đó chính là
         // những lớp cần nhắc thu thêm phiếu.
         int totalResponses = sectionSurveys.Sum(x =>
@@ -2028,7 +2028,7 @@ public sealed class EfReportService(
             .Where(x => sectionIds.Contains(x.CourseSectionId))
             .ToDictionaryAsync(x => x.CourseSectionId, x => x.ClassSize, cancellationToken);
 
-        int target = sectionSurveys.Sum(x => classSizeBySectionId.GetValueOrDefault(x.CourseSectionId));
+        int target = sectionSurveys.Sum(x => classSizeBySectionId.GetValueOrDefault(x.CourseSectionId ?? 0));
 
         var tallies = await ResponseTalliesAsync(cssIds, cancellationToken);
 
@@ -2046,7 +2046,7 @@ public sealed class EfReportService(
         foreach (var section in sectionSurveys)
         {
             if (!tallies.TryGetValue(section.CourseSectionSurveyId, out var tally)) continue;
-            var classSize = classSizeBySectionId.GetValueOrDefault(section.CourseSectionId);
+            var classSize = classSizeBySectionId.GetValueOrDefault(section.CourseSectionId ?? 0);
             if (!tally.IsScored || tally.SnapshotValidCount == 0)
             {
                 continue;
@@ -2401,7 +2401,7 @@ public sealed class EfReportService(
 
         foreach (var css in sectionSurveys)
         {
-            sectionById.TryGetValue(css.CourseSectionId, out var sec);
+            sectionById.TryGetValue(css.CourseSectionId ?? 0, out var sec);
             courses.TryGetValue(sec?.CourseId ?? 0, out var crs);
             lecturerById.TryGetValue(sec?.LecturerId ?? 0, out var lec);
 

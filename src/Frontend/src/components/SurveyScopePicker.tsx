@@ -4,21 +4,24 @@ import { catalogApi } from '../services/catalogApi';
 import { surveyApi, type SurveyScopeType } from '../services/surveyApi';
 import type { Course, CourseSection, Department, Faculty } from '../types';
 
-const scopeChoices: { value: SurveyScopeType; label: string }[] = [
+const scopeChoices: { value: CourseScopeType; label: string }[] = [
   { value: 'all', label: 'Tất cả lớp học phần' },
   { value: 'faculty', label: 'Khoa / Viện' },
   { value: 'department', label: 'Bộ môn' },
   { value: 'section', label: 'Lớp học phần' },
 ];
 
-const unitLabel: Record<SurveyScopeType, string> = {
+/** Bộ chọn này chỉ phục vụ khảo sát học phần; CTĐT và giảng viên chọn phạm vi trong hộp thoại tạo đợt. */
+type CourseScopeType = Extract<SurveyScopeType, 'all' | 'faculty' | 'department' | 'section'>;
+
+const unitLabel: Record<CourseScopeType, string> = {
   all: '',
   faculty: 'Khoa / Viện cần phát phiếu',
   department: 'Bộ môn cần phát phiếu',
   section: 'Lớp học phần cần phát phiếu',
 };
 
-const unitPlaceholder: Record<SurveyScopeType, string> = {
+const unitPlaceholder: Record<CourseScopeType, string> = {
   all: '',
   faculty: 'Gõ tên khoa/viện để tìm',
   department: 'Gõ tên bộ môn để tìm',
@@ -28,8 +31,8 @@ const unitPlaceholder: Record<SurveyScopeType, string> = {
 interface SurveyScopePickerProps {
   /** Học kỳ đang chọn. Null thì chưa nạp được danh mục nào. */
   semesterId: number | null;
-  scopeType: SurveyScopeType;
-  onScopeTypeChange: (scopeType: SurveyScopeType) => void;
+  scopeType: CourseScopeType;
+  onScopeTypeChange: (scopeType: CourseScopeType) => void;
   /** Chuỗi rỗng nghĩa là chưa chọn đơn vị nào. */
   scopeId: string;
   onScopeIdChange: (scopeId: string) => void;

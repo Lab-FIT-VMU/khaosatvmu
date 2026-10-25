@@ -12,6 +12,31 @@ public static class AnswerScaleKinds
     public static bool IsValid(string? value) => value is Options or Text;
 }
 
+/// <summary>
+/// Các giá trị hợp lệ của "SemesterSurveys"."SurveyType". Ba loại dùng chung bộ câu hỏi,
+/// hình thức phiếu và đường nộp phiếu; chỉ khác đơn vị được phát link (xem
+/// <see cref="CourseSectionSurvey"/>) và phần thống kê.
+/// </summary>
+public static class SurveyTypes
+{
+    /// <summary>Sinh viên đánh giá lớp học phần. Mỗi lớp một link, sĩ số là sĩ số lớp.</summary>
+    public const string Course = "COURSE";
+
+    /// <summary>
+    /// Đánh giá chương trình đào tạo. Mỗi khoá ngành một link, KHÔNG có sĩ số: không
+    /// chặn khi đủ phiếu, không tính tỷ lệ phản hồi.
+    /// </summary>
+    public const string Program = "PROGRAM";
+
+    /// <summary>
+    /// Giảng viên tự trả lời. Mỗi khoa/viện một link, sĩ số là số giảng viên của khoa
+    /// chốt lúc phát link.
+    /// </summary>
+    public const string Lecturer = "LECTURER";
+
+    public static bool IsValid(string? value) => value is Course or Program or Lecturer;
+}
+
 /// <summary>Bảng "AnswerScales". Thang trả lời dùng lại được cho nhiều bộ câu hỏi.</summary>
 public sealed class AnswerScale : ISoftDeletable
 {
@@ -157,6 +182,13 @@ public sealed class SemesterSurvey : ISoftDeletable
     /// <summary>NOT NULL, ON DELETE RESTRICT.</summary>
     public int SurveyTemplateId { get; set; }
 
+    /// <summary>
+    /// Một trong <see cref="SurveyTypes"/>, chọn lúc tạo và không đổi được: đổi loại là
+    /// đổi luôn đơn vị của mọi link đã phát. Đợt tạo trước khi có cột này là
+    /// <see cref="SurveyTypes.Course"/>.
+    /// </summary>
+    public string SurveyType { get; set; } = SurveyTypes.Course;
+
     /// <summary>Khung thời gian tổng; mọi lịch của lớp trong đợt phải nằm trọn bên trong.</summary>
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
@@ -179,8 +211,13 @@ public sealed class SemesterSurvey : ISoftDeletable
 }
 
 /// <summary>
-/// Bảng "CourseSectionSurveys". Mỗi lớp học phần có một bài khảo sát riêng với
-/// LinkToken riêng để dựng link và mã QR. UNIQUE theo (SemesterSurveyId, CourseSectionId).
+/// Bảng "CourseSectionSurveys". Một đơn vị được phát link trong một đợt, mỗi đơn vị có
+/// LinkToken riêng để dựng link và mã QR. Tên bảng giữ từ thời chỉ có khảo sát học phần;
+/// nay đơn vị là đúng MỘT trong ba cột <see cref="CourseSectionId"/>,
+/// <see cref="CohortMajorId"/>, <see cref="FacultyId"/>, tuỳ loại của đợt.
+///
+/// Gộp chung một bảng thay vì mỗi loại một bảng là để phiếu, câu trả lời, link, cache và
+/// bộ lọc nhiễu vẫn đi đúng một đường: "SurveyResponses" chỉ trỏ vào bảng này.
 /// </summary>
 public sealed class CourseSectionSurvey : ISoftDeletable
 {
@@ -189,8 +226,30 @@ public sealed class CourseSectionSurvey : ISoftDeletable
     /// <summary>NOT NULL, ON DELETE CASCADE.</summary>
     public int SemesterSurveyId { get; set; }
 
-    /// <summary>NOT NULL, ON DELETE CASCADE.</summary>
-    public int CourseSectionId { get; set; }
+    /// <summary>
+    /// Đợt <see cref="SurveyTypes.Course"/>: lớp được phát link, ON DELETE CASCADE.
+    /// Null với hai loại còn lại. UNIQUE theo (SemesterSurveyId, CourseSectionId).
+    /// </summary>
+    public int? CourseSectionId { get; set; }
+
+    /// <summary>
+    /// Đợt <see cref="SurveyTypes.Program"/>: khoá ngành được phát link, ON DELETE RESTRICT.
+    /// UNIQUE theo (SemesterSurveyId, CohortMajorId) khi khác null.
+    /// </summary>
+    public int? CohortMajorId { get; set; }
+
+    /// <summary>
+    /// Đợt <see cref="SurveyTypes.Lecturer"/>: khoa/viện được phát link, ON DELETE RESTRICT.
+    /// UNIQUE theo (SemesterSurveyId, FacultyId) khi khác null.
+    /// </summary>
+    public int? FacultyId { get; set; }
+
+    /// <summary>
+    /// Sĩ số của đơn vị khi nó không tự có: số giảng viên của khoa, chốt lúc phát link để
+    /// tỷ lệ phản hồi không trượt theo mỗi lần sửa danh mục giảng viên. Null với lớp học
+    /// phần (đọc "ClassSize" của lớp) và với khoá ngành (khảo sát CTĐT không có sĩ số).
+    /// </summary>
+    public int? TargetCount { get; set; }
 
     /// <summary>UNIQUE. Chuỗi ngẫu nhiên dùng trong link và mã QR của lớp.</summary>
     public string LinkToken { get; set; } = string.Empty;

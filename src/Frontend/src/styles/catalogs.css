@@ -2765,3 +2765,53 @@
   color: #6b7780;
   font-size: 12px;
 }
+
+/* Bước đầu của hộp thoại tạo đợt: chọn một trong ba loại khảo sát. */
+.survey-type-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.survey-type-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #dfe4e8;
+  background: #ffffff;
+  color: #20262c;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.survey-type-option:hover {
+  border-color: #0788b8;
+}
+
+.survey-type-option.is-selected {
+  border-color: #0788b8;
+  background: #eef7fb;
+  box-shadow: inset 0 0 0 1px #0788b8;
+}
+
+.survey-type-option strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.survey-type-option span {
+  color: #68737d;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .survey-type-picker {
+    grid-template-columns: 1fr;
+  }
+}

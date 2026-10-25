@@ -224,6 +224,42 @@ export interface SemesterSurvey {
   missingSectionCount: number;
   /** Hình thức phiếu đang lưu; null là dùng mẫu mặc định. */
   formConfig: SurveyFormConfig | null;
+  /**
+   * Loại đợt. Với loại khác học phần, `sectionSurveyCount` là số đơn vị được phát link
+   * (khoá ngành hoặc khoa).
+   */
+  surveyType: SurveyType;
+}
+
+/** Khớp `Domain.SurveyTypes` bên backend. Chọn lúc tạo đợt và không đổi được. */
+export type SurveyType = 'COURSE' | 'PROGRAM' | 'LECTURER';
+
+/**
+ * Một đơn vị được phát link trong đợt CTĐT (khoá ngành) hoặc khảo sát giảng viên (khoa).
+ * Số phiếu đếm sống từ phiếu đã nộp.
+ */
+export interface SurveyUnit {
+  courseSectionSurveyId: number;
+  semesterSurveyId: number;
+  surveyType: SurveyType;
+  linkToken: string;
+  startTime: string;
+  endTime: string;
+  /** CTĐT: mã khoá ngành. Giảng viên: mã khoa. */
+  unitId: number;
+  unitCode: string;
+  /** CTĐT: tên ngành. Giảng viên: tên khoa. */
+  unitName: string;
+  /** CTĐT: tên khoá học. Rỗng với khảo sát giảng viên. */
+  cohortName: string;
+  facultyId: number | null;
+  facultyName: string;
+  /** Sĩ số; null với CTĐT vì loại này không có sĩ số. */
+  targetCount: number | null;
+  responseCount: number;
+  validResponseCount: number;
+  invalidResponseCount: number;
+  openCommentCount: number;
 }
 
 /** Bảng "CourseSectionSurveys": bài khảo sát riêng của một lớp học phần. */
@@ -356,6 +392,17 @@ export interface PublicSurvey {
   }[];
   /** Hình thức phiếu do quản trị đặt lúc tạo đợt; null là dùng mẫu mặc định. */
   formConfig: SurveyFormConfig | null;
+  /**
+   * Loại đợt: quyết định phần thông tin đầu phiếu. Học phần hiện lớp và giảng viên, CTĐT
+   * hiện khoá ngành, khảo sát giảng viên chỉ hiện khoa.
+   */
+  surveyType: SurveyType;
+  /** CTĐT: mã khoá ngành, vd 'CNT63CL'. Rỗng với hai loại kia. */
+  cohortMajorCode: string;
+  /** CTĐT: tên ngành. */
+  majorName: string;
+  /** CTĐT: tên khoá học, vd 'Khoá 63'. */
+  cohortName: string;
 }
 
 /**

@@ -26,6 +26,8 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   'course-campaigns': 'COURSE_CAMPAIGNS_ACCESS',
   campaigns: 'COURSE_CAMPAIGNS_ACCESS',
   'program-campaigns': 'PROGRAM_CAMPAIGNS_ACCESS',
+  // Tạm dùng chung quyền đợt CTĐT tới khi có quyền riêng cho khảo sát giảng viên.
+  'lecturer-campaigns': 'PROGRAM_CAMPAIGNS_ACCESS',
   'program-criteria': 'PROGRAM_CRITERIA_ACCESS',
   'users-admin': 'USER_ADMIN_ACCESS',
 };

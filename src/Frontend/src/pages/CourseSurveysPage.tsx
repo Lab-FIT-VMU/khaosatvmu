@@ -22,7 +22,7 @@ import { useAuth } from '../auth/authContext';
 import { isUnitManagerRole, isUnrestrictedRole, ROLE_CODES } from '../auth/roles';
 import { writeSemesterSurveysCache } from '../hooks/useSemesterSurveys';
 import { ConfirmDialog, Modal } from '../components/Modal';
-import { SearchableSelect } from '../components/SearchableSelect';
+import { CreateSurveyDialog } from '../components/CreateSurveyDialog';
 import { SurveyFormDesigner } from '../components/SurveyFormDesigner';
 import type { SurveyPreviewData } from '../components/SurveyFormPreview';
 import { QRCodeModal } from '../components/QRCodeModal';
@@ -35,6 +35,7 @@ import {
   surveyApi,
   surveyErrorMessage,
   surveyLinkOf,
+  surveyTypeLabels,
 } from '../services/surveyApi';
 import type {
   AnswerScale,
@@ -42,8 +43,9 @@ import type {
   SemesterSurvey,
   SurveyFormConfig,
   SurveyTemplate,
+  SurveyType,
 } from '../types';
-import { emptySurveyFormConfig, surveyFormTemplates } from '../utils/surveyFormTemplates';
+import { emptySurveyFormConfig } from '../utils/surveyFormTemplates';
 import { foldVietnamese, toVietnameseFileSlug } from '../utils/vietnamese';
 import '../styles/catalogs.css';
 import '../styles/survey-operations.css';
@@ -177,11 +179,6 @@ function formatDateRange(startTime: string, endTime: string): string {
   return `${formatter.format(new Date(startTime))} → ${formatter.format(new Date(endTime))}`;
 }
 
-/** Tên mẫu đang chọn, để nút mở màn soạn nói rõ đợt đang dùng hình thức nào. */
-const templateNameOf = (config: SurveyFormConfig | null | undefined): string =>
-  surveyFormTemplates.find((template) => template.id === config?.templateId)?.name
-    ?? 'Chưa chọn mẫu';
-
 const defaultSchedule = (): ScheduleForm => {
   const now = new Date();
   const nextMonth = new Date();
@@ -205,12 +202,15 @@ interface CourseSurveysPageProps {
    * khi ấy phần hướng dẫn chỉ còn chữ, không kèm nút bấm dẫn tới chỗ vào không được.
    */
   onOpenClasses?: () => void;
+  /** Chuyển sang trang đợt của loại khác, sau khi hộp thoại tạo ra một đợt CTĐT / giảng viên. */
+  onOpenSurveyType?: (surveyType: SurveyType) => void;
 }
 
 export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   onOpenSurveyReport,
   onSurveysChanged,
   onOpenClasses,
+  onOpenSurveyType,
 }) => {
   const {
     academicYears,
@@ -251,19 +251,10 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   /** Số lớp học phần của kỳ đang chọn. Null nghĩa là chưa đếm được. */
   const [sectionCount, setSectionCount] = useState<number | null>(null);
 
+  // Hộp thoại tạo đợt dùng chung cho ba loại khảo sát, bước đầu bắt buộc chọn loại.
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [createSurveyName, setCreateSurveyName] = useState('');
-  const [createTemplateId, setCreateTemplateId] = useState('');
-  const [createSchedule, setCreateSchedule] = useState<ScheduleForm>(defaultSchedule);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  /** Hình thức phiếu của đợt sắp tạo. */
-  const [createFormConfig, setCreateFormConfig] = useState<SurveyFormConfig>(emptySurveyFormConfig);
-  /**
-   * Màn soạn phiếu đang mở cho ai: 'create' là đợt sắp tạo, một đợt là đợt đã có.
-   * Null là đóng.
-   */
-  const [designerTarget, setDesignerTarget] = useState<'create' | SemesterSurvey | null>(null);
+  /** Màn soạn phiếu của một đợt ĐÃ TẠO. Null là đóng. */
+  const [designerTarget, setDesignerTarget] = useState<SemesterSurvey | null>(null);
   const [savingFormConfig, setSavingFormConfig] = useState(false);
   /**
    * Cấu hình mở màn soạn. Phải giữ nguyên tham chiếu giữa các lần vẽ: màn soạn coi
@@ -271,20 +262,16 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
    * gõ chữ nào cũng bị nuốt.
    */
   const designerValue = useMemo(
-    () => (designerTarget === null || designerTarget === 'create'
-      ? createFormConfig
-      : designerTarget.formConfig ?? emptySurveyFormConfig()),
-    [designerTarget, createFormConfig],
+    () => designerTarget?.formConfig ?? emptySurveyFormConfig(),
+    [designerTarget],
   );
 
-  /**
-   * Tên đợt và bộ câu hỏi THẬT đưa vào màn soạn. Xem trước phải là đúng phiếu sinh viên
-   * sẽ nhận, nên phải chọn bộ câu hỏi và đặt tên đợt trước rồi mới soạn được hình thức.
-   */
+  /** Tên đợt và bộ câu hỏi THẬT đưa vào màn soạn, để xem trước đúng phiếu sinh viên nhận. */
   const designerData = useMemo((): SurveyPreviewData | undefined => {
-    const isCreate = designerTarget === 'create' || designerTarget === null;
-    const templateId = isCreate ? Number(createTemplateId) : designerTarget.surveyTemplateId;
-    const template = templates.find((item) => item.surveyTemplateId === templateId);
+    if (designerTarget === null) return undefined;
+    const template = templates.find(
+      (item) => item.surveyTemplateId === designerTarget.surveyTemplateId,
+    );
     if (!template) return undefined;
 
     const scaleById = new Map(answerScales.map((scale) => [scale.answerScaleId, scale]));
@@ -298,8 +285,9 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
       }));
 
     return {
-      surveyName: isCreate ? createSurveyName : designerTarget.surveyName,
+      surveyName: designerTarget.surveyName,
       templateName: template.templateName,
+      surveyType: designerTarget.surveyType,
       sections: template.sections
         .map((section) => ({
           sectionName: section.sectionName,
@@ -308,10 +296,7 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
         .filter((section) => section.questions.length > 0),
       questionCount: template.questions.length,
     };
-  }, [designerTarget, createTemplateId, createSurveyName, templates, answerScales]);
-
-  /** Chưa chọn bộ câu hỏi hoặc chưa đặt tên đợt thì chưa soạn hình thức được. */
-  const canDesignCreateForm = createSurveyName.trim().length > 0 && createTemplateId !== '';
+  }, [designerTarget, templates, answerScales]);
 
   const [editingSurvey, setEditingSurvey] = useState<SemesterSurvey | null>(null);
   const [editSurveyName, setEditSurveyName] = useState('');
@@ -472,51 +457,23 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     }
   };
 
-  const handleCreate = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!semesterId) {
-      setCreateError('Vui lòng chọn học kỳ trước.');
-      return;
-    }
-    if (!createSurveyName.trim()) {
-      setCreateError('Vui lòng đặt tên cho bài khảo sát.');
-      return;
-    }
-    if (!createTemplateId) {
-      setCreateError('Vui lòng chọn bộ câu hỏi khảo sát.');
-      return;
-    }
-    if (new Date(createSchedule.endTime) <= new Date(createSchedule.startTime)) {
-      setCreateError('Thời gian đóng phải sau thời gian mở.');
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const created = await surveyApi.createSemesterSurvey({
-        surveyName: createSurveyName.trim(),
-        semesterId: Number(semesterId),
-        surveyTemplateId: Number(createTemplateId),
-        startTime: toIso(createSchedule.startTime),
-        endTime: toIso(createSchedule.endTime),
-        formConfig: createFormConfig,
+  const handleCreated = async (created: SemesterSurvey) => {
+    setIsCreateOpen(false);
+    onSurveysChanged?.();
+    // Đợt loại khác không hiện ở trang này: báo xong rồi chuyển sang trang của loại đó.
+    if (created.surveyType !== 'COURSE') {
+      toast.success(`Đã tạo bài khảo sát ${surveyTypeLabels[created.surveyType].toLowerCase()}`, {
+        description: `${created.surveyName} · ${created.sectionSurveyCount} đơn vị`,
       });
-      await loadSemesterSurveys(semesterId);
-      setExpanded((prev) => ({ ...prev, [created.semesterSurveyId]: true }));
-      await loadSections(created.semesterSurveyId);
-      onSurveysChanged?.();
-      toast.success('Đã tạo bài khảo sát cho các lớp học phần', {
-        description: `${created.surveyName} · ${created.sectionSurveyCount} lớp`,
-      });
-      setIsCreateOpen(false);
-      setCreateError(null);
-      setCreateSurveyName('');
-      setCreateFormConfig(emptySurveyFormConfig());
-    } catch (error) {
-      setCreateError(messageFrom(error));
-    } finally {
-      setCreating(false);
+      onOpenSurveyType?.(created.surveyType);
+      return;
     }
+    await loadSemesterSurveys(semesterId);
+    setExpanded((prev) => ({ ...prev, [created.semesterSurveyId]: true }));
+    await loadSections(created.semesterSurveyId);
+    toast.success('Đã tạo bài khảo sát cho các lớp học phần', {
+      description: `${created.surveyName} · ${created.sectionSurveyCount} lớp`,
+    });
   };
 
   /** Lưu hình thức phiếu của một đợt ĐÃ TẠO. Server chặn nếu đợt đã tới giờ mở. */
@@ -746,22 +703,13 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
         </div>
         {canManageCampaign && (
           <div className="operations-tab-actions">
+            {/* Không khoá nút khi kỳ chưa có lớp: vẫn tạo được đợt CTĐT hay giảng viên.
+                Hộp thoại tự đếm và chặn khi loại đã chọn không có đơn vị nào. */}
             <button
               type="button"
               className="btn btn-primary"
-              disabled={!semesterId || hasNoSections}
-              title={
-                hasNoSections
-                  ? 'Học kỳ này chưa có lớp học phần nào để phát phiếu'
-                  : undefined
-              }
-              onClick={() => {
-                setCreateError(null);
-                setCreateSurveyName('');
-                setCreateTemplateId(templates.length === 1 ? String(templates[0].surveyTemplateId) : '');
-                setCreateSchedule(defaultSchedule());
-                setIsCreateOpen(true);
-              }}
+              disabled={!semesterId}
+              onClick={() => setIsCreateOpen(true)}
             >
               <Plus className="operation-icon" aria-hidden="true" />
               Tạo bài khảo sát
@@ -1060,126 +1008,14 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
         );
       })}
 
-      <Modal
+      <CreateSurveyDialog
         isOpen={isCreateOpen}
-        onClose={() => {
-          if (creating) return;
-          setIsCreateOpen(false);
-          setCreateError(null);
-        }}
-        title="Tạo bài khảo sát cho học kỳ"
-      >
-        <form className="catalog-form" onSubmit={(event) => void handleCreate(event)}>
-          {createError && (
-            <div className="catalog-validation-error" role="alert">{createError}</div>
-          )}
-
-          <div className="catalog-context-band">
-            Mỗi lớp học phần trong phạm vi đã chọn sẽ được tạo một bài khảo sát riêng, dùng chung
-            bộ câu hỏi bên dưới và có đường dẫn, mã QR riêng. Sau khi tạo vẫn thêm được phạm vi
-            khác vào chính đợt này.
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="create-survey-name">Tên bài khảo sát</label>
-            <input
-              id="create-survey-name"
-              type="text"
-              value={createSurveyName}
-              onChange={(event) => setCreateSurveyName(event.target.value)}
-              placeholder="VD: Khảo sát giữa kỳ đợt 1"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="create-survey-template">Bộ câu hỏi khảo sát</label>
-            <SearchableSelect
-              id="create-survey-template"
-              value={createTemplateId}
-              onChange={setCreateTemplateId}
-              required
-              placeholder="Chọn bộ câu hỏi"
-              options={templates.map((template) => ({
-                value: String(template.surveyTemplateId),
-                label: `${template.templateName} (${template.questions.length} câu)`,
-              }))}
-            />
-          </div>
-
-          {/* Hình thức phiếu soạn trong một hộp thoại riêng: bản dựng phiếu không nhét
-              vừa biểu mẫu tạo đợt. */}
-          <div className="survey-form-picker">
-            <div>
-              <strong>Mẫu phiếu: {templateNameOf(createFormConfig)}</strong>
-              <br />
-              <span>
-                {canDesignCreateForm
-                  ? 'Bỏ qua thì phiếu dùng mẫu mặc định của hệ thống.'
-                  : 'Đặt tên bài khảo sát và chọn bộ câu hỏi trước, để xem trước đúng phiếu thật.'}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              disabled={creating || !canDesignCreateForm}
-              title={canDesignCreateForm
-                ? undefined
-                : 'Đặt tên bài khảo sát và chọn bộ câu hỏi trước'}
-              onClick={() => setDesignerTarget('create')}
-            >
-              <Palette className="operation-icon" aria-hidden="true" />
-              {createFormConfig.templateId ? 'Sửa hình thức phiếu' : 'Chọn mẫu phiếu'}
-            </button>
-          </div>
-
-          <div className="catalog-form-grid catalog-form-grid--2">
-            <div className="form-group">
-              <label htmlFor="create-survey-start">Thời gian mở</label>
-              <input
-                id="create-survey-start"
-                type="datetime-local"
-                value={createSchedule.startTime}
-                onChange={(event) =>
-                  setCreateSchedule((prev) => ({ ...prev, startTime: event.target.value }))
-                }
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="create-survey-end">Thời gian đóng</label>
-              <input
-                id="create-survey-end"
-                type="datetime-local"
-                value={createSchedule.endTime}
-                onChange={(event) =>
-                  setCreateSchedule((prev) => ({ ...prev, endTime: event.target.value }))
-                }
-                required
-              />
-            </div>
-          </div>
-
-          <div className="modal-footer catalog-form-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setIsCreateOpen(false)}
-              disabled={creating}
-            >
-              Hủy
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={creating}>
-              {creating ? (
-                <LoaderCircle className="auth-spin" aria-hidden="true" size={16} />
-              ) : (
-                <Save aria-hidden="true" size={16} />
-              )}
-              Tạo bài khảo sát
-            </button>
-          </div>
-        </form>
-      </Modal>
+        semesterId={semesterId ? Number(semesterId) : null}
+        templates={templates}
+        answerScales={answerScales}
+        onClose={() => setIsCreateOpen(false)}
+        onCreated={handleCreated}
+      />
 
       <Modal
         isOpen={editingSurvey !== null}
@@ -1318,12 +1154,6 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
         data={designerData}
         onClose={() => setDesignerTarget(null)}
         onSave={(config) => {
-          if (designerTarget === 'create') {
-            // Đợt chưa tồn tại nên chỉ giữ trong biểu mẫu, gửi kèm lúc bấm Tạo.
-            setCreateFormConfig(config);
-            setDesignerTarget(null);
-            return;
-          }
           if (designerTarget) void saveFormConfig(designerTarget, config);
         }}
       />

@@ -520,7 +520,10 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("AverageScore")
                         .HasColumnType("numeric(4,2)");
 
-                    b.Property<int>("CourseSectionId")
+                    b.Property<int?>("CohortMajorId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CourseSectionId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
@@ -531,6 +534,9 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime>("EndTime")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("FacultyId")
+                        .HasColumnType("integer");
 
                     b.Property<int>("InvalidResponseCount")
                         .ValueGeneratedOnAdd()
@@ -553,6 +559,9 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("StartTime")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("TargetCount")
+                        .HasColumnType("integer");
+
                     b.Property<int>("TotalResponseCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -565,16 +574,30 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("CourseSectionSurveyId");
 
+                    b.HasIndex("CohortMajorId");
+
                     b.HasIndex("CourseSectionId");
+
+                    b.HasIndex("FacultyId");
 
                     b.HasIndex("LinkToken")
                         .IsUnique();
 
+                    b.HasIndex("SemesterSurveyId", "CohortMajorId")
+                        .IsUnique()
+                        .HasFilter("\"CohortMajorId\" IS NOT NULL");
+
                     b.HasIndex("SemesterSurveyId", "CourseSectionId")
                         .IsUnique();
 
+                    b.HasIndex("SemesterSurveyId", "FacultyId")
+                        .IsUnique()
+                        .HasFilter("\"FacultyId\" IS NOT NULL");
+
                     b.ToTable("CourseSectionSurveys", null, t =>
                         {
+                            t.HasCheckConstraint("CK_CourseSectionSurveys_SingleUnit", "num_nonnulls(\"CourseSectionId\", \"CohortMajorId\", \"FacultyId\") = 1");
+
                             t.HasCheckConstraint("CK_CourseSectionSurveys_TimeRange", "\"EndTime\" > \"StartTime\"");
                         });
                 });
@@ -1513,14 +1536,25 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<int>("SurveyTemplateId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("SurveyType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("COURSE");
+
                     b.HasKey("SemesterSurveyId");
 
                     b.HasIndex("SemesterId");
 
                     b.HasIndex("SurveyTemplateId");
 
+                    b.HasIndex("SemesterId", "SurveyType");
+
                     b.ToTable("SemesterSurveys", null, t =>
                         {
+                            t.HasCheckConstraint("CK_SemesterSurveys_SurveyType", "\"SurveyType\" IN ('COURSE', 'PROGRAM', 'LECTURER')");
+
                             t.HasCheckConstraint("CK_SemesterSurveys_TimeRange", "\"EndTime\" > \"StartTime\"");
                         });
                 });
@@ -2018,11 +2052,20 @@ namespace Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Domain.CourseSectionSurvey", b =>
                 {
+                    b.HasOne("Domain.CohortMajor", null)
+                        .WithMany()
+                        .HasForeignKey("CohortMajorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.CourseSection", null)
                         .WithMany()
                         .HasForeignKey("CourseSectionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Domain.Faculty", null)
+                        .WithMany()
+                        .HasForeignKey("FacultyId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Domain.SemesterSurvey", null)
                         .WithMany()

@@ -123,7 +123,12 @@ public sealed record SemesterSurveyDto(
     /// Hình thức phiếu của đợt; null là dùng mẫu mặc định. Giao diện cần nó để mở lại
     /// màn soạn phiếu trên đúng cấu hình đang lưu.
     /// </summary>
-    SurveyFormConfigDto? FormConfig = null);
+    SurveyFormConfigDto? FormConfig = null,
+    /// <summary>
+    /// Loại đợt, một trong <see cref="Domain.SurveyTypes"/>. Với loại khác học phần,
+    /// <see cref="SectionSurveyCount"/> là số đơn vị được phát link (khoá ngành / khoa).
+    /// </summary>
+    string SurveyType = Domain.SurveyTypes.Course);
 
 // ------------------------------------------- Sheet 1: chuẩn hoá điểm (Z-score)
 
@@ -638,8 +643,28 @@ public static class SurveyScopeTypes
     /// </summary>
     public const string Section = "section";
 
+    /// <summary>Khảo sát CTĐT: mọi khoá ngành của một khoá học. <c>ScopeId</c> là CohortId.</summary>
+    public const string Cohort = "cohort";
+
+    /// <summary>Khảo sát CTĐT: đúng một khoá ngành. <c>ScopeId</c> là CohortMajorId.</summary>
+    public const string CohortMajor = "cohort-major";
+
+    /// <summary>Phạm vi lớp học phần — giữ cho các chỗ gọi cũ chỉ biết khảo sát học phần.</summary>
     public static bool IsValid(string? scopeType) =>
-        scopeType is All or Faculty or Department or Section;
+        IsValidFor(Domain.SurveyTypes.Course, scopeType);
+
+    /// <summary>
+    /// Mỗi loại khảo sát chỉ nhận đúng các phạm vi chọn được đơn vị của nó. "Khoa" thì
+    /// loại nào cũng có, nhưng hiểu theo đơn vị của loại đó: lớp quy về khoa, khoá ngành
+    /// thuộc ngành của khoa, hay chính khoa được phát link.
+    /// </summary>
+    public static bool IsValidFor(string? surveyType, string? scopeType) => surveyType switch
+    {
+        Domain.SurveyTypes.Course => scopeType is All or Faculty or Department or Section,
+        Domain.SurveyTypes.Program => scopeType is All or Faculty or Cohort or CohortMajor,
+        Domain.SurveyTypes.Lecturer => scopeType is All or Faculty,
+        _ => false,
+    };
 
     /// <summary>Chỉ <see cref="All"/> mới được thiếu <c>ScopeId</c>.</summary>
     public static bool RequiresScopeId(string scopeType) => scopeType != All;
@@ -660,7 +685,12 @@ public sealed record CreateSemesterSurveyCommand(
     /// được nữa, nên lệnh cập nhật đợt không có trường này.
     /// Null là dùng mẫu mặc định của hệ thống.
     /// </summary>
-    SurveyFormConfigDto? FormConfig = null);
+    SurveyFormConfigDto? FormConfig = null,
+    /// <summary>
+    /// Một trong <see cref="Domain.SurveyTypes"/>, bắt buộc chọn ngay từ bước đầu tạo
+    /// đợt. Mặc định học phần để các chỗ gọi cũ giữ nguyên nghĩa.
+    /// </summary>
+    string SurveyType = Domain.SurveyTypes.Course);
 
 /// <summary>Chỉnh sửa thông tin chung của đợt; không thay đổi học kỳ hoặc bộ câu hỏi.</summary>
 public sealed record UpdateSemesterSurveyCommand(
@@ -772,7 +802,47 @@ public sealed record PublicSurveyDto(
     /// <summary>Tên khoa của học phần, rỗng khi học phần chưa gắn khoa.</summary>
     string FacultyName = "",
     /// <summary>Tên bộ môn của học phần, rỗng khi học phần chưa gắn bộ môn.</summary>
-    string DepartmentName = "");
+    string DepartmentName = "",
+    /// <summary>
+    /// Loại đợt, để phiếu chọn phần thông tin đầu phiếu: học phần hiện lớp và giảng viên,
+    /// CTĐT hiện khoá ngành, khảo sát giảng viên hiện khoa.
+    /// </summary>
+    string SurveyType = Domain.SurveyTypes.Course,
+    /// <summary>Khảo sát CTĐT: mã khoá ngành, vd 'CNT63CL'. Rỗng với hai loại kia.</summary>
+    string CohortMajorCode = "",
+    /// <summary>Khảo sát CTĐT: tên ngành của khoá ngành.</summary>
+    string MajorName = "",
+    /// <summary>Khảo sát CTĐT: tên khoá học, vd 'Khoá 63'.</summary>
+    string CohortName = "");
+
+/// <summary>
+/// Một đơn vị được phát link trong đợt CTĐT hoặc khảo sát giảng viên: khoá ngành hoặc
+/// khoa, kèm link và số phiếu đã thu. Đếm sống từ phiếu, giống trang Tiến độ thu phiếu.
+/// </summary>
+public sealed record SurveyUnitDto(
+    int CourseSectionSurveyId,
+    int SemesterSurveyId,
+    string SurveyType,
+    string LinkToken,
+    DateTime StartTime,
+    DateTime EndTime,
+    /// <summary>CTĐT: CohortMajorId. Khảo sát giảng viên: FacultyId.</summary>
+    int UnitId,
+    /// <summary>CTĐT: mã khoá ngành. Khảo sát giảng viên: mã khoa.</summary>
+    string UnitCode,
+    /// <summary>CTĐT: tên ngành. Khảo sát giảng viên: tên khoa.</summary>
+    string UnitName,
+    /// <summary>CTĐT: tên khoá học. Rỗng với khảo sát giảng viên.</summary>
+    string CohortName,
+    /// <summary>Khoa quản lý đơn vị: khoa của ngành, hoặc chính khoa được phát link.</summary>
+    int? FacultyId,
+    string FacultyName,
+    /// <summary>Sĩ số. Null với CTĐT — loại này không có sĩ số và không tính tỷ lệ phản hồi.</summary>
+    int? TargetCount,
+    int ResponseCount,
+    int ValidResponseCount,
+    int InvalidResponseCount,
+    int OpenCommentCount);
 
 /// <summary>
 /// <paramref name="AnswerValue"/> là số mức đã chọn ("1".."5") với câu thang
@@ -888,9 +958,13 @@ public interface ISurveyService
         int surveyTemplateId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Bỏ trống semesterId để lấy toàn bộ đợt khảo sát.</summary>
+    /// <summary>
+    /// Bỏ trống semesterId để lấy toàn bộ đợt khảo sát. Bỏ trống surveyType để lấy mọi
+    /// loại — endpoint thì mặc định học phần, để màn hình cũ không thấy đợt loại khác.
+    /// </summary>
     Task<IReadOnlyList<SemesterSurveyDto>> GetSemesterSurveysAsync(
         int? semesterId,
+        string? surveyType = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -933,14 +1007,25 @@ public interface ISurveyService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Đếm trước số lớp của một phạm vi. Truyền <paramref name="semesterSurveyId"/>
-    /// để biết thêm bao nhiêu lớp trong đó chưa có bài trong đợt.
+    /// Đếm trước số đơn vị (lớp / khoá ngành / khoa, theo <paramref name="surveyType"/>)
+    /// của một phạm vi. Truyền <paramref name="semesterSurveyId"/> để biết thêm bao nhiêu
+    /// đơn vị trong đó chưa có link trong đợt; khi đó loại lấy theo chính đợt.
     /// </summary>
     Task<SurveyOperationResult<SurveyScopePreviewDto>> PreviewSectionScopeAsync(
         int semesterId,
         string scopeType,
         int? scopeId,
         int? semesterSurveyId,
+        string surveyType = Domain.SurveyTypes.Course,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Các đơn vị được phát link của một đợt CTĐT hoặc khảo sát giảng viên. Đợt học
+    /// phần trả <see cref="SurveyErrorCodes.SurveyTypeMismatch"/>: lớp học phần đi đường
+    /// <see cref="GetCourseSectionSurveysAsync(int, CancellationToken)"/>.
+    /// </summary>
+    Task<SurveyOperationResult<IReadOnlyList<SurveyUnitDto>>> GetSurveyUnitsAsync(
+        int semesterSurveyId,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<CourseSectionSurveyDto>> GetCourseSectionSurveysAsync(
@@ -1232,4 +1317,10 @@ public static class SurveyErrorCodes
     public const string ScopeNotFound = "SURVEY_SCOPE_NOT_FOUND";
 
     public const string CommentsTooLong = "SURVEY_COMMENTS_TOO_LONG";
+
+    /// <summary>Loại khảo sát không nằm trong <see cref="Domain.SurveyTypes"/>.</summary>
+    public const string SurveyTypeInvalid = "SURVEY_TYPE_INVALID";
+
+    /// <summary>Thao tác chỉ dành cho một loại đợt khác, vd xem lớp học phần của đợt CTĐT.</summary>
+    public const string SurveyTypeMismatch = "SURVEY_TYPE_MISMATCH";
 }

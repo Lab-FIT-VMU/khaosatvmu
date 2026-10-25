@@ -9,6 +9,8 @@ import type {
   SurveyResponseDetail,
   SurveyResponseSummary,
   SurveyTemplate,
+  SurveyType,
+  SurveyUnit,
 } from '../types';
 import { maximumSectionsPerTemplate } from '../types';
 import type { ScoringThresholds } from '../utils/reportThresholds';
@@ -444,8 +446,18 @@ export interface RecalculateScoresResult {
 }
 
 /** Kết quả bù bài khảo sát cho lớp thêm vào kỳ sau khi đợt đã tạo. */
-/** Phạm vi lớp được phát phiếu. Khớp `SurveyScopeTypes` bên backend. */
-export type SurveyScopeType = 'all' | 'faculty' | 'department' | 'section';
+/**
+ * Phạm vi đơn vị được phát phiếu. Khớp `SurveyScopeTypes` bên backend: học phần dùng
+ * all/faculty/department/section, CTĐT dùng all/faculty/cohort/cohort-major, khảo sát
+ * giảng viên dùng all/faculty.
+ */
+export type SurveyScopeType =
+  | 'all'
+  | 'faculty'
+  | 'department'
+  | 'section'
+  | 'cohort'
+  | 'cohort-major';
 
 export interface AddSectionsToSemesterSurveyPayload {
   scopeType: SurveyScopeType;
@@ -673,13 +685,20 @@ export const surveyApi = {
       `/api/surveys/semester-surveys/${semesterSurveyId}/department-dashboard`,
     ),
 
-  semesterSurveys: (semesterId?: number, signal?: AbortSignal) =>
-    apiRequest<SemesterSurvey[]>(
-      semesterId === undefined
-        ? '/api/surveys/semester-surveys'
-        : `/api/surveys/semester-surveys?semesterId=${semesterId}`,
+  /** Không truyền `surveyType` thì server chỉ trả đợt học phần. */
+  semesterSurveys: (semesterId?: number, signal?: AbortSignal, surveyType?: SurveyType) => {
+    const searchParams = new URLSearchParams();
+    if (semesterId !== undefined) searchParams.set('semesterId', String(semesterId));
+    if (surveyType !== undefined) searchParams.set('surveyType', surveyType);
+    const query = searchParams.toString();
+    return apiRequest<SemesterSurvey[]>(
+      query ? `/api/surveys/semester-surveys?${query}` : '/api/surveys/semester-surveys',
       { signal },
-    ),
+    );
+  },
+  /** Link và số phiếu theo từng khoá ngành / khoa của đợt CTĐT hoặc khảo sát giảng viên. */
+  surveyUnits: (semesterSurveyId: number, signal?: AbortSignal) =>
+    apiRequest<SurveyUnit[]>(`/api/surveys/semester-surveys/${semesterSurveyId}/units`, { signal }),
   createSemesterSurvey: (survey: CreateSemesterSurveyPayload) =>
     csrfRequest<SemesterSurvey>('/api/surveys/semester-surveys', 'POST', survey),
   updateSemesterSurvey: (
@@ -771,11 +790,14 @@ export const surveyApi = {
     scopeType: SurveyScopeType;
     scopeId: number | null;
     semesterSurveyId?: number;
+    /** Loại đợt sắp tạo; đợt đã có thì server lấy theo chính đợt. Mặc định học phần. */
+    surveyType?: SurveyType;
   }) => {
     const searchParams = new URLSearchParams({
       semesterId: String(params.semesterId),
       scopeType: params.scopeType,
     });
+    if (params.surveyType) searchParams.set('surveyType', params.surveyType);
     if (params.scopeId !== null) searchParams.set('scopeId', String(params.scopeId));
     if (params.semesterSurveyId !== undefined) {
       searchParams.set('semesterSurveyId', String(params.semesterSurveyId));
@@ -864,10 +886,14 @@ export const publicSurveyApi = {
 export interface CreateSemesterSurveyPayload {
   /** Tên đợt do quản trị đặt. Bắt buộc, backend trả SURVEY_SEMESTER_SURVEY_NAME_REQUIRED nếu trống. */
   surveyName: string;
+  /** Loại khảo sát, bắt buộc chọn ở bước đầu của hộp thoại tạo đợt. */
+  surveyType: SurveyType;
   /**
-   * Đợt luôn phát cho MỌI lớp học phần của kỳ, nên không gửi phạm vi nữa; backend
-   * không nhận trường này thì tự hiểu là cả kỳ.
+   * Đợt học phần luôn phát cho MỌI lớp của kỳ nên không gửi phạm vi; backend không
+   * nhận trường này thì hiểu là cả kỳ. CTĐT và giảng viên thì chọn phạm vi đơn vị.
    */
+  scopeType?: SurveyScopeType;
+  scopeId?: number | null;
   semesterId: number;
   surveyTemplateId: number;
   /** ISO 8601 (UTC) */
@@ -929,10 +955,17 @@ export async function downloadCourseSurveyQrExcel(semesterSurveyId: number): Pro
   return { blob: await response.blob(), fileName };
 }
 
-/** Link sinh viên dùng để vào làm bài của một lớp học phần. */
+/** Link vào làm bài của một đơn vị: lớp học phần, khoá ngành hoặc khoa. */
 export function surveyLinkOf(linkToken: string): string {
   return `${window.location.origin}/survey/${linkToken}`;
 }
+
+/** Nhãn của ba loại khảo sát, dùng chung cho hộp thoại tạo đợt, menu và tiêu đề trang. */
+export const surveyTypeLabels: Record<SurveyType, string> = {
+  COURSE: 'Học phần',
+  PROGRAM: 'Chương trình đào tạo',
+  LECTURER: 'Giảng viên',
+};
 
 
 /** Thông báo tiếng Việt cho mã lỗi của API bộ câu hỏi khảo sát. */
@@ -995,9 +1028,10 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_SEMESTER_SURVEY_HAS_RESPONSES: 'Đợt khảo sát đã có phiếu trả lời nên không xóa được.',
   SURVEY_SCOPE_TYPE_UNSUPPORTED: 'Kiểu phạm vi không hợp lệ.',
   SURVEY_SCOPE_ID_REQUIRED: 'Vui lòng chọn đơn vị cho phạm vi đã chọn.',
-  SURVEY_SCOPE_HAS_NO_SECTIONS: 'Phạm vi này không có lớp học phần nào trong học kỳ đã chọn.',
+  SURVEY_SCOPE_HAS_NO_SECTIONS:
+    'Phạm vi này không có đơn vị nào để phát phiếu (lớp học phần, khoá ngành hoặc khoa có giảng viên).',
   SURVEY_SCOPE_SECTIONS_ALREADY_ADDED:
-    'Mọi lớp của phạm vi này đều đã có bài khảo sát trong đợt.',
+    'Mọi đơn vị của phạm vi này đều đã có đường dẫn khảo sát trong đợt.',
   SURVEY_SECTION_SURVEY_NOT_FOUND: 'Không tìm thấy bài khảo sát của lớp học phần.',
   SURVEY_SECTION_SURVEY_HAS_NO_RESPONSES: 'Lớp này chưa có phiếu nào nên không có gì để huỷ.',
   SURVEY_RESPONSE_NOT_FOUND: 'Không tìm thấy phiếu trả lời.',
@@ -1005,11 +1039,13 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_LINK_NOT_OPEN: 'Bài khảo sát chưa mở hoặc đã hết hạn.',
   SURVEY_LINK_NOT_STARTED: 'Bài khảo sát chưa tới thời gian mở. Vui lòng quay lại đúng khung giờ ghi trên thông báo của lớp.',
   SURVEY_LINK_EXPIRED: 'Bài khảo sát đã hết hạn nộp phiếu. Đường dẫn này không còn nhận thêm câu trả lời.',
-  SURVEY_CLASS_FULL: 'Lớp đã thu đủ số phiếu theo sĩ số nên không nhận thêm. Nếu bạn chưa làm bài, vui lòng báo giảng viên phụ trách lớp.',
+  SURVEY_CLASS_FULL: 'Đã thu đủ số phiếu theo sĩ số nên không nhận thêm. Nếu bạn chưa làm bài, vui lòng báo người phụ trách khảo sát.',
   SURVEY_ANSWERS_INCOMPLETE: 'Vui lòng trả lời đầy đủ tất cả câu hỏi.',
   SURVEY_ANSWER_VALUE_INVALID: 'Mức đánh giá không hợp lệ.',
   SURVEY_ANSWER_TEXT_TOO_LONG: 'Câu trả lời tự nhập không được vượt quá 2000 ký tự.',
   SURVEY_COMMENTS_TOO_LONG: 'Ý kiến khác không được vượt quá 1000 ký tự.',
+  SURVEY_TYPE_INVALID: 'Vui lòng chọn loại bài khảo sát.',
+  SURVEY_TYPE_MISMATCH: 'Thao tác này không áp dụng cho loại khảo sát của đợt.',
   AUTH_CSRF_INVALID: 'Phiên bảo mật đã thay đổi. Vui lòng tải lại trang.',
 };
 

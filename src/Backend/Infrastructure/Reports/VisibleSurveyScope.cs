@@ -25,7 +25,10 @@ internal static class VisibleSurveyScope
         IUserScopeResolver userScope,
         CancellationToken cancellationToken)
     {
-        var query = db.CourseSectionSurveys.AsNoTracking();
+        // Mọi màn báo cáo đi qua đây đều là báo cáo lớp học phần. Đơn vị của đợt CTĐT và
+        // khảo sát giảng viên không có lớp, để lọt vào là đếm nhầm phiếu của loại khác.
+        var query = db.CourseSectionSurveys.AsNoTracking()
+            .Where(x => x.CourseSectionId != null);
         var visible = await publication.VisibleSurveyIdsAsync(cancellationToken);
         if (visible is not null)
         {

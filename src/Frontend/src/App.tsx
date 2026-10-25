@@ -42,7 +42,7 @@ const CriteriaPage = lazy(() => import('./pages/CriteriaPage').then(m => ({ defa
 const SurveyTemplatesPage = lazy(() => import('./pages/SurveyTemplatesPage').then(m => ({ default: m.SurveyTemplatesPage })));
 const CourseSurveysPage = lazy(() => import('./pages/CourseSurveysPage').then(m => ({ default: m.CourseSurveysPage })));
 const PublicSurveyPage = lazy(() => import('./pages/PublicSurveyPage').then(m => ({ default: m.PublicSurveyPage })));
-const CampaignsPage = lazy(() => import('./pages/CampaignsPage').then(m => ({ default: m.CampaignsPage })));
+const UnitSurveysPage = lazy(() => import('./pages/UnitSurveysPage').then(m => ({ default: m.UnitSurveysPage })));
 const SurveyProgressPage = lazy(() => import('./pages/SurveyProgressPage').then(m => ({ default: m.SurveyProgressPage })));
 const ReportsOverviewPage = lazy(() => import('./pages/ReportsOverviewPage').then(m => ({ default: m.ReportsOverviewPage })));
 const SurveyStatisticsPage = lazy(() => import('./pages/SurveyStatisticsPage').then(m => ({ default: m.SurveyStatisticsPage })));
@@ -78,7 +78,7 @@ import type {
   CourseSectionSurvey,
   Criterion,
   SemesterSurvey,
-  SurveyCampaign,
+  SurveyType,
   SystemStats,
 } from './types';
 
@@ -250,8 +250,8 @@ function DashboardApp() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [criteria, setCriteria] = useState<Criterion[]>([]);
-  const [campaigns, setCampaigns] = useState<SurveyCampaign[]>([]);
-  const [surveyCounters, setSurveyCounters] = useState({ qrScanCount: 0 });
+  // Bộ đếm lượt quét QR chỉ trang đợt CTĐT giả từng tăng; trang đó đã thay bằng trang thật.
+  const [surveyCounters] = useState({ qrScanCount: 0 });
 
   // Số phiếu đã thu nằm ở "CourseSectionSurveys". Nạp một lần tại đây để bảng
   // điều khiển và trang tiến độ thu phiếu luôn đọc cùng một con số.
@@ -309,14 +309,14 @@ function DashboardApp() {
       totalMajors: majors.length,
       totalCourses: courses.length,
       totalClasses: sections.length,
-      activeCampaigns: campaigns.filter((campaign) => campaign.status === 'Đang diễn ra').length,
+      activeCampaigns: 0,
       // Chỉ phiếu hợp lệ, giống mọi chỗ khác đo tiến độ.
       totalResponses: sectionSurveys.reduce((total, item) => total + item.validResponseCount, 0),
       totalTargetResponses: sectionSurveys.reduce((total, item) => total + item.classSize, 0),
       overallSatisfaction: 0,
       qrScanCount: surveyCounters.qrScanCount,
     }),
-    [faculties, majors, courses, sections, campaigns, sectionSurveys, surveyCounters]
+    [faculties, majors, courses, sections, sectionSurveys, surveyCounters]
   );
 
   // QR Modal state
@@ -545,49 +545,15 @@ function DashboardApp() {
     setCriteria(criteria.filter((c) => c.id !== id));
   };
 
-  const handleAddCampaign = (campaign: Omit<SurveyCampaign, 'id'>) => {
-    const newId = `camp_${Date.now()}`;
-    const newCampaign: SurveyCampaign = {
-      ...campaign,
-      id: newId,
-      qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://khaosat.vimaru.edu.vn/survey/${newId}`,
-      surveyLink: `https://khaosat.vimaru.edu.vn/survey/${newId}`,
-    };
-    setCampaigns([newCampaign, ...campaigns]);
-  };
-
-  const handleAddMultipleCampaigns = (campaignsToAdd: Omit<SurveyCampaign, 'id'>[]) => {
-    const newCampaigns: SurveyCampaign[] = campaignsToAdd.map((c, index) => {
-      const newId = `camp_${Date.now()}_${index}`;
-      return {
-        ...c,
-        id: newId,
-        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://khaosat.vimaru.edu.vn/survey/${newId}`,
-        surveyLink: `https://khaosat.vimaru.edu.vn/survey/${newId}`,
-      };
-    });
-    setCampaigns([...newCampaigns, ...campaigns]);
-  };
-
-  const handleDeleteCampaign = (id: string) => {
-    setCampaigns(campaigns.filter((c) => c.id !== id));
-  };
-
-  const handleUpdateCampaignDates = (id: string, startDate: string, endDate: string) => {
-    setCampaigns(
-      campaigns.map((c) => (c.id === id ? { ...c, startDate, endDate } : c))
+  /** Mỗi loại khảo sát có trang đợt riêng; hộp thoại tạo đợt chuyển sang đúng trang sau khi tạo. */
+  const openSurveyTypeTab = (surveyType: SurveyType) => {
+    setCurrentTab(
+      surveyType === 'PROGRAM'
+        ? 'program-campaigns'
+        : surveyType === 'LECTURER'
+          ? 'lecturer-campaigns'
+          : 'course-campaigns',
     );
-  };
-
-  const handleOpenCampaignQR = (campaign: SurveyCampaign) => {
-    setQrModalData({
-      isOpen: true,
-      title: campaign.title,
-      subtitle: `${campaign.courseName || campaign.majorName || ''} • ${campaign.lecturerName || ''}`,
-      qrUrl: campaign.qrCodeUrl || '',
-      surveyLink: campaign.surveyLink || '',
-    });
-    setSurveyCounters((prev) => ({ ...prev, qrScanCount: prev.qrScanCount + 1 }));
   };
 
   if (isStudentView) {
@@ -770,6 +736,7 @@ function DashboardApp() {
 
             {(currentTab === 'course-campaigns' || currentTab === 'campaigns') && (
               <CourseSurveysPage
+                onOpenSurveyType={openSurveyTypeTab}
                 onOpenSurveyReport={handleOpenSurveyReport}
                 onOpenClasses={
                   canLoadCourseSections ? () => setCurrentTab('classes') : undefined
@@ -778,20 +745,11 @@ function DashboardApp() {
             )}
 
             {currentTab === 'program-campaigns' && (
-              <CampaignsPage
-                campaigns={campaigns}
-                majors={majors}
-                sections={sections}
-                courses={courses}
-                lecturers={lecturers}
-                criteria={criteria}
-                surveyType="Chương trình đào tạo"
-                onAddCampaign={handleAddCampaign}
-                onAddMultipleCampaigns={handleAddMultipleCampaigns}
-                onDeleteCampaign={handleDeleteCampaign}
-                onUpdateCampaignDates={handleUpdateCampaignDates}
-                onOpenQR={handleOpenCampaignQR}
-              />
+              <UnitSurveysPage surveyType="PROGRAM" onOpenSurveyType={openSurveyTypeTab} />
+            )}
+
+            {currentTab === 'lecturer-campaigns' && (
+              <UnitSurveysPage surveyType="LECTURER" onOpenSurveyType={openSurveyTypeTab} />
             )}
 
             {currentTab === 'users-admin' && <UsersAdminPage />}

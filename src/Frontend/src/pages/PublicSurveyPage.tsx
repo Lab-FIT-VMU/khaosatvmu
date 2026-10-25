@@ -35,6 +35,46 @@ const defaultIntroText = 'Vui lòng đọc kỹ từng câu hỏi và trả lờ
   + ' bạn. Phiếu này không ghi tên, mã sinh viên hay bất kỳ thông tin nào nhận ra bạn: giảng viên'
   + ' chỉ nhận được kết quả tổng hợp của cả lớp, không xem được từng phiếu riêng lẻ.';
 
+/** Câu lưu ý mặc định của CTĐT và khảo sát giảng viên: không có "lớp" hay "giảng viên dạy". */
+const defaultUnitIntroText = 'Vui lòng đọc kỹ từng câu hỏi và trả lời dựa trên trải nghiệm thực tế'
+  + ' của bạn. Phiếu này không ghi tên hay bất kỳ thông tin nào nhận ra bạn; kết quả chỉ được xem'
+  + ' dưới dạng tổng hợp, không xem được từng phiếu riêng lẻ.';
+
+/**
+ * Phần thông tin đơn vị ở đầu phiếu. Ba loại khảo sát dùng chung một form và chung các
+ * công tắc ẩn/hiện, chỉ khác nội dung: công tắc "học phần" hiện dòng tên đơn vị, công tắc
+ * "lớp học phần" hiện dòng chi tiết (lớp, hoặc khoá với CTĐT). Giảng viên, tín chỉ và bộ
+ * môn chỉ có nghĩa với khảo sát học phần.
+ */
+function unitInfoOf(survey: PublicSurvey) {
+  const surveyType = survey.surveyType ?? 'COURSE';
+  if (surveyType === 'PROGRAM') {
+    return {
+      isCourse: false,
+      headline: [survey.cohortMajorCode, survey.majorName].filter(Boolean).join(' – '),
+      detailLabel: 'Khoá',
+      detailValue: survey.cohortName,
+      introText: defaultUnitIntroText,
+    };
+  }
+  if (surveyType === 'LECTURER') {
+    return {
+      isCourse: false,
+      headline: survey.facultyName,
+      detailLabel: '',
+      detailValue: '',
+      introText: defaultUnitIntroText,
+    };
+  }
+  return {
+    isCourse: true,
+    headline: `${survey.courseCode} – ${survey.courseName}`,
+    detailLabel: 'Lớp học phần',
+    detailValue: survey.sectionName,
+    introText: defaultIntroText,
+  };
+}
+
 /**
  * Hình thức phiếu kèm trong lời báo lỗi của màn chặn. Server gửi nó cùng `errorCode`
  * khi link có thật nhưng chưa mở, đã hết hạn hoặc lớp đã đủ phiếu — nhờ vậy màn chặn
@@ -292,6 +332,7 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
   // Hình thức phiếu do quản trị đặt lúc tạo đợt. Không có thì mọi thứ về mẫu mặc định.
   const form = survey?.formConfig ?? null;
   const theme = useMemo(() => themeStyleOf(form), [form]);
+  const unit = survey ? unitInfoOf(survey) : null;
 
   // Danh sách phẳng cho thanh tiến độ, lưới điều hướng và việc tìm câu chưa trả lời.
   const questionRows = useMemo(
@@ -503,25 +544,23 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
               {isFieldVisible(form, 'templateName') && (
                 <p className="public-intro-template">{survey.templateName}</p>
               )}
-              {isFieldVisible(form, 'course') && (
-                <p>
-                  {survey.courseCode} – {survey.courseName}
-                </p>
+              {isFieldVisible(form, 'course') && unit?.headline && (
+                <p>{unit.headline}</p>
               )}
             </header>
 
             {/* Từng ô thông tin bật/tắt được trong màn soạn phiếu của quản trị. */}
             <dl className="public-intro-meta">
-              {isFieldVisible(form, 'section') && (
+              {isFieldVisible(form, 'section') && unit?.detailLabel && (
                 <div className="public-intro-meta-item">
                   <ClipboardList aria-hidden="true" />
                   <div>
-                    <dt>Lớp học phần</dt>
-                    <dd>{survey.sectionName}</dd>
+                    <dt>{unit.detailLabel}</dt>
+                    <dd>{unit.detailValue}</dd>
                   </div>
                 </div>
               )}
-              {isFieldVisible(form, 'lecturer') && (
+              {isFieldVisible(form, 'lecturer') && unit?.isCourse && (
                 <div className="public-intro-meta-item">
                   <UserRound aria-hidden="true" />
                   <div>
@@ -541,7 +580,7 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
                   </div>
                 </div>
               )}
-              {isFieldVisible(form, 'credits') && survey.credits > 0 && (
+              {isFieldVisible(form, 'credits') && unit?.isCourse && survey.credits > 0 && (
                 <div className="public-intro-meta-item">
                   <ClipboardList aria-hidden="true" />
                   <div>
@@ -559,7 +598,7 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
                   </div>
                 </div>
               )}
-              {isFieldVisible(form, 'department') && survey.departmentName && (
+              {isFieldVisible(form, 'department') && unit?.isCourse && survey.departmentName && (
                 <div className="public-intro-meta-item">
                   <ClipboardList aria-hidden="true" />
                   <div>
@@ -599,7 +638,7 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
                   {textOr(form?.introHeading, 'Lưu ý')}
                 </strong>
                 <p style={textStyleOf(form?.noticeTextStyle)}>
-                  {textOr(form?.intro, defaultIntroText)}
+                  {textOr(form?.intro, unit?.introText ?? defaultIntroText)}
                 </p>
               </div>
             </div>
@@ -684,20 +723,19 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
           </h1>
 
           <dl className="public-quiz-meta">
-            {(isFieldVisible(form, 'course') || isFieldVisible(form, 'section')) && (
+            {((isFieldVisible(form, 'course') && unit?.headline)
+              || (isFieldVisible(form, 'section') && unit?.detailLabel)) && (
               <div className="public-quiz-meta-item">
                 <BookOpen aria-hidden="true" />
                 <div>
-                  {isFieldVisible(form, 'course') && (
-                    <dt>
-                      {survey.courseCode} – {survey.courseName}
-                    </dt>
+                  {isFieldVisible(form, 'course') && unit?.headline && <dt>{unit.headline}</dt>}
+                  {isFieldVisible(form, 'section') && unit?.detailLabel && (
+                    <dd>{unit.detailLabel}: {unit.detailValue}</dd>
                   )}
-                  {isFieldVisible(form, 'section') && <dd>Lớp học phần: {survey.sectionName}</dd>}
                 </div>
               </div>
             )}
-            {isFieldVisible(form, 'lecturer') && (
+            {isFieldVisible(form, 'lecturer') && unit?.isCourse && (
               <div className="public-quiz-meta-item">
                 <UserRound aria-hidden="true" />
                 <div>
@@ -720,14 +758,14 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
               </div>
             )}
             {((isFieldVisible(form, 'faculty') && survey.facultyName)
-              || (isFieldVisible(form, 'department') && survey.departmentName)) && (
+              || (isFieldVisible(form, 'department') && unit?.isCourse && survey.departmentName)) && (
               <div className="public-quiz-meta-item">
                 <BookOpen aria-hidden="true" />
                 <div>
                   {isFieldVisible(form, 'faculty') && survey.facultyName && (
                     <dt>{survey.facultyName}</dt>
                   )}
-                  {isFieldVisible(form, 'department') && survey.departmentName && (
+                  {isFieldVisible(form, 'department') && unit?.isCourse && survey.departmentName && (
                     <dd>{survey.departmentName}</dd>
                   )}
                 </div>
@@ -1001,20 +1039,39 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
           </p>
 
           <dl className="public-submit-facts">
-            <div>
-              <dt>Môn học:</dt>
-              <dd>
-                {survey.courseCode} - {survey.courseName}
-              </dd>
-            </div>
-            <div>
-              <dt>Lớp học phần:</dt>
-              <dd>{survey.sectionName}</dd>
-            </div>
-            <div>
-              <dt>Giảng viên:</dt>
-              <dd>{survey.lecturerName || 'Chưa phân công'}</dd>
-            </div>
+            {unit?.isCourse ? (
+              <>
+                <div>
+                  <dt>Môn học:</dt>
+                  <dd>
+                    {survey.courseCode} - {survey.courseName}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Lớp học phần:</dt>
+                  <dd>{survey.sectionName}</dd>
+                </div>
+                <div>
+                  <dt>Giảng viên:</dt>
+                  <dd>{survey.lecturerName || 'Chưa phân công'}</dd>
+                </div>
+              </>
+            ) : (
+              <>
+                {unit?.headline && (
+                  <div>
+                    <dt>{survey.surveyType === 'PROGRAM' ? 'Khoá ngành:' : 'Khoa / Viện:'}</dt>
+                    <dd>{unit.headline}</dd>
+                  </div>
+                )}
+                {unit?.detailLabel && unit.detailValue && (
+                  <div>
+                    <dt>{unit.detailLabel}:</dt>
+                    <dd>{unit.detailValue}</dd>
+                  </div>
+                )}
+              </>
+            )}
             <div>
               <dt>Số câu hỏi:</dt>
               <dd>{totalQuestions}</dd>
