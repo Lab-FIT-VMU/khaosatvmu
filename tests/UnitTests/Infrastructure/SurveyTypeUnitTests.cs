@@ -383,6 +383,129 @@ public class SurveyTypeUnitTests
         });
     }
 
+    private static Task<SurveyOperationResult<SubmitSurveyResponseDto>> SubmitAsync(
+        EfSurveyService service,
+        string linkToken,
+        int questionId,
+        string value,
+        double elapsedSeconds = 120,
+        string? comment = null) =>
+        service.SubmitSurveyResponseAsync(
+            linkToken,
+            new SubmitSurveyResponseCommand(
+                [new SubmitSurveyAnswerCommand(questionId, value)],
+                comment,
+                elapsedSeconds));
+
+    [Fact]
+    public async Task ProgramReport_HasNoTarget_AndScoresOnlyCountedResponses()
+    {
+        await RunInRollbackAsync(async (db, serviceFor) =>
+        {
+            var seed = await SeedAsync(db);
+            var service = serviceFor(Admin);
+            var created = await service.CreateSemesterSurveyAsync(
+                Command(seed, SurveyTypes.Program, SurveyScopeTypes.Cohort, seed.CohortId));
+            var surveyId = created.Value!.SemesterSurveyId;
+            var units = (await service.GetSurveyUnitsAsync(surveyId)).Value!;
+            var unitA = units.Single(x => x.UnitId == seed.CohortMajorA);
+
+            // Bốn phiếu thật (4, 2, 4, 2) và một phiếu làm quá nhanh bị bộ lọc nhiễu loại:
+            // 4/5 = 80% hợp lệ, vừa chạm ngưỡng mặc định nên khoá ngành được tính điểm.
+            (await SubmitAsync(service, unitA.LinkToken, seed.QuestionId, "4", comment: "Tốt")).Succeeded.Should().BeTrue();
+            foreach (var answer in new[] { "2", "4", "2" })
+            {
+                (await SubmitAsync(service, unitA.LinkToken, seed.QuestionId, answer)).Succeeded.Should().BeTrue();
+            }
+            (await SubmitAsync(service, unitA.LinkToken, seed.QuestionId, "5", elapsedSeconds: 1)).Succeeded.Should().BeTrue();
+
+            var report = await service.GetUnitSurveyReportAsync(surveyId);
+            report.Succeeded.Should().BeTrue(report.ErrorCode);
+            var value = report.Value!;
+
+            value.Summary.TargetCount.Should().BeNull();
+            value.Summary.ResponseRate.Should().BeNull();
+            value.Summary.UnitCount.Should().Be(2);
+            value.Summary.ResponseCount.Should().Be(5);
+            value.Summary.ValidResponseCount.Should().Be(4);
+            value.Summary.AverageScore.Should().Be(3m);
+
+            var rowA = value.Units.Single(x => x.UnitId == seed.CohortMajorA);
+            rowA.ResponseRate.Should().BeNull();
+            rowA.IsScored.Should().BeTrue();
+            rowA.AverageScore.Should().Be(3m);
+            rowA.QuestionScores.Single().AverageScore.Should().Be(3m);
+            rowA.OpenCommentCount.Should().Be(1);
+            value.Units.Single(x => x.UnitId == seed.CohortMajorB).IsScored.Should().BeFalse();
+
+            value.Majors.Should().HaveCount(2);
+            value.Cohorts.Should().ContainSingle();
+            value.Comments.Should().ContainSingle(x => x.Comment == "Tốt" && x.UnitCode == unitA.UnitCode);
+
+            // Phiếu bị lọc (chọn 5) không vào phân bố mức.
+            var distribution = value.Questions.Single().Distribution;
+            distribution.Should().HaveCount(5);
+            distribution.Single(x => x.Value == 4).Count.Should().Be(2);
+            distribution.Single(x => x.Value == 5).Count.Should().Be(0);
+        });
+    }
+
+    [Fact]
+    public async Task LecturerReport_UsesSnapshotTargetForResponseRate()
+    {
+        await RunInRollbackAsync(async (db, serviceFor) =>
+        {
+            var seed = await SeedAsync(db);
+            var service = serviceFor(Admin);
+            var created = await service.CreateSemesterSurveyAsync(
+                Command(seed, SurveyTypes.Lecturer, SurveyScopeTypes.All, null));
+            var surveyId = created.Value!.SemesterSurveyId;
+            var unitA = (await service.GetSurveyUnitsAsync(surveyId)).Value!
+                .Single(x => x.UnitId == seed.FacultyA);
+
+            (await SubmitAsync(service, unitA.LinkToken, seed.QuestionId, "5")).Succeeded.Should().BeTrue();
+            (await SubmitAsync(service, unitA.LinkToken, seed.QuestionId, "3")).Succeeded.Should().BeTrue();
+
+            var value = (await service.GetUnitSurveyReportAsync(surveyId)).Value!;
+            var rowA = value.Units.Single(x => x.UnitId == seed.FacultyA);
+            rowA.TargetCount.Should().Be(2);
+            rowA.ResponseRate.Should().Be(100m);
+            rowA.IsScored.Should().BeTrue();
+            rowA.AverageScore.Should().Be(4m);
+
+            var rowB = value.Units.Single(x => x.UnitId == seed.FacultyB);
+            rowB.ResponseRate.Should().Be(0m);
+            rowB.IsScored.Should().BeFalse();
+
+            // Điểm gộp chỉ lấy đơn vị được tính điểm.
+            value.Faculties.Single(x => x.Key == seed.FacultyA.ToString()).AverageScore.Should().Be(4m);
+            value.Majors.Should().BeEmpty();
+            value.Questions.Single().AverageScore.Should().Be(4m);
+        });
+    }
+
+    [Fact]
+    public async Task UnitReport_RejectsCourseSurveysAndNonAdmins()
+    {
+        await RunInRollbackAsync(async (db, serviceFor) =>
+        {
+            var seed = await SeedAsync(db);
+            var created = await serviceFor(Admin).CreateSemesterSurveyAsync(
+                Command(seed, SurveyTypes.Program, SurveyScopeTypes.All, null));
+
+            (await serviceFor(ManagerOf(1)).GetUnitSurveyReportAsync(created.Value!.SemesterSurveyId))
+                .ErrorCode.Should().Be(SurveyErrorCodes.OutOfScope);
+
+            var courseSurvey = (await serviceFor(Admin).GetSemesterSurveysAsync(null, SurveyTypes.Course))
+                .FirstOrDefault();
+            if (courseSurvey is not null)
+            {
+                (await serviceFor(Admin).GetUnitSurveyReportAsync(courseSurvey.SemesterSurveyId))
+                    .ErrorCode.Should().Be(SurveyErrorCodes.SurveyTypeMismatch);
+            }
+        });
+    }
+
     [Fact]
     public async Task CourseScreens_DoNotSeeOtherSurveyTypes()
     {

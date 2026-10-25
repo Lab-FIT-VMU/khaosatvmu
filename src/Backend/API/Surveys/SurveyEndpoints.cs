@@ -127,6 +127,14 @@ public static class SurveyEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.GetSurveyUnitsAsync(semesterSurveyId, cancellationToken)));
 
+        // Thống kê của đợt CTĐT / giảng viên, dùng chung cho ba màn Tiến độ, Bảng dữ liệu
+        // và Thống kê & Báo cáo. Service chỉ trả cho quản trị toàn trường.
+        operationalReadGroup.MapGet("/semester-surveys/{semesterSurveyId:int}/unit-report", async (
+            int semesterSurveyId,
+            ISurveyService service,
+            CancellationToken cancellationToken) =>
+            ToResult(await service.GetUnitSurveyReportAsync(semesterSurveyId, cancellationToken)));
+
         campaignGroup.MapPost("/semester-surveys", async (
             CreateSemesterSurveyRequest request,
             ISurveyService service,

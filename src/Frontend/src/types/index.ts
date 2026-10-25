@@ -262,6 +262,101 @@ export interface SurveyUnit {
   openCommentCount: number;
 }
 
+/**
+ * Thống kê của một đợt CTĐT hoặc khảo sát giảng viên, tính sống ở server. Phiếu đi qua
+ * bộ lọc nhiễu, đơn vị phải qua ngưỡng mới được tính điểm (CTĐT chỉ xét ngưỡng phiếu hợp
+ * lệ vì không có sĩ số), điểm gộp là trung bình cộng điểm các đơn vị được tính.
+ */
+export interface UnitSurveyReport {
+  semesterSurveyId: number;
+  surveyName: string;
+  surveyType: SurveyType;
+  templateName: string;
+  semesterName: string;
+  academicYearName: string;
+  startTime: string;
+  endTime: string;
+  minimumResponseRate: number;
+  minimumValidRate: number;
+  summary: UnitReportSummary;
+  questions: UnitReportQuestion[];
+  units: UnitReportRow[];
+  faculties: UnitReportGroup[];
+  /** CTĐT: gộp theo ngành. Rỗng với khảo sát giảng viên. */
+  majors: UnitReportGroup[];
+  /** CTĐT: gộp theo khoá học. Rỗng với khảo sát giảng viên. */
+  cohorts: UnitReportGroup[];
+  comments: UnitReportComment[];
+}
+
+/** `targetCount` và `responseRate` null với CTĐT vì loại này không có sĩ số. */
+export interface UnitReportSummary {
+  unitCount: number;
+  respondedUnitCount: number;
+  scoredUnitCount: number;
+  targetCount: number | null;
+  responseCount: number;
+  validResponseCount: number;
+  responseRate: number | null;
+  averageScore: number | null;
+}
+
+export interface UnitReportQuestion {
+  questionId: number;
+  order: number;
+  questionText: string;
+  sectionId: number;
+  sectionName: string;
+  /** Câu thang mức chọn và không phải câu bẫy; chỉ câu này mới có điểm. */
+  isScored: boolean;
+  averageScore: number | null;
+  answerCount: number;
+  distribution: { value: number; displayText: string; count: number }[];
+}
+
+export interface UnitReportRow {
+  courseSectionSurveyId: number;
+  unitId: number;
+  unitCode: string;
+  unitName: string;
+  cohortName: string;
+  majorName: string;
+  facultyId: number | null;
+  facultyName: string;
+  targetCount: number | null;
+  responseCount: number;
+  validResponseCount: number;
+  responseRate: number | null;
+  /** Qua đủ ngưỡng để được tính vào điểm gộp. */
+  isScored: boolean;
+  averageScore: number | null;
+  questionScores: { questionId: number; averageScore: number; answerCount: number }[];
+  openCommentCount: number;
+}
+
+export interface UnitReportGroup {
+  key: string;
+  name: string;
+  unitCount: number;
+  scoredUnitCount: number;
+  targetCount: number | null;
+  responseCount: number;
+  validResponseCount: number;
+  responseRate: number | null;
+  averageScore: number | null;
+}
+
+export interface UnitReportComment {
+  responseId: number;
+  unitCode: string;
+  unitName: string;
+  facultyName: string;
+  comment: string;
+  /** Phiếu có qua bộ lọc nhiễu không. Ý kiến của phiếu bị lọc vẫn hiện để đọc. */
+  isValid: boolean;
+  submittedAt: string;
+}
+
 /** Bảng "CourseSectionSurveys": bài khảo sát riêng của một lớp học phần. */
 export interface CourseSectionSurvey {
   courseSectionSurveyId: number;

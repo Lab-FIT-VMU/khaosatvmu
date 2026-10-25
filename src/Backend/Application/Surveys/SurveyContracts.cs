@@ -621,6 +621,120 @@ public sealed record CourseSectionSurveyDto(
     /// <summary>Số phiếu có nội dung trong ô “Ý kiến khác”.</summary>
     int OpenCommentCount);
 
+// ------------------------------- Thống kê đợt CTĐT và khảo sát giảng viên
+
+/// <summary>
+/// Toàn bộ số liệu thống kê của một đợt CTĐT hoặc khảo sát giảng viên, dùng chung cho ba
+/// màn Tiến độ thu phiếu, Bảng dữ liệu và Thống kê & Báo cáo.
+///
+/// Tính SỐNG mỗi lần gọi, không qua bước Cập nhật điểm như khảo sát học phần: một đợt chỉ
+/// có vài chục khoá ngành hay khoa, không có gì phải chụp sẵn. Luật thì giữ nguyên: phiếu
+/// đi qua bộ lọc nhiễu đang bật, đơn vị phải qua hai vòng ngưỡng mới được tính điểm (CTĐT
+/// không có sĩ số nên chỉ xét vòng phiếu hợp lệ), điểm gộp là trung bình cộng điểm các đơn
+/// vị được tính, mỗi đơn vị nặng như nhau.
+/// </summary>
+public sealed record UnitSurveyReportDto(
+    int SemesterSurveyId,
+    string SurveyName,
+    string SurveyType,
+    string TemplateName,
+    string SemesterName,
+    string AcademicYearName,
+    DateTime StartTime,
+    DateTime EndTime,
+    /// <summary>Hai ngưỡng đang áp, để màn hình in ra "đang tính theo x% / y%".</summary>
+    decimal MinimumResponseRate,
+    decimal MinimumValidRate,
+    UnitReportSummaryDto Summary,
+    IReadOnlyList<UnitReportQuestionDto> Questions,
+    IReadOnlyList<UnitReportRowDto> Units,
+    IReadOnlyList<UnitReportGroupDto> Faculties,
+    /// <summary>CTĐT: gộp theo ngành. Rỗng với khảo sát giảng viên.</summary>
+    IReadOnlyList<UnitReportGroupDto> Majors,
+    /// <summary>CTĐT: gộp theo khoá học. Rỗng với khảo sát giảng viên.</summary>
+    IReadOnlyList<UnitReportGroupDto> Cohorts,
+    IReadOnlyList<UnitReportCommentDto> Comments);
+
+/// <summary>
+/// Số tổng của đợt. <see cref="TargetCount"/> và <see cref="ResponseRate"/> null với CTĐT:
+/// loại đó không có sĩ số nên không có tỷ lệ phản hồi.
+/// </summary>
+public sealed record UnitReportSummaryDto(
+    int UnitCount,
+    int RespondedUnitCount,
+    int ScoredUnitCount,
+    int? TargetCount,
+    int ResponseCount,
+    int ValidResponseCount,
+    decimal? ResponseRate,
+    decimal? AverageScore);
+
+/// <summary>Số phiếu chọn một mức của một câu.</summary>
+public sealed record UnitReportValueCountDto(int Value, string DisplayText, int Count);
+
+/// <summary>
+/// Một câu của bộ câu hỏi. Chỉ câu thang mức chọn và không phải câu bẫy mới có điểm
+/// (<see cref="IsScored"/>); câu tự nhập và câu bẫy vẫn liệt kê để giữ đúng số thứ tự.
+/// Điểm câu tính trên phiếu hợp lệ của các đơn vị được tính điểm, mỗi lượt trả lời nặng
+/// như nhau.
+/// </summary>
+public sealed record UnitReportQuestionDto(
+    int QuestionId,
+    int Order,
+    string QuestionText,
+    int SectionId,
+    string SectionName,
+    bool IsScored,
+    decimal? AverageScore,
+    int AnswerCount,
+    IReadOnlyList<UnitReportValueCountDto> Distribution);
+
+public sealed record UnitQuestionScoreDto(int QuestionId, decimal AverageScore, int AnswerCount);
+
+/// <summary>Một khoá ngành hoặc một khoa của đợt.</summary>
+public sealed record UnitReportRowDto(
+    int CourseSectionSurveyId,
+    int UnitId,
+    string UnitCode,
+    string UnitName,
+    string CohortName,
+    string MajorName,
+    int? FacultyId,
+    string FacultyName,
+    int? TargetCount,
+    int ResponseCount,
+    int ValidResponseCount,
+    /// <summary>Phần trăm phiếu đã thu trên sĩ số; null khi không có sĩ số.</summary>
+    decimal? ResponseRate,
+    /// <summary>Qua đủ ngưỡng để được tính vào điểm gộp.</summary>
+    bool IsScored,
+    /// <summary>Điểm trung bình các phiếu hợp lệ; null khi chưa có phiếu hợp lệ nào.</summary>
+    decimal? AverageScore,
+    IReadOnlyList<UnitQuestionScoreDto> QuestionScores,
+    int OpenCommentCount);
+
+/// <summary>Gộp đơn vị theo khoa, ngành hoặc khoá.</summary>
+public sealed record UnitReportGroupDto(
+    string Key,
+    string Name,
+    int UnitCount,
+    int ScoredUnitCount,
+    int? TargetCount,
+    int ResponseCount,
+    int ValidResponseCount,
+    decimal? ResponseRate,
+    decimal? AverageScore);
+
+/// <summary>Một ý kiến mở ("Ý kiến khác") kèm đơn vị của phiếu. Phiếu ẩn danh nên không có gì hơn.</summary>
+public sealed record UnitReportCommentDto(
+    int ResponseId,
+    string UnitCode,
+    string UnitName,
+    string FacultyName,
+    string Comment,
+    bool IsValid,
+    DateTime SubmittedAt);
+
 /// <summary>
 /// Phạm vi lớp được phát phiếu. Dùng chung cho lúc tạo đợt và lúc bổ sung thêm
 /// vào đợt đã có, để hai luồng không bao giờ hiểu "khoa X" theo hai kiểu.
@@ -1025,6 +1139,14 @@ public interface ISurveyService
     /// <see cref="GetCourseSectionSurveysAsync(int, CancellationToken)"/>.
     /// </summary>
     Task<SurveyOperationResult<IReadOnlyList<SurveyUnitDto>>> GetSurveyUnitsAsync(
+        int semesterSurveyId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Thống kê của một đợt CTĐT hoặc khảo sát giảng viên, tính sống. Đợt học phần trả
+    /// <see cref="SurveyErrorCodes.SurveyTypeMismatch"/>.
+    /// </summary>
+    Task<SurveyOperationResult<UnitSurveyReportDto>> GetUnitSurveyReportAsync(
         int semesterSurveyId,
         CancellationToken cancellationToken = default);
 

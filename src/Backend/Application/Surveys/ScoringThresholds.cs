@@ -66,6 +66,25 @@ public readonly record struct ScoringThresholds(
         var validRate = (decimal)validResponseCount / totalResponseCount * 100;
         return validRate >= MinimumValidRate;
     }
+
+    /// <summary>
+    /// Bản cho đơn vị KHÔNG có sĩ số (khảo sát chương trình đào tạo): không có mẫu số cho
+    /// vòng 1 nên chỉ xét vòng 2. Có sĩ số thì đi đúng <see cref="HasEnoughResponsesToScore"/>.
+    /// </summary>
+    public bool HasEnoughResponsesToScore(
+        int? targetCount,
+        int totalResponseCount,
+        int validResponseCount)
+    {
+        if (targetCount is { } size)
+        {
+            return HasEnoughResponsesToScore(size, totalResponseCount, validResponseCount);
+        }
+        if (totalResponseCount <= 0) return false;
+
+        var validRate = (decimal)validResponseCount / totalResponseCount * 100;
+        return validRate >= MinimumValidRate;
+    }
 }
 
 /// <summary>Đọc và ghi cặp ngưỡng tính điểm đang áp dụng cho toàn hệ thống.</summary>

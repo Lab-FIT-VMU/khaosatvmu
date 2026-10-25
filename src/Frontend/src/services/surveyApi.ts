@@ -11,6 +11,7 @@ import type {
   SurveyTemplate,
   SurveyType,
   SurveyUnit,
+  UnitSurveyReport,
 } from '../types';
 import { maximumSectionsPerTemplate } from '../types';
 import type { ScoringThresholds } from '../utils/reportThresholds';
@@ -699,6 +700,12 @@ export const surveyApi = {
   /** Link và số phiếu theo từng khoá ngành / khoa của đợt CTĐT hoặc khảo sát giảng viên. */
   surveyUnits: (semesterSurveyId: number, signal?: AbortSignal) =>
     apiRequest<SurveyUnit[]>(`/api/surveys/semester-surveys/${semesterSurveyId}/units`, { signal }),
+  /** Thống kê đợt CTĐT / giảng viên, dùng chung cho Tiến độ, Bảng dữ liệu và Báo cáo. */
+  unitSurveyReport: (semesterSurveyId: number, signal?: AbortSignal) =>
+    apiRequest<UnitSurveyReport>(
+      `/api/surveys/semester-surveys/${semesterSurveyId}/unit-report`,
+      { signal },
+    ),
   createSemesterSurvey: (survey: CreateSemesterSurveyPayload) =>
     csrfRequest<SemesterSurvey>('/api/surveys/semester-surveys', 'POST', survey),
   updateSemesterSurvey: (
