@@ -507,6 +507,33 @@ public class SurveyTypeUnitTests
     }
 
     [Fact]
+    public async Task CourseStatistics_IgnoreUnitsOfOtherSurveyTypes()
+    {
+        // Trang học phần từng mở nhầm mã đợt CTĐT lưu trong ô nhớ dùng chung và hiện mỗi
+        // khoá ngành thành một "lớp" trống. Mã đợt loại khác phải ra bảng rỗng và không
+        // chốt điểm được.
+        await RunInRollbackAsync(async (db, serviceFor) =>
+        {
+            var seed = await SeedAsync(db);
+            var service = serviceFor(Admin);
+            var created = await service.CreateSemesterSurveyAsync(
+                Command(seed, SurveyTypes.Program, SurveyScopeTypes.Cohort, seed.CohortId));
+            var surveyId = created.Value!.SemesterSurveyId;
+            var unit = (await service.GetSurveyUnitsAsync(surveyId)).Value!.First();
+            (await SubmitAsync(service, unit.LinkToken, seed.QuestionId, "4")).Succeeded.Should().BeTrue();
+
+            var statistics = await service.GetSemesterSurveyStatisticsAsync(surveyId);
+            if (statistics.Succeeded)
+            {
+                statistics.Value!.Rows.Should().BeEmpty();
+            }
+
+            (await service.RecalculateSemesterSurveyScoresAsync(surveyId))
+                .ErrorCode.Should().Be(SurveyErrorCodes.SurveyTypeMismatch);
+        });
+    }
+
+    [Fact]
     public async Task CourseScreens_DoNotSeeOtherSurveyTypes()
     {
         await RunInRollbackAsync(async (db, serviceFor) =>

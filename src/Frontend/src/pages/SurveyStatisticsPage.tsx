@@ -284,20 +284,29 @@ export const SurveyStatisticsPage: React.FC = () => {
     if (campaignsError) setLoadError(messageFrom(campaignsError));
   }, [campaignsError]);
 
+  // Chỉ nhận kết quả của lần tải MỚI NHẤT. Lúc mở trang, đợt đọc từ ô nhớ dùng chung có
+  // thể không thuộc kỳ này; đổi sang đợt khác (hoặc về rỗng) mà kết quả của lần tải cũ về
+  // muộn thì bảng hiện số của đợt đã bỏ chọn.
+  const latestRequest = useRef(0);
   const loadStatistics = useCallback(async () => {
+    const request = ++latestRequest.current;
     if (!semesterSurveyId) {
       setStatistics(null);
+      setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      setStatistics(await surveyApi.semesterSurveyStatistics(Number(semesterSurveyId)));
+      const next = await surveyApi.semesterSurveyStatistics(Number(semesterSurveyId));
+      if (request !== latestRequest.current) return;
+      setStatistics(next);
       setLoadError(null);
     } catch (error) {
+      if (request !== latestRequest.current) return;
       setLoadError(messageFrom(error));
       setStatistics(null);
     } finally {
-      setLoading(false);
+      if (request === latestRequest.current) setLoading(false);
     }
   }, [semesterSurveyId]);
 

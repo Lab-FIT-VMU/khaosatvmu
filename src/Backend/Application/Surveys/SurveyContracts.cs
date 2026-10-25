@@ -687,7 +687,9 @@ public sealed record UnitReportQuestionDto(
     bool IsScored,
     decimal? AverageScore,
     int AnswerCount,
-    IReadOnlyList<UnitReportValueCountDto> Distribution);
+    IReadOnlyList<UnitReportValueCountDto> Distribution,
+    /// <summary>Câu bẫy kiểm tra độ tập trung: không có điểm và không lên bảng.</summary>
+    bool IsAttentionCheck = false);
 
 public sealed record UnitQuestionScoreDto(int QuestionId, decimal AverageScore, int AnswerCount);
 

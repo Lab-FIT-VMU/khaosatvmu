@@ -43,9 +43,12 @@ const CriteriaPage = lazy(() => import('./pages/CriteriaPage').then(m => ({ defa
 const SurveyTemplatesPage = lazy(() => import('./pages/SurveyTemplatesPage').then(m => ({ default: m.SurveyTemplatesPage })));
 const SurveyCampaignsPage = lazy(() => import('./pages/SurveyCampaignsPage').then(m => ({ default: m.SurveyCampaignsPage })));
 // Thống kê CTĐT / giảng viên: ba view chung một module, tách chunk khỏi các trang học phần.
-const UnitProgressView = lazy(() => import('./components/unitReports/UnitSurveyStatistics').then(m => ({ default: m.UnitProgressView })));
-const UnitStatisticsView = lazy(() => import('./components/unitReports/UnitSurveyStatistics').then(m => ({ default: m.UnitStatisticsView })));
-const UnitReportView = lazy(() => import('./components/unitReports/UnitSurveyStatistics').then(m => ({ default: m.UnitReportView })));
+const UnitDashboardView = lazy(() => import('./components/unitReports/UnitDashboardView').then(m => ({ default: m.UnitDashboardView })));
+const UnitSurveyDashboardView = lazy(() => import('./components/unitReports/UnitSurveyDashboardView').then(m => ({ default: m.UnitSurveyDashboardView })));
+const UnitProgressView = lazy(() => import('./components/unitReports/UnitProgressView').then(m => ({ default: m.UnitProgressView })));
+const UnitStatisticsView = lazy(() => import('./components/unitReports/UnitStatisticsView').then(m => ({ default: m.UnitStatisticsView })));
+const UnitReportView = lazy(() => import('./components/unitReports/UnitReportView').then(m => ({ default: m.UnitReportView })));
+const UnitAnalysisView = lazy(() => import('./components/unitReports/UnitAnalysisView').then(m => ({ default: m.UnitAnalysisView })));
 const PublicSurveyPage = lazy(() => import('./pages/PublicSurveyPage').then(m => ({ default: m.PublicSurveyPage })));
 const SurveyProgressPage = lazy(() => import('./pages/SurveyProgressPage').then(m => ({ default: m.SurveyProgressPage })));
 const ReportsOverviewPage = lazy(() => import('./pages/ReportsOverviewPage').then(m => ({ default: m.ReportsOverviewPage })));
@@ -598,13 +601,20 @@ function DashboardApp() {
                 Xem congviec2.md mục F1 và congviec3.md mục I1. */}
             {currentTab === 'overview' && (
               seesAllData(auth.activeProfile?.roleCode) ? (
-                <DashboardOverview
-                  semesterSurveys={semesterSurveys}
-                  sectionSurveys={sectionSurveys}
-                  surveyLoading={surveyLoading}
-                  surveyLoadError={surveyLoadError}
-                  permissions={permissions}
-                  onNavigateTab={(tab) => setCurrentTab(tab)}
+                <SurveyTypeTabs
+                  course={(
+                    <DashboardOverview
+                      semesterSurveys={semesterSurveys}
+                      sectionSurveys={sectionSurveys}
+                      surveyLoading={surveyLoading}
+                      surveyLoadError={surveyLoadError}
+                      permissions={permissions}
+                      onNavigateTab={(tab) => setCurrentTab(tab)}
+                    />
+                  )}
+                  renderUnit={(surveyType) => (
+                    <UnitDashboardView surveyType={surveyType} onNavigateTab={(tab) => setCurrentTab(tab)} />
+                  )}
                 />
               ) : seesOnlyOwnSections(auth.activeProfile?.roleCode) ? (
                 <LecturerDashboardPage onNavigateTab={(tab) => setCurrentTab(tab)} />
@@ -613,11 +623,14 @@ function DashboardApp() {
               )
             )}
 
+            {/* Các trang thống kê có tab theo loại khảo sát; tab Học phần là trang cũ. */}
             {currentTab === 'survey-dashboard' && (
-              <SurveyDashboardPage />
+              <SurveyTypeTabs
+                course={<SurveyDashboardPage />}
+                renderUnit={(surveyType) => <UnitSurveyDashboardView surveyType={surveyType} />}
+              />
             )}
 
-            {/* Ba trang thống kê có tab theo loại khảo sát; tab Học phần là trang cũ. */}
             {currentTab === 'progress' && (
               <SurveyTypeTabs
                 course={(
@@ -647,7 +660,10 @@ function DashboardApp() {
             )}
 
             {currentTab === 'survey-analysis' && (
-              <SurveyAnalysisPage />
+              <SurveyTypeTabs
+                course={<SurveyAnalysisPage />}
+                renderUnit={(surveyType) => <UnitAnalysisView surveyType={surveyType} />}
+              />
             )}
 
             {(currentTab === 'graduation-data-upload' || currentTab === 'graduation-analytics' || currentTab === 'graduation-analytics-2') && (

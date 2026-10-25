@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, CircleAlert, LoaderCircle } from 'lucide-react';
 import {
@@ -295,20 +295,27 @@ export const SurveyDashboardPage: React.FC = () => {
     if (campaignsError) setLoadError(messageFrom(campaignsError));
   }, [campaignsError]);
 
+  // Chỉ nhận kết quả của lần tải mới nhất: kết quả của đợt đã bỏ chọn về muộn thì bỏ.
+  const latestRequest = useRef(0);
   const loadData = useCallback(async () => {
+    const request = ++latestRequest.current;
     if (!semesterSurveyId) {
       setData(null);
+      setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      setData(await surveyApi.semesterSurveyDashboard(Number(semesterSurveyId)));
+      const next = await surveyApi.semesterSurveyDashboard(Number(semesterSurveyId));
+      if (request !== latestRequest.current) return;
+      setData(next);
       setLoadError(null);
     } catch (error) {
+      if (request !== latestRequest.current) return;
       setLoadError(messageFrom(error));
       setData(null);
     } finally {
-      setLoading(false);
+      if (request === latestRequest.current) setLoading(false);
     }
   }, [semesterSurveyId]);
 

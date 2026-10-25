@@ -312,6 +312,8 @@ export interface UnitReportQuestion {
   averageScore: number | null;
   answerCount: number;
   distribution: { value: number; displayText: string; count: number }[];
+  /** Câu bẫy kiểm tra độ tập trung: không có điểm và không lên bảng. */
+  isAttentionCheck: boolean;
 }
 
 export interface UnitReportRow {

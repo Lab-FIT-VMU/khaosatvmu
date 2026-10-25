@@ -166,7 +166,8 @@ public sealed partial class EfSurveyService
                                 option.DisplayText,
                                 values.Count(value => value == option.Value)))
                             .ToList()
-                        : []);
+                        : [],
+                    question.AttentionCheckValue != null);
             })
             .ToList();
 

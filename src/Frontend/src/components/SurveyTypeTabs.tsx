@@ -4,7 +4,7 @@ import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole } from '../auth/roles';
 import { surveyTypeLabels } from '../services/surveyApi';
 import type { SurveyType } from '../types';
-import type { UnitSurveyType } from './unitReports/UnitSurveyStatistics';
+import type { UnitSurveyType } from './unitReports/unitReportModel';
 import '../styles/survey-operations.css';
 
 /*

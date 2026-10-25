@@ -2043,11 +2043,19 @@ public sealed partial class EfSurveyService(
             return Failed<RecalculateScoresDto>(SurveyErrorCodes.OutOfScope);
         }
 
-        var exists = await db.SemesterSurveys
-            .AnyAsync(x => x.SemesterSurveyId == semesterSurveyId, cancellationToken);
-        if (!exists)
+        var surveyType = await db.SemesterSurveys
+            .Where(x => x.SemesterSurveyId == semesterSurveyId)
+            .Select(x => x.SurveyType)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (surveyType is null)
         {
             return Failed<RecalculateScoresDto>(SurveyErrorCodes.SemesterSurveyNotFound);
+        }
+        // Chốt điểm theo lớp học phần chỉ có nghĩa với đợt học phần; CTĐT và khảo sát giảng
+        // viên tính điểm sống, không có ảnh chụp nào để chốt.
+        if (surveyType != SurveyTypes.Course)
+        {
+            return Failed<RecalculateScoresDto>(SurveyErrorCodes.SurveyTypeMismatch);
         }
 
         // Đã phát hành thì trưởng khoa, trưởng bộ môn, giảng viên đang đọc đúng bộ điểm
@@ -2261,7 +2269,7 @@ public sealed partial class EfSurveyService(
         // ở đây chứ không phải lọc ở bước cuối như các sheet phân tích.
         var sectionSurveyQuery = VisibleSurveyScope.InScope(
             db,
-            db.CourseSectionSurveys.AsNoTracking().Where(x => x.SemesterSurveyId == semesterSurveyId),
+            db.CourseSectionSurveys.AsNoTracking().Where(x => x.SemesterSurveyId == semesterSurveyId && x.CourseSectionId != null),
             scope);
 
         var sectionSurveys = await sectionSurveyQuery.ToListAsync(cancellationToken);
@@ -2543,7 +2551,7 @@ public sealed partial class EfSurveyService(
         CancellationToken cancellationToken)
     {
         var sectionSurveys = await db.CourseSectionSurveys.AsNoTracking()
-            .Where(x => x.SemesterSurveyId == semesterSurveyId)
+            .Where(x => x.SemesterSurveyId == semesterSurveyId && x.CourseSectionId != null)
             .ToListAsync(cancellationToken);
         if (sectionSurveys.Count == 0) return [];
 
@@ -3466,7 +3474,7 @@ public sealed partial class EfSurveyService(
         var allSectionSurveys = await VisibleSurveyScope.InScope(
                 db,
                 db.CourseSectionSurveys.AsNoTracking()
-                    .Where(x => x.SemesterSurveyId == semesterSurveyId),
+                    .Where(x => x.SemesterSurveyId == semesterSurveyId && x.CourseSectionId != null),
                 scope)
             .Select(x => new { x.CourseSectionSurveyId, x.CourseSectionId })
             .ToListAsync(cancellationToken);
