@@ -40,9 +40,8 @@ const CoursesPage = lazy(() => import('./pages/CoursesPage').then(m => ({ defaul
 const ClassesPage = lazy(() => import('./pages/ClassesPage').then(m => ({ default: m.ClassesPage })));
 const CriteriaPage = lazy(() => import('./pages/CriteriaPage').then(m => ({ default: m.CriteriaPage })));
 const SurveyTemplatesPage = lazy(() => import('./pages/SurveyTemplatesPage').then(m => ({ default: m.SurveyTemplatesPage })));
-const CourseSurveysPage = lazy(() => import('./pages/CourseSurveysPage').then(m => ({ default: m.CourseSurveysPage })));
+const SurveyCampaignsPage = lazy(() => import('./pages/SurveyCampaignsPage').then(m => ({ default: m.SurveyCampaignsPage })));
 const PublicSurveyPage = lazy(() => import('./pages/PublicSurveyPage').then(m => ({ default: m.PublicSurveyPage })));
-const UnitSurveysPage = lazy(() => import('./pages/UnitSurveysPage').then(m => ({ default: m.UnitSurveysPage })));
 const SurveyProgressPage = lazy(() => import('./pages/SurveyProgressPage').then(m => ({ default: m.SurveyProgressPage })));
 const ReportsOverviewPage = lazy(() => import('./pages/ReportsOverviewPage').then(m => ({ default: m.ReportsOverviewPage })));
 const SurveyStatisticsPage = lazy(() => import('./pages/SurveyStatisticsPage').then(m => ({ default: m.SurveyStatisticsPage })));
@@ -78,7 +77,6 @@ import type {
   CourseSectionSurvey,
   Criterion,
   SemesterSurvey,
-  SurveyType,
   SystemStats,
 } from './types';
 
@@ -545,16 +543,6 @@ function DashboardApp() {
     setCriteria(criteria.filter((c) => c.id !== id));
   };
 
-  /** Mỗi loại khảo sát có trang đợt riêng; hộp thoại tạo đợt chuyển sang đúng trang sau khi tạo. */
-  const openSurveyTypeTab = (surveyType: SurveyType) => {
-    setCurrentTab(
-      surveyType === 'PROGRAM'
-        ? 'program-campaigns'
-        : surveyType === 'LECTURER'
-          ? 'lecturer-campaigns'
-          : 'course-campaigns',
-    );
-  };
 
   if (isStudentView) {
     return (
@@ -734,22 +722,25 @@ function DashboardApp() {
               />
             )}
 
-            {(currentTab === 'course-campaigns' || currentTab === 'campaigns') && (
-              <CourseSurveysPage
-                onOpenSurveyType={openSurveyTypeTab}
+            {/* Một trang đợt cho cả ba loại. Hash cũ của trang đợt CTĐT / giảng viên vẫn
+                nhận, chỉ mở thẳng vào tab của loại đó. */}
+            {(currentTab === 'course-campaigns'
+              || currentTab === 'campaigns'
+              || currentTab === 'program-campaigns'
+              || currentTab === 'lecturer-campaigns') && (
+              <SurveyCampaignsPage
+                initialSurveyType={
+                  currentTab === 'program-campaigns'
+                    ? 'PROGRAM'
+                    : currentTab === 'lecturer-campaigns'
+                      ? 'LECTURER'
+                      : 'COURSE'
+                }
                 onOpenSurveyReport={handleOpenSurveyReport}
                 onOpenClasses={
                   canLoadCourseSections ? () => setCurrentTab('classes') : undefined
                 }
               />
-            )}
-
-            {currentTab === 'program-campaigns' && (
-              <UnitSurveysPage surveyType="PROGRAM" onOpenSurveyType={openSurveyTypeTab} />
-            )}
-
-            {currentTab === 'lecturer-campaigns' && (
-              <UnitSurveysPage surveyType="LECTURER" onOpenSurveyType={openSurveyTypeTab} />
             )}
 
             {currentTab === 'users-admin' && <UsersAdminPage />}

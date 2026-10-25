@@ -10,7 +10,6 @@ import {
   ListChecks,
   Network,
   Presentation,
-  School,
   Sigma,
   Table2,
   Upload,
@@ -70,22 +69,12 @@ export const menuStructure: SidebarMenuGroup[] = [
     ],
   },
   {
-    section: 'KHẢO SÁT HỌC PHẦN',
+    // Một nhóm cho cả ba loại khảo sát: loại chọn ngay ở bước đầu hộp thoại tạo đợt, và
+    // trang đợt có thanh tab theo loại.
+    section: 'KHẢO SÁT',
     items: [
       { id: 'course-question-sets', label: 'Danh sách bộ khảo sát', icon: ListChecks },
       { id: 'course-campaigns', label: 'Danh sách đợt khảo sát', icon: ClipboardCheck },
-    ],
-  },
-  {
-    section: 'KHẢO SÁT CHƯƠNG TRÌNH ĐÀO TẠO',
-    items: [
-      { id: 'program-campaigns', label: 'Đợt khảo sát CTĐT', icon: School },
-    ],
-  },
-  {
-    section: 'KHẢO SÁT GIẢNG VIÊN',
-    items: [
-      { id: 'lecturer-campaigns', label: 'Đợt khảo sát giảng viên', icon: Presentation },
     ],
   },
   {
