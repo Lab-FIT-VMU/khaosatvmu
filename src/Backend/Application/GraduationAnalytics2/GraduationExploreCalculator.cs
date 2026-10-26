@@ -322,6 +322,7 @@ public static class GraduationExploreCalculator
             x => x.Count);
         var runningBySeries = new Dictionary<string, int>(StringComparer.Ordinal);
         var runningGraduatedBySeries = new Dictionary<string, int>(StringComparer.Ordinal);
+        var completedSeries = new HashSet<string>(StringComparer.Ordinal);
         var completed = new List<GraduationChartPointV3Dto>();
         foreach (var period in periods)
         {
@@ -329,6 +330,10 @@ public static class GraduationExploreCalculator
             foreach (var seriesItem in series)
             {
                 var seriesKey = seriesItem?.Key ?? string.Empty;
+                if (mode == GraduationExploreModes.CohortCumulative && completedSeries.Contains(seriesKey))
+                {
+                    continue;
+                }
                 var value = pointByPeriodAndSeries.GetValueOrDefault((periodKey, seriesKey));
                 if (mode == GraduationExploreModes.CohortCumulative)
                 {
@@ -362,6 +367,13 @@ public static class GraduationExploreCalculator
                     Percentage(value, total),
                     value,
                     total));
+                if (mode == GraduationExploreModes.CohortCumulative
+                    && metricId is not "studentTotal" and not "notGraduated"
+                    && total > 0
+                    && value >= total)
+                {
+                    completedSeries.Add(seriesKey);
+                }
             }
         }
         return completed;

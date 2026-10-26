@@ -143,6 +143,29 @@ public sealed class GraduationExploreCalculatorV3Tests
         k61.Value.Should().Be(mode == GraduationExploreModes.Period ? 65.517m : 100m);
     }
 
+    [Fact]
+    public void Calculate_CumulativeChart_StopsEachSeriesAtItsFirstOneHundredPercentPoint()
+    {
+        var result = GraduationExploreCalculator.Calculate(
+            GraduationExploreModes.CohortCumulative, null,
+            [new GraduationExplorePeriod(1, 2024, 1, 8, 2024),
+             new GraduationExplorePeriod(2, 2024, 2, 10, 2024),
+             new GraduationExplorePeriod(3, 2024, 3, 12, 2024)],
+            [Cell(GraduationRank.Good, false, 4, 1, "56"),
+             Cell(GraduationRank.Good, false, 6, 2, "56"),
+             Cell(GraduationRank.Good, false, 5, 1, "57"),
+             Cell(GraduationRank.Good, false, 5, 2, "57"),
+             Cell(GraduationRank.Good, false, 10, 3, "57")],
+            [Population(10, "56"), Population(20, "57")],
+            new GraduationExploreFacetsV3Dto([], [], []),
+            "graduated", "period", "cohort");
+
+        result.ChartPoints.Where(x => x.SeriesKey == "56").Select(x => x.GroupKey).Should().Equal("1", "2");
+        result.ChartPoints.Where(x => x.SeriesKey == "57").Select(x => x.GroupKey).Should().Equal("1", "2", "3");
+        result.ChartPoints.Single(x => x.SeriesKey == "56" && x.GroupKey == "2").Value.Should().Be(100m);
+        result.ChartPoints.Single(x => x.SeriesKey == "57" && x.GroupKey == "3").Value.Should().Be(100m);
+    }
+
     [Theory]
     [InlineData("56", 2020)]
     [InlineData("57", 2021)]
