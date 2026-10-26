@@ -1,21 +1,18 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
-  AreaChart as AreaChartIcon,
-  BarChart3,
+  ChartBar,
   CalendarRange,
   ChartBarStacked,
   ChartColumn,
   ChartColumnStacked,
   ChartNoAxesCombined,
   CircleAlert,
-  Donut,
   Eye,
   FileSpreadsheet,
   History,
   LineChart as LineChartIcon,
   LoaderCircle,
   Minus,
-  PieChart,
   Plus,
   RotateCcw,
   Trash2,
@@ -113,16 +110,13 @@ const recommendedChartGroup = (
   return 'cohort';
 };
 
-const chartOptions: Array<{ id: GraduationChartType; label: string; icon: typeof BarChart3 }> = [
-  { id: 'bar', label: 'Thanh ngang', icon: BarChart3 },
+const chartOptions: Array<{ id: GraduationChartType; label: string; icon: typeof ChartBar }> = [
+  { id: 'bar', label: 'Thanh ngang', icon: ChartBar },
   { id: 'column', label: 'Cột', icon: ChartColumn },
   { id: 'combo', label: 'Cột + đường', icon: ChartNoAxesCombined },
   { id: 'stacked-bar', label: 'Thanh chồng', icon: ChartBarStacked },
   { id: 'stacked-column', label: 'Cột chồng', icon: ChartColumnStacked },
   { id: 'line', label: 'Đường', icon: LineChartIcon },
-  { id: 'area', label: 'Miền', icon: AreaChartIcon },
-  { id: 'pie', label: 'Tròn', icon: PieChart },
-  { id: 'donut', label: 'Donut', icon: Donut },
 ];
 
 const chartMetrics: Array<{ id: ExploreChartMetric; label: string }> = [
@@ -178,7 +172,7 @@ const currentAcademicYearStart = () => {
 /** Tỷ lệ tốt nghiệp cũng ba chữ số thập phân như mọi tỷ lệ khác trong hệ thống. */
 const formatRate = (value: number) => formatPercent(value);
 const usesGraduatedDenominator = (metric: ExploreChartMetric) =>
-  ['onTime', 'workStudy', 'excellent', 'veryGood', 'good', 'average'].includes(metric);
+  ['excellent', 'veryGood', 'good', 'average'].includes(metric);
 const reviewDateLabel = (reviewMonth: number | null, reviewYear: number | null) =>
   reviewMonth !== null && reviewYear !== null
     ? `${String(reviewMonth).padStart(2, '0')}/${reviewYear}`
@@ -506,7 +500,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
           const values = timelineMetricValues(point, displayedChartMetric);
           const chartPoint = pointByPeriod.get(String(point.periodId));
           const total = chartPoint?.total ?? 0;
-          const periodTotal = usesGraduatedDenominator(displayedChartMetric) ? point.graduated : total;
+          const periodTotal = total;
           return {
             name: point.periodLabel,
             periodValue: periodTotal > 0 ? values.period * 100 / periodTotal : 0,
@@ -588,11 +582,13 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
       .map((item) => item.id)
       .filter((type) => {
         if (type === 'combo') return false;
-        if (type === 'pie' || type === 'donut') return !displayedChartSeries && chartModel.data.length <= 12;
+        // Tỷ lệ của từng nhóm có mẫu số riêng, không phải các thành phần của một tổng.
+        if (type === 'pie' || type === 'donut') return false;
+        if (type === 'line' || type === 'area') return displayedChartGroup === 'period';
         if (type === 'stacked-bar' || type === 'stacked-column') return Boolean(displayedChartSeries);
         return true;
       });
-  }, [chartModel.data.length, displayedChartSeries, isDisplayedCumulativeCombo, isDisplayedCumulativeTimeline]);
+  }, [displayedChartGroup, displayedChartSeries, isDisplayedCumulativeCombo, isDisplayedCumulativeTimeline]);
 
   useEffect(() => {
     if (!availableChartTypes.includes(chartType)) {
@@ -624,7 +620,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
       ? 'Cột: riêng từng đợt · Đường: tổng tích lũy'
       : displayedChartSeries
         ? `Nhóm phụ theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}`
-        : 'Không chia nhóm phụ'} · Tỷ lệ trên ${usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số sinh viên đầu vào'}`;
+        : 'Không chia nhóm phụ'} · Tỷ lệ trên ${usesGraduatedDenominator(displayedChartMetric) ? 'số sinh viên đã tốt nghiệp' : 'số sinh viên đầu vào'}`;
     const kpiInfo = Object.fromEntries(explore.kpis.map((kpi) => [
       kpi.label,
       `${formatNumber(kpi.count)} (${formatRate(kpi.rate)})`,
@@ -637,9 +633,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
       { key: 'count', header: 'Số lượng', numeric: true },
       {
         key: 'denominator',
-        header: usesGraduatedDenominator(displayedChartMetric)
-          ? 'Số sinh viên đã tốt nghiệp'
-          : 'Số sinh viên đầu vào',
+        header: usesGraduatedDenominator(displayedChartMetric) ? 'Số sinh viên đã tốt nghiệp' : 'Số sinh viên đầu vào',
         numeric: true,
       },
     ];
@@ -836,7 +830,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
               {explore.kpis.map((kpi) => <div key={kpi.id} data-kpi={kpi.id}>
                 <span>{kpi.label}</span>
                 <strong>{formatNumber(kpi.count)}</strong>
-                <small>{`${formatRate(kpi.rate)} ${kpi.id === 'graduated' ? 'số sinh viên nhập học' : 'số sinh viên đã tốt nghiệp'}`}</small>
+                <small>{`${formatRate(kpi.rate)} số sinh viên đầu vào`}</small>
               </div>)}
             </section>
             <section className="graduation-result-summary__ranks" aria-labelledby="graduation-rank-heading">
@@ -844,7 +838,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
                 <h3 id="graduation-rank-heading">Xếp loại tốt nghiệp</h3>
                 <span>Tỷ trọng trên số sinh viên đã tốt nghiệp</span>
               </div>
-              <div className="graduation-result-summary__distribution" role="img" aria-label="Tỷ trọng các mức xếp loại tốt nghiệp">
+              <div className="graduation-result-summary__distribution" role="img" aria-label="Tỷ trọng các mức xếp loại trong số sinh viên đã tốt nghiệp">
                 {explore.ranks.map((rank) => <span key={rank.rank} style={{ width: `${rank.rate}%` }} title={`${rank.label}: ${formatRate(rank.rate)}`} />)}
               </div>
               <div className="graduation-result-summary__rank-grid">
@@ -886,11 +880,32 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
               <label>So sánh theo<select value={chartGroupBy} onChange={(event) => { const next = event.target.value as ExploreChartDimension; setChartGroupBy(next); if (chartSeriesBy === next || (next === 'program' && chartSeriesBy === 'faculty')) setChartSeriesBy(''); }}>{chartDimensions.map((item) => <option key={item.id} value={item.id} disabled={!availableChartGroups.has(item.id)}>{item.label}</option>)}</select></label>
               <label>Nhóm phụ<select value={chartSeriesBy} onChange={(event) => setChartSeriesBy(event.target.value as ExploreChartSeries)}><option value="">Không chia nhóm phụ</option>{chartSeriesDimensions.map((item) => <option key={item.id} value={item.id} disabled={!isChartSeriesAvailable(item.id)}>{item.label}</option>)}</select></label>
               {allChartDimensionsFixed && <p className="graduation-builder__error">Tất cả chiều so sánh đã bị cố định. Hãy bỏ bớt bộ lọc để biểu đồ có nhiều nhóm.</p>}
-              <fieldset><legend>Loại biểu đồ</legend><div className="graduation-chart-types">{chartOptions.map((item) => { const Icon = item.icon; const enabled = availableChartTypes.includes(item.id); return <button key={item.id} type="button" disabled={!enabled} className={chartType === item.id ? 'is-selected' : ''} onClick={() => setChartType(item.id)} aria-pressed={chartType === item.id}><Icon aria-hidden="true" /><span>{item.label}</span></button>; })}</div></fieldset>
+              <fieldset>
+                <legend>Loại biểu đồ</legend>
+                <div className="graduation-chart-types">
+                  {chartOptions.map((item) => {
+                    const Icon = item.icon;
+                    const enabled = availableChartTypes.includes(item.id);
+                    const reason = item.id === 'pie' || item.id === 'donut'
+                      ? 'Tỷ lệ của từng nhóm có mẫu số riêng, không thể biểu diễn thành các phần của một tổng 100%.'
+                      : (item.id === 'line' || item.id === 'area') && displayedChartGroup !== 'period'
+                        ? 'Biểu đồ đường và miền chỉ dùng để so sánh theo đợt tốt nghiệp.'
+                        : 'Loại biểu đồ không phù hợp với cấu hình hiện tại.';
+                    return (
+                      <button key={item.id} type="button" disabled={!enabled}
+                        title={enabled ? item.label : reason}
+                        className={enabled && chartType === item.id ? 'is-selected' : ''}
+                        onClick={() => setChartType(item.id)} aria-pressed={enabled && chartType === item.id}>
+                        <Icon aria-hidden="true" /><span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
               <label className="graduation-builder__check"><input type="checkbox" checked={showChartLabels} onChange={(event) => setShowChartLabels(event.target.checked)} /> Hiển thị nhãn giá trị</label>
             </aside>
             <article className="graduation-chart-panel">
-              <header><div><h2>{selectedGraduationChartTitle}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Nhóm phụ theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không chia nhóm phụ'} · Tỷ lệ trên {usesGraduatedDenominator(displayedChartMetric) ? 'số đã tốt nghiệp' : 'số sinh viên đầu vào'}; số lượng hiển thị trong tooltip</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <div className="graduation-chart-zoom-controls"><button type="button" onClick={() => graduationChartRef.current?.zoomOut()} disabled={!chartZoomAvailable || chartZoomPercent <= 100} title="Thu nhỏ biểu đồ" aria-label="Thu nhỏ biểu đồ"><Minus aria-hidden="true" /></button><span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span><button type="button" onClick={() => graduationChartRef.current?.zoomIn()} disabled={!chartZoomAvailable || chartZoomPercent >= 2000} title="Phóng to biểu đồ" aria-label="Phóng to biểu đồ"><Plus aria-hidden="true" /></button></div>}</div></header>
+              <header><div><h2>{selectedGraduationChartTitle}</h2><p>{isDisplayedCumulativeCombo ? 'Cột: riêng từng đợt · Đường: tổng tích lũy' : displayedChartSeries ? `Nhóm phụ theo ${chartSeriesDimensions.find((item) => item.id === displayedChartSeries)?.label.toLocaleLowerCase('vi-VN')}` : 'Không chia nhóm phụ'} · Tỷ lệ trên {usesGraduatedDenominator(displayedChartMetric) ? 'số sinh viên đã tốt nghiệp' : 'số sinh viên đầu vào'}; số lượng hiển thị trong tooltip</p></div><div className="graduation-panel-actions"><span className={exploreLoading ? 'is-updating' : ''}>{exploreLoading ? <><LoaderCircle className="spin" /> Đang cập nhật</> : `${chartModel.data.length} ${isDisplayedCumulativeTimeline ? 'mốc thời gian' : 'nhóm dữ liệu'}`}</span>{chartModel.data.length > 0 && <div className="graduation-chart-zoom-controls"><button type="button" onClick={() => graduationChartRef.current?.zoomOut()} disabled={!chartZoomAvailable || chartZoomPercent <= 100} title="Thu nhỏ biểu đồ" aria-label="Thu nhỏ biểu đồ"><Minus aria-hidden="true" /></button><span className="graduation-chart-zoom" aria-live="polite">Zoom {chartZoomPercent}%</span><button type="button" onClick={() => graduationChartRef.current?.zoomIn()} disabled={!chartZoomAvailable || chartZoomPercent >= 2000} title="Phóng to biểu đồ" aria-label="Phóng to biểu đồ"><Plus aria-hidden="true" /></button></div>}</div></header>
               {chartModel.data.length > 0 ? <div className="graduation-chart"><GraduationEChart ref={graduationChartRef} type={chartType} data={chartModel.data} series={chartModel.series} unit="percent" showLabels={showChartLabels} onZoomChange={setChartZoomPercent} /></div> : <div className="graduation-chart-empty">{Array.isArray(explore.chartPoints) ? 'Không có dữ liệu phù hợp với cấu hình hiện tại.' : 'Backend API đang dùng phiên bản cũ. Hãy khởi động lại API để sử dụng cấu hình này.'}</div>}
             </article>
           </div>

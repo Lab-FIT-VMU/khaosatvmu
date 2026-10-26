@@ -612,8 +612,27 @@
   margin-top: 10px;
 }
 .graduation-explore-chart-workspace .graduation-builder label { margin-top: 10px; }
-.graduation-explore-chart-workspace .graduation-builder fieldset { margin-top: 12px; }
-.graduation-explore-chart-workspace .graduation-chart-types { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.graduation-explore-chart-workspace .graduation-builder { display: flex; flex-direction: column; }
+.graduation-explore-chart-workspace .graduation-builder fieldset {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin-top: 12px;
+}
+.graduation-explore-chart-workspace .graduation-chart-types {
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+}
+.graduation-explore-chart-workspace .graduation-chart-types button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .35em;
+  text-align: center;
+}
+.graduation-explore-chart-workspace .graduation-chart-types button svg { flex-shrink: 0; }
 .graduation-explore-chart-workspace .graduation-chart-panel {
   display: flex;
   height: 68dvh;
@@ -725,8 +744,9 @@
   .graduation-explore-chart-workspace .graduation-builder__check { grid-column: 1 / -1; }
   .graduation-explore-chart-workspace .graduation-builder label,
   .graduation-explore-chart-workspace .graduation-builder fieldset { margin-top: 0; }
+  .graduation-explore-chart-workspace .graduation-builder fieldset { display: block; flex: none; }
   .graduation-explore-chart-workspace .graduation-chart-types {
-    grid-template-columns: repeat(5, minmax(0, 19.6%));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: .5%;
     overflow-x: auto;
   }

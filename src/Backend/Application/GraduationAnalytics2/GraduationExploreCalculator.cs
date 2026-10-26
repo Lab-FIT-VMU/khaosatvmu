@@ -77,8 +77,8 @@ public static class GraduationExploreCalculator
         var kpis = new[]
         {
             new GraduationKpiDto("graduated", "Đã tốt nghiệp", total, Percentage(total, studentTotal)),
-            new GraduationKpiDto("onTime", "Tốt nghiệp đúng hạn", onTime, Percentage(onTime, total)),
-            new GraduationKpiDto("workStudy", "Hệ VLVH", workStudy, Percentage(workStudy, total)),
+            new GraduationKpiDto("onTime", "Tốt nghiệp đúng hạn", onTime, Percentage(onTime, studentTotal)),
+            new GraduationKpiDto("workStudy", "Hệ VLVH", workStudy, Percentage(workStudy, studentTotal)),
         };
         var ranks = Enum.GetValues<GraduationRank>()
             .Select(rank =>
@@ -261,8 +261,15 @@ public static class GraduationExploreCalculator
             .ToDictionary(
                 group => (group.Key.GroupKey, group.Key.SeriesKey ?? string.Empty),
                 group => group.Sum(x => x.Value));
-        var graduatedByGroup = cells
-            .GroupBy(cell => DimensionValue(cell, groupBy, periodById).Key)
+        var graduatesByGroupAndSeries = cells
+            .GroupBy(cell => (
+                Group: DimensionValue(cell, groupBy, periodById).Key,
+                Series: seriesBy is null ? string.Empty : DimensionValue(cell, seriesBy, periodById).Key))
+            .ToDictionary(group => group.Key, group => group.Sum(cell => cell.StudentCount));
+        var graduatesBySeries = cells
+            .GroupBy(cell => seriesBy is null
+                ? string.Empty
+                : DimensionValue(cell, seriesBy, periodById).Key)
             .ToDictionary(group => group.Key, group => group.Sum(cell => cell.StudentCount));
         var populationGroups = BuildPopulationGroups(population, periods, groupBy, seriesBy);
         var points = populationGroups
@@ -281,7 +288,9 @@ public static class GraduationExploreCalculator
                     count = Math.Max(0, group.ComponentTotal - graduated);
                 }
                 var denominator = UsesGraduatedDenominator(metricId)
-                    ? graduatedByGroup.GetValueOrDefault(group.GroupKey)
+                    ? groupBy == "period"
+                        ? graduatesBySeries.GetValueOrDefault(group.SeriesKey ?? string.Empty)
+                        : graduatesByGroupAndSeries.GetValueOrDefault((group.GroupKey, group.SeriesKey ?? string.Empty))
                     : group.Total;
                 return new GraduationChartPointV3Dto(
                     group.GroupKey,
@@ -313,16 +322,10 @@ public static class GraduationExploreCalculator
             x => x.Count);
         var runningBySeries = new Dictionary<string, int>(StringComparer.Ordinal);
         var runningGraduatedBySeries = new Dictionary<string, int>(StringComparer.Ordinal);
-        var cumulativeGraduatedDenominator = 0;
         var completed = new List<GraduationChartPointV3Dto>();
         foreach (var period in periods)
         {
             var periodKey = period.PeriodId.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            var periodGraduatedDenominator = graduatedByGroup.GetValueOrDefault(periodKey);
-            if (mode == GraduationExploreModes.CohortCumulative)
-            {
-                cumulativeGraduatedDenominator += periodGraduatedDenominator;
-            }
             foreach (var seriesItem in series)
             {
                 var seriesKey = seriesItem?.Key ?? string.Empty;
@@ -348,11 +351,9 @@ public static class GraduationExploreCalculator
                     }
                 }
                 var total = UsesGraduatedDenominator(metricId)
-                    ? mode == GraduationExploreModes.CohortCumulative
-                        ? cumulativeGraduatedDenominator
-                        : periodGraduatedDenominator
+                    ? graduatesBySeries.GetValueOrDefault(seriesKey)
                     : points.FirstOrDefault(x => x.GroupKey == periodKey && (x.SeriesKey ?? string.Empty) == seriesKey)?.Total
-                        ?? population.Sum(x => x.StudentCount);
+                        ?? PopulationComponentTotal(population, seriesBy, seriesItem?.Key);
                 completed.Add(new GraduationChartPointV3Dto(
                     periodKey,
                     PeriodLabel(period),
@@ -378,7 +379,7 @@ public static class GraduationExploreCalculator
                 ? new[] { new PopulationGroup(string.Empty, string.Empty, null, null, population.Sum(x => x.StudentCount), population.Sum(x => x.StudentCount)) }
                 : population
                     .GroupBy(x => PopulationDimensionValue(x, seriesBy))
-                    .Select(x => new PopulationGroup(string.Empty, string.Empty, x.Key.Key, x.Key.Label, x.Sum(y => y.StudentCount), population.Sum(y => y.StudentCount)))
+                    .Select(x => new PopulationGroup(string.Empty, string.Empty, x.Key.Key, x.Key.Label, x.Sum(y => y.StudentCount), x.Sum(y => y.StudentCount)))
                     .ToArray();
             return periods.SelectMany(period => seriesGroups.Select(series => series with
             {
@@ -453,7 +454,7 @@ public static class GraduationExploreCalculator
     };
 
     private static bool UsesGraduatedDenominator(string metricId) => metricId is
-        "onTime" or "workStudy" or "excellent" or "veryGood" or "good" or "average";
+        "excellent" or "veryGood" or "good" or "average";
 
     private static int RankCount(IEnumerable<GraduationExploreCell> cells, GraduationRank rank) =>
         cells.Where(x => x.GraduationRank == rank).Sum(x => x.StudentCount);
