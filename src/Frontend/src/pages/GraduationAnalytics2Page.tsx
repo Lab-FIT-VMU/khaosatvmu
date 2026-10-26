@@ -496,7 +496,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
     if (explore && isDisplayedCumulativeCombo) {
       const pointByPeriod = new Map(explore.chartPoints.map((point) => [point.groupKey, point]));
       return {
-        data: explore.timeline.map((point) => {
+        data: explore.timeline.filter((point) => pointByPeriod.has(String(point.periodId))).map((point) => {
           const values = timelineMetricValues(point, displayedChartMetric);
           const chartPoint = pointByPeriod.get(String(point.periodId));
           const total = chartPoint?.total ?? 0;
@@ -561,9 +561,10 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
     const data = [...groups.values()].map((group) => {
       const row: Record<string, string | number | null> = { name: group.name, total: group.total };
       series.forEach((item) => {
-        row[item.key] = group.values.get(item.key) ?? 0;
-        row[item.tooltipCountKey] = group.counts.get(item.key) ?? 0;
-        row[item.tooltipTotalKey] = group.totals.get(item.key) ?? 0;
+        const hasValue = group.values.has(item.key);
+        row[item.key] = hasValue ? group.values.get(item.key)! : isDisplayedCumulativeTimeline ? null : 0;
+        row[item.tooltipCountKey] = hasValue ? group.counts.get(item.key)! : null;
+        row[item.tooltipTotalKey] = hasValue ? group.totals.get(item.key)! : null;
       });
       return row;
     });
@@ -639,13 +640,13 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
     ];
     const tableRows = chartModel.data.flatMap((row) => {
       const values = row as Record<string, string | number | null>;
-      return chartModel.series.map((series) => ({
+      return chartModel.series.flatMap((series) => typeof values[series.key] !== 'number' ? [] : [{
         group: String(values.name ?? ''),
         ...(hasSeriesColumn ? { series: series.label } : {}),
         rate: Math.round(Number(values[series.key] ?? 0) * 100) / 100,
         count: Number(values[series.tooltipCountKey] ?? 0),
         denominator: Number(values[series.tooltipTotalKey] ?? 0),
-      }));
+      }]);
     });
     return {
       fileName: `thong-ke-tot-nghiep-${new Date().toISOString().slice(0, 10)}`,
