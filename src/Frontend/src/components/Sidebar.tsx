@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  ExternalLink,
   PanelLeftClose,
   PanelLeftOpen,
   X,
@@ -23,6 +24,7 @@ interface SidebarItem {
   label: string;
   icon: LucideIcon;
   badge?: number;
+  externalUrl?: string;
 }
 
 interface SidebarGroup {
@@ -149,6 +151,28 @@ export function Sidebar({
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = currentTab === item.id;
+
+                // Trang ngoài: liên kết thật mở tab mới, nên chuột giữa / Ctrl + bấm vẫn
+                // dùng được như mọi đường link. noopener để trang kia không điều khiển
+                // được tab của hệ thống qua window.opener.
+                if (item.externalUrl) {
+                  return (
+                    <a
+                      key={item.id}
+                      className="menu-item"
+                      href={item.externalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`${item.label} (mở trong tab mới)`}
+                      title={isCollapsed ? `${item.label} (mở tab mới)` : 'Mở trong tab mới'}
+                      onClick={() => setIsMobileOpen(false)}
+                    >
+                      <Icon className="menu-icon" aria-hidden="true" />
+                      <span className="menu-label">{item.label}</span>
+                      <ExternalLink className="menu-external-icon" aria-hidden="true" />
+                    </a>
+                  );
+                }
 
                 return (
                   <button

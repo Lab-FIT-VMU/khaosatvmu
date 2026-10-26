@@ -3,6 +3,7 @@ import {
   BookOpen,
   Building2,
   ChartColumn,
+  ChartNoAxesCombined,
   ClipboardCheck,
   Gauge,
   GraduationCap,
@@ -30,6 +31,11 @@ export interface SidebarMenuItem {
   id: string;
   label: string;
   icon: LucideIcon;
+  /**
+   * Trang ngoài hệ thống: bấm vào mở tab mới tới địa chỉ này thay vì chuyển trang bên
+   * trong. Mục loại này không có quyền module riêng nên mọi vai trò đều thấy.
+   */
+  externalUrl?: string;
 }
 
 export interface SidebarMenuGroup {
@@ -47,6 +53,12 @@ export const menuStructure: SidebarMenuGroup[] = [
       { id: 'survey-statistics', label: 'Bảng dữ liệu khảo sát', icon: Table2 },
       { id: 'reports', label: 'Thống kê & Báo cáo', icon: BarChart3 },
       { id: 'survey-analysis', label: 'Phân tích chuyên sâu', icon: Sigma },
+      {
+        id: 'course-grade-analysis',
+        label: 'Phân tích điểm học phần',
+        icon: ChartNoAxesCombined,
+        externalUrl: 'https://minhvima.github.io/Phan_tich_diem_Hoc_phan/',
+      },
     ],
   },
   {

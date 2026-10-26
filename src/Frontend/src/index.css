@@ -171,6 +171,7 @@ textarea:focus-visible {
 .sidebar.is-collapsed .menu-section-title,
 .sidebar.is-collapsed .menu-label,
 .sidebar.is-collapsed .menu-count,
+.sidebar.is-collapsed .menu-external-icon,
 .sidebar.is-collapsed .sidebar-semester-bar {
   display: none;
 }
@@ -360,6 +361,19 @@ textarea:focus-visible {
 
 .menu-label {
   min-width: 0;
+}
+
+/* Mục mở trang ngoài là thẻ <a>: bỏ gạch chân để nhìn y như các mục còn lại. */
+a.menu-item {
+  text-decoration: none;
+}
+
+/* Biểu tượng nhỏ báo mục này mở tab mới, đứng đúng chỗ của bộ đếm. */
+.menu-external-icon {
+  width: 13px;
+  height: 13px;
+  color: #8C969F;
+  stroke-width: 2;
 }
 
 .menu-count {
