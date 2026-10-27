@@ -400,9 +400,6 @@ public static class GraduationExploreCalculator
             })).ToList();
         }
 
-        var groupTotals = population
-            .GroupBy(cell => PopulationDimensionValue(cell, groupBy).Key)
-            .ToDictionary(group => group.Key, group => group.Sum(cell => cell.StudentCount));
         return population
             .Select(cell => new
             {
@@ -417,7 +414,7 @@ public static class GraduationExploreCalculator
                 x.Key.SeriesKey,
                 x.Key.SeriesLabel,
                 x.Sum(y => y.StudentCount),
-                groupTotals.GetValueOrDefault(x.Key.Key)))
+                x.Sum(y => y.StudentCount)))
             .ToList();
     }
 

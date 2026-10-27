@@ -8,6 +8,31 @@ using Xunit;
 public sealed class GraduationExploreCalculatorV3Tests
 {
     [Theory]
+    [InlineData("program", "cohort")]
+    [InlineData("faculty", "cohort")]
+    [InlineData("cohort", "program")]
+    [InlineData("cohort", "faculty")]
+    public void Calculate_GroupedChart_UsesInputOfEachGroupAndSeriesPair(string groupBy, string seriesBy)
+    {
+        var result = GraduationExploreCalculator.Calculate(
+            GraduationExploreModes.CohortCumulative, null,
+            [new GraduationExplorePeriod(1, 2024, 1, 8, 2024)],
+            [Cell(GraduationRank.Good, false, 15, 1, "60"),
+             Cell(GraduationRank.Good, false, 80, 1, "61")],
+            [Population(15, "60"), Population(80, "61")],
+            new GraduationExploreFacetsV3Dto([], [], []),
+            "graduated", groupBy, seriesBy);
+
+        result.ChartPoints.Should().HaveCount(2);
+        var k60 = result.ChartPoints.Single(x => (groupBy == "cohort" ? x.GroupKey : x.SeriesKey) == "60");
+        var k61 = result.ChartPoints.Single(x => (groupBy == "cohort" ? x.GroupKey : x.SeriesKey) == "61");
+        k60.Total.Should().Be(15);
+        k61.Total.Should().Be(80);
+        k60.Value.Should().Be(100m);
+        k61.Value.Should().Be(100m);
+    }
+
+    [Theory]
     [InlineData("excellent", GraduationRank.Excellent)]
     [InlineData("veryGood", GraduationRank.VeryGood)]
     [InlineData("good", GraduationRank.Good)]
