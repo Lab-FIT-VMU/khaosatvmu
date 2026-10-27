@@ -586,7 +586,7 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
         // Tỷ lệ của từng nhóm có mẫu số riêng, không phải các thành phần của một tổng.
         if (type === 'pie' || type === 'donut') return false;
         if (type === 'line' || type === 'area') return displayedChartGroup === 'period';
-        if (type === 'stacked-bar' || type === 'stacked-column') return Boolean(displayedChartSeries);
+        if (type === 'stacked-bar' || type === 'stacked-column') return false;
         return true;
       });
   }, [displayedChartGroup, displayedChartSeries, isDisplayedCumulativeCombo, isDisplayedCumulativeTimeline]);
@@ -887,7 +887,9 @@ export function GraduationAnalytics2Page({ view }: { view: GraduationAnalyticsVi
                   {chartOptions.map((item) => {
                     const Icon = item.icon;
                     const enabled = availableChartTypes.includes(item.id);
-                    const reason = item.id === 'pie' || item.id === 'donut'
+                    const reason = item.id === 'stacked-bar' || item.id === 'stacked-column'
+                      ? 'Mỗi nhóm có mẫu số riêng nên không thể cộng chồng các tỷ lệ.'
+                      : item.id === 'pie' || item.id === 'donut'
                       ? 'Tỷ lệ của từng nhóm có mẫu số riêng, không thể biểu diễn thành các phần của một tổng 100%.'
                       : (item.id === 'line' || item.id === 'area') && displayedChartGroup !== 'period'
                         ? 'Biểu đồ đường và miền chỉ dùng để so sánh theo đợt tốt nghiệp.'
