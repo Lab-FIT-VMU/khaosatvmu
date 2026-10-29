@@ -57,7 +57,7 @@ export const menuStructure: SidebarMenuGroup[] = [
         id: 'course-grade-analysis',
         label: 'Phân tích điểm học phần',
         icon: ChartNoAxesCombined,
-        externalUrl: 'https://minhvima.github.io/Phan_tich_diem_Hoc_phan/',
+        externalUrl: 'https://minhvima.github.io/Publish-PT-Diem-HP/',
       },
     ],
   },
