@@ -665,7 +665,7 @@ export const SurveyTemplatesPage: React.FC = () => {
         exportConfig={{
           title: 'DANH SÁCH BỘ CÂU HỎI KHẢO SÁT',
           fileName: 'danh-sach-bo-cau-hoi-khao-sat',
-          breadcrumb: ['Danh sách bộ khảo sát'],
+          breadcrumb: ['Danh sách bộ câu hỏi'],
         }}
         onAddNew={() => setIsImportOpen(true)}
         addNewLabel="Thêm bộ khảo sát mới"

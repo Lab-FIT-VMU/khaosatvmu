@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  ChevronDown,
   ExternalLink,
   PanelLeftClose,
   PanelLeftOpen,
@@ -8,9 +9,10 @@ import {
 } from 'lucide-react';
 import { canAccessModule } from '../auth/modulePermissions';
 import { useAuth } from '../auth/authContext';
-import { canAccessDashboard } from '../auth/roles';
+import { canAccessDashboard, isUnrestrictedRole } from '../auth/roles';
 import { HeaderSemesterPicker } from './HeaderSemesterPicker';
-import { menuStructure } from './sidebarMenu';
+import { isMenuGroup, menuStructure } from './sidebarMenu';
+import { parseUnitStatisticsTab } from './surveyStatisticsTabs';
 
 interface SidebarProps {
   currentTab: string;
@@ -28,9 +30,15 @@ interface SidebarItem {
 }
 
 interface SidebarGroup {
-  section: string;
+  id: string;
+  label: string;
+  icon: LucideIcon;
   items: SidebarItem[];
 }
+
+type SidebarEntry = SidebarItem | SidebarGroup;
+
+const isGroup = (entry: SidebarEntry): entry is SidebarGroup => 'items' in entry;
 
 /** Nhớ trạng thái thu gọn giữa các lần mở web. */
 const collapsedStorageKey = 'khaosatvmu.sidebar.collapsed';
@@ -45,6 +53,7 @@ export function Sidebar({
 
   const { activeProfile } = useAuth();
   const dashboardAllowed = canAccessDashboard(activeProfile?.roleCode);
+  const unrestricted = isUnrestrictedRole(activeProfile?.roleCode);
 
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -68,29 +77,108 @@ export function Sidebar({
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [isMobileOpen]);
 
-  const menuGroups: SidebarGroup[] = menuStructure
-    .map((group) => ({
-      ...group,
-      items: group.items
-        .filter(
-          (item) =>
-            // Tải lên dữ liệu tốt nghiệp có quyền module riêng (GRADUATION_UPLOAD_ACCESS)
-            // nên không cần lọc thêm theo vai trò ở đây; vai trò chỉ đọc không được cấp
-            // quyền đó, và backend vẫn từ chối nếu ai đó bật nhầm.
-            canAccessModule(permissions, item.id)
-            // Bảng điều khiển tạm đóng với giảng viên và các trưởng đơn vị.
-            && (item.id !== 'overview' || dashboardAllowed)
-        )
-        // Huy hiệu "đợt đang mở" chỉ có nghĩa với mục danh sách đợt khảo sát học phần.
-        .map((item) => (item.id === 'course-campaigns' && activeCampaignsCount > 0
-          ? { ...item, badge: activeCampaignsCount }
-          : item)),
-    }))
-    .filter((group) => group.items.length > 0);
+  const isItemVisible = (item: SidebarItem) => {
+    // Bảng điều khiển (cả bản CTĐT / giảng viên) tạm đóng với giảng viên và các trưởng
+    // đơn vị.
+    const page = parseUnitStatisticsTab(item.id)?.page ?? item.id;
+    return (
+      // Tải lên dữ liệu tốt nghiệp có quyền module riêng (GRADUATION_UPLOAD_ACCESS)
+      // nên không cần lọc thêm theo vai trò ở đây; vai trò chỉ đọc không được cấp
+      // quyền đó, và backend vẫn từ chối nếu ai đó bật nhầm.
+      canAccessModule(permissions, item.id)
+      && (page !== 'overview' || dashboardAllowed)
+    );
+  };
+
+  // Chỉ giữ mục người dùng mở được; nhóm rỗng thì ẩn luôn.
+  const entries: SidebarEntry[] = menuStructure.flatMap<SidebarEntry>((entry) => {
+    if (!isMenuGroup(entry)) return isItemVisible(entry) ? [entry] : [];
+    if (entry.unrestrictedOnly && !unrestricted) return [];
+    const items = entry.items
+      .filter(isItemVisible)
+      // Huy hiệu "đợt đang mở" chỉ có nghĩa với mục danh sách bài khảo sát.
+      .map((item) => (item.id === 'course-campaigns' && activeCampaignsCount > 0
+        ? { ...item, badge: activeCampaignsCount }
+        : item));
+    return items.length > 0 ? [{ ...entry, items }] : [];
+  });
+
+  const activeGroupId = entries.find(
+    (entry) => isGroup(entry) && entry.items.some((item) => item.id === currentTab),
+  )?.id ?? null;
+
+  // Chỉ tự mở nhóm chứa trang đang xem; các nhóm khác người dùng tự bấm mở.
+  const [expanded, setExpanded] = useState<string[]>(() => (activeGroupId ? [activeGroupId] : []));
+  useEffect(() => {
+    if (activeGroupId) {
+      setExpanded((prev) => (prev.includes(activeGroupId) ? prev : [...prev, activeGroupId]));
+    }
+  }, [activeGroupId]);
+
+  const toggleGroup = (groupId: string) => {
+    // Đang thu gọn thì không có chỗ sổ danh sách: mở rộng thanh rồi mở đúng nhóm vừa bấm.
+    if (isCollapsed) {
+      setIsCollapsed(false);
+      setExpanded([groupId]);
+      return;
+    }
+    setExpanded((prev) => (prev.includes(groupId)
+      ? prev.filter((id) => id !== groupId)
+      : [...prev, groupId]));
+  };
 
   const handleSelect = (tab: string) => {
     onSelectTab(tab);
     setIsMobileOpen(false);
+  };
+
+  const renderItem = (item: SidebarItem, isChild: boolean) => {
+    const Icon = item.icon;
+    const isActive = currentTab === item.id;
+    const className = `menu-item${isChild ? ' menu-item--child' : ''}`;
+
+    // Trang ngoài: liên kết thật mở tab mới, nên chuột giữa / Ctrl + bấm vẫn dùng được
+    // như mọi đường link. noopener để trang kia không điều khiển được tab của hệ thống
+    // qua window.opener.
+    if (item.externalUrl) {
+      return (
+        <a
+          key={item.id}
+          className={className}
+          href={item.externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${item.label} (mở trong tab mới)`}
+          title={isCollapsed ? `${item.label} (mở tab mới)` : 'Mở trong tab mới'}
+          onClick={() => setIsMobileOpen(false)}
+        >
+          <Icon className="menu-icon" aria-hidden="true" />
+          <span className="menu-label">{item.label}</span>
+          <ExternalLink className="menu-external-icon" aria-hidden="true" />
+        </a>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        key={item.id}
+        className={`${className}${isActive ? ' active' : ''}`}
+        aria-current={isActive ? 'page' : undefined}
+        // Thu gọn thì chỉ còn biểu tượng, tên trang chuyển thành chú thích của trình
+        // duyệt để vẫn biết mình đang trỏ vào đâu.
+        title={isCollapsed ? item.label : undefined}
+        onClick={() => handleSelect(item.id)}
+      >
+        <Icon className="menu-icon" aria-hidden="true" />
+        <span className="menu-label">{item.label}</span>
+        {item.badge !== undefined && (
+          <span className="menu-count" aria-label={`${item.badge} đợt đang mở`}>
+            {item.badge}
+          </span>
+        )}
+      </button>
+    );
   };
 
   return (
@@ -145,58 +233,40 @@ export function Sidebar({
         </div>
 
         <nav className="sidebar-menu" aria-label="Điều hướng chính">
-          {menuGroups.map((group) => (
-            <section className="menu-section" key={group.section}>
-              <h3 className="menu-section-title">{group.section}</h3>
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentTab === item.id;
+          {entries.map((entry) => {
+            if (!isGroup(entry)) return renderItem(entry, false);
 
-                // Trang ngoài: liên kết thật mở tab mới, nên chuột giữa / Ctrl + bấm vẫn
-                // dùng được như mọi đường link. noopener để trang kia không điều khiển
-                // được tab của hệ thống qua window.opener.
-                if (item.externalUrl) {
-                  return (
-                    <a
-                      key={item.id}
-                      className="menu-item"
-                      href={item.externalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`${item.label} (mở trong tab mới)`}
-                      title={isCollapsed ? `${item.label} (mở tab mới)` : 'Mở trong tab mới'}
-                      onClick={() => setIsMobileOpen(false)}
-                    >
-                      <Icon className="menu-icon" aria-hidden="true" />
-                      <span className="menu-label">{item.label}</span>
-                      <ExternalLink className="menu-external-icon" aria-hidden="true" />
-                    </a>
-                  );
-                }
+            const GroupIcon = entry.icon;
+            const isOpen = expanded.includes(entry.id) && !isCollapsed;
+            const containsActive = entry.id === activeGroupId;
+            const panelId = `sidebar-group-${entry.id}`;
 
-                return (
-                  <button
-                    type="button"
-                    key={item.id}
-                    className={`menu-item ${isActive ? 'active' : ''}`}
-                    aria-current={isActive ? 'page' : undefined}
-                    // Thu gọn thì chỉ còn biểu tượng, tên trang chuyển thành chú
-                    // thích của trình duyệt để vẫn biết mình đang trỏ vào đâu.
-                    title={isCollapsed ? item.label : undefined}
-                    onClick={() => handleSelect(item.id)}
-                  >
-                    <Icon className="menu-icon" aria-hidden="true" />
-                    <span className="menu-label">{item.label}</span>
-                    {item.badge !== undefined && (
-                      <span className="menu-count" aria-label={`${item.badge} đợt đang mở`}>
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </section>
-          ))}
+            return (
+              <div className="menu-group" key={entry.id}>
+                <button
+                  type="button"
+                  className={`menu-item menu-group-toggle${containsActive ? ' contains-active' : ''}`}
+                  aria-expanded={isOpen}
+                  aria-controls={panelId}
+                  title={isCollapsed ? entry.label : undefined}
+                  onClick={() => toggleGroup(entry.id)}
+                >
+                  <GroupIcon className="menu-icon" aria-hidden="true" />
+                  <span className="menu-label">{entry.label}</span>
+                  <ChevronDown
+                    className={`menu-group-chevron${isOpen ? ' is-open' : ''}`}
+                    aria-hidden="true"
+                  />
+                </button>
+
+                {isOpen && (
+                  <div className="menu-group-items" id={panelId}>
+                    {entry.items.map((item) => renderItem(item, true))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="sidebar-collapse-bar">

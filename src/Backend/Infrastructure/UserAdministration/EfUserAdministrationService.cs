@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Net.Mail;
 using Application.Auth;
 using Application.UserAdministration;
@@ -441,12 +441,14 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
     /// </summary>
     private static readonly Dictionary<string, int> CategoryOrderMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Tổng quan"] = 1,
-        ["Thống kê tốt nghiệp"] = 2,
-        ["Danh mục đào tạo"] = 3,
-        ["Khảo sát học phần"] = 4,
-        ["Khảo sát chương trình"] = 5,
-        ["Quản trị"] = 6
+        [SurveyStatisticsPermissions.CourseCategory] = 1,
+        [SurveyStatisticsPermissions.UnitGroups[0].Category] = 2,
+        [SurveyStatisticsPermissions.UnitGroups[1].Category] = 3,
+        ["Thống kê tốt nghiệp"] = 4,
+        ["Khảo sát học phần"] = 5,
+        ["Khảo sát chương trình"] = 6,
+        ["Danh mục đào tạo"] = 7,
+        ["Quản trị"] = 8
     };
 
     private static int GetCategoryOrder(string category) =>
@@ -454,7 +456,7 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
 
     private static readonly Dictionary<string, int> PermissionOrderMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        // Tổng quan
+        // Thống kê khảo sát học phần
         ["DASHBOARD_ACCESS"] = 1,
         ["SURVEY_DASHBOARD_ACCESS"] = 2,
         ["PROGRESS_ACCESS"] = 3,
@@ -465,13 +467,14 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         ["GRADUATION_UPLOAD_ACCESS"] = 1,
         ["GRADUATION_ANALYTICS_ACCESS"] = 2,
         // Danh mục đào tạo
-        ["FACULTIES_ACCESS"] = 1,
-        ["DEPARTMENTS_ACCESS"] = 2,
-        ["LECTURERS_ACCESS"] = 3,
-        ["MAJORS_ACCESS"] = 4,
-        ["COHORT_MAJORS_ACCESS"] = 5,
-        ["COURSES_ACCESS"] = 6,
-        ["COURSE_SECTIONS_ACCESS"] = 7,
+        ["ACADEMIC_YEARS_ACCESS"] = 1,
+        ["FACULTIES_ACCESS"] = 2,
+        ["DEPARTMENTS_ACCESS"] = 3,
+        ["LECTURERS_ACCESS"] = 4,
+        ["MAJORS_ACCESS"] = 5,
+        ["COHORT_MAJORS_ACCESS"] = 6,
+        ["COURSES_ACCESS"] = 7,
+        ["COURSE_SECTIONS_ACCESS"] = 8,
         // Khảo sát học phần
         ["COURSE_QUESTION_SETS_ACCESS"] = 1,
         ["COURSE_CAMPAIGNS_ACCESS"] = 2,
@@ -481,6 +484,30 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         // Quản trị
         ["USER_ADMIN_ACCESS"] = 1
     };
+
+    /// <summary>
+    /// Thứ tự trong một nhóm. Nhóm thống kê CTĐT / giảng viên xếp sáu trang y như nhóm học
+    /// phần, nên đọc thứ tự từ <see cref="SurveyStatisticsPermissions.Pages"/>.
+    /// </summary>
+    private static int GetModuleOrder(string code)
+    {
+        if (PermissionOrderMap.TryGetValue(code, out var order)) return order;
+        foreach (var group in SurveyStatisticsPermissions.UnitGroups)
+        {
+            for (var index = 0; index < SurveyStatisticsPermissions.Pages.Count; index++)
+            {
+                if (string.Equals(
+                        SurveyStatisticsPermissions.UnitCode(group, SurveyStatisticsPermissions.Pages[index]),
+                        code,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return index + 1;
+                }
+            }
+        }
+
+        return 99;
+    }
 
     /// <summary>
     /// Quyền tab xếp ngay dưới module cha, theo đúng thứ tự trong
@@ -503,7 +530,7 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
     private static int GetPermissionOrder(string code) =>
         TabOrderMap.TryGetValue(code, out var tabOrder)
             ? tabOrder
-            : (PermissionOrderMap.TryGetValue(code, out var order) ? order : 99) * 1000;
+            : GetModuleOrder(code) * 1000;
 
     public async Task<IReadOnlyList<PermissionDto>> GetPermissionsAsync(CancellationToken cancellationToken = default) =>
         await db.Permissions

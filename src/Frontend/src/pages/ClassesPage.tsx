@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   CalendarDays,
   ChevronDown,
@@ -7,7 +7,6 @@ import {
   Layers,
   MailPlus,
   Pencil,
-  Plus,
   Trash2,
   TriangleAlert,
 } from 'lucide-react';
@@ -23,11 +22,9 @@ import { ApiError } from '../services/apiClient';
 import {
   catalogApi,
   catalogErrorMessage,
-  type SaveAcademicYearPayload,
   type UnidentifiedLecturerReport,
 } from '../services/catalogApi';
 import type {
-  AcademicYear,
   Course,
   CourseSection,
   Department,
@@ -52,67 +49,12 @@ interface ClassesPageProps {
   onCatalogChanged: () => Promise<void>;
 }
 
-interface YearForm {
-  academicYearName: string;
-  startDate: string;
-  endDate: string;
-}
-
 interface SectionForm {
   courseId: string;
   lecturerId: string;
   sectionName: string;
   classSize: string;
 }
-
-const emptyYearForm: YearForm = {
-  academicYearName: '',
-  startDate: '',
-  endDate: '',
-};
-
-/**
- * Năm học kết thúc vào ngày liền trước mốc bắt đầu của năm sau, để hai năm liên
- * tiếp khít nhau. Ngày 29/2 lùi về 28/2 trước khi trừ một ngày, khớp cách
- * DateOnly.AddYears của máy chủ làm tròn.
- */
-const endDateFromStart = (startDate: string) => {
-  const [year, month, day] = startDate.split('-').map(Number);
-  if (!year || !month || !day) return '';
-
-  const nextYear = year + 1;
-  const daysInMonth = new Date(Date.UTC(nextYear, month, 0)).getUTCDate();
-  const anniversary = new Date(Date.UTC(nextYear, month - 1, Math.min(day, daysInMonth)));
-  anniversary.setUTCDate(anniversary.getUTCDate() - 1);
-  return anniversary.toISOString().slice(0, 10);
-};
-
-/**
- * Dải năm học sinh sẵn trong danh sách chọn, tính từ năm hiện tại: 20 năm đã qua
- * để nhập bù dữ liệu cũ, 10 năm sắp tới để mở trước. Dải trượt theo năm hiện tại
- * nên không có mốc cứng nào phải sửa lại về sau.
- */
-const YEARS_BEFORE = 20;
-const YEARS_AFTER = 10;
-
-/**
- * Năm học chỉ nhận khuôn "n-(n+1)", nên thay vì để gõ tay rồi lọt "2025-2027",
- * danh sách được sinh quanh năm hiện tại. Tên đang sửa luôn có mặt, kể cả khi
- * nó nằm ngoài dải, để mở hộp thoại sửa không làm mất giá trị cũ.
- */
-const buildAcademicYearOptions = (currentName: string): string[] => {
-  const thisYear = new Date().getFullYear();
-  const generated = Array.from(
-    { length: YEARS_BEFORE + YEARS_AFTER + 1 },
-    (_, index) => {
-      const start = thisYear - YEARS_BEFORE + index;
-      return `${start}-${start + 1}`;
-    }
-  );
-  return currentName && !generated.includes(currentName)
-    ? [currentName, ...generated]
-    : generated;
-};
 
 const emptySectionForm: SectionForm = {
   courseId: '',
@@ -139,11 +81,8 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
   faculties,
   onCatalogChanged,
 }) => {
-  const {
-    academicYears,
-    activeSemesterId,
-    reloadAcademicYears,
-  } = useSemester();
+  // Năm học và học kỳ tạo ở mục riêng "Năm học & học kỳ"; ở đây cây chỉ để chọn học kỳ.
+  const { academicYears, activeSemesterId } = useSemester();
   const [loadError] = useState<string | null>(null);
   const [selectedSemesterId, setSelectedSemesterId] = useState<number | null>(() => activeSemesterId);
   const [expandedYearIds, setExpandedYearIds] = useState<number[]>([]);
@@ -152,17 +91,6 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [search, setSearch] = useState('');
   const [isImportOpen, setIsImportOpen] = useState(false);
-
-  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
-  const [editingYear, setEditingYear] = useState<AcademicYear | null>(null);
-  const [yearForm, setYearForm] = useState<YearForm>(emptyYearForm);
-  const [yearError, setYearError] = useState('');
-  const [savingYear, setSavingYear] = useState(false);
-
-  const [isSemesterModalOpen, setIsSemesterModalOpen] = useState(false);
-  const [semesterName, setSemesterName] = useState('');
-  const [semesterError, setSemesterError] = useState('');
-  const [savingSemester, setSavingSemester] = useState(false);
 
   const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<CourseSection | null>(null);
@@ -205,18 +133,6 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
   }, [selectedSemesterId, academicYears]);
 
   const selectedYear = academicYears.find((year) => year.academicYearId === selectedYearId) ?? null;
-
-  // Năm học đã có trong danh mục thì bỏ khỏi danh sách chọn, khỏi để người dùng
-  // chọn xong mới nhận lỗi trùng tên từ API.
-  const yearNameOptions = useMemo(() => {
-    const editingName = editingYear?.academicYearName ?? '';
-    const taken = new Set(
-      academicYears
-        .filter((year) => year.academicYearId !== editingYear?.academicYearId)
-        .map((year) => year.academicYearName)
-    );
-    return buildAcademicYearOptions(editingName).filter((option) => !taken.has(option));
-  }, [academicYears, editingYear]);
 
   const selectedSemester =
     academicYears
@@ -314,11 +230,6 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
 
   // ----- Nạp dữ liệu --------------------------------------------------------
 
-  const reloadYears = async (): Promise<AcademicYear[]> => {
-    const next = await reloadAcademicYears();
-    return next;
-  };
-
   useEffect(() => {
     let cancelled = false;
 
@@ -358,110 +269,6 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
         : [...current, academicYearId]
     );
     setSelectedYearId(academicYearId);
-  };
-
-  const openCreateYear = () => {
-    setEditingYear(null);
-    setYearForm(emptyYearForm);
-    setYearError('');
-    setIsYearModalOpen(true);
-  };
-
-  const openEditYear = (year: AcademicYear) => {
-    setEditingYear(year);
-    setYearForm({
-      academicYearName: year.academicYearName,
-      startDate: year.startDate,
-      endDate: year.endDate,
-    });
-    setYearError('');
-    setIsYearModalOpen(true);
-  };
-
-  const handleYearSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const name = yearForm.academicYearName.trim();
-
-    if (!name) {
-      setYearError('Vui lòng nhập tên năm học.');
-      return;
-    }
-    if (!yearForm.startDate) {
-      setYearError('Vui lòng chọn ngày bắt đầu năm học.');
-      return;
-    }
-
-    const payload: SaveAcademicYearPayload = {
-      academicYearName: name,
-      startDate: yearForm.startDate,
-    };
-
-    setSavingYear(true);
-    try {
-      if (editingYear) {
-        await catalogApi.updateAcademicYear(editingYear.academicYearId, payload);
-        await reloadYears();
-        toast.success('Đã cập nhật năm học', { description: name });
-      } else {
-        const created = await catalogApi.createAcademicYear(payload);
-        await reloadYears();
-        setExpandedYearIds((current) => [...current, created.academicYearId]);
-        setSelectedYearId(created.academicYearId);
-        toast.success('Đã thêm năm học', {
-          description: `${name} · tự tạo ${created.semesters.length} học kỳ`,
-        });
-      }
-      setIsYearModalOpen(false);
-      setEditingYear(null);
-      setYearForm(emptyYearForm);
-      setYearError('');
-    } catch (error) {
-      setYearError(catalogErrorMessage(errorCodeOf(error)));
-    } finally {
-      setSavingYear(false);
-    }
-  };
-
-  // ----- Học kỳ -------------------------------------------------------------
-
-  // Ba học kỳ được sinh tự động cùng năm học và không cho sửa hay xoá, tránh việc
-  // đổi nhầm tên hay xoá nhầm một học kỳ đang gánh lớp học phần.
-  const openCreateSemester = () => {
-    setSemesterName('');
-    setSemesterError('');
-    setIsSemesterModalOpen(true);
-  };
-
-  const handleSemesterSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    const name = semesterName.trim();
-    const academicYearId = selectedYearId;
-
-    if (!name) {
-      setSemesterError('Vui lòng nhập tên học kỳ.');
-      return;
-    }
-    if (academicYearId === null) {
-      setSemesterError('Hãy chọn một năm học trước.');
-      return;
-    }
-
-    setSavingSemester(true);
-    try {
-      await catalogApi.createSemester(name, academicYearId);
-      await reloadYears();
-      setExpandedYearIds((current) =>
-        current.includes(academicYearId) ? current : [...current, academicYearId]
-      );
-      toast.success('Đã thêm học kỳ', { description: name });
-      setIsSemesterModalOpen(false);
-      setSemesterName('');
-      setSemesterError('');
-    } catch (error) {
-      setSemesterError(catalogErrorMessage(errorCodeOf(error)));
-    } finally {
-      setSavingSemester(false);
-    }
   };
 
   // ----- Lớp học phần -------------------------------------------------------
@@ -830,25 +637,14 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
               <CalendarDays aria-hidden="true" size={16} />
               Năm học
             </span>
-            {/* Năm học và học kỳ là khung dùng chung cho cả trường, chỉ quản trị mới
-                được sửa — backend cũng từ chối, xem congviec3.md mục H4. */}
-            {canManageAll && (
-              <button
-                type="button"
-                className="term-tree__add"
-                onClick={openCreateYear}
-                aria-label="Thêm năm học"
-                title="Thêm năm học"
-              >
-                <Plus aria-hidden="true" size={16} />
-              </button>
-            )}
           </header>
 
           {loadError && <p className="term-tree__error">{loadError}</p>}
 
           {academicYears.length === 0 ? (
-            <p className="term-tree__empty">Chưa có năm học nào</p>
+            <p className="term-tree__empty">
+              Chưa có năm học nào. Tạo năm học ở mục Danh mục đào tạo → Năm học &amp; học kỳ.
+            </p>
           ) : (
             <ul className="term-tree__list">
               {academicYears.map((year) => {
@@ -874,19 +670,6 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
                         <span className="term-tree__year-name">{year.academicYearName}</span>
                         <span className="term-tree__count">{year.semesters.length}</span>
                       </button>
-                      {canManageAll && (
-                        <span className="term-tree__row-actions">
-                          <button
-                            type="button"
-                            className="catalog-icon-button catalog-icon-button--sm"
-                            onClick={() => openEditYear(year)}
-                            aria-label={`Sửa ${year.academicYearName}`}
-                            title="Sửa năm học"
-                          >
-                            <Pencil aria-hidden="true" size={13} />
-                          </button>
-                        </span>
-                      )}
                     </div>
 
                     {isExpanded && (
@@ -947,19 +730,6 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
                 </>
               )}
             </span>
-
-            {/* Khi đã chọn học kỳ, nút thêm nằm trên thanh công cụ của bảng. */}
-            {!selectedSemester && canManageAll && (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm catalog-add-button"
-                onClick={openCreateSemester}
-                disabled={selectedYearId === null}
-              >
-                <Plus aria-hidden="true" size={16} />
-                <span>Thêm học kỳ</span>
-              </button>
-            )}
           </header>
 
           {selectedSemester && unidentified !== null && unidentified.sectionCount > 0 && (
@@ -1057,116 +827,6 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
           )}
         </section>
       </div>
-
-      {/* Modal năm học */}
-      <Modal
-        isOpen={isYearModalOpen}
-        onClose={() => setIsYearModalOpen(false)}
-        title={editingYear ? 'Sửa năm học' : 'Thêm năm học'}
-      >
-        <form className="catalog-form" onSubmit={(event) => void handleYearSubmit(event)}>
-          {yearError && <div className="catalog-validation-error" role="alert">{yearError}</div>}
-          <div className="form-group">
-            <label htmlFor="year-name">Tên năm học</label>
-            <select
-              id="year-name"
-              value={yearForm.academicYearName}
-              onChange={(event) =>
-                setYearForm((prev) => ({ ...prev, academicYearName: event.target.value }))
-              }
-              required
-            >
-              <option value="">-- Chọn năm học --</option>
-              {yearNameOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="year-start-date">Ngày bắt đầu</label>
-            <input
-              id="year-start-date"
-              type="date"
-              value={yearForm.startDate}
-              onChange={(event) =>
-                setYearForm((prev) => ({
-                  ...prev,
-                  startDate: event.target.value,
-                  endDate: endDateFromStart(event.target.value),
-                }))
-              }
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="year-end-date">Ngày kết thúc</label>
-            <input
-              id="year-end-date"
-              type="date"
-              value={yearForm.endDate}
-              readOnly
-              disabled
-            />
-            <small className="form-hint">
-              Tự tính theo ngày bắt đầu: ngày liền trước mốc đó của năm sau.
-            </small>
-          </div>
-          {!editingYear && (
-            <div className="catalog-context-band">
-              Sau khi lưu, hệ thống tự tạo ba học kỳ: Học kỳ phụ, Học kỳ 1, Học kỳ 2.
-            </div>
-          )}
-          <div className="modal-footer catalog-form-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => setIsYearModalOpen(false)}>
-              Hủy
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={savingYear}>
-              {savingYear ? 'Đang lưu...' : 'Lưu'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal học kỳ */}
-      <Modal
-        isOpen={isSemesterModalOpen}
-        onClose={() => setIsSemesterModalOpen(false)}
-        title="Thêm học kỳ"
-      >
-        <form className="catalog-form" onSubmit={(event) => void handleSemesterSubmit(event)}>
-          {semesterError && (
-            <div className="catalog-validation-error" role="alert">{semesterError}</div>
-          )}
-          <div className="catalog-context-band">
-            Năm học: <strong>{selectedYear?.academicYearName ?? 'Chưa chọn'}</strong>
-          </div>
-          <div className="form-group">
-            <label htmlFor="semester-name">Tên học kỳ</label>
-            <input
-              id="semester-name"
-              type="text"
-              placeholder="VD: Học kỳ 1"
-              value={semesterName}
-              onChange={(event) => setSemesterName(event.target.value)}
-              required
-            />
-          </div>
-          <div className="modal-footer catalog-form-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setIsSemesterModalOpen(false)}
-            >
-              Hủy
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={savingSemester}>
-              {savingSemester ? 'Đang lưu...' : 'Lưu'}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Modal lớp học phần */}
       <Modal

@@ -154,7 +154,8 @@ public sealed class EndpointAuthorizationTests
     [InlineData("/api/catalog/course-sections", "GET", AuthPolicies.CourseSectionsAccess)]
     [InlineData("/api/catalog/lecturers", "GET", AuthPolicies.LecturersRead)]
     [InlineData("/api/catalog/lecturers", "POST", AuthPolicies.LecturersAccess)]
-    [InlineData("/api/catalog/academic-years", "POST", AuthPolicies.CourseSectionsAccess)]
+    [InlineData("/api/catalog/academic-years", "POST", AuthPolicies.AcademicYearsAccess)]
+    [InlineData("/api/catalog/semesters", "POST", AuthPolicies.AcademicYearsAccess)]
     public void CatalogEndpoints_RequireResourcePermission(
         string route,
         string method,

@@ -3,6 +3,7 @@ namespace UnitTests.InfrastructureTests;
 using Application;
 using Application.Auth;
 using Application.Catalog;
+using Domain;
 using FluentAssertions;
 using global::Infrastructure.Catalog;
 using global::Infrastructure.Persistence;
@@ -291,6 +292,41 @@ public class CatalogWriteGuardTests
                     new SaveSemesterCommand("Hoc ky thu nghiem", year.AcademicYearId))).ErrorCode
                     .Should().Be(CatalogErrorCodes.OutOfScope);
             }
+        });
+    }
+
+    [Fact]
+    public async Task CreateAcademicYear_AlsoCreatesItsCohort()
+    {
+        await RunInRollbackAsync(async (db, serviceFor) =>
+        {
+            var created = await serviceFor(Admin).CreateAcademicYearAsync(
+                new SaveAcademicYearCommand("2099-2100", new DateOnly(2099, 7, 25)));
+            created.Succeeded.Should().BeTrue(created.ErrorCode);
+            created.Value!.Semesters.Should().HaveCount(3);
+
+            // 2018-2019 là khoá 59, nên 2099-2100 là khoá 140.
+            var cohort = await db.Cohorts.SingleAsync(x => x.AcademicYearId == created.Value.AcademicYearId);
+            cohort.CohortCode.Should().Be("140");
+            cohort.CohortName.Should().Be("Khoá 140");
+        });
+    }
+
+    [Fact]
+    public async Task CreateAcademicYear_FailsWithoutWriting_WhenCohortCodeIsTaken()
+    {
+        await RunInRollbackAsync(async (db, serviceFor) =>
+        {
+            var anyYear = await db.AcademicYears.FirstOrDefaultAsync();
+            if (anyYear is null) return;
+            // Mã "141" của năm 2100-2101 đã bị một khoá khác chiếm.
+            db.Cohorts.Add(new Cohort { CohortCode = "141", CohortName = "Khoá chiếm mã", AcademicYearId = anyYear.AcademicYearId });
+            await db.SaveChangesAsync();
+
+            var result = await serviceFor(Admin).CreateAcademicYearAsync(
+                new SaveAcademicYearCommand("2100-2101", new DateOnly(2100, 7, 25)));
+            result.ErrorCode.Should().Be(CatalogErrorCodes.AcademicYearCohortCodeExists);
+            (await db.AcademicYears.AnyAsync(x => x.AcademicYearName == "2100-2101")).Should().BeFalse();
         });
     }
 }

@@ -86,10 +86,6 @@ public interface ICohortService
 {
     Task<IReadOnlyList<CohortDto>> GetCohortsAsync(CancellationToken cancellationToken = default);
 
-    Task<CohortOperationResult<CohortDto>> CreateCohortAsync(
-        SaveCohortCommand command,
-        CancellationToken cancellationToken = default);
-
     Task<CohortOperationResult<CohortDto>> UpdateCohortAsync(
         int cohortId,
         SaveCohortCommand command,

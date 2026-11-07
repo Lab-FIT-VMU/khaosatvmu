@@ -293,6 +293,8 @@ export const catalogErrorMessages: Record<string, string> = {
   CATALOG_ACADEMIC_YEAR_NOT_FOUND: 'Không tìm thấy năm học.',
   CATALOG_ACADEMIC_YEAR_NAME_REQUIRED: 'Thiếu tên năm học.',
   CATALOG_ACADEMIC_YEAR_NAME_EXISTS: 'Tên năm học đã tồn tại.',
+  CATALOG_ACADEMIC_YEAR_COHORT_CODE_EXISTS:
+    'Mã khoá của năm học này đã được một khoá khác dùng. Sửa mã khoá đó ở mục Khoá ngành đào tạo rồi thử lại.',
   CATALOG_ACADEMIC_YEAR_NAME_INVALID:
     'Tên năm học phải có dạng năm liền nhau, ví dụ 2025-2026.',
   CATALOG_SEMESTER_NOT_FOUND: 'Không tìm thấy học kỳ.',

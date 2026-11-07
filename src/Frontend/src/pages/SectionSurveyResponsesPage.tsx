@@ -70,7 +70,7 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
   onBack,
   backLabel = 'Quay lại danh sách lớp',
   showAnalysis = false,
-  breadcrumb = ['Danh sách bộ khảo sát'],
+  breadcrumb = ['Danh sách bộ câu hỏi'],
 }) => {
   const [sectionSurvey, setSectionSurvey] = useState<CourseSectionSurvey | null>(null);
   const [responses, setResponses] = useState<SurveyResponseSummary[]>([]);

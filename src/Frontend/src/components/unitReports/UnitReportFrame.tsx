@@ -76,26 +76,19 @@ export const UnitReportToolbar: React.FC<UnitReportToolbarProps> = ({
 };
 
 /**
- * Dòng cấu hình tính điểm, cùng thành phần với trang học phần nhưng câu chữ theo loại:
- * CTĐT không có sĩ số nên chỉ có tiêu chí phiếu hợp lệ.
+ * Dòng cấu hình tính điểm, cùng thành phần với trang học phần. CTĐT và khảo sát giảng viên
+ * đều không có sĩ số nên chỉ có tiêu chí phiếu hợp lệ.
  */
 export const UnitScoringNote: React.FC<{ report: UnitSurveyReport | null; surveyType: UnitSurveyType }> = ({
   report,
   surveyType,
 }) => (
   <ScoringConfigNote>
-    {report === null ? undefined : surveyType === 'PROGRAM' ? (
+    {report === null ? undefined : (
       <>
-        Số liệu chỉ sử dụng phiếu của các khoá ngành hợp lệ (tỷ lệ phiếu hợp lệ ≥{' '}
-        <strong>{report.minimumValidRate}%</strong>). Khảo sát chương trình đào tạo không có sĩ số
-        nên không xét tỷ lệ phản hồi. Số liệu tính trực tiếp từ phiếu, không cần Cập nhật điểm.
-      </>
-    ) : (
-      <>
-        Số liệu chỉ sử dụng phiếu của các khoa/viện hợp lệ (đảm bảo hai tiêu chí: tỷ lệ phản hồi ≥{' '}
-        <strong>{report.minimumResponseRate}%</strong> và tỷ lệ phiếu hợp lệ ≥{' '}
-        <strong>{report.minimumValidRate}%</strong>). Sĩ số là số giảng viên của khoa, chốt lúc tạo
-        đợt. Số liệu tính trực tiếp từ phiếu, không cần Cập nhật điểm.
+        Số liệu chỉ sử dụng phiếu của các {unitNounOf[surveyType]} hợp lệ (tỷ lệ phiếu hợp lệ ≥{' '}
+        <strong>{report.minimumValidRate}%</strong>). Khảo sát {surveyTypeLabels[surveyType].toLowerCase()} không
+        có sĩ số nên không xét tỷ lệ phản hồi. Số liệu tính trực tiếp từ phiếu, không cần Cập nhật điểm.
       </>
     )}
   </ScoringConfigNote>

@@ -1961,7 +1961,7 @@
   border-top: 1px solid var(--grid-line);
 }
 
-/* Bảng lớp trong Danh sách đợt khảo sát dùng chung quy chuẩn tiêu đề với các bảng
+/* Bảng lớp trong Danh sách bài khảo sát dùng chung quy chuẩn tiêu đề với các bảng
    còn lại: chữ căn giữa cả hai chiều và được xuống dòng. */
 .campaign-table th {
   position: relative;

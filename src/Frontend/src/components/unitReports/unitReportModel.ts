@@ -13,8 +13,8 @@ import type {
 } from '../../types';
 
 /*
-  Phần dữ liệu dùng chung của các trang thống kê CTĐT / giảng viên: nạp báo cáo của đợt
-  đang chọn, và các phép tính mà trang học phần làm ở backend nhưng hai loại này làm ngay
+  Phần dữ liệu dùng chung của các trang thống kê CTĐT / giảng viên (programReports/ và
+  lecturerReports/): nạp báo cáo của đợt đang chọn, và các phép tính mà trang học phần làm ở backend nhưng hai loại này làm ngay
   trên số liệu sống (đánh số câu, Z-score, số đơn vị cảnh báo, điểm theo mục).
 */
 
@@ -24,18 +24,6 @@ export type UnitSurveyType = Exclude<SurveyType, 'COURSE'>;
 export const unitNounOf: Record<UnitSurveyType, string> = {
   PROGRAM: 'khoá ngành',
   LECTURER: 'khoa / viện',
-};
-
-/** Tiêu đề cột đơn vị. */
-export const unitHeaderOf: Record<UnitSurveyType, string> = {
-  PROGRAM: 'Khoá ngành',
-  LECTURER: 'Khoa / Viện',
-};
-
-/** Tên người trả lời, cho các câu chữ kiểu "Ý kiến khác do ... nhập". */
-export const respondentNounOf: Record<UnitSurveyType, string> = {
-  PROGRAM: 'người học',
-  LECTURER: 'giảng viên',
 };
 
 export function messageFrom(error: unknown): string {
@@ -224,9 +212,9 @@ export function questionWarningCounts(report: UnitSurveyReport): Map<number, num
 // ------------------------------------------- Chuyển sang kiểu của biểu đồ dùng chung
 
 /**
- * Dữ liệu theo khoa cho FacultyScoreChart / FacultyCompletionChart của trang học phần.
- * CTĐT không có sĩ số nên `targetResponses` bằng số phiếu đã thu và `completionRate` là 0;
- * trang CTĐT không dựng biểu đồ tỷ lệ hoàn thành.
+ * Dữ liệu theo khoa cho FacultyScoreChart của trang học phần. CTĐT và khảo sát giảng viên
+ * không có sĩ số nên `targetResponses` bằng số phiếu đã thu và `completionRate` là 0; hai
+ * loại này không dựng biểu đồ tỷ lệ hoàn thành.
  */
 export function toFacultyOverviews(report: UnitSurveyReport): FacultyOverview[] {
   return report.faculties
@@ -241,20 +229,6 @@ export function toFacultyOverviews(report: UnitSurveyReport): FacultyOverview[] 
       completionRate: group.responseRate ?? 0,
       averageScore: group.averageScore ?? 0,
     }));
-}
-
-/** Dữ liệu tỷ lệ phản hồi theo khoa — gồm cả khoa chưa có điểm. Chỉ dùng cho khảo sát giảng viên. */
-export function toFacultyCompletion(report: UnitSurveyReport): FacultyOverview[] {
-  return report.faculties.map((group, index) => ({
-    facultyId: Number(group.key) || -(index + 1),
-    facultyName: group.name,
-    departmentCount: 0,
-    sectionCount: group.unitCount,
-    targetResponses: group.targetCount ?? 0,
-    responseCount: group.responseCount,
-    completionRate: group.responseRate ?? 0,
-    averageScore: group.averageScore ?? 0,
-  }));
 }
 
 /** Câu có điểm theo kiểu QuestionRating cho WeakestQuestionsPanel / SchoolCriteriaChart. */
@@ -282,11 +256,6 @@ export function toQuestionRatings(report: UnitSurveyReport): QuestionRating[] {
 /** Số phiếu hợp lệ của các đơn vị được tính điểm — mẫu số của điểm tiêu chí. */
 export function scoredValidResponseCountOf(report: UnitSurveyReport): number {
   return report.units.filter((row) => row.isScored).reduce((sum, row) => sum + row.validResponseCount, 0);
-}
-
-/** Tên đơn vị đầy đủ: CTĐT ghép mã khoá ngành và tên ngành, khảo sát giảng viên là tên khoa. */
-export function unitTitleOf(row: Pick<UnitReportRow, 'unitCode' | 'unitName'>, surveyType: UnitSurveyType): string {
-  return surveyType === 'PROGRAM' ? `${row.unitCode} – ${row.unitName}` : row.unitName;
 }
 
 /** Danh sách học kỳ cho ô chọn của thanh công cụ. */

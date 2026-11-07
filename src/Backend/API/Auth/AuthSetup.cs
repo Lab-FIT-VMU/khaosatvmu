@@ -1,3 +1,4 @@
+﻿using Application.UserAdministration;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
@@ -40,6 +41,7 @@ public static class AuthSetup
             AddPermissionPolicy(AuthPolicies.MajorsAccess, "MAJORS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CoursesAccess, "COURSES_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseSectionsAccess, "COURSE_SECTIONS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.AcademicYearsAccess, "ACADEMIC_YEARS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseQuestionSetsAccess, "COURSE_QUESTION_SETS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseCampaignsAccess, "COURSE_CAMPAIGNS_ACCESS");
             AddPermissionPolicy(AuthPolicies.ProgramCampaignsAccess, "PROGRAM_CAMPAIGNS_ACCESS");
@@ -59,12 +61,17 @@ public static class AuthSetup
                 "SURVEY_ANALYSIS_ACCESS");
             options.AddPolicy(AuthPolicies.SurveyOperationalRead, policy =>
                 policy.RequireAuthenticatedUser().AddRequirements(new AnyPermissionRequirement(
-                    "PROGRESS_ACCESS",
-                    "REPORTS_ACCESS",
-                    "SURVEY_DASHBOARD_ACCESS",
-                    "SURVEY_STATISTICS_ACCESS",
-                    "SURVEY_ANALYSIS_ACCESS",
-                    "COURSE_CAMPAIGNS_ACCESS")));
+                    [
+                        "PROGRESS_ACCESS",
+                        "REPORTS_ACCESS",
+                        "SURVEY_DASHBOARD_ACCESS",
+                        "SURVEY_STATISTICS_ACCESS",
+                        "SURVEY_ANALYSIS_ACCESS",
+                        "COURSE_CAMPAIGNS_ACCESS",
+                        // Các trang thống kê CTĐT / giảng viên đọc danh sách đợt, đơn vị và
+                        // số liệu qua nhóm endpoint này.
+                        .. SurveyStatisticsPermissions.AllUnitCodes,
+                    ])));
 
             // Nhóm "một trong nhiều quyền": nhiều màn hình đọc chung một danh mục để đổ vào ô
             // chọn, nên policy đọc phải nhận quyền mở của TẤT CẢ các màn hình đó — không thì

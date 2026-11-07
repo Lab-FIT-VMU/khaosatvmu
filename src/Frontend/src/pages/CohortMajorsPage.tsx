@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileSpreadsheet, GraduationCap, Layers, Pencil, Plus, Trash2 } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { FileSpreadsheet, GraduationCap, Layers, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
@@ -9,7 +9,6 @@ import { ConfirmDialog, Modal } from '../components/Modal';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { CohortMajorImportDialog } from '../components/CohortMajorImportDialog';
 import { ApiError } from '../services/apiClient';
-import { catalogApi } from '../services/catalogApi';
 import {
   cohortApi,
   cohortErrorMessage,
@@ -18,7 +17,7 @@ import {
   type CohortMajor,
 } from '../services/cohortApi';
 import type { ImportCohortMajorRow } from '../utils/cohortMajorImportExcel';
-import type { AcademicYear, Major } from '../types';
+import type { Major } from '../types';
 import { foldVietnamese } from '../utils/vietnamese';
 
 interface CohortMajorsPageProps {
@@ -49,17 +48,12 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
   // Vai trò chỉ đọc (giảng viên, Ban Giám hiệu) không sửa được gì, nên ẩn cả nút Sửa.
   const readOnly = isReadOnlyRole(activeProfile?.roleCode);
 
-  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [cohortMajors, setCohortMajors] = useState<CohortMajor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCohortId, setSelectedCohortId] = useState<number | null>(null);
 
-  const [isCohortModalOpen, setIsCohortModalOpen] = useState(false);
-  const [cohortAcademicYearId, setCohortAcademicYearId] = useState('');
-  const [cohortError, setCohortError] = useState('');
-  const [savingCohort, setSavingCohort] = useState(false);
   const [cohortToDelete, setCohortToDelete] = useState<Cohort | null>(null);
 
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -73,12 +67,10 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [nextYears, nextCohorts, nextCohortMajors] = await Promise.all([
-        catalogApi.academicYears(),
+      const [nextCohorts, nextCohortMajors] = await Promise.all([
         cohortApi.cohorts(),
         cohortApi.cohortMajors(),
       ]);
-      setAcademicYears(nextYears);
       setCohorts(nextCohorts);
       setCohortMajors(nextCohortMajors);
     } catch {
@@ -94,37 +86,6 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
 
   const updateForm = (patch: Partial<CohortMajorForm>) =>
     setForm((prev) => ({ ...prev, ...patch }));
-
-  // Năm học chưa có khoá nào mới được chọn; mỗi năm học ứng với đúng một khoá.
-  const availableYears = useMemo(() => {
-    const used = new Set(cohorts.map((cohort) => cohort.academicYearId));
-    return academicYears.filter((year) => !used.has(year.academicYearId));
-  }, [academicYears, cohorts]);
-
-  const openCreateCohort = () => {
-    setCohortAcademicYearId(availableYears[0] ? String(availableYears[0].academicYearId) : '');
-    setCohortError('');
-    setIsCohortModalOpen(true);
-  };
-
-  const handleCreateCohort = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!cohortAcademicYearId) {
-      setCohortError('Vui lòng chọn năm học.');
-      return;
-    }
-    setSavingCohort(true);
-    try {
-      const created = await cohortApi.createCohort(Number(cohortAcademicYearId));
-      toast.success('Đã tạo khoá học', { description: created.cohortName });
-      setIsCohortModalOpen(false);
-      await reload();
-    } catch (error) {
-      setCohortError(cohortErrorMessage(errorCodeOf(error)));
-    } finally {
-      setSavingCohort(false);
-    }
-  };
 
   const handleDeleteCohort = async () => {
     if (!cohortToDelete) return;
@@ -266,29 +227,28 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
     {
       key: 'cohortMajorCode',
       header: 'Khoá ngành đào tạo',
-      width: '20%',
+      width: '13%',
       filterValue: (item) => item.cohortMajorCode,
       render: (item) => <span className="catalog-cell-primary">{item.cohortMajorCode}</span>,
     },
     {
       key: 'majorName',
       header: 'Ngành đào tạo',
-      width: '26%',
+      width: '21%',
       filterValue: (item) => item.majorName,
-      // Ô trên màn hình in hai dòng: tên ngành rồi khoa. Tệp xuất gộp cả hai vào một
-      // ô, thay vì chỉ có tên ngành như trước.
-      exportFormat: (item) => `${item.majorName} · ${item.facultyName}`,
-      render: (item) => (
-        <div>
-          <div className="catalog-cell-primary">{item.majorName}</div>
-          <div className="catalog-cell-secondary">{item.facultyName}</div>
-        </div>
-      ),
+      render: (item) => <span className="catalog-cell-primary">{item.majorName}</span>,
+    },
+    {
+      key: 'facultyName',
+      header: 'Khoa / Viện',
+      width: '17%',
+      filterValue: (item) => item.facultyName,
+      render: (item) => item.facultyName,
     },
     {
       key: 'studentCount',
       header: 'Số lượng sinh viên đầu vào',
-      width: '11%',
+      width: '10%',
       numeric: true,
       filterValue: (item) => String(item.studentCount),
       render: (item) => item.studentCount,
@@ -296,7 +256,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
     {
       key: 'graduatedCount',
       header: 'Đã tốt nghiệp',
-      width: '11%',
+      width: '9%',
       numeric: true,
       filterValue: (item) => String(item.graduatedCount),
       render: (item) => item.graduatedCount,
@@ -304,7 +264,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
     {
       key: 'notGraduatedCount',
       header: 'Chưa tốt nghiệp',
-      width: '11%',
+      width: '9%',
       numeric: true,
       filterValue: (item) => String(item.notGraduatedCount),
       render: (item) => item.notGraduatedCount,
@@ -312,7 +272,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
     {
       key: 'onTimeGraduatedCount',
       header: 'Tốt nghiệp đúng hạn',
-      width: '13%',
+      width: '11%',
       numeric: true,
       filterValue: (item) => String(item.onTimeGraduatedCount),
       render: (item) => item.onTimeGraduatedCount,
@@ -324,7 +284,7 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
     columns.push({
       key: 'actions',
       header: 'Hành động',
-      width: '12%',
+      width: '10%',
       render: (item) => (
         <div className="catalog-actions">
           <button
@@ -364,27 +324,14 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
               <GraduationCap aria-hidden="true" size={16} />
               Khoá học
             </span>
-            {canManageCatalog && (
-              <button
-                type="button"
-                className="term-tree__add"
-                onClick={openCreateCohort}
-                disabled={availableYears.length === 0}
-                aria-label="Tạo khoá học"
-                title={
-                  availableYears.length === 0
-                    ? 'Mọi năm học đều đã có khoá học'
-                    : 'Tạo khoá học từ năm học'
-                }
-              >
-                <Plus aria-hidden="true" size={16} />
-              </button>
-            )}
+            {/* Không có nút tạo khoá: khoá học tự tạo khi thêm năm học ở mục Năm học & học kỳ. */}
           </header>
 
           {cohorts.length === 0 ? (
             <p className="term-tree__empty">
-              {loading ? 'Đang tải...' : 'Chưa có khoá học nào'}
+              {loading
+                ? 'Đang tải...'
+                : 'Chưa có khoá học nào. Khoá học tự tạo khi thêm năm học ở mục Năm học & học kỳ.'}
             </p>
           ) : (
             <ul className="term-tree__list">
@@ -483,79 +430,9 @@ export const CohortMajorsPage: React.FC<CohortMajorsPageProps> = ({ majors }) =>
             emptyMessage="Chưa có khoá ngành đào tạo nào."
             keyExtractor={(item) => String(item.cohortMajorId)}
             pageSize={20}
-            renderFooter={(rows) => {
-              const totals = rows.reduce((sum, item) => ({
-                studentCount: sum.studentCount + item.studentCount,
-                graduatedCount: sum.graduatedCount + item.graduatedCount,
-                notGraduatedCount: sum.notGraduatedCount + item.notGraduatedCount,
-                onTimeGraduatedCount: sum.onTimeGraduatedCount + item.onTimeGraduatedCount,
-              }), {
-                studentCount: 0,
-                graduatedCount: 0,
-                notGraduatedCount: 0,
-                onTimeGraduatedCount: 0,
-              });
-              return (
-                <tr className="catalog-table-total">
-                  <td className="catalog-table__index" aria-hidden="true" />
-                  <td className="catalog-table-total__label">Tổng cộng</td>
-                  <td className="catalog-table-total__context">{rows.length.toLocaleString('vi-VN')} khóa ngành</td>
-                  <td className="catalog-cell-numeric">{totals.studentCount.toLocaleString('vi-VN')}</td>
-                  <td className="catalog-cell-numeric">{totals.graduatedCount.toLocaleString('vi-VN')}</td>
-                  <td className="catalog-cell-numeric">{totals.notGraduatedCount.toLocaleString('vi-VN')}</td>
-                  <td className="catalog-cell-numeric">{totals.onTimeGraduatedCount.toLocaleString('vi-VN')}</td>
-                  <td aria-hidden="true" />
-                </tr>
-              );
-            }}
           />
         </section>
       </div>
-
-      <Modal
-        isOpen={isCohortModalOpen}
-        onClose={() => setIsCohortModalOpen(false)}
-        title="Tạo khoá học"
-      >
-        <form className="catalog-form" onSubmit={(event) => void handleCreateCohort(event)}>
-          {cohortError && (
-            <div className="catalog-validation-error" role="alert">{cohortError}</div>
-          )}
-          <div className="form-group">
-            <label htmlFor="cohort-academic-year">Năm học nhập học</label>
-            <SearchableSelect
-              id="cohort-academic-year"
-              value={cohortAcademicYearId}
-              onChange={setCohortAcademicYearId}
-              required
-              placeholder="Chọn năm học"
-              options={availableYears.map((year) => ({
-                value: String(year.academicYearId),
-                label: year.academicYearName,
-              }))}
-            />
-            <small className="form-hint">
-              Mã khoá tự sinh theo năm học: 2018-2019 là khoá 59, mỗi năm sau tăng một khoá.
-            </small>
-          </div>
-          <div className="modal-footer catalog-form-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setIsCohortModalOpen(false)}
-            >
-              Hủy
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={savingCohort || availableYears.length === 0}
-            >
-              {savingCohort ? 'Đang lưu...' : 'Tạo khoá'}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       <Modal
         isOpen={isModalOpen}

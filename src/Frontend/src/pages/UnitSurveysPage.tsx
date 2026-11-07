@@ -160,11 +160,10 @@ const UnitTable: React.FC<UnitTableProps> = ({ surveyType, survey, units, onCopy
             <tr>
               <th style={{ width: isProgram ? '18%' : '30%' }}>Khoa / Viện</th>
               {isProgram && <th style={{ width: '22%' }}>Khoá ngành</th>}
-              {!isProgram && <th style={{ width: '8%' }}>Sĩ số</th>}
               <th style={{ width: '22%' }}>Đường dẫn riêng</th>
               <th style={{ width: '12%' }}>Thời gian mở</th>
               <th style={{ width: '10%' }}>Lượt trả lời</th>
-              {isProgram && <th style={{ width: '8%' }}>Ý kiến khác</th>}
+              <th style={{ width: '8%' }}>Ý kiến khác</th>
               <th style={{ width: '8%' }}>Ảnh QR</th>
             </tr>
           </thead>
@@ -196,11 +195,6 @@ const UnitTable: React.FC<UnitTableProps> = ({ surveyType, survey, units, onCopy
                     </div>
                   </td>
                 )}
-                {!isProgram && (
-                  <td className="campaign-number-cell" style={{ textAlign: 'right' }}>
-                    {unit.targetCount ?? '—'}
-                  </td>
-                )}
                 <td className="campaign-link-cell">
                   <div className="campaign-link-row">
                     <input
@@ -228,18 +222,12 @@ const UnitTable: React.FC<UnitTableProps> = ({ surveyType, survey, units, onCopy
                   </div>
                 </td>
                 <td className="campaign-number-cell" style={{ textAlign: 'right' }}>
-                  {/* CTĐT không có sĩ số nên chỉ đếm phiếu, không có tỷ lệ. */}
-                  <span className="operations-count campaign-response-count">
-                    {unit.targetCount === null
-                      ? unit.responseCount
-                      : `${unit.responseCount}/${unit.targetCount}`}
-                  </span>
+                  {/* CTĐT và khảo sát giảng viên không có sĩ số nên chỉ đếm phiếu, không có tỷ lệ. */}
+                  <span className="operations-count campaign-response-count">{unit.responseCount}</span>
                 </td>
-                {isProgram && (
-                  <td className="campaign-number-cell" style={{ textAlign: 'right' }}>
-                    {unit.openCommentCount}
-                  </td>
-                )}
+                <td className="campaign-number-cell" style={{ textAlign: 'right' }}>
+                  {unit.openCommentCount}
+                </td>
                 <td className="campaign-qr-cell">
                   <div className="campaign-row-actions">
                     <button

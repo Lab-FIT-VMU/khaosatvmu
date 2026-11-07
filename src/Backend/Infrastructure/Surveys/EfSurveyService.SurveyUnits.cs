@@ -1,4 +1,4 @@
-using Application.Surveys;
+﻿using Application.Surveys;
 using Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,9 +17,10 @@ public sealed partial class EfSurveyService
 {
     /// <summary>
     /// Một đơn vị có thể được phát link. <c>UnitId</c> là CohortMajorId hoặc FacultyId tuỳ
-    /// loại; <c>CohortId</c> chỉ có với CTĐT; <c>TargetCount</c> chỉ có với khảo sát giảng viên.
+    /// loại; <c>CohortId</c> chỉ có với CTĐT. Cả hai loại đều không có sĩ số: link không giới
+    /// hạn số phiếu, khoa / khoá ngành đủ điều kiện tính điểm chỉ xét tỷ lệ phiếu hợp lệ.
     /// </summary>
-    private sealed record UnitCandidate(int UnitId, int? FacultyId, int? CohortId, int? TargetCount);
+    private sealed record UnitCandidate(int UnitId, int? FacultyId, int? CohortId);
 
     private async Task<List<UnitCandidate>> ResolveUnitCandidatesAsync(
         string surveyType,
@@ -36,8 +37,7 @@ public sealed partial class EfSurveyService
                     select new UnitCandidate(
                         cohortMajor.CohortMajorId,
                         major.FacultyId,
-                        cohortMajor.CohortId,
-                        null))
+                        cohortMajor.CohortId))
                 .ToListAsync(cancellationToken);
         }
 
@@ -50,20 +50,17 @@ public sealed partial class EfSurveyService
                 from department in departmentRows.DefaultIfEmpty()
                 select lecturer.FacultyId ?? (department == null ? null : department.FacultyId))
             .ToListAsync(cancellationToken);
-        var lecturerCountByFaculty = lecturerFaculties
-            .OfType<int>()
-            .GroupBy(id => id)
-            .ToDictionary(group => group.Key, group => group.Count());
+        var facultiesWithLecturers = lecturerFaculties.OfType<int>().ToHashSet();
 
         var facultyIds = await db.Faculties.AsNoTracking()
             .Select(x => x.FacultyId)
             .ToListAsync(cancellationToken);
 
-        // Khoa chưa có giảng viên nào thì không phát link: sĩ số 0 là một link không ai
-        // làm được và một tỷ lệ phản hồi chia cho 0.
+        // Khoa chưa có giảng viên nào thì không phát link: không ai làm được phiếu đó. Số
+        // giảng viên chỉ dùng để quyết định có phát hay không, không chốt làm sĩ số.
         return facultyIds
-            .Where(lecturerCountByFaculty.ContainsKey)
-            .Select(id => new UnitCandidate(id, id, null, lecturerCountByFaculty[id]))
+            .Where(facultiesWithLecturers.Contains)
+            .Select(id => new UnitCandidate(id, id, null))
             .ToList();
     }
 
@@ -105,7 +102,7 @@ public sealed partial class EfSurveyService
             SemesterSurveyId = semesterSurveyId,
             CohortMajorId = surveyType == SurveyTypes.Program ? candidate.UnitId : null,
             FacultyId = surveyType == SurveyTypes.Lecturer ? candidate.UnitId : null,
-            TargetCount = candidate.TargetCount,
+            TargetCount = null,
             LinkToken = Guid.NewGuid().ToString("N"),
             StartTime = startTime,
             EndTime = endTime,
@@ -348,7 +345,7 @@ public sealed partial class EfSurveyService
                     cohortName,
                     facultyId,
                     facultyId is { } id ? faculties.GetValueOrDefault(id) ?? string.Empty : string.Empty,
-                    unit.TargetCount,
+                    null, // CTĐT và khảo sát giảng viên không có sĩ số.
                     counts.Total,
                     counts.Valid,
                     counts.Total - counts.Valid,

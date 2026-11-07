@@ -168,7 +168,7 @@ textarea:focus-visible {
 /* ----- Trạng thái thu gọn ----- */
 
 .sidebar.is-collapsed .sidebar-header-text,
-.sidebar.is-collapsed .menu-section-title,
+.sidebar.is-collapsed .menu-group-chevron,
 .sidebar.is-collapsed .menu-label,
 .sidebar.is-collapsed .menu-count,
 .sidebar.is-collapsed .menu-external-icon,
@@ -202,10 +202,15 @@ textarea:focus-visible {
   padding: 7px 0;
 }
 
-.sidebar.is-collapsed .menu-section + .menu-section {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid #EDF1F3;
+/* Thu gọn thì không sổ được nhóm, nên nhóm chứa trang đang xem tô hẳn như mục đang chọn. */
+.sidebar.is-collapsed .menu-group-toggle.contains-active {
+  background: var(--sidebar-accent);
+  border-color: var(--sidebar-accent-strong);
+  color: #FFFFFF;
+}
+
+.sidebar.is-collapsed .menu-group-toggle.contains-active .menu-icon {
+  color: #FFFFFF;
 }
 
 .sidebar.is-collapsed .sidebar-collapse-bar {
@@ -293,18 +298,48 @@ textarea:focus-visible {
   scrollbar-width: thin;
 }
 
-.menu-section + .menu-section {
-  margin-top: 12px;
+/*
+  Nhóm sổ xuống: hàng đầu là nút nhóm, bấm vào mở danh sách mục con thụt vào, có vạch
+  dọc bên trái để thấy mục nào thuộc nhóm nào.
+*/
+.sidebar-menu > * + * {
+  margin-top: 2px;
 }
 
-.menu-section-title {
-  margin: 0 0 3px;
-  padding: 0 5px;
-  color: #3F7E90;
-  font-size: 10px;
+.menu-group-toggle.contains-active {
+  color: var(--sidebar-accent-strong);
   font-weight: 600;
-  letter-spacing: 0;
-  line-height: 22px;
+}
+
+.menu-group-chevron {
+  width: 15px;
+  height: 15px;
+  color: #8C969F;
+  stroke-width: 2;
+  transform: rotate(-90deg);
+  transition: transform 150ms ease;
+}
+
+.menu-group-chevron.is-open {
+  transform: none;
+}
+
+.menu-group-items {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 6px 20px;
+  padding-left: 7px;
+  border-left: 1px solid #DFE4E8;
+}
+
+.menu-item--child {
+  min-height: 34px;
+  padding: 6px 10px;
+}
+
+.menu-item--child .menu-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .menu-item {

@@ -5,7 +5,7 @@ import { roleDisplayName } from '../auth/roles';
 import { useBreadcrumbTrail } from '../context/breadcrumbTrail';
 import type { AuthProfile, AuthUser } from '../types';
 import { ProfileSelectionDialog } from './ProfileSelectionDialog';
-import { sidebarTabLabels } from './sidebarMenu';
+import { sidebarTabGroupLabels, sidebarTabLabels } from './sidebarMenu';
 import { UserAccountMenu } from './UserAccountMenu';
 
 interface HeaderProps {
@@ -29,8 +29,20 @@ const institutionName = 'Trường Đại học Hàng hải Việt Nam';
 const legacyTabLabels: Record<string, string> = {
   'graduation-analytics': 'Tải lên dữ liệu',
   'graduation-analytics-2': 'Tải lên dữ liệu',
-  criteria: 'Danh sách bộ khảo sát',
-  campaigns: 'Danh sách đợt khảo sát',
+  criteria: 'Danh sách bộ câu hỏi',
+  campaigns: 'Danh sách bài khảo sát',
+  'program-campaigns': 'Danh sách bài khảo sát',
+  'lecturer-campaigns': 'Danh sách bài khảo sát',
+};
+
+/** Nhóm trên sidebar của các mã tab cũ ở trên. */
+const legacyTabGroupLabels: Record<string, string> = {
+  'graduation-analytics': 'Thống kê tốt nghiệp',
+  'graduation-analytics-2': 'Thống kê tốt nghiệp',
+  criteria: 'Khảo sát',
+  campaigns: 'Khảo sát',
+  'program-campaigns': 'Khảo sát',
+  'lecturer-campaigns': 'Khảo sát',
 };
 
 export function Header({
@@ -45,12 +57,13 @@ export function Header({
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
   /*
-    Dòng 2 là đường dẫn điều hướng: mở đầu bằng tên mục đang chọn trên sidebar, rồi
-    tới các cấp sâu hơn mà chính trang khai ra (tab con, khoa/viện, lớp...). Không có
+    Dòng 2 là đường dẫn điều hướng: mở đầu bằng tên nhóm và tên mục đang chọn trên
+    sidebar, rồi tới các cấp sâu hơn mà chính trang khai ra (tab con, khoa/viện, lớp...). Không có
     cụm "Hệ thống khảo sát" ở đầu — mục đầu tiên phải là mục người dùng vừa bấm.
   */
   const trail = useBreadcrumbTrail();
   const crumbs = [
+    sidebarTabGroupLabels[currentTab] ?? legacyTabGroupLabels[currentTab] ?? '',
     sidebarTabLabels[currentTab] ?? legacyTabLabels[currentTab] ?? 'Bảng điều khiển',
     ...trail,
   ].filter((crumb, index, all) => crumb.trim() !== '' && crumb !== all[index - 1]);

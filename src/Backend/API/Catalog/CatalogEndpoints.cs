@@ -220,6 +220,8 @@ public static class CatalogEndpoints
             .RequireAuthorization(AuthPolicies.MajorsAccess);
 
         // ------------------------------------------------- Năm học và học kỳ
+        // Đọc thì mọi người đã đăng nhập đều được (ô chọn học kỳ ở khắp nơi). Ghi đòi quyền
+        // riêng của mục "Năm học & học kỳ", và service còn chặn thêm: chỉ quản trị toàn trường.
 
         academicYears.MapGet("", async (
             ICatalogService service,
@@ -232,7 +234,7 @@ public static class CatalogEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.CreateAcademicYearAsync(request.ToCommand(), cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
-            .RequireAuthorization(AuthPolicies.CourseSectionsAccess);
+            .RequireAuthorization(AuthPolicies.AcademicYearsAccess);
 
         academicYears.MapPut("/{academicYearId:int}", async (
             int academicYearId,
@@ -244,7 +246,7 @@ public static class CatalogEndpoints
                 request.ToCommand(),
                 cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
-            .RequireAuthorization(AuthPolicies.CourseSectionsAccess);
+            .RequireAuthorization(AuthPolicies.AcademicYearsAccess);
 
         academicYears.MapDelete("/{academicYearId:int}", async (
             int academicYearId,
@@ -252,7 +254,7 @@ public static class CatalogEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.DeleteAcademicYearAsync(academicYearId, cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
-            .RequireAuthorization(AuthPolicies.CourseSectionsAccess);
+            .RequireAuthorization(AuthPolicies.AcademicYearsAccess);
 
         semesters.MapPost("", async (
             SaveSemesterRequest request,
@@ -262,7 +264,7 @@ public static class CatalogEndpoints
                 new SaveSemesterCommand(request.SemesterName, request.AcademicYearId),
                 cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
-            .RequireAuthorization(AuthPolicies.CourseSectionsAccess);
+            .RequireAuthorization(AuthPolicies.AcademicYearsAccess);
 
         semesters.MapPut("/{semesterId:int}", async (
             int semesterId,
@@ -274,7 +276,7 @@ public static class CatalogEndpoints
                 new SaveSemesterCommand(request.SemesterName, request.AcademicYearId),
                 cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
-            .RequireAuthorization(AuthPolicies.CourseSectionsAccess);
+            .RequireAuthorization(AuthPolicies.AcademicYearsAccess);
 
         semesters.MapDelete("/{semesterId:int}", async (
             int semesterId,
@@ -282,7 +284,7 @@ public static class CatalogEndpoints
             CancellationToken cancellationToken) =>
             ToResult(await service.DeleteSemesterAsync(semesterId, cancellationToken)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
-            .RequireAuthorization(AuthPolicies.CourseSectionsAccess);
+            .RequireAuthorization(AuthPolicies.AcademicYearsAccess);
 
         // ------------------------------------------------------- Lớp học phần
 
@@ -492,13 +494,13 @@ public static class CatalogEndpoints
             int academicYearId, ICatalogService service, CancellationToken ct) =>
             ToResult(await service.RestoreAcademicYearAsync(academicYearId, ct)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
-            .RequireAuthorization(AuthPolicies.CourseSectionsAccess);
+            .RequireAuthorization(AuthPolicies.AcademicYearsAccess);
 
         semesters.MapPatch("/{semesterId:int}/restore", async (
             int semesterId, ICatalogService service, CancellationToken ct) =>
             ToResult(await service.RestoreSemesterAsync(semesterId, ct)))
             .AddEndpointFilter<RequireAntiforgeryFilter>()
-            .RequireAuthorization(AuthPolicies.CourseSectionsAccess);
+            .RequireAuthorization(AuthPolicies.AcademicYearsAccess);
 
         courseSections.MapPatch("/{courseSectionId:int}/restore", async (
             int courseSectionId, ICatalogService service, CancellationToken ct) =>

@@ -217,7 +217,7 @@ public class SurveyTypeUnitTests
     }
 
     [Fact]
-    public async Task CreateLecturerSurvey_SnapshotsLecturerCountPerFaculty()
+    public async Task CreateLecturerSurvey_GivesOneLinkPerFaculty_WithoutTargetCount()
     {
         await RunInRollbackAsync(async (db, serviceFor) =>
         {
@@ -229,20 +229,11 @@ public class SurveyTypeUnitTests
             result.Succeeded.Should().BeTrue(result.ErrorCode);
 
             var units = (await service.GetSurveyUnitsAsync(result.Value!.SemesterSurveyId)).Value!;
-            units.Single(x => x.UnitId == seed.FacultyA).TargetCount.Should().Be(2);
-            // Giảng viên chỉ gắn bộ môn vẫn được quy về khoa của bộ môn.
-            units.Single(x => x.UnitId == seed.FacultyB).TargetCount.Should().Be(1);
-
-            // Thêm giảng viên sau khi phát link không làm trượt sĩ số đã chốt.
-            db.Lecturers.Add(new Lecturer
-            {
-                FullName = "GV mới",
-                Email = $"new-{Guid.NewGuid():N}@test.invalid",
-                FacultyId = seed.FacultyA,
-            });
-            await db.SaveChangesAsync();
-            (await service.GetSurveyUnitsAsync(result.Value.SemesterSurveyId)).Value!
-                .Single(x => x.UnitId == seed.FacultyA).TargetCount.Should().Be(2);
+            units.Should().Contain(x => x.UnitId == seed.FacultyA);
+            // Giảng viên chỉ gắn bộ môn vẫn được quy về khoa của bộ môn, nên khoa đó cũng có link.
+            units.Should().Contain(x => x.UnitId == seed.FacultyB);
+            // Khảo sát giảng viên không xét sĩ số, như CTĐT.
+            units.Should().OnlyContain(x => x.TargetCount == null);
         });
     }
 
@@ -359,7 +350,7 @@ public class SurveyTypeUnitTests
     }
 
     [Fact]
-    public async Task LecturerLink_ClosesWhenFacultyLecturerCountIsReached()
+    public async Task LecturerLink_StaysOpen_WhenResponsesExceedLecturerCount()
     {
         await RunInRollbackAsync(async (db, serviceFor) =>
         {
@@ -368,18 +359,16 @@ public class SurveyTypeUnitTests
             var created = await service.CreateSemesterSurveyAsync(
                 Command(seed, SurveyTypes.Lecturer, SurveyScopeTypes.Faculty, seed.FacultyB));
             var unit = (await service.GetSurveyUnitsAsync(created.Value!.SemesterSurveyId)).Value!.Single();
-            unit.TargetCount.Should().Be(1);
+            unit.TargetCount.Should().BeNull();
 
-            var submitted = await service.SubmitSurveyResponseAsync(
-                unit.LinkToken,
-                new SubmitSurveyResponseCommand(
-                    [new SubmitSurveyAnswerCommand(seed.QuestionId, "5")],
-                    null,
-                    120));
-            submitted.Succeeded.Should().BeTrue(submitted.ErrorCode);
+            // Khoa B chỉ có một giảng viên, nhưng không có sĩ số nên link không tự đóng.
+            for (var i = 0; i < 2; i++)
+            {
+                (await SubmitAsync(service, unit.LinkToken, seed.QuestionId, "4"))
+                    .Succeeded.Should().BeTrue();
+            }
 
-            (await service.GetPublicSurveyAsync(unit.LinkToken))
-                .ErrorCode.Should().Be(SurveyErrorCodes.ClassFull);
+            (await service.GetPublicSurveyAsync(unit.LinkToken)).Succeeded.Should().BeTrue();
         });
     }
 
@@ -451,7 +440,7 @@ public class SurveyTypeUnitTests
     }
 
     [Fact]
-    public async Task LecturerReport_UsesSnapshotTargetForResponseRate()
+    public async Task LecturerReport_ScoresByValidRateOnly_WithoutResponseRate()
     {
         await RunInRollbackAsync(async (db, serviceFor) =>
         {
@@ -468,14 +457,18 @@ public class SurveyTypeUnitTests
 
             var value = (await service.GetUnitSurveyReportAsync(surveyId)).Value!;
             var rowA = value.Units.Single(x => x.UnitId == seed.FacultyA);
-            rowA.TargetCount.Should().Be(2);
-            rowA.ResponseRate.Should().Be(100m);
+            rowA.TargetCount.Should().BeNull();
+            rowA.ResponseRate.Should().BeNull();
             rowA.IsScored.Should().BeTrue();
             rowA.AverageScore.Should().Be(4m);
 
+            // Chưa có phiếu nào thì vẫn không đủ điều kiện tính điểm.
             var rowB = value.Units.Single(x => x.UnitId == seed.FacultyB);
-            rowB.ResponseRate.Should().Be(0m);
+            rowB.ResponseRate.Should().BeNull();
             rowB.IsScored.Should().BeFalse();
+
+            value.Summary.TargetCount.Should().BeNull();
+            value.Summary.ResponseRate.Should().BeNull();
 
             // Điểm gộp chỉ lấy đơn vị được tính điểm.
             value.Faculties.Single(x => x.Key == seed.FacultyA.ToString()).AverageScore.Should().Be(4m);

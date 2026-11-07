@@ -1,16 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, CircleAlert, LoaderCircle, RadioTower } from 'lucide-react';
 import { useSemester } from '../../context/semesterContext';
-import { surveyApi, surveyTypeLabels } from '../../services/surveyApi';
+import { surveyApi } from '../../services/surveyApi';
 import type { SemesterSurvey, SurveyUnit } from '../../types';
-import { messageFrom, unitNounOf, useSemesterOptions, type UnitSurveyType } from './unitReportModel';
+import { messageFrom, useSemesterOptions } from '../unitReports/unitReportModel';
 import '../../styles/dashboard.css';
 import '../../styles/survey-statistics.css';
 
 /*
-  Bảng điều khiển của CTĐT / giảng viên, dựng theo đúng bảng "Đợt khảo sát đang tiếp nhận
-  phản hồi" của tab học phần. Khảo sát giảng viên có sĩ số nên tiến độ là phiếu hợp lệ trên
-  tổng sĩ số; CTĐT không có sĩ số nên cột tiến độ chỉ in số phiếu hợp lệ.
+  Bảng điều khiển của khảo sát giảng viên, dựng theo đúng bảng "Đợt khảo sát đang tiếp
+  nhận phản hồi" của học phần. Không xét sĩ số nên cột tiến độ chỉ in số phiếu hợp lệ,
+  không có thanh tiến độ.
 */
 
 const formatDate = (value: string) => {
@@ -19,18 +19,14 @@ const formatDate = (value: string) => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('vi-VN');
 };
 
-/** Hash của trang Danh sách đợt khảo sát, mở thẳng vào tab của loại. */
-const campaignTabOf: Record<UnitSurveyType, string> = {
-  PROGRAM: 'program-campaigns',
-  LECTURER: 'lecturer-campaigns',
-};
+/** Hash của trang Danh sách bài khảo sát, mở thẳng vào tab giảng viên. */
+const campaignTab = 'lecturer-campaigns';
 
-interface UnitDashboardViewProps {
-  surveyType: UnitSurveyType;
+interface LecturerDashboardViewProps {
   onNavigateTab: (tab: string) => void;
 }
 
-export const UnitDashboardView: React.FC<UnitDashboardViewProps> = ({ surveyType, onNavigateTab }) => {
+export const LecturerDashboardView: React.FC<LecturerDashboardViewProps> = ({ onNavigateTab }) => {
   const { activeSemesterId, setActiveSemesterId } = useSemester();
   const semesterOptions = useSemesterOptions();
   const [surveys, setSurveys] = useState<SemesterSurvey[]>([]);
@@ -46,8 +42,8 @@ export const UnitDashboardView: React.FC<UnitDashboardViewProps> = ({ surveyType
     setLoading(true);
     const load = async () => {
       try {
-        const next = await surveyApi.semesterSurveys(activeSemesterId, controller.signal, surveyType);
-        // Một đợt chỉ vài chục đơn vị nên nạp đơn vị của từng đợt để có số phiếu hợp lệ và sĩ số.
+        const next = await surveyApi.semesterSurveys(activeSemesterId, controller.signal, 'LECTURER');
+        // Một đợt chỉ vài chục khoa nên nạp đơn vị của từng đợt để có số phiếu hợp lệ.
         const units = await Promise.all(
           next.map((survey) => surveyApi.surveyUnits(survey.semesterSurveyId, controller.signal)),
         );
@@ -62,7 +58,7 @@ export const UnitDashboardView: React.FC<UnitDashboardViewProps> = ({ surveyType
     };
     void load();
     return () => controller.abort();
-  }, [activeSemesterId, surveyType]);
+  }, [activeSemesterId]);
 
   const campaigns = useMemo(() => {
     const now = Date.now();
@@ -83,14 +79,11 @@ export const UnitDashboardView: React.FC<UnitDashboardViewProps> = ({ surveyType
         startDate: survey.startTime,
         endDate: survey.endTime,
         status,
-        target: surveyType === 'LECTURER'
-          ? units.reduce((sum, unit) => sum + (unit.targetCount ?? 0), 0)
-          : null,
         actual: units.reduce((sum, unit) => sum + unit.validResponseCount, 0),
         unitCount: survey.sectionSurveyCount,
       };
     });
-  }, [surveys, unitsBySurvey, surveyType]);
+  }, [surveys, unitsBySurvey]);
 
   return (
     <div className="executive-dashboard">
@@ -113,10 +106,10 @@ export const UnitDashboardView: React.FC<UnitDashboardViewProps> = ({ surveyType
         </label>
       </section>
 
-      <section className="dashboard-block dashboard-campaigns" aria-labelledby="unit-dashboard-campaigns-title">
+      <section className="dashboard-block dashboard-campaigns" aria-labelledby="lecturer-dashboard-campaigns-title">
         <header className="dashboard-block-heading dashboard-campaigns-heading">
           <div>
-            <h2 id="unit-dashboard-campaigns-title">Đợt khảo sát đang tiếp nhận phản hồi</h2>
+            <h2 id="lecturer-dashboard-campaigns-title">Đợt khảo sát đang tiếp nhận phản hồi</h2>
             <p>Theo dõi tiến độ phát phiếu và điều hướng trực tiếp tới từng đợt khảo sát</p>
           </div>
           <div className="dashboard-heading-actions">
@@ -159,86 +152,66 @@ export const UnitDashboardView: React.FC<UnitDashboardViewProps> = ({ surveyType
                 <tr>
                   <td colSpan={6} className="dashboard-empty-cell">
                     <RadioTower aria-hidden="true" />
-                    <strong>Chưa có đợt khảo sát {surveyTypeLabels[surveyType].toLowerCase()} nào</strong>
+                    <strong>Chưa có đợt khảo sát giảng viên nào</strong>
                     <span>Các đợt khảo sát mới sẽ xuất hiện tại đây.</span>
                   </td>
                 </tr>
               ) : (
-                campaigns.map((campaign) => {
-                  const progress = campaign.target
-                    ? Math.min(100, Math.round((campaign.actual / campaign.target) * 100))
-                    : 0;
-                  return (
-                    <tr
-                      key={campaign.id}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => onNavigateTab(campaignTabOf[surveyType])}
-                    >
-                      <td className="dashboard-campaign-name">
-                        <strong title={campaign.title}>{campaign.title}</strong>
-                        <span>
-                          {campaign.semester} · {campaign.academicYear} · {campaign.unitCount} {unitNounOf[surveyType]}
+                campaigns.map((campaign) => (
+                  <tr
+                    key={campaign.id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => onNavigateTab(campaignTab)}
+                  >
+                    <td className="dashboard-campaign-name">
+                      <strong title={campaign.title}>{campaign.title}</strong>
+                      <span>
+                        {campaign.semester} · {campaign.academicYear} · {campaign.unitCount} khoa / viện
+                      </span>
+                    </td>
+                    <td>
+                      <span className="dashboard-type-label">Giảng viên</span>
+                    </td>
+                    <td className="dashboard-date-cell">
+                      {formatDate(campaign.startDate)}
+                      <span aria-hidden="true"> - </span>
+                      {formatDate(campaign.endDate)}
+                    </td>
+                    <td>
+                      {/* Không có sĩ số: chỉ có số phiếu hợp lệ, không có thanh tiến độ. */}
+                      <div
+                        className="dashboard-progress"
+                        aria-label={`Đã thu ${campaign.actual} phiếu hợp lệ`}
+                      >
+                        <span className="dashboard-progress-value">
+                          {campaign.actual.toLocaleString('vi-VN')}
+                          <small> phiếu hợp lệ</small>
                         </span>
-                      </td>
-                      <td>
-                        <span className="dashboard-type-label">{surveyTypeLabels[surveyType]}</span>
-                      </td>
-                      <td className="dashboard-date-cell">
-                        {formatDate(campaign.startDate)}
-                        <span aria-hidden="true"> - </span>
-                        {formatDate(campaign.endDate)}
-                      </td>
-                      <td>
-                        {campaign.target === null ? (
-                          // CTĐT không có sĩ số: chỉ có số phiếu hợp lệ, không có thanh tiến độ.
-                          <div
-                            className="dashboard-progress"
-                            aria-label={`Đã thu ${campaign.actual} phiếu hợp lệ`}
-                          >
-                            <span className="dashboard-progress-value">
-                              {campaign.actual.toLocaleString('vi-VN')}
-                              <small> phiếu hợp lệ</small>
-                            </span>
-                          </div>
-                        ) : (
-                          <div
-                            className="dashboard-progress"
-                            aria-label={`Đã thu ${campaign.actual} trên ${campaign.target} phiếu, đạt ${progress}%`}
-                          >
-                            <div className="dashboard-progress-track" aria-hidden="true">
-                              <span style={{ width: `${progress}%` }} />
-                            </div>
-                            <span className="dashboard-progress-value">
-                              {campaign.actual.toLocaleString('vi-VN')}
-                              <small> / {campaign.target.toLocaleString('vi-VN')}</small>
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`dashboard-status ${campaign.status === 'Đang diễn ra' ? 'is-active' : campaign.status === 'Sắp diễn ra' ? 'is-upcoming' : 'is-complete'}`}>
-                          <span aria-hidden="true" />
-                          {campaign.status}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          className="executive-action-link"
-                          aria-label={`Vào đợt khảo sát ${campaign.title}`}
-                          title="Vào đợt khảo sát"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onNavigateTab(campaignTabOf[surveyType]);
-                          }}
-                        >
-                          Vào khảo sát
-                          <ChevronRight style={{ width: 14, height: 14 }} aria-hidden="true" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`dashboard-status ${campaign.status === 'Đang diễn ra' ? 'is-active' : campaign.status === 'Sắp diễn ra' ? 'is-upcoming' : 'is-complete'}`}>
+                        <span aria-hidden="true" />
+                        {campaign.status}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        className="executive-action-link"
+                        aria-label={`Vào đợt khảo sát ${campaign.title}`}
+                        title="Vào đợt khảo sát"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onNavigateTab(campaignTab);
+                        }}
+                      >
+                        Vào khảo sát
+                        <ChevronRight style={{ width: 14, height: 14 }} aria-hidden="true" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

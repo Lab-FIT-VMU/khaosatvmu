@@ -11,36 +11,30 @@ import {
 } from 'lucide-react';
 import { DataTable, type Column } from '../DataTable';
 import { NoteModalButton } from '../NoteModalButton';
-import { FacultyCompletionChart } from '../reports/FacultyCompletionChart';
 import { FacultyScoreChart } from '../reports/FacultyScoreChart';
 import { SchoolCriteriaChart } from '../reports/SchoolCriteriaChart';
 import { WeakestQuestionsPanel } from '../reports/WeakestQuestionsPanel';
 import { completionColor, scoreColor } from '../reports/theme';
-import { surveyTypeLabels } from '../../services/surveyApi';
 import type { UnitReportComment, UnitReportGroup, UnitReportRow, UnitSurveyReport } from '../../types';
 import { formatDecimal, formatNumber, formatPercent } from '../../utils/formatNumber';
 import { foldVietnamese } from '../../utils/vietnamese';
-import { UnitReportBody, UnitReportToolbar, UnitScoringNote } from './UnitReportFrame';
+import { UnitReportBody, UnitReportToolbar, UnitScoringNote } from '../unitReports/UnitReportFrame';
 import {
-  respondentNounOf,
   scoredValidResponseCountOf,
-  toFacultyCompletion,
   toFacultyOverviews,
   toQuestionRatings,
-  unitNounOf,
-  unitTitleOf,
   useUnitSurveyReport,
-  type UnitSurveyType,
-} from './unitReportModel';
+} from '../unitReports/unitReportModel';
 import '../../styles/survey-operations.css';
 import '../../styles/reports.css';
 import '../../styles/survey-statistics.css';
 import '../../styles/catalogs.css';
 
 /*
-  Thống kê & Báo cáo của CTĐT / giảng viên, dựng theo đúng module của tab học phần: thanh
-  tab chế độ xem, tab Tổng quan với hai nhóm thẻ chỉ số và ba tab con dùng lại đúng các
-  biểu đồ của học phần, các bảng xếp hạng theo đơn vị, ý kiến mở và tra cứu chi tiết.
+  Thống kê & Báo cáo của khảo sát chương trình đào tạo, dựng theo đúng module của học phần:
+  thanh tab chế độ xem, tab Tổng quan với hai nhóm thẻ chỉ số và ba tab con dùng lại đúng
+  các biểu đồ của học phần, các bảng xếp hạng theo khoa / ngành / khoá, ý kiến mở và tra
+  cứu chi tiết. CTĐT không có sĩ số nên không có tỷ lệ phản hồi.
 */
 
 type Workspace = 'overview' | 'faculties' | 'majors' | 'cohorts' | 'comments' | 'details';
@@ -48,38 +42,35 @@ type AnalysisView = 'faculties' | 'quality' | 'criteria';
 
 const rankedPageSize = 20;
 
-const workspaceDefs: { id: Workspace; label: string; icon: React.ReactNode; program: boolean; lecturer: boolean }[] = [
-  { id: 'overview', label: 'Tổng quan', icon: <LayoutDashboard className="operation-icon" aria-hidden="true" />, program: true, lecturer: true },
-  { id: 'faculties', label: 'Theo Khoa/Viện', icon: <Building2 className="operation-icon" aria-hidden="true" />, program: true, lecturer: true },
-  { id: 'majors', label: 'Theo Ngành', icon: <GraduationCap className="operation-icon" aria-hidden="true" />, program: true, lecturer: false },
-  { id: 'cohorts', label: 'Theo Khoá', icon: <CalendarDays className="operation-icon" aria-hidden="true" />, program: true, lecturer: false },
-  { id: 'comments', label: 'Phân tích ý kiến mở', icon: <MessageSquareText className="operation-icon" aria-hidden="true" />, program: true, lecturer: true },
-  // Khảo sát giảng viên: mỗi đơn vị đã là một khoa, tra cứu chi tiết trùng với Theo Khoa/Viện.
-  { id: 'details', label: 'Tra cứu chi tiết', icon: <ListFilter className="operation-icon" aria-hidden="true" />, program: true, lecturer: false },
+const workspaces: { id: Workspace; label: string; icon: React.ReactNode }[] = [
+  { id: 'overview', label: 'Tổng quan', icon: <LayoutDashboard className="operation-icon" aria-hidden="true" /> },
+  { id: 'faculties', label: 'Theo Khoa/Viện', icon: <Building2 className="operation-icon" aria-hidden="true" /> },
+  { id: 'majors', label: 'Theo Ngành', icon: <GraduationCap className="operation-icon" aria-hidden="true" /> },
+  { id: 'cohorts', label: 'Theo Khoá', icon: <CalendarDays className="operation-icon" aria-hidden="true" /> },
+  { id: 'comments', label: 'Phân tích ý kiến mở', icon: <MessageSquareText className="operation-icon" aria-hidden="true" /> },
+  { id: 'details', label: 'Tra cứu chi tiết', icon: <ListFilter className="operation-icon" aria-hidden="true" /> },
 ];
 
 const validRateOf = (valid: number, total: number) => (total === 0 ? 0 : (valid / total) * 100);
 
-export const UnitReportView: React.FC<{ surveyType: UnitSurveyType }> = ({ surveyType }) => {
-  const state = useUnitSurveyReport(surveyType);
+export const ProgramReportView: React.FC = () => {
+  const state = useUnitSurveyReport('PROGRAM');
   const [workspace, setWorkspace] = useState<Workspace>('overview');
-  const isProgram = surveyType === 'PROGRAM';
-  const workspaces = workspaceDefs.filter((item) => (isProgram ? item.program : item.lecturer));
 
   return (
     <div className="survey-operations-page reports-module">
-      <UnitReportToolbar surveyType={surveyType} state={state} idPrefix="unit-reports" />
+      <UnitReportToolbar surveyType="PROGRAM" state={state} idPrefix="program-reports" />
 
       <div className="reports-header">
         <h1 className="reports-title">
           <BarChart3 className="operation-icon" aria-hidden="true" />
-          Thống kê kết quả khảo sát {surveyTypeLabels[surveyType].toLowerCase()}
+          Thống kê kết quả khảo sát chương trình đào tạo
         </h1>
       </div>
 
-      <UnitScoringNote report={state.report} surveyType={surveyType} />
+      <UnitScoringNote report={state.report} surveyType="PROGRAM" />
 
-      <UnitReportBody surveyType={surveyType} state={state} loadingLabel="Đang tải kết quả...">
+      <UnitReportBody surveyType="PROGRAM" state={state} loadingLabel="Đang tải kết quả...">
         {(report) => (
           <div className="reports-overview">
             <nav className="reports-workspace-tabs" aria-label="Chế độ xem báo cáo" role="tablist">
@@ -98,24 +89,19 @@ export const UnitReportView: React.FC<{ surveyType: UnitSurveyType }> = ({ surve
               ))}
             </nav>
 
-            {workspace === 'overview' && <OverviewWorkspace report={report} surveyType={surveyType} />}
+            {workspace === 'overview' && <OverviewWorkspace report={report} />}
 
             {workspace === 'faculties' && (
               <div className="reports-aggregate-workspace" role="tabpanel">
-                {isProgram ? (
-                  <RankedGroupTable
-                    title="Kết quả theo Khoa/Viện"
-                    groupHeader="Khoa / Viện"
-                    itemLabel="khoa/viện"
-                    data={report.faculties}
-                    surveyType={surveyType}
-                    report={report}
-                    exportTitle="BÁO CÁO XẾP HẠNG KẾT QUẢ THEO KHOA/VIỆN"
-                    exportFileName="xep-hang-khoa-vien-ctdt"
-                  />
-                ) : (
-                  <RankedUnitTable report={report} surveyType={surveyType} title="Kết quả theo Khoa/Viện" />
-                )}
+                <RankedGroupTable
+                  title="Kết quả theo Khoa/Viện"
+                  groupHeader="Khoa / Viện"
+                  itemLabel="khoa/viện"
+                  data={report.faculties}
+                  report={report}
+                  exportTitle="BÁO CÁO XẾP HẠNG KẾT QUẢ THEO KHOA/VIỆN"
+                  exportFileName="xep-hang-khoa-vien-ctdt"
+                />
               </div>
             )}
 
@@ -126,7 +112,6 @@ export const UnitReportView: React.FC<{ surveyType: UnitSurveyType }> = ({ surve
                   groupHeader="Ngành"
                   itemLabel="ngành"
                   data={report.majors}
-                  surveyType={surveyType}
                   report={report}
                   exportTitle="BÁO CÁO XẾP HẠNG KẾT QUẢ THEO NGÀNH"
                   exportFileName="xep-hang-nganh-ctdt"
@@ -141,7 +126,6 @@ export const UnitReportView: React.FC<{ surveyType: UnitSurveyType }> = ({ surve
                   groupHeader="Khoá"
                   itemLabel="khoá"
                   data={report.cohorts}
-                  surveyType={surveyType}
                   report={report}
                   exportTitle="BÁO CÁO XẾP HẠNG KẾT QUẢ THEO KHOÁ"
                   exportFileName="xep-hang-khoa-ctdt"
@@ -149,9 +133,9 @@ export const UnitReportView: React.FC<{ surveyType: UnitSurveyType }> = ({ surve
               </div>
             )}
 
-            {workspace === 'comments' && <CommentsWorkspace report={report} surveyType={surveyType} />}
+            {workspace === 'comments' && <CommentsWorkspace report={report} />}
 
-            {workspace === 'details' && <DetailsWorkspace report={report} surveyType={surveyType} />}
+            {workspace === 'details' && <DetailsWorkspace report={report} />}
           </div>
         )}
       </UnitReportBody>
@@ -161,12 +145,8 @@ export const UnitReportView: React.FC<{ surveyType: UnitSurveyType }> = ({ surve
 
 // ------------------------------------------------------------------ Tổng quan
 
-const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSurveyType }> = ({
-  report,
-  surveyType,
-}) => {
-  const isProgram = surveyType === 'PROGRAM';
-  const noun = unitNounOf[surveyType];
+const OverviewWorkspace: React.FC<{ report: UnitSurveyReport }> = ({ report }) => {
+  const noun = 'khoá ngành';
   const [analysisView, setAnalysisView] = useState<AnalysisView>('faculties');
   const [questionCount, setQuestionCount] = useState(5);
   const [questionInput, setQuestionInput] = useState('5');
@@ -175,7 +155,6 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
   const summary = report.summary;
   const scoredValid = scoredValidResponseCountOf(report);
   const faculties = useMemo(() => toFacultyOverviews(report), [report]);
-  const completion = useMemo(() => toFacultyCompletion(report), [report]);
   const questions = useMemo(() => toQuestionRatings(report), [report]);
   const rankedQuestions = useMemo(
     () => [...questions]
@@ -198,7 +177,7 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
       <header className="reports-exec-header">
         <div className="reports-exec-heading">
           <div>
-            <h2>Bảng tổng quan kết quả khảo sát {surveyTypeLabels[surveyType].toLowerCase()}</h2>
+            <h2>Bảng tổng quan kết quả khảo sát chương trình đào tạo</h2>
           </div>
         </div>
       </header>
@@ -207,7 +186,7 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
         <div className="reports-exec-empty">
           <Info className="operation-icon" aria-hidden="true" />
           <strong>Đợt này chưa có phiếu trả lời</strong>
-          <span>Số liệu sẽ có khi {respondentNounOf[surveyType]} bắt đầu nộp phiếu.</span>
+          <span>Số liệu sẽ có khi người học bắt đầu nộp phiếu.</span>
         </div>
       ) : (
         <>
@@ -217,25 +196,14 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
                 <span className="reports-overview-group-title">Tiến độ thu thập phiếu</span>
               </div>
               <div className="reports-overview-kpis" role="region" aria-label="Tiến độ thu thập phiếu">
-                {isProgram ? (
-                  <div className="reports-overview-kpi-card" title="Số khoá ngành được phát đường dẫn khảo sát">
-                    <span className="reports-overview-kpi-label">Số khoá ngành khảo sát</span>
-                    <div className="reports-overview-kpi-value">
-                      <strong className="reports-overview-kpi-num">{formatNumber(summary.unitCount)}</strong>
-                      <span className="reports-overview-kpi-unit">khoá ngành</span>
-                    </div>
-                    <span className="reports-overview-kpi-sub">Không có sĩ số, không có chỉ tiêu phiếu</span>
+                <div className="reports-overview-kpi-card" title="Số khoá ngành được phát đường dẫn khảo sát">
+                  <span className="reports-overview-kpi-label">Số khoá ngành khảo sát</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">{formatNumber(summary.unitCount)}</strong>
+                    <span className="reports-overview-kpi-unit">khoá ngành</span>
                   </div>
-                ) : (
-                  <div className="reports-overview-kpi-card" title="Tổng số giảng viên của các khoa được khảo sát">
-                    <span className="reports-overview-kpi-label">Tổng số phiếu phải thu</span>
-                    <div className="reports-overview-kpi-value">
-                      <strong className="reports-overview-kpi-num">{formatNumber(summary.targetCount ?? 0)}</strong>
-                      <span className="reports-overview-kpi-unit">phiếu</span>
-                    </div>
-                    <span className="reports-overview-kpi-sub">Số giảng viên cần khảo sát</span>
-                  </div>
-                )}
+                  <span className="reports-overview-kpi-sub">Không có sĩ số, không có chỉ tiêu phiếu</span>
+                </div>
 
                 <div className="reports-overview-kpi-card" title="Tổng số lượt đã hoàn thành và gửi phiếu khảo sát">
                   <span className="reports-overview-kpi-label">Số phiếu đã thu</span>
@@ -263,26 +231,16 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
                   <span className="reports-overview-kpi-sub">Vượt qua các bộ lọc chất lượng</span>
                 </div>
 
-                {isProgram ? (
-                  <div className="reports-overview-kpi-card" title="Khoá ngành đã có ít nhất một phiếu">
-                    <span className="reports-overview-kpi-label">Khoá ngành đã có phiếu</span>
-                    <div className="reports-overview-kpi-value">
-                      <strong className="reports-overview-kpi-num">
-                        {formatNumber(summary.respondedUnitCount)}
-                        <span className="reports-overview-kpi-denom"> / {formatNumber(summary.unitCount)}</span>
-                      </strong>
-                    </div>
-                    <span className="reports-overview-kpi-sub">Khoá ngành có ít nhất một phiếu</span>
+                <div className="reports-overview-kpi-card" title="Khoá ngành đã có ít nhất một phiếu">
+                  <span className="reports-overview-kpi-label">Khoá ngành đã có phiếu</span>
+                  <div className="reports-overview-kpi-value">
+                    <strong className="reports-overview-kpi-num">
+                      {formatNumber(summary.respondedUnitCount)}
+                      <span className="reports-overview-kpi-denom"> / {formatNumber(summary.unitCount)}</span>
+                    </strong>
                   </div>
-                ) : (
-                  <div className="reports-overview-kpi-card" title="Phiếu đã thu chia tổng số phiếu phải thu">
-                    <span className="reports-overview-kpi-label">Tỷ lệ phản hồi</span>
-                    <div className="reports-overview-kpi-value">
-                      <strong className="reports-overview-kpi-num">{formatPercent(summary.responseRate ?? 0)}</strong>
-                    </div>
-                    <span className="reports-overview-kpi-sub">Phiếu đã thu trên chỉ tiêu</span>
-                  </div>
-                )}
+                  <span className="reports-overview-kpi-sub">Khoá ngành có ít nhất một phiếu</span>
+                </div>
               </div>
             </div>
 
@@ -301,7 +259,7 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
                 </div>
 
                 <div className="reports-overview-kpi-card" title={`${noun} qua tiêu chí tính điểm trên tổng số ${noun}`}>
-                  <span className="reports-overview-kpi-label">{isProgram ? 'Khoá ngành' : 'Khoa / viện'} đủ điều kiện</span>
+                  <span className="reports-overview-kpi-label">Khoá ngành đủ điều kiện</span>
                   <div className="reports-overview-kpi-value">
                     <strong className="reports-overview-kpi-num">
                       {formatNumber(summary.scoredUnitCount)}
@@ -313,9 +271,7 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
                       </span>
                     )}
                   </div>
-                  <span className="reports-overview-kpi-sub">
-                    {isProgram ? 'Qua tiêu chí phiếu hợp lệ' : 'Qua cả 2 tiêu chí'}
-                  </span>
+                  <span className="reports-overview-kpi-sub">Qua tiêu chí phiếu hợp lệ</span>
                 </div>
 
                 <div className="reports-overview-kpi-card" title="Số phiếu hợp lệ thực sự được dùng để tính điểm">
@@ -350,10 +306,8 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
               </span>
               <span className="reports-exec-note-sep" aria-hidden="true">•</span>
               <span>
-                <strong>{isProgram ? 'Khoá ngành' : 'Khoa / viện'} đủ điều kiện:</strong>{' '}
-                {isProgram
-                  ? `Khoá ngành có tỷ lệ phiếu hợp lệ ≥ ${report.minimumValidRate}%; chỉ những khoá ngành này mới được tính vào điểm trung bình.`
-                  : 'Khoa qua cả hai ngưỡng tỷ lệ phản hồi và tỷ lệ phiếu hợp lệ; chỉ những khoa này mới được tính vào điểm trung bình.'}
+                <strong>Khoá ngành đủ điều kiện:</strong>{' '}
+                {`Khoá ngành có tỷ lệ phiếu hợp lệ ≥ ${report.minimumValidRate}%; chỉ những khoá ngành này mới được tính vào điểm trung bình.`}
               </span>
             </div>
           </div>
@@ -378,32 +332,14 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
           </div>
 
           {analysisView === 'faculties' && (
-            isProgram ? (
-              // CTĐT không có sĩ số nên không có biểu đồ tỷ lệ hoàn thành bên cạnh.
-              <div className="reports-exec-card reports-analysis-panel" role="tabpanel">
-                <header className="reports-exec-card-head">
-                  <h3>Điểm TB theo Khoa / Viện</h3>
-                  <span className="reports-exec-card-note">Đường nét đứt = điểm TB toàn trường</span>
-                </header>
-                <FacultyScoreChart faculties={faculties} schoolAverage={schoolAverage} />
-              </div>
-            ) : (
-              <div className="reports-exec-grid reports-analysis-panel" role="tabpanel">
-                <div className="reports-exec-card">
-                  <header className="reports-exec-card-head">
-                    <h3>Điểm TB theo Khoa / Viện</h3>
-                    <span className="reports-exec-card-note">Đường nét đứt = điểm TB toàn trường</span>
-                  </header>
-                  <FacultyScoreChart faculties={faculties} schoolAverage={schoolAverage} />
-                </div>
-                <div className="reports-exec-card">
-                  <header className="reports-exec-card-head">
-                    <h3>Tỷ lệ hoàn thành theo Khoa / Viện</h3>
-                  </header>
-                  <FacultyCompletionChart faculties={completion} />
-                </div>
-              </div>
-            )
+            // Không có sĩ số nên không có biểu đồ tỷ lệ hoàn thành bên cạnh.
+            <div className="reports-exec-card reports-analysis-panel" role="tabpanel">
+              <header className="reports-exec-card-head">
+                <h3>Điểm TB theo Khoa / Viện</h3>
+                <span className="reports-exec-card-note">Đường nét đứt = điểm TB toàn trường</span>
+              </header>
+              <FacultyScoreChart faculties={faculties} schoolAverage={schoolAverage} />
+            </div>
           )}
 
           {analysisView === 'quality' && (
@@ -411,9 +347,9 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
               <header className="reports-exec-card-head">
                 <h3>{questionLowest ? 'Tiêu chí cần cải tiến' : 'Tiêu chí được đánh giá cao'}</h3>
                 <div className="reports-question-controls">
-                  <label htmlFor="unit-reports-question-count">Hiển thị</label>
+                  <label htmlFor="program-reports-question-count">Hiển thị</label>
                   <input
-                    id="unit-reports-question-count"
+                    id="program-reports-question-count"
                     type="number"
                     min={1}
                     max={Math.max(1, questions.length)}
@@ -421,11 +357,11 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
                     onChange={(event) => changeQuestionCount(event.target.value)}
                     onBlur={() => setQuestionInput(String(questionCount))}
                   />
-                  <label className="catalog-sr-only" htmlFor="unit-reports-question-order">
+                  <label className="catalog-sr-only" htmlFor="program-reports-question-order">
                     Đầu bảng điểm
                   </label>
                   <select
-                    id="unit-reports-question-order"
+                    id="program-reports-question-order"
                     value={questionLowest ? 'lowest' : 'highest'}
                     onChange={(event) => setQuestionLowest(event.target.value === 'lowest')}
                   >
@@ -498,13 +434,10 @@ const RankedGroupTable: React.FC<{
   groupHeader: string;
   itemLabel: string;
   data: UnitReportGroup[];
-  surveyType: UnitSurveyType;
   report: UnitSurveyReport;
   exportTitle: string;
   exportFileName: string;
-}> = ({ title, groupHeader, itemLabel, data, surveyType, report, exportTitle, exportFileName }) => {
-  const withTarget = surveyType === 'LECTURER';
-  const noun = unitNounOf[surveyType];
+}> = ({ title, groupHeader, itemLabel, data, report, exportTitle, exportFileName }) => {
   const columns: Column<UnitReportGroup>[] = [
     {
       key: 'name',
@@ -516,7 +449,7 @@ const RankedGroupTable: React.FC<{
     },
     {
       key: 'unitCount',
-      header: `Số ${noun}`,
+      header: 'Số khoá ngành',
       width: '8%',
       numeric: true,
       sortValue: (item) => item.unitCount,
@@ -525,24 +458,13 @@ const RankedGroupTable: React.FC<{
     },
     {
       key: 'scoredUnitCount',
-      header: `${noun[0].toUpperCase()}${noun.slice(1)} đủ điều kiện`,
+      header: 'Khoá ngành đủ điều kiện',
       width: '9%',
       numeric: true,
       sortValue: (item) => item.scoredUnitCount,
       filterValue: (item) => String(item.scoredUnitCount),
       render: (item) => countCell(item.scoredUnitCount),
     },
-    ...(withTarget
-      ? [{
-        key: 'targetCount',
-        header: 'Tổng số phiếu phải thu',
-        width: '8%',
-        numeric: true,
-        sortValue: (item: UnitReportGroup) => item.targetCount ?? 0,
-        filterValue: (item: UnitReportGroup) => String(item.targetCount ?? 0),
-        render: (item: UnitReportGroup) => countCell(item.targetCount ?? 0),
-      }]
-      : []),
     {
       key: 'responseCount',
       header: 'Số phiếu đã thu',
@@ -577,17 +499,6 @@ const RankedGroupTable: React.FC<{
         );
       },
     },
-    ...(withTarget
-      ? [{
-        key: 'responseRate',
-        header: 'Tỷ lệ phản hồi (%)',
-        width: '10%',
-        numeric: true,
-        sortValue: (item: UnitReportGroup) => item.responseRate ?? 0,
-        filterValue: (item: UnitReportGroup) => formatDecimal(item.responseRate ?? 0, 3),
-        render: (item: UnitReportGroup) => rateCell(item.responseRate, true),
-      }]
-      : []),
     {
       key: 'validRate',
       header: 'Tỷ lệ phiếu hợp lệ (%)',
@@ -625,12 +536,11 @@ const RankedGroupTable: React.FC<{
           title: exportTitle,
           fileName: exportFileName,
           subtitle: report.surveyName,
-          breadcrumb: ['Thống kê & Báo cáo', surveyTypeLabels[surveyType], title],
+          breadcrumb: ['Thống kê & Báo cáo', 'Chương trình đào tạo', title],
           summaryNotes: [
-            ...(withTarget ? ['Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu.'] : []),
             'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
             'Số phiếu không hợp lệ là phiếu bị bộ lọc nhiễu loại, không tham gia tính điểm.',
-            `Điểm trung bình chỉ gộp các ${noun} đủ điều kiện tính điểm.`,
+            'Điểm trung bình chỉ gộp các khoá ngành đủ điều kiện tính điểm.',
           ],
         }}
         emptyMessage="Chưa có dữ liệu tổng hợp."
@@ -639,142 +549,99 @@ const RankedGroupTable: React.FC<{
   );
 };
 
-// ------------------------------------------------- Bảng đơn vị (khoa / khoá ngành)
+// ------------------------------------------------------- Bảng từng khoá ngành
 
-function unitColumns(surveyType: UnitSurveyType): Column<UnitReportRow>[] {
-  const isProgram = surveyType === 'PROGRAM';
-  return [
-    ...(isProgram
-      ? [
-        {
-          key: 'facultyName',
-          header: 'Khoa / Viện',
-          width: '16%',
-          sortValue: (item: UnitReportRow) => item.facultyName,
-          filterValue: (item: UnitReportRow) => item.facultyName,
-          render: (item: UnitReportRow) => <span className="catalog-cell-primary">{item.facultyName}</span>,
-        },
-        {
-          key: 'unitName',
-          header: 'Ngành',
-          width: '18%',
-          sortValue: (item: UnitReportRow) => item.unitName,
-          filterValue: (item: UnitReportRow) => item.unitName,
-          render: (item: UnitReportRow) => <span className="catalog-cell-primary">{item.unitName}</span>,
-        },
-        {
-          key: 'unitCode',
-          header: 'Khoá ngành',
-          width: '9%',
-          sortValue: (item: UnitReportRow) => item.unitCode,
-          filterValue: (item: UnitReportRow) => item.unitCode,
-          render: (item: UnitReportRow) => <span className="operations-code">{item.unitCode}</span>,
-        },
-        {
-          key: 'cohortName',
-          header: 'Khoá',
-          width: '7%',
-          sortValue: (item: UnitReportRow) => item.cohortName,
-          filterValue: (item: UnitReportRow) => item.cohortName,
-        },
-      ]
-      : [
-        {
-          key: 'unitName',
-          header: 'Khoa / Viện',
-          width: '24%',
-          sortValue: (item: UnitReportRow) => item.unitName,
-          filterValue: (item: UnitReportRow) => item.unitName,
-          render: (item: UnitReportRow) => <span className="catalog-cell-primary">{item.unitName}</span>,
-        },
-        {
-          key: 'targetCount',
-          header: 'Tổng số phiếu phải thu',
-          width: '9%',
-          numeric: true,
-          sortValue: (item: UnitReportRow) => item.targetCount ?? 0,
-          filterValue: (item: UnitReportRow) => String(item.targetCount ?? 0),
-          render: (item: UnitReportRow) => countCell(item.targetCount ?? 0),
-        },
-      ]),
-    {
-      key: 'responseCount',
-      header: 'Số phiếu đã thu',
-      width: '8%',
-      numeric: true,
-      sortValue: (item) => item.responseCount,
-      filterValue: (item) => String(item.responseCount),
-      render: (item) => countCell(item.responseCount),
+const unitColumns: Column<UnitReportRow>[] = [
+  {
+    key: 'facultyName',
+    header: 'Khoa / Viện',
+    width: '16%',
+    sortValue: (item: UnitReportRow) => item.facultyName,
+    filterValue: (item: UnitReportRow) => item.facultyName,
+    render: (item: UnitReportRow) => <span className="catalog-cell-primary">{item.facultyName}</span>,
+  },
+  {
+    key: 'unitName',
+    header: 'Ngành',
+    width: '18%',
+    sortValue: (item: UnitReportRow) => item.unitName,
+    filterValue: (item: UnitReportRow) => item.unitName,
+    render: (item: UnitReportRow) => <span className="catalog-cell-primary">{item.unitName}</span>,
+  },
+  {
+    key: 'unitCode',
+    header: 'Khoá ngành',
+    width: '9%',
+    sortValue: (item: UnitReportRow) => item.unitCode,
+    filterValue: (item: UnitReportRow) => item.unitCode,
+    render: (item: UnitReportRow) => <span className="operations-code">{item.unitCode}</span>,
+  },
+  {
+    key: 'cohortName',
+    header: 'Khoá',
+    width: '7%',
+    sortValue: (item: UnitReportRow) => item.cohortName,
+    filterValue: (item: UnitReportRow) => item.cohortName,
+  },
+  {
+    key: 'responseCount',
+    header: 'Số phiếu đã thu',
+    width: '8%',
+    numeric: true,
+    sortValue: (item) => item.responseCount,
+    filterValue: (item) => String(item.responseCount),
+    render: (item) => countCell(item.responseCount),
+  },
+  {
+    key: 'validResponseCount',
+    header: 'Số phiếu hợp lệ',
+    width: '8%',
+    numeric: true,
+    sortValue: (item) => item.validResponseCount,
+    filterValue: (item) => String(item.validResponseCount),
+    render: (item) => countCell(item.validResponseCount),
+  },
+  {
+    key: 'invalidResponseCount',
+    header: 'Số phiếu không hợp lệ',
+    width: '9%',
+    numeric: true,
+    sortValue: (item) => item.responseCount - item.validResponseCount,
+    filterValue: (item) => String(item.responseCount - item.validResponseCount),
+    render: (item) => {
+      const invalid = item.responseCount - item.validResponseCount;
+      return (
+        <span className={invalid > 0 ? 'catalog-cell-number reports-invalid-count' : 'catalog-cell-number'}>
+          {invalid}
+        </span>
+      );
     },
-    {
-      key: 'validResponseCount',
-      header: 'Số phiếu hợp lệ',
-      width: '8%',
-      numeric: true,
-      sortValue: (item) => item.validResponseCount,
-      filterValue: (item) => String(item.validResponseCount),
-      render: (item) => countCell(item.validResponseCount),
-    },
-    {
-      key: 'invalidResponseCount',
-      header: 'Số phiếu không hợp lệ',
-      width: '9%',
-      numeric: true,
-      sortValue: (item) => item.responseCount - item.validResponseCount,
-      filterValue: (item) => String(item.responseCount - item.validResponseCount),
-      render: (item) => {
-        const invalid = item.responseCount - item.validResponseCount;
-        return (
-          <span className={invalid > 0 ? 'catalog-cell-number reports-invalid-count' : 'catalog-cell-number'}>
-            {invalid}
-          </span>
-        );
-      },
-    },
-    ...(isProgram
-      ? []
-      : [{
-        key: 'responseRate',
-        header: 'Tỷ lệ phản hồi (%)',
-        width: '10%',
-        numeric: true,
-        sortValue: (item: UnitReportRow) => item.responseRate ?? 0,
-        filterValue: (item: UnitReportRow) => formatDecimal(item.responseRate ?? 0, 3),
-        render: (item: UnitReportRow) => rateCell(item.responseRate, true),
-      }]),
-    {
-      key: 'validRate',
-      header: 'Tỷ lệ phiếu hợp lệ (%)',
-      width: '9%',
-      numeric: true,
-      sortValue: (item) => validRateOf(item.validResponseCount, item.responseCount),
-      filterValue: (item) => formatDecimal(validRateOf(item.validResponseCount, item.responseCount), 3),
-      render: (item) => rateCell(validRateOf(item.validResponseCount, item.responseCount), false),
-    },
-    {
-      key: 'averageScore',
-      header: 'Điểm trung bình',
-      width: '8%',
-      numeric: true,
-      sortValue: (item) => (item.isScored ? item.averageScore ?? -1 : -1),
-      filterValue: (item) => (item.isScored ? formatDecimal(item.averageScore ?? 0, 3) : '—'),
-      render: (item) => scoreCell(item.isScored ? item.averageScore : null),
-    },
-  ];
-}
+  },
+  {
+    key: 'validRate',
+    header: 'Tỷ lệ phiếu hợp lệ (%)',
+    width: '9%',
+    numeric: true,
+    sortValue: (item) => validRateOf(item.validResponseCount, item.responseCount),
+    filterValue: (item) => formatDecimal(validRateOf(item.validResponseCount, item.responseCount), 3),
+    render: (item) => rateCell(validRateOf(item.validResponseCount, item.responseCount), false),
+  },
+  {
+    key: 'averageScore',
+    header: 'Điểm trung bình',
+    width: '8%',
+    numeric: true,
+    sortValue: (item) => (item.isScored ? item.averageScore ?? -1 : -1),
+    filterValue: (item) => (item.isScored ? formatDecimal(item.averageScore ?? 0, 3) : '—'),
+    render: (item) => scoreCell(item.isScored ? item.averageScore : null),
+  },
+];
 
-const unitExportColumns = (surveyType: UnitSurveyType) => [
-  ...(surveyType === 'PROGRAM'
-    ? [
-      { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
-      { key: 'unitName', header: 'Ngành', width: 26 },
-      { key: 'unitCode', header: 'Khoá ngành', width: 12, align: 'left' as const },
-      { key: 'cohortName', header: 'Khoá', width: 10 },
-    ]
-    : [
-      { key: 'unitName', header: 'Khoa / Viện', width: 26 },
-      { key: 'targetCount', header: 'Tổng số phiếu phải thu', width: 10, type: 'number' as const, align: 'right' as const },
-    ]),
+const unitExportColumns = [
+  { key: 'facultyName', header: 'Khoa / Viện', width: 22 },
+  { key: 'unitName', header: 'Ngành', width: 26 },
+  { key: 'unitCode', header: 'Khoá ngành', width: 12, align: 'left' as const },
+  { key: 'cohortName', header: 'Khoá', width: 10 },
   { key: 'responseCount', header: 'Số phiếu đã thu', width: 12, type: 'number' as const, align: 'right' as const },
   { key: 'validResponseCount', header: 'Số phiếu hợp lệ', width: 12, type: 'number' as const, align: 'right' as const },
   {
@@ -787,46 +654,9 @@ const unitExportColumns = (surveyType: UnitSurveyType) => [
   },
 ];
 
-/** Khảo sát giảng viên: bảng "Theo Khoa/Viện" chính là bảng từng đơn vị. */
-const RankedUnitTable: React.FC<{ report: UnitSurveyReport; surveyType: UnitSurveyType; title: string }> = ({
-  report,
-  surveyType,
-  title,
-}) => (
-  <section className="reports-rank" aria-label={title}>
-    <header className="reports-rank-header">
-      <span className="reports-rank-title">
-        <h3>{title} ({report.units.length} {unitNounOf[surveyType]})</h3>
-      </span>
-    </header>
-    <DataTable
-      columns={unitColumns(surveyType)}
-      data={report.units}
-      keyExtractor={(item) => String(item.courseSectionSurveyId)}
-      showIndex={false}
-      pageSize={rankedPageSize}
-      exportConfig={{
-        title: 'BÁO CÁO XẾP HẠNG KẾT QUẢ THEO KHOA/VIỆN',
-        fileName: 'xep-hang-khoa-vien-giang-vien',
-        subtitle: report.surveyName,
-        breadcrumb: ['Thống kê & Báo cáo', surveyTypeLabels[surveyType], title],
-        summaryNotes: [
-          'Tỷ lệ phản hồi = Số phiếu đã thu ÷ Tổng số phiếu phải thu (số giảng viên của khoa).',
-          'Tỷ lệ phiếu hợp lệ = Số phiếu hợp lệ ÷ Số phiếu đã thu.',
-          'Khoa chưa đủ điều kiện tính điểm không có điểm trung bình.',
-        ],
-      }}
-      emptyMessage="Chưa có dữ liệu tổng hợp."
-    />
-  </section>
-);
-
 // ---------------------------------------------------------- Tra cứu chi tiết
 
-const DetailsWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSurveyType }> = ({
-  report,
-  surveyType,
-}) => {
+const DetailsWorkspace: React.FC<{ report: UnitSurveyReport }> = ({ report }) => {
   const [search, setSearch] = useState('');
   const keyword = foldVietnamese(search);
   const rows = report.units.filter((row) =>
@@ -837,8 +667,8 @@ const DetailsWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSur
   return (
     <>
       <div className="reports-kpi-band" aria-label="Tổng quan kết quả đang lọc">
-        <span className="reports-kpi-item" title={`Số ${unitNounOf[surveyType]} trong bộ lọc`}>
-          Số {unitNounOf[surveyType]} khảo sát
+        <span className="reports-kpi-item" title="Số khoá ngành trong bộ lọc">
+          Số khoá ngành khảo sát
           <strong>{rows.length.toLocaleString('vi-VN')}</strong>
         </span>
         <span className="reports-kpi-item" title="Mọi lượt nộp, kể cả phiếu bị lọc nhiễu">
@@ -861,19 +691,19 @@ const DetailsWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSur
 
       <section className="reports-table-section" aria-label="Bảng kết quả chi tiết">
         <DataTable
-          columns={unitColumns(surveyType)}
+          columns={unitColumns}
           data={rows}
           searchValue={search}
           onSearchChange={setSearch}
           searchPlaceholder="Khoa/viện, khoá ngành, ngành, khoá..."
           exportConfig={{
-            title: `BÁO CÁO KẾT QUẢ KHẢO SÁT ${surveyTypeLabels[surveyType].toUpperCase()} CHI TIẾT`,
+            title: 'BÁO CÁO KẾT QUẢ KHẢO SÁT CHƯƠNG TRÌNH ĐÀO TẠO CHI TIẾT',
             fileName: `bao-cao-ket-qua-khao-sat-ctdt-chi-tiet-${report.semesterName}`,
             subtitle: report.surveyName,
-            breadcrumb: ['Thống kê & Báo cáo', surveyTypeLabels[surveyType], 'Tra cứu chi tiết'],
+            breadcrumb: ['Thống kê & Báo cáo', 'Chương trình đào tạo', 'Tra cứu chi tiết'],
             info: {
               'Học kỳ': `${report.semesterName} · ${report.academicYearName}`,
-              [`Số ${unitNounOf[surveyType]}`]: rows.length,
+              'Số khoá ngành': rows.length,
               'Số phiếu đã thu': totalResponses,
               'Số phiếu hợp lệ': totalValid,
             },
@@ -883,12 +713,12 @@ const DetailsWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSur
             ],
             sheets: [{
               sheetName: 'Ket qua',
-              title: `DANH SÁCH KẾT QUẢ KHẢO SÁT (${rows.length} ${unitNounOf[surveyType].toUpperCase()})`,
-              columns: unitExportColumns(surveyType),
+              title: `DANH SÁCH KẾT QUẢ KHẢO SÁT (${rows.length} KHOÁ NGÀNH)`,
+              columns: unitExportColumns,
               data: rows,
             }],
           }}
-          emptyMessage={`Không có ${unitNounOf[surveyType]} nào khớp với bộ lọc hiện tại.`}
+          emptyMessage="Không có khoá ngành nào khớp với bộ lọc hiện tại."
           keyExtractor={(item) => String(item.courseSectionSurveyId)}
           showIndex={false}
           pageSize={20}
@@ -900,11 +730,7 @@ const DetailsWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSur
 
 // ------------------------------------------------------------- Ý kiến mở
 
-const CommentsWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSurveyType }> = ({
-  report,
-  surveyType,
-}) => {
-  const isProgram = surveyType === 'PROGRAM';
+const CommentsWorkspace: React.FC<{ report: UnitSurveyReport }> = ({ report }) => {
   const [search, setSearch] = useState('');
   const keyword = foldVietnamese(search);
   const rows = report.comments.filter((comment) =>
@@ -912,26 +738,24 @@ const CommentsWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
       .includes(keyword));
 
   const columns: Column<UnitReportComment>[] = [
-    ...(isProgram
-      ? [{
-        key: 'facultyName',
-        header: 'Khoa / Viện',
-        width: '16%',
-        filterValue: (item: UnitReportComment) => item.facultyName,
-        render: (item: UnitReportComment) => <span className="catalog-cell-primary">{item.facultyName}</span>,
-      }]
-      : []),
+    {
+      key: 'facultyName',
+      header: 'Khoa / Viện',
+      width: '16%',
+      filterValue: (item) => item.facultyName,
+      render: (item) => <span className="catalog-cell-primary">{item.facultyName}</span>,
+    },
     {
       key: 'unit',
-      header: isProgram ? 'Khoá ngành' : 'Khoa / Viện',
-      width: isProgram ? '20%' : '22%',
-      filterValue: (item) => unitTitleOf(item, surveyType),
-      render: (item) => <span className="catalog-cell-primary">{unitTitleOf(item, surveyType)}</span>,
+      header: 'Khoá ngành',
+      width: '20%',
+      filterValue: (item) => `${item.unitCode} – ${item.unitName}`,
+      render: (item) => <span className="catalog-cell-primary">{`${item.unitCode} – ${item.unitName}`}</span>,
     },
     {
       key: 'comment',
       header: 'Ý kiến khác',
-      width: isProgram ? '44%' : '58%',
+      width: '44%',
       render: (item) => <span style={{ whiteSpace: 'pre-wrap' }}>{item.comment}</span>,
     },
     {
@@ -968,10 +792,10 @@ const CommentsWorkspace: React.FC<{ report: UnitSurveyReport; surveyType: UnitSu
         onSearchChange={setSearch}
         searchPlaceholder="Tìm nội dung ý kiến, khoa/viện, khoá ngành..."
         exportConfig={{
-          title: `TỔNG HỢP Ý KIẾN MỞ KHẢO SÁT ${surveyTypeLabels[surveyType].toUpperCase()}`,
-          fileName: `y-kien-mo-${isProgram ? 'ctdt' : 'giang-vien'}`,
+          title: 'TỔNG HỢP Ý KIẾN MỞ KHẢO SÁT CHƯƠNG TRÌNH ĐÀO TẠO',
+          fileName: 'y-kien-mo-ctdt',
           subtitle: report.surveyName,
-          breadcrumb: ['Thống kê & Báo cáo', surveyTypeLabels[surveyType], 'Phân tích ý kiến mở'],
+          breadcrumb: ['Thống kê & Báo cáo', 'Chương trình đào tạo', 'Phân tích ý kiến mở'],
           summaryNotes: ['Ý kiến của phiếu bị bộ lọc nhiễu loại vẫn được giữ để tham khảo, có ghi rõ ở cột Phiếu.'],
         }}
         emptyMessage="Chưa có ý kiến mở nào."

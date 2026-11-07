@@ -1,4 +1,4 @@
-using Application.Auth;
+﻿using Application.Auth;
 using Application.Surveys;
 using Domain;
 using Infrastructure.Persistence;
@@ -1724,8 +1724,8 @@ public sealed partial class EfSurveyService(
         // đã nộp là đã dùng một suất, không cho làm lại. Huỷ phiếu của lớp thì suất
         // được trả lại vì bộ lọc IsDeleted của EF loại chúng khỏi phép đếm.
         //
-        // Sĩ số: lớp học phần đọc sĩ số lớp, khảo sát giảng viên đọc số giảng viên đã chốt
-        // lúc phát link. CTĐT không có sĩ số nên ClassSize ra 0 và không bao giờ bị chặn.
+        // Sĩ số: lớp học phần đọc sĩ số lớp. CTĐT và khảo sát giảng viên không có sĩ số nên
+        // ClassSize ra 0 và không bao giờ bị chặn.
         var capacity = await db.CourseSectionSurveys.AsNoTracking()
             .Where(x => x.LinkToken == token)
             .Select(x => new

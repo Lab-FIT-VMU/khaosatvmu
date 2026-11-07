@@ -9,7 +9,7 @@ import { UnitSurveysPage } from './UnitSurveysPage';
 import '../styles/survey-operations.css';
 
 /*
-  Danh sách đợt khảo sát của cả ba loại trên MỘT mục menu. Loại đã chọn ngay ở bước đầu
+  Danh sách bài khảo sát của cả ba loại trên MỘT mục menu. Loại đã chọn ngay ở bước đầu
   hộp thoại tạo đợt, nên menu không cần chia nhóm theo loại; ở đây chỉ còn thanh tab để
   xem đợt của từng loại. Tạo xong một đợt loại khác thì tự chuyển sang tab của loại đó.
 */

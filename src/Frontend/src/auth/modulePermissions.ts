@@ -1,3 +1,5 @@
+import { surveyStatisticsPages, unitStatisticsTabId } from '../components/surveyStatisticsTabs';
+
 export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   // Mỗi mục trên thanh điều hướng có đúng một quyền, để trang Phân quyền Module bật
   // tắt được từng mục một. Tên quyền bên backend cũng phải trùng nhãn của mục.
@@ -13,6 +15,8 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
   'graduation-analytics-2': 'GRADUATION_ANALYTICS_ACCESS',
   'survey-dashboard': 'SURVEY_DASHBOARD_ACCESS',
+  // Năm học & học kỳ tách khỏi Lớp học phần thành mục riêng, có quyền riêng.
+  'academic-years': 'ACADEMIC_YEARS_ACCESS',
   faculties: 'FACULTIES_ACCESS',
   departments: 'DEPARTMENTS_ACCESS',
   lecturers: 'LECTURERS_ACCESS',
@@ -31,6 +35,18 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   'program-criteria': 'PROGRAM_CRITERIA_ACCESS',
   'users-admin': 'USER_ADMIN_ACCESS',
 };
+
+/*
+  Thống kê CTĐT / giảng viên: mỗi mục một quyền riêng, mã ghép từ loại khảo sát và quyền
+  của trang học phần cùng tên, ví dụ `program-progress` → PROGRAM_PROGRESS_ACCESS. Khớp
+  SurveyStatisticsPermissions bên backend; đổi một bên phải đổi cả bên kia.
+*/
+for (const surveyType of ['PROGRAM', 'LECTURER'] as const) {
+  for (const page of surveyStatisticsPages) {
+    MODULE_REQUIRED_PERMISSION[unitStatisticsTabId(surveyType, page)] =
+      `${surveyType}_${MODULE_REQUIRED_PERMISSION[page]}`;
+  }
+}
 
 /**
  * Quyền của từng tab bên trong module, khớp ModuleTabPermissions bên backend. Trang

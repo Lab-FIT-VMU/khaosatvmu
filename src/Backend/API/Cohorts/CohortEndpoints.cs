@@ -18,13 +18,7 @@ public static class CohortEndpoints
         cohorts.MapGet("", async (ICohortService service, CancellationToken ct) =>
             Results.Ok(await service.GetCohortsAsync(ct)));
 
-        cohorts.MapPost("", async (
-            SaveCohortRequest request,
-            ICohortService service,
-            CancellationToken ct) =>
-            ToResult(await service.CreateCohortAsync(
-                new SaveCohortCommand(request.AcademicYearId, request.CohortCode, request.CohortName), ct)))
-            .AddEndpointFilter<RequireAntiforgeryFilter>();
+        // Không có POST: khoá học tự tạo cùng năm học ở mục Năm học & học kỳ.
 
         cohorts.MapPut("/{cohortId:int}", async (
             int cohortId,

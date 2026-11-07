@@ -48,12 +48,7 @@ export interface CohortImportResponse {
 export const cohortApi = {
   cohorts: () => apiRequest<Cohort[]>('/api/catalog/cohorts'),
 
-  createCohort: (academicYearId: number, cohortCode?: string, cohortName?: string) =>
-    csrfRequest<Cohort>('/api/catalog/cohorts', 'POST', {
-      academicYearId,
-      cohortCode: cohortCode ?? null,
-      cohortName: cohortName ?? null,
-    }),
+  // Không có createCohort: khoá học tự tạo khi thêm năm học (catalogApi.createAcademicYear).
 
   updateCohort: (cohortId: number, academicYearId: number, cohortCode: string, cohortName: string) =>
     csrfRequest<Cohort>(`/api/catalog/cohorts/${cohortId}`, 'PUT', {

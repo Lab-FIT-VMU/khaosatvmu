@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Application.Auth;
 using Application.Catalog;
+using Application.Cohorts;
 using Application.UserAdministration;
 using Domain;
 using Infrastructure.Auth;
@@ -627,6 +628,27 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var academicYearName = command.AcademicYearName.Trim();
         var startDate = command.StartDate!.Value;
         var endDate = AcademicYearEndDate(startDate);
+
+        // Mỗi năm học là năm nhập học của đúng một khoá, tạo luôn ở đây thay vì để người dùng
+        // tạo tay ở mục Khoá ngành đào tạo (dễ quên, dễ gõ sai mã). Kiểm trước khi ghi gì để
+        // trùng mã thì không để lại năm học thiếu khoá.
+        var cohortCode = CohortCodeRules.FromAcademicYearName(academicYearName);
+        if (cohortCode.Length == 0)
+        {
+            return Failed<AcademicYearDto>(CatalogErrorCodes.AcademicYearNameInvalid);
+        }
+        if (await db.Cohorts.AnyAsync(x => x.CohortCode == cohortCode, cancellationToken))
+        {
+            return Failed<AcademicYearDto>(CatalogErrorCodes.AcademicYearCohortCodeExists);
+        }
+
+        // Năm học, ba học kỳ và khoá cùng ăn hoặc cùng bỏ. Người gọi đã mở transaction thì
+        // tham gia vào đó — Npgsql không cho lồng.
+        var ownTransaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        await using var transactionScope = ownTransaction;
+
         var year = new AcademicYear
         {
             AcademicYearName = academicYearName,
@@ -640,7 +662,14 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .Select(name => new Semester { SemesterName = name, AcademicYearId = year.AcademicYearId })
             .ToList();
         db.Semesters.AddRange(semesters);
+        db.Cohorts.Add(new Cohort
+        {
+            CohortCode = cohortCode,
+            CohortName = CohortCodeRules.DefaultName(cohortCode),
+            AcademicYearId = year.AcademicYearId,
+        });
         await db.SaveChangesAsync(cancellationToken);
+        if (ownTransaction is not null) await ownTransaction.CommitAsync(cancellationToken);
 
         return Succeeded(new AcademicYearDto(
             year.AcademicYearId,

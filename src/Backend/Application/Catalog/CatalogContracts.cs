@@ -511,6 +511,8 @@ public static class CatalogErrorCodes
     public const string AcademicYearNameRequired = "CATALOG_ACADEMIC_YEAR_NAME_REQUIRED";
     public const string AcademicYearNameExists = "CATALOG_ACADEMIC_YEAR_NAME_EXISTS";
     public const string AcademicYearNameInvalid = "CATALOG_ACADEMIC_YEAR_NAME_INVALID";
+    /// <summary>Mã khoá tự sinh từ năm học đã thuộc về một khoá khác.</summary>
+    public const string AcademicYearCohortCodeExists = "CATALOG_ACADEMIC_YEAR_COHORT_CODE_EXISTS";
 
     public const string SemesterNotFound = "CATALOG_SEMESTER_NOT_FOUND";
     public const string SemesterNameRequired = "CATALOG_SEMESTER_NAME_REQUIRED";

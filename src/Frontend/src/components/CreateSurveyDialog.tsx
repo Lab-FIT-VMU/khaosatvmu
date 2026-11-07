@@ -58,7 +58,7 @@ const typeOptions: { type: SurveyType; icon: React.ReactNode; description: strin
   {
     type: 'LECTURER',
     icon: <Presentation size={16} aria-hidden="true" />,
-    description: 'Giảng viên trả lời. Mỗi khoa một link, sĩ số là số giảng viên của khoa.',
+    description: 'Giảng viên trả lời. Mỗi khoa một link, không có sĩ số.',
   },
 ];
 
@@ -345,8 +345,9 @@ export const CreateSurveyDialog: React.FC<CreateSurveyDialogProps> = ({
                 )}
                 {surveyType === 'LECTURER' && (
                   <>
-                    Mỗi khoa / viện trong phạm vi được tạo một đường dẫn và mã QR riêng. Sĩ số là số
-                    giảng viên của khoa trong danh mục, chốt tại lúc tạo đợt.
+                    Mỗi khoa / viện trong phạm vi được tạo một đường dẫn và mã QR riêng. Khảo sát
+                    giảng viên <strong>không có sĩ số</strong>: không giới hạn số phiếu và không
+                    tính tỷ lệ phản hồi.
                   </>
                 )}
                 {unitCount !== null && (

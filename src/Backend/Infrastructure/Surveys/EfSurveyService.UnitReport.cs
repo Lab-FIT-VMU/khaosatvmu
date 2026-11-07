@@ -1,4 +1,4 @@
-using Application.Surveys;
+﻿using Application.Surveys;
 using Domain;
 using Microsoft.EntityFrameworkCore;
 
@@ -125,11 +125,13 @@ public sealed partial class EfSurveyService
                     survey.SurveyType == SurveyTypes.Program ? unit.UnitName : string.Empty,
                     unit.FacultyId,
                     unit.FacultyName,
-                    unit.TargetCount,
+                    // CTĐT và khảo sát giảng viên không có sĩ số: không có tỷ lệ phản hồi,
+                    // đủ điều kiện tính điểm chỉ xét tỷ lệ phiếu hợp lệ.
+                    null,
                     unitResponses.Count,
                     counted.Count,
-                    RateOf(unitResponses.Count, unit.TargetCount),
-                    thresholds.HasEnoughResponsesToScore(unit.TargetCount, unitResponses.Count, counted.Count),
+                    null,
+                    thresholds.HasEnoughResponsesToScore((int?)null, unitResponses.Count, counted.Count),
                     counted.Count == 0 ? null : Math.Round(counted.Average(x => x.Score), 3),
                     questionScores,
                     unitResponses.Count(x => !string.IsNullOrWhiteSpace(x.AdditionalComments)));
@@ -175,12 +177,10 @@ public sealed partial class EfSurveyService
             rows.Count,
             rows.Count(x => x.ResponseCount > 0),
             rows.Count(x => x.IsScored),
-            survey.SurveyType == SurveyTypes.Program ? null : rows.Sum(x => x.TargetCount ?? 0),
+            null,
             rows.Sum(x => x.ResponseCount),
             rows.Sum(x => x.ValidResponseCount),
-            survey.SurveyType == SurveyTypes.Program
-                ? null
-                : RateOf(rows.Sum(x => x.ResponseCount), rows.Sum(x => x.TargetCount ?? 0)),
+            null,
             MeanOfScored(rows));
 
         var comments = responses
@@ -216,15 +216,11 @@ public sealed partial class EfSurveyService
             questionDtos,
             rows.OrderBy(x => x.FacultyName).ThenBy(x => x.UnitCode).ToList(),
             GroupRows(rows, x => x.FacultyId?.ToString() ?? string.Empty,
-                x => x.FacultyName.Length == 0 ? "Chưa gắn khoa" : x.FacultyName, isProgram),
-            isProgram ? GroupRows(rows, x => x.MajorName, x => x.MajorName, isProgram) : [],
-            isProgram ? GroupRows(rows, x => x.CohortName, x => x.CohortName, isProgram) : [],
+                x => x.FacultyName.Length == 0 ? "Chưa gắn khoa" : x.FacultyName),
+            isProgram ? GroupRows(rows, x => x.MajorName, x => x.MajorName) : [],
+            isProgram ? GroupRows(rows, x => x.CohortName, x => x.CohortName) : [],
             comments));
     }
-
-    /// <summary>Phần trăm phiếu đã thu trên sĩ số, một chữ số thập phân; null khi không có sĩ số.</summary>
-    private static decimal? RateOf(int responseCount, int? targetCount) =>
-        targetCount is > 0 ? Math.Round((decimal)responseCount / targetCount.Value * 100, 1) : null;
 
     /// <summary>Trung bình cộng điểm các đơn vị được tính điểm, mỗi đơn vị nặng như nhau.</summary>
     private static decimal? MeanOfScored(IEnumerable<UnitReportRowDto> rows)
@@ -239,23 +235,20 @@ public sealed partial class EfSurveyService
     private static List<UnitReportGroupDto> GroupRows(
         IEnumerable<UnitReportRowDto> rows,
         Func<UnitReportRowDto, string> keyOf,
-        Func<UnitReportRowDto, string> nameOf,
-        bool withoutTarget) =>
+        Func<UnitReportRowDto, string> nameOf) =>
         rows
             .GroupBy(keyOf)
             .Select(group =>
             {
-                var target = withoutTarget ? (int?)null : group.Sum(x => x.TargetCount ?? 0);
-                var responseCount = group.Sum(x => x.ResponseCount);
                 return new UnitReportGroupDto(
                     group.Key,
                     nameOf(group.First()),
                     group.Count(),
                     group.Count(x => x.IsScored),
-                    target,
-                    responseCount,
+                    null,
+                    group.Sum(x => x.ResponseCount),
                     group.Sum(x => x.ValidResponseCount),
-                    RateOf(responseCount, target),
+                    null,
                     MeanOfScored(group));
             })
             .OrderBy(x => x.Name)

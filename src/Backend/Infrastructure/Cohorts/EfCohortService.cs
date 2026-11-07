@@ -15,9 +15,8 @@ namespace Infrastructure.Cohorts;
 /// </summary>
 public sealed class EfCohortService(AppDbContext db) : ICohortService
 {
-    /// <summary>Năm học 2018-2019 ứng với khoá 59; mỗi năm học sau đó tăng một khoá.</summary>
-    private const int BaseAcademicYearStart = 2018;
-    private const int BaseCohortNumber = 59;
+    // Khoá học không tạo tay nữa: thêm năm học là có khoá (EfCatalogService.CreateAcademicYearAsync,
+    // quy tắc mã ở CohortCodeRules). Ở đây chỉ còn đọc, sửa và xoá khoá.
 
     public async Task<IReadOnlyList<CohortDto>> GetCohortsAsync(
         CancellationToken cancellationToken = default)
@@ -44,53 +43,6 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
                 x.AcademicYearName,
                 counts.GetValueOrDefault(x.cohort.CohortId)))
             .ToList();
-    }
-
-    public async Task<CohortOperationResult<CohortDto>> CreateCohortAsync(
-        SaveCohortCommand command,
-        CancellationToken cancellationToken = default)
-    {
-        if (command.AcademicYearId <= 0)
-        {
-            return Failed<CohortDto>(CohortErrorCodes.AcademicYearRequired);
-        }
-
-        var year = await db.AcademicYears.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.AcademicYearId == command.AcademicYearId, cancellationToken);
-        if (year is null)
-        {
-            return Failed<CohortDto>(CohortErrorCodes.AcademicYearNotFound);
-        }
-
-        if (await db.Cohorts.AnyAsync(x => x.AcademicYearId == command.AcademicYearId, cancellationToken))
-        {
-            return Failed<CohortDto>(CohortErrorCodes.AcademicYearUsed);
-        }
-
-        var code = NormalizeCode(command.CohortCode) is { Length: > 0 } explicitCode
-            ? explicitCode
-            : DeriveCohortCode(year.AcademicYearName);
-        if (code.Length == 0)
-        {
-            return Failed<CohortDto>(CohortErrorCodes.CohortCodeRequired);
-        }
-        if (await db.Cohorts.AnyAsync(x => x.CohortCode == code, cancellationToken))
-        {
-            return Failed<CohortDto>(CohortErrorCodes.CohortCodeExists);
-        }
-
-        var cohort = new Cohort
-        {
-            CohortCode = code,
-            CohortName = NormalizeName(command.CohortName) is { Length: > 0 } name ? name : $"Khoá {code}",
-            AcademicYearId = command.AcademicYearId,
-        };
-        db.Cohorts.Add(cohort);
-        await db.SaveChangesAsync(cancellationToken);
-
-        return Ok(new CohortDto(
-            cohort.CohortId, cohort.CohortCode, cohort.CohortName,
-            cohort.AcademicYearId, year.AcademicYearName, 0));
     }
 
     public async Task<CohortOperationResult<CohortDto>> UpdateCohortAsync(
@@ -516,15 +468,6 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
             }
         }
         return builder.ToString().Normalize(NormalizationForm.FormC);
-    }
-
-    /// <summary>'2018-2019' cho ra '59'. Trả về rỗng nếu tên năm học không đọc được.</summary>
-    private static string DeriveCohortCode(string academicYearName)
-    {
-        var digits = new string(academicYearName.TakeWhile(char.IsDigit).ToArray());
-        return int.TryParse(digits, NumberStyles.Integer, CultureInfo.InvariantCulture, out var yearStart)
-            ? (BaseCohortNumber + (yearStart - BaseAcademicYearStart)).ToString(CultureInfo.InvariantCulture)
-            : string.Empty;
     }
 
     private static string NormalizeCode(string? value) => (value ?? string.Empty).Trim();

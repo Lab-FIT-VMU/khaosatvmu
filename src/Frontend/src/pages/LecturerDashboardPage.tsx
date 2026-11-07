@@ -49,7 +49,7 @@ const quickActions: QuickAction[] = [
   },
   {
     tab: 'course-campaigns',
-    title: 'Danh sách đợt khảo sát',
+    title: 'Danh sách bài khảo sát',
     description: 'Phiếu khảo sát của các lớp',
     icon: ClipboardCheck,
     tone: 'teal',

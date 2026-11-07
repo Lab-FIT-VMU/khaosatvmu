@@ -87,37 +87,49 @@ public static class DatabaseSeeder
         AppDbContext db,
         CancellationToken cancellationToken)
     {
-        var definitions = new[]
+        var moduleDefinitions = new[]
         {
             // Tên và nhóm phải trùng KHÍT với thanh điều hướng: trang phân quyền
             // là nơi người quản trị tích chọn từng module, đọc thấy tên khác tên
             // trên menu là không biết mình đang mở khoá cho trang nào.
-            (Code: "DASHBOARD_ACCESS",            Name: "Bảng điều khiển",                   Description: "Truy cập module bảng điều khiển",                       Category: "Tổng quan"),
-            (Code: "SURVEY_DASHBOARD_ACCESS",     Name: "Tổng quan khảo sát",                Description: "Truy cập module tổng quan khảo sát",                    Category: "Tổng quan"),
-            (Code: "PROGRESS_ACCESS",             Name: "Tiến độ thu phiếu",                Description: "Truy cập module tiến độ thu phiếu",                    Category: "Tổng quan"),
-            (Code: "SURVEY_STATISTICS_ACCESS",    Name: "Bảng dữ liệu khảo sát",             Description: "Truy cập module bảng dữ liệu khảo sát",                 Category: "Tổng quan"),
-            (Code: "REPORTS_ACCESS",              Name: "Thống kê & Báo cáo",                Description: "Truy cập module thống kê và báo cáo",                  Category: "Tổng quan"),
-            (Code: "SURVEY_ANALYSIS_ACCESS",      Name: "Phân tích chuyên sâu",              Description: "Truy cập module phân tích chuyên sâu",                 Category: "Tổng quan"),
+            (Code: "DASHBOARD_ACCESS",            Name: "Bảng điều khiển",                   Description: "Truy cập module bảng điều khiển",                       Category: "Thống kê khảo sát học phần"),
+            (Code: "SURVEY_DASHBOARD_ACCESS",     Name: "Tổng quan khảo sát",                Description: "Truy cập module tổng quan khảo sát",                    Category: "Thống kê khảo sát học phần"),
+            (Code: "PROGRESS_ACCESS",             Name: "Tiến độ thu phiếu",                Description: "Truy cập module tiến độ thu phiếu",                    Category: "Thống kê khảo sát học phần"),
+            (Code: "SURVEY_STATISTICS_ACCESS",    Name: "Bảng dữ liệu khảo sát",             Description: "Truy cập module bảng dữ liệu khảo sát",                 Category: "Thống kê khảo sát học phần"),
+            (Code: "REPORTS_ACCESS",              Name: "Thống kê & Báo cáo",                Description: "Truy cập module thống kê và báo cáo",                  Category: "Thống kê khảo sát học phần"),
+            (Code: "SURVEY_ANALYSIS_ACCESS",      Name: "Phân tích chuyên sâu",              Description: "Truy cập module phân tích chuyên sâu",                 Category: "Thống kê khảo sát học phần"),
             (Code: "GRADUATION_UPLOAD_ACCESS",    Name: "Tải lên dữ liệu",                   Description: "Tải lên và xoá đợt dữ liệu tốt nghiệp",                Category: "Thống kê tốt nghiệp"),
             (Code: "GRADUATION_ANALYTICS_ACCESS", Name: "Thống kê chi tiết",                 Description: "Xem thống kê sinh viên tốt nghiệp",                    Category: "Thống kê tốt nghiệp"),
+            (Code: "ACADEMIC_YEARS_ACCESS",       Name: "Năm học & học kỳ",                  Description: "Truy cập module quản lý năm học và học kỳ",            Category: "Danh mục đào tạo"),
             (Code: "FACULTIES_ACCESS",            Name: "Khoa / Viện",                       Description: "Truy cập module quản lý khoa và viện",                  Category: "Danh mục đào tạo"),
             (Code: "DEPARTMENTS_ACCESS",          Name: "Bộ môn",                            Description: "Truy cập module quản lý bộ môn",                        Category: "Danh mục đào tạo"),
             (Code: "LECTURERS_ACCESS",            Name: "Giảng viên",                        Description: "Truy cập module quản lý giảng viên và chức vụ",         Category: "Danh mục đào tạo"),
             (Code: "MAJORS_ACCESS",               Name: "Ngành đào tạo",                     Description: "Truy cập module quản lý ngành đào tạo",                 Category: "Danh mục đào tạo"),
             (Code: "COHORT_MAJORS_ACCESS",        Name: "Khoá ngành đào tạo",                Description: "Truy cập module quản lý khoá học và khoá ngành đào tạo", Category: "Danh mục đào tạo"),
             (Code: "COURSES_ACCESS",              Name: "Học phần",                          Description: "Truy cập module quản lý học phần",                      Category: "Danh mục đào tạo"),
-            (Code: "COURSE_SECTIONS_ACCESS",      Name: "Lớp học phần",                      Description: "Truy cập module quản lý lớp học phần, năm học và học kỳ", Category: "Danh mục đào tạo"),
-            (Code: "COURSE_QUESTION_SETS_ACCESS", Name: "Danh sách bộ khảo sát",             Description: "Truy cập module bộ câu hỏi khảo sát học phần",         Category: "Khảo sát học phần"),
-            (Code: "COURSE_CAMPAIGNS_ACCESS",     Name: "Danh sách đợt khảo sát",            Description: "Truy cập module đợt khảo sát học phần",                Category: "Khảo sát học phần"),
+            (Code: "COURSE_SECTIONS_ACCESS",      Name: "Lớp học phần",                      Description: "Truy cập module quản lý lớp học phần",                  Category: "Danh mục đào tạo"),
+            (Code: "COURSE_QUESTION_SETS_ACCESS", Name: "Danh sách bộ câu hỏi",              Description: "Truy cập module bộ câu hỏi khảo sát học phần",         Category: "Khảo sát học phần"),
+            (Code: "COURSE_CAMPAIGNS_ACCESS",     Name: "Danh sách bài khảo sát",            Description: "Truy cập module đợt khảo sát học phần",                Category: "Khảo sát học phần"),
             (Code: "PROGRAM_CAMPAIGNS_ACCESS",    Name: "Đợt khảo sát CTĐT",                 Description: "Truy cập module đợt khảo sát chương trình đào tạo",     Category: "Khảo sát chương trình"),
             (Code: "PROGRAM_CRITERIA_ACCESS",     Name: "Tiêu chí CTĐT",                     Description: "Truy cập module tiêu chí chương trình đào tạo",        Category: "Khảo sát chương trình"),
             (Code: "USER_ADMIN_ACCESS",           Name: "Người dùng & phân quyền",           Description: "Truy cập module quản trị người dùng và phân quyền",    Category: "Quản trị"),
             // Hai quyền dưới đây không mở thêm mục nào trên menu. Chúng khoá hai thao tác
             // ghi của tính năng phân loại cảm xúc: sửa nhãn model đã đoán, và chạy lại model.
             // Không cấp sẵn cho DEPARTMENT_MANAGER: xem được kết quả không có nghĩa là được sửa.
-            (Code: "OPEN_COMMENT_SENTIMENT_REVIEW", Name: "Hiệu chỉnh cảm xúc ý kiến mở", Description: "Sửa nhãn cảm xúc do model dự đoán trên màn Phân tích ý kiến mở", Category: "Tổng quan"),
+            (Code: "OPEN_COMMENT_SENTIMENT_REVIEW", Name: "Hiệu chỉnh cảm xúc ý kiến mở", Description: "Sửa nhãn cảm xúc do model dự đoán trên màn Phân tích ý kiến mở", Category: "Thống kê khảo sát học phần"),
             (Code: "OPEN_COMMENT_MODEL_ADMIN",    Name: "Quản trị model cảm xúc",           Description: "Xem trạng thái model và chạy lại phân tích cảm xúc",     Category: "Quản trị"),
         };
+
+        // Thống kê CTĐT / giảng viên: cùng sáu trang như học phần, mỗi trang một quyền
+        // riêng, nằm trong nhóm riêng giống thanh điều hướng.
+        var definitions = moduleDefinitions
+            .Concat(SurveyStatisticsPermissions.UnitGroups.SelectMany(group =>
+                SurveyStatisticsPermissions.Pages.Select(page => (
+                    Code: SurveyStatisticsPermissions.UnitCode(group, page),
+                    page.Name,
+                    Description: $"Truy cập module {page.Name.ToLowerInvariant()} của {group.Category.ToLowerInvariant()}",
+                    group.Category))))
+            .ToArray();
 
         // Quyền tab nằm cùng nhóm với module cha để trang phân quyền xếp ngay dưới nó.
         var categoryByCode = definitions.ToDictionary(x => x.Code, x => x.Category, StringComparer.OrdinalIgnoreCase);
@@ -183,6 +195,7 @@ public static class DatabaseSeeder
             (RoleCode: "ADMIN", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "GRADUATION_UPLOAD_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "ACADEMIC_YEARS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "LECTURERS_ACCESS"),
@@ -207,6 +220,7 @@ public static class DatabaseSeeder
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "GRADUATION_UPLOAD_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
+            (RoleCode: "SURVEY_ADMIN", PermissionCode: "ACADEMIC_YEARS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "LECTURERS_ACCESS"),
@@ -232,6 +246,8 @@ public static class DatabaseSeeder
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
+            // Ban Giám hiệu xem được danh sách năm học; thêm / sửa vẫn bị service chặn.
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "ACADEMIC_YEARS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "DEPARTMENTS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "LECTURERS_ACCESS"),
@@ -257,7 +273,15 @@ public static class DatabaseSeeder
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "REPORTS_ACCESS"),
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
-        };
+        }.ToList();
+
+        // Thống kê CTĐT / giảng viên chỉ quản trị toàn trường xem được (service cũng chặn
+        // các vai trò khác), nên chỉ cấp sẵn cho hai vai trò này.
+        foreach (var roleCode in new[] { "ADMIN", "SURVEY_ADMIN" })
+        {
+            definitions.AddRange(SurveyStatisticsPermissions.AllUnitCodes
+                .Select(code => (RoleCode: roleCode, PermissionCode: code)));
+        }
 
         foreach (var definition in definitions)
         {
