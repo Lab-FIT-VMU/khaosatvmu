@@ -47,10 +47,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<GraduationRoundRevisionAggregate> GraduationRoundRevisionAggregates => Set<GraduationRoundRevisionAggregate>();
     public DbSet<CohortMajorGraduation> CohortMajorGraduations => Set<CohortMajorGraduation>();
     public DbSet<ChangeAuditLog> ChangeAuditLogs => Set<ChangeAuditLog>();
+    public DbSet<Student> Students => Set<Student>();
+    public DbSet<GradeImportRevision> GradeImportRevisions => Set<GradeImportRevision>();
+    public DbSet<StudentCourseGrade> StudentCourseGrades => Set<StudentCourseGrade>();
+    public DbSet<GradeAnalysisThreshold> GradeAnalysisThresholds => Set<GradeAnalysisThreshold>();
+    public DbSet<GradeAnalysisRun> GradeAnalysisRuns => Set<GradeAnalysisRun>();
+    public DbSet<GradeAnalysisTermResult> GradeAnalysisTermResults => Set<GradeAnalysisTermResult>();
+    public DbSet<GradeAnalysisCourseResult> GradeAnalysisCourseResults => Set<GradeAnalysisCourseResult>();
+    public DbSet<GradeAnalysisSectionResult> GradeAnalysisSectionResults => Set<GradeAnalysisSectionResult>();
+    public DbSet<GradeAnalysisLecturerCourseResult> GradeAnalysisLecturerCourseResults =>
+        Set<GradeAnalysisLecturerCourseResult>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasSequence<long>("UserProfileCodeSequence");
+        modelBuilder.Entity<Student>().HasQueryFilter(e => !e.IsDeleted);
 
         // Global soft-delete filters — excluded from queries unless .IgnoreQueryFilters() is used
         modelBuilder.Entity<Role>().HasQueryFilter(e => !e.IsDeleted);
@@ -888,6 +899,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .WithMany()
             .HasForeignKey(x => x.ActiveRevisionId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        CourseGradeModelConfiguration.Configure(modelBuilder);
 
         modelBuilder.Entity<ChangeAuditLog>(entity =>
         {

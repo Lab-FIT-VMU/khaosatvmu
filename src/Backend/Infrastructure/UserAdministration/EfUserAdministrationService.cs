@@ -444,11 +444,13 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         [SurveyStatisticsPermissions.CourseCategory] = 1,
         [SurveyStatisticsPermissions.UnitGroups[0].Category] = 2,
         [SurveyStatisticsPermissions.UnitGroups[1].Category] = 3,
-        ["Thống kê tốt nghiệp"] = 4,
-        ["Khảo sát học phần"] = 5,
-        ["Khảo sát chương trình"] = 6,
-        ["Danh mục đào tạo"] = 7,
-        ["Quản trị"] = 8
+        // Cùng thứ tự với thanh điều hướng: "Phân tích điểm học phần" đứng ngay trước "Thống kê tốt nghiệp".
+        ["Phân tích điểm học phần"] = 4,
+        ["Thống kê tốt nghiệp"] = 5,
+        ["Khảo sát học phần"] = 6,
+        ["Khảo sát chương trình"] = 7,
+        ["Danh mục đào tạo"] = 8,
+        ["Quản trị"] = 9
     };
 
     private static int GetCategoryOrder(string category) =>
@@ -463,6 +465,10 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         ["SURVEY_STATISTICS_ACCESS"] = 4,
         ["REPORTS_ACCESS"] = 5,
         ["SURVEY_ANALYSIS_ACCESS"] = 6,
+        // Phân tích điểm học phần
+        ["COURSE_GRADE_UPLOAD_ACCESS"] = 1,
+        ["COURSE_GRADE_THRESHOLDS_ACCESS"] = 2,
+        ["COURSE_GRADE_ANALYSIS_ACCESS"] = 3,
         // Thống kê tốt nghiệp
         ["GRADUATION_UPLOAD_ACCESS"] = 1,
         ["GRADUATION_ANALYTICS_ACCESS"] = 2,

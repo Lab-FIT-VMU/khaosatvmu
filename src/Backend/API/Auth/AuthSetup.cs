@@ -53,6 +53,9 @@ public static class AuthSetup
             AddPermissionPolicy(AuthPolicies.SurveyAnalysisAccess, "SURVEY_ANALYSIS_ACCESS");
             AddPermissionPolicy(AuthPolicies.GraduationAnalyticsAccess, "GRADUATION_ANALYTICS_ACCESS");
             AddPermissionPolicy(AuthPolicies.GraduationUploadAccess, "GRADUATION_UPLOAD_ACCESS");
+            AddPermissionPolicy(AuthPolicies.CourseGradeUploadAccess, "COURSE_GRADE_UPLOAD_ACCESS");
+            AddPermissionPolicy(AuthPolicies.CourseGradeThresholdsAccess, "COURSE_GRADE_THRESHOLDS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.CourseGradeAnalysisAccess, "COURSE_GRADE_ANALYSIS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CohortMajorsAccess, "COHORT_MAJORS_ACCESS");
             AddPermissionPolicy(AuthPolicies.OpenCommentSentimentReview, "OPEN_COMMENT_SENTIMENT_REVIEW");
             AddPermissionPolicy(AuthPolicies.OpenCommentModelAdmin, "OPEN_COMMENT_MODEL_ADMIN");

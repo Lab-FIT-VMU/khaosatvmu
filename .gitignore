@@ -86,9 +86,10 @@ project.fragment.lock.json
 pgdata/
 .pgdata/
 postgres-data/
-# Database export/dump files should not live in the repo
-khaosatvmu_dump.sql
-*_dump.sql
+# Database export/dump files should not live in the repo.
+# Mọi tệp .sql ở đây đều là bản dump (có email giảng viên, sắp tới có cả sinh viên và
+# điểm); lược đồ đã nằm trong EF migrations nên không cần tệp .sql nào trong repo.
+*.sql
 pgadmin-servers.json
 
 # Local source/import workbooks can contain student or lecturer data.

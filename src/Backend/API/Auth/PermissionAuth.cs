@@ -32,6 +32,11 @@ public static class AuthPolicies
     /// <summary>Tải lên và xoá đợt dữ liệu tốt nghiệp — tách khỏi quyền chỉ xem.</summary>
     public const string GraduationUploadAccess = "PERMISSION_GRADUATION_UPLOAD_ACCESS";
     public const string CohortMajorsAccess = "PERMISSION_COHORT_MAJORS_ACCESS";
+    /// <summary>Tải lên, nạp lại, gỡ file điểm học phần — tách khỏi quyền chỉ xem.</summary>
+    public const string CourseGradeUploadAccess = "PERMISSION_COURSE_GRADE_UPLOAD_ACCESS";
+    /// <summary>Sửa ngưỡng của bộ luật D, E. Ai được sửa phương pháp do quyền này quyết định.</summary>
+    public const string CourseGradeThresholdsAccess = "PERMISSION_COURSE_GRADE_THRESHOLDS_ACCESS";
+    public const string CourseGradeAnalysisAccess = "PERMISSION_COURSE_GRADE_ANALYSIS_ACCESS";
     /// <summary>Hiệu chỉnh nhãn cảm xúc do model dự đoán. Không nằm trong nhóm mở module.</summary>
     public const string OpenCommentSentimentReview = "PERMISSION_OPEN_COMMENT_SENTIMENT_REVIEW";
     /// <summary>Xem trạng thái model cảm xúc và chạy lại phân tích.</summary>

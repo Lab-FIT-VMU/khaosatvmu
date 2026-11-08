@@ -19,7 +19,7 @@ services:
     mem_limit: ${DB_MEM_LIMIT:-640m}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-khaosatvmu@123}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?can-i-please-have-a-postgres-password}
       POSTGRES_DB: ${POSTGRES_DB:-khaosatvmu}
     command:
       - "postgres"
@@ -62,7 +62,7 @@ services:
     mem_limit: ${API_MEM_LIMIT:-768m}
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-khaosatvmu};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-khaosatvmu@123}
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-khaosatvmu};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?can-i-please-have-a-postgres-password}
       Authentication__FrontendBaseUrl: ${FRONTEND_BASE_URL:-http://localhost:8080}
       Authentication__Google__ClientId: ${GOOGLE_CLIENT_ID:?can-i-please-have-a-google-client-id}
       Authentication__Google__ClientSecret: ${GOOGLE_CLIENT_SECRET:?can-i-please-have-a-google-client-secret}
@@ -127,7 +127,7 @@ services:
     mem_limit: ${SENTIMENT_MEM_LIMIT:-1536m}
     environment:
       DOTNET_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
-      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-khaosatvmu};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-khaosatvmu@123}
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-khaosatvmu};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?can-i-please-have-a-postgres-password}
       # Model nằm ngoài ảnh, gắn chỉ đọc: ảnh không phình thêm 515 MB và mỗi lần lên model mới
       # chỉ việc thay thư mục, không phải dựng lại ảnh.
       OpenCommentSentiment__ModelDirectory: /models

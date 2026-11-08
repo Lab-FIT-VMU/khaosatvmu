@@ -1033,6 +1033,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<CourseSectionImportDto>(CatalogErrorCodes.SemesterNotFound);
         }
 
+        // Bộ luật B-N4: chuẩn hóa văn bản một lần ở đầu vào (NFC, Ð → Đ, gộp khoảng trắng),
+        // để hai bước bên dưới và phân tích điểm đọc cùng một chuỗi.
+        rows = rows.Select(NormalizeImportRow).ToList();
+
         // Các map tra ngược. Học phần và giảng viên được tạo giữa chừng cũng ghi
         // vào đây để dòng sau dùng lại, tránh tạo trùng trong cùng một tệp.
         var courseIdByCode = new Dictionary<string, int>();
@@ -1113,32 +1117,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 continue;
             }
 
-            // Bộ môn: ưu tiên cột "Mã BM", trống thì mới tra theo tên.
-            int? departmentId = null;
-            var departmentCode = row.DepartmentCode?.Trim() ?? string.Empty;
-            var departmentName = row.DepartmentName?.Trim() ?? string.Empty;
-            if (departmentCode.Length > 0)
+            var (departmentId, departmentError) = ResolveImportDepartment(row, departmentNameById, departmentIdByName);
+            if (departmentError is not null)
             {
-                if (!int.TryParse(departmentCode, out var parsedDepartmentId) || parsedDepartmentId <= 0)
-                {
-                    itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.DepartmentCodeInvalid);
-                    continue;
-                }
-                if (!departmentNameById.ContainsKey(parsedDepartmentId))
-                {
-                    itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.DepartmentNotFound);
-                    continue;
-                }
-                departmentId = parsedDepartmentId;
-            }
-            else if (departmentName.Length > 0)
-            {
-                if (!departmentIdByName.TryGet(departmentName, out var foundDepartment))
-                {
-                    itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.DepartmentNotFound);
-                    continue;
-                }
-                departmentId = foundDepartment;
+                itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, departmentError);
+                continue;
             }
 
             int? facultyId = null;
@@ -1247,17 +1230,9 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             var classSizeText = row.ClassSize?.Trim() ?? string.Empty;
             int.TryParse(classSizeText, out var classSize);
 
-            int? departmentId = null;
-            var departmentCode = row.DepartmentCode?.Trim() ?? string.Empty;
+            // Dòng tới được đây đã qua bước 1, nên bộ môn luôn tra được (hoặc để trống).
+            var departmentId = ResolveImportDepartment(row, departmentNameById, departmentIdByName).DepartmentId;
             var departmentName = row.DepartmentName?.Trim() ?? string.Empty;
-            if (departmentCode.Length > 0 && int.TryParse(departmentCode, out var parsedDepartmentId))
-            {
-                departmentId = parsedDepartmentId;
-            }
-            else if (departmentName.Length > 0 && departmentIdByName.TryGet(departmentName, out var foundDept))
-            {
-                departmentId = foundDept;
-            }
 
             var facultyName = row.FacultyName?.Trim() ?? string.Empty;
 
@@ -2216,6 +2191,77 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
     // ------------------------------------------------------------------ Helpers
 
     private static string NormalizeKey(string value) => value.Trim().ToLowerInvariant();
+
+    private static ImportCourseSectionRowCommand NormalizeImportRow(ImportCourseSectionRowCommand row) => row with
+    {
+        CourseCode = CourseSectionImportRules.NormalizeText(row.CourseCode)?.ToUpperInvariant() ?? string.Empty,
+        CourseName = CourseSectionImportRules.NormalizeText(row.CourseName),
+        SectionName = CourseSectionImportRules.NormalizeText(row.SectionName) ?? string.Empty,
+        DepartmentName = CourseSectionImportRules.NormalizeText(row.DepartmentName),
+        DepartmentCode = CourseSectionImportRules.NormalizeText(row.DepartmentCode),
+        FacultyName = CourseSectionImportRules.NormalizeText(row.FacultyName),
+        LecturerFullName = CourseSectionImportRules.NormalizeText(row.LecturerFullName),
+        LecturerEmail = CourseSectionImportRules.NormalizeText(row.LecturerEmail),
+    };
+
+    /// <summary>
+    /// Bộ môn của một dòng file lớp, theo thứ tự của bộ luật B-T1:
+    /// <list type="number">
+    /// <item>Mã học phần 121… luôn thuộc bộ môn 122 (khi bộ môn 122 có trong danh mục).</item>
+    /// <item>Cột "Mã BM", sau khi gộp 194/195 → 191.</item>
+    /// <item>Cột "Bộ môn" (tên), khi "Mã BM" trống.</item>
+    /// <item>Cả hai trống hoặc ghi lỗi công thức (#N/A): suy từ 3 chữ số đầu mã học phần;
+    /// suy không ra bộ môn có trong danh mục thì để trống như trước.</item>
+    /// </list>
+    /// </summary>
+    private static (int? DepartmentId, string? ErrorCode) ResolveImportDepartment(
+        ImportCourseSectionRowCommand row,
+        IReadOnlyDictionary<int, string> departmentNameById,
+        NameLookup departmentIdByName)
+    {
+        var courseCode = row.CourseCode?.Trim() ?? string.Empty;
+        if (CourseSectionImportRules.ForcedDepartmentFor(courseCode) is { } forced
+            && departmentNameById.ContainsKey(forced))
+        {
+            return (forced, null);
+        }
+
+        var departmentCode = row.DepartmentCode?.Trim() ?? string.Empty;
+        var departmentName = row.DepartmentName?.Trim() ?? string.Empty;
+        if (CourseSectionImportRules.IsSpreadsheetError(departmentCode))
+        {
+            departmentCode = string.Empty;
+        }
+        if (CourseSectionImportRules.IsSpreadsheetError(departmentName))
+        {
+            departmentName = string.Empty;
+        }
+
+        if (departmentCode.Length > 0)
+        {
+            if (!int.TryParse(departmentCode, out var parsed) || parsed <= 0)
+            {
+                return (null, CatalogErrorCodes.DepartmentCodeInvalid);
+            }
+
+            var merged = CourseSectionImportRules.ApplyDepartmentMerge(parsed);
+            return departmentNameById.ContainsKey(merged)
+                ? (merged, null)
+                : (null, CatalogErrorCodes.DepartmentNotFound);
+        }
+
+        if (departmentName.Length > 0)
+        {
+            return departmentIdByName.TryGet(departmentName, out var byName)
+                ? (byName, null)
+                : (null, CatalogErrorCodes.DepartmentNotFound);
+        }
+
+        return CourseSectionImportRules.DeriveDepartmentFromCourseCode(courseCode) is { } derived
+            && departmentNameById.ContainsKey(derived)
+                ? (derived, null)
+                : (null, null);
+    }
 
     private static string NormalizeMajorCode(string? value)
     {

@@ -16,6 +16,7 @@ public static class DatabaseSeeder
         var permissions = await EnsurePermissionsAsync(db, cancellationToken);
         await EnsureRolePermissionsAsync(db, roles, permissions, cancellationToken);
         await CatalogImportAliasSeeder.SeedAsync(db, cancellationToken);
+        await Infrastructure.CourseGrades.GradeAnalysisThresholdSeeder.SeedAsync(db, cancellationToken);
         if (includeDevelopmentData)
         {
             await EnsureDevUserAsync(db, roles, cancellationToken);
@@ -100,6 +101,11 @@ public static class DatabaseSeeder
             (Code: "SURVEY_ANALYSIS_ACCESS",      Name: "Phân tích chuyên sâu",              Description: "Truy cập module phân tích chuyên sâu",                 Category: "Thống kê khảo sát học phần"),
             (Code: "GRADUATION_UPLOAD_ACCESS",    Name: "Tải lên dữ liệu",                   Description: "Tải lên và xoá đợt dữ liệu tốt nghiệp",                Category: "Thống kê tốt nghiệp"),
             (Code: "GRADUATION_ANALYTICS_ACCESS", Name: "Thống kê chi tiết",                 Description: "Xem thống kê sinh viên tốt nghiệp",                    Category: "Thống kê tốt nghiệp"),
+            // Phân tích điểm học phần: tải lên và ngưỡng tách khỏi quyền xem như module tốt
+            // nghiệp. Ai được sửa phương pháp (ngưỡng bộ luật D, E) do quyền thứ hai quyết định.
+            (Code: "COURSE_GRADE_UPLOAD_ACCESS",     Name: "Tải lên dữ liệu điểm",        Description: "Tải lên, nạp lại và gỡ file điểm học phần theo học kỳ", Category: "Phân tích điểm học phần"),
+            (Code: "COURSE_GRADE_THRESHOLDS_ACCESS", Name: "Ngưỡng phân tích",            Description: "Sửa và khôi phục ngưỡng phân tích điểm học phần",       Category: "Phân tích điểm học phần"),
+            (Code: "COURSE_GRADE_ANALYSIS_ACCESS",   Name: "Báo cáo phân tích",           Description: "Xem báo cáo phân tích điểm học phần",                   Category: "Phân tích điểm học phần"),
             (Code: "ACADEMIC_YEARS_ACCESS",       Name: "Năm học & học kỳ",                  Description: "Truy cập module quản lý năm học và học kỳ",            Category: "Danh mục đào tạo"),
             (Code: "FACULTIES_ACCESS",            Name: "Khoa / Viện",                       Description: "Truy cập module quản lý khoa và viện",                  Category: "Danh mục đào tạo"),
             (Code: "DEPARTMENTS_ACCESS",          Name: "Bộ môn",                            Description: "Truy cập module quản lý bộ môn",                        Category: "Danh mục đào tạo"),
@@ -195,6 +201,9 @@ public static class DatabaseSeeder
             (RoleCode: "ADMIN", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "GRADUATION_UPLOAD_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "COURSE_GRADE_UPLOAD_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "COURSE_GRADE_THRESHOLDS_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "COURSE_GRADE_ANALYSIS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "ACADEMIC_YEARS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),
@@ -220,6 +229,9 @@ public static class DatabaseSeeder
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "GRADUATION_UPLOAD_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
+            (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_GRADE_UPLOAD_ACCESS"),
+            (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_GRADE_THRESHOLDS_ACCESS"),
+            (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_GRADE_ANALYSIS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "ACADEMIC_YEARS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),
@@ -246,6 +258,8 @@ public static class DatabaseSeeder
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
+            // Báo cáo cấp Ban giám hiệu: server cắt tên giảng viên và mã lớp (quy tắc R1).
+            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COURSE_GRADE_ANALYSIS_ACCESS"),
             // Ban Giám hiệu xem được danh sách năm học; thêm / sửa vẫn bị service chặn.
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "ACADEMIC_YEARS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "FACULTIES_ACCESS"),
@@ -266,6 +280,8 @@ public static class DatabaseSeeder
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "REPORTS_ACCESS"),
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
+            // Báo cáo cấp bộ môn, lọc theo UserScope.
+            (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "COURSE_GRADE_ANALYSIS_ACCESS"),
 
             // FACULTY_MANAGER: cùng bộ module với trưởng bộ môn, khác ở phạm vi dữ liệu.
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "PROGRESS_ACCESS"),
@@ -273,6 +289,8 @@ public static class DatabaseSeeder
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "REPORTS_ACCESS"),
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "FACULTY_MANAGER", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
+            // Báo cáo cấp khoa, lọc theo UserScope.
+            (RoleCode: "FACULTY_MANAGER", PermissionCode: "COURSE_GRADE_ANALYSIS_ACCESS"),
         }.ToList();
 
         // Thống kê CTĐT / giảng viên chỉ quản trị toàn trường xem được (service cũng chặn
