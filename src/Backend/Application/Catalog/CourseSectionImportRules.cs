@@ -70,6 +70,24 @@ public static partial class CourseSectionImportRules
         return ApplyDepartmentMerge(prefix);
     }
 
+    /// <summary>
+    /// Luật loại lớp B-L1–B-L4 của bộ luật B, áp ở bước phân tích điểm chứ không ở bước import
+    /// (khảo sát vẫn cần đủ mọi lớp). Đồng bộ với L4, L5, L6, L8 của bộ luật A.
+    /// </summary>
+    public static string? AnalysisExclusionReason(string courseCode, string? courseName)
+    {
+        var code = courseCode.Trim().ToUpperInvariant();
+        if (code.StartsWith("24", StringComparison.Ordinal)) return "B-L1";
+        if (PhysicalEducationCode().IsMatch(code)) return "B-L2";
+        var lower = (NormalizeText(courseName) ?? string.Empty).ToLowerInvariant();
+        if (lower.Contains("thực tập", StringComparison.Ordinal) || lower.Contains("tốt nghiệp", StringComparison.Ordinal)) return "B-L3";
+        if (code.StartsWith("179", StringComparison.Ordinal)) return "B-L4";
+        return null;
+    }
+
     [GeneratedRegex(@"\s+")]
     private static partial Regex Whitespace();
+
+    [GeneratedRegex(@"^27\d{3}$")]
+    private static partial Regex PhysicalEducationCode();
 }

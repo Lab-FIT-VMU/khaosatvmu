@@ -1,6 +1,7 @@
 ﻿using API.Auth;
 using API.Catalog;
 using API.Cohorts;
+using API.CourseGrades;
 using API.GraduationAnalytics2;
 using API.Middleware;
 using API.Reports;
@@ -161,6 +162,15 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     Application.GraduationAnalytics2.IGraduationAnalyticsV3Service,
     Infrastructure.GraduationAnalytics2.EfGraduationAnalyticsV3Service>();
+// Phân tích điểm học phần: khóa mã hóa điểm nằm ở mục "CourseGrades" (Docker secret khi triển khai).
+builder.Services.Configure<Infrastructure.CourseGrades.CourseGradeEncryptionOptions>(
+    builder.Configuration.GetSection(Infrastructure.CourseGrades.CourseGradeEncryptionOptions.SectionName));
+builder.Services.AddSingleton<
+    Application.CourseGrades.IGradeCipher,
+    Infrastructure.CourseGrades.AesGcmGradeCipher>();
+builder.Services.AddScoped<
+    Application.CourseGrades.ICourseGradeImportService,
+    Infrastructure.CourseGrades.EfCourseGradeImportService>();
 builder.Services.AddScoped<ApplicationCookieEvents>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
@@ -201,6 +211,7 @@ app.MapCohortEndpoints();
 app.MapSurveyEndpoints();
 app.MapReportEndpoints();
 app.MapGraduationAnalytics2Endpoints();
+app.MapCourseGradeEndpoints();
 
 app.MapHealthChecks("/healthz");
 app.MapHealthChecks("/api/health");

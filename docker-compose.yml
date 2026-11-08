@@ -75,6 +75,9 @@ services:
       # Ảnh của phiếu khảo sát lưu ra đĩa, không vào cơ sở dữ liệu. Phải trỏ vào ổ gắn
       # ngoài, để dựng lại container không mất logo và ảnh bìa của các đợt đã tạo.
       SurveyFormAssets__Path: /app/App_Data/survey-form-assets
+      # Khóa mã hóa điểm học phần (xem .env.example). Để trống thì chỉ chức năng nạp điểm
+      # báo lỗi 503; mất khóa là mất toàn bộ điểm, nên phải cất bản sao ngoại tuyến.
+      CourseGrades__EncryptionKeys__1: ${COURSE_GRADE_ENCRYPTION_KEY:-}
     expose:
       - "8080"
     volumes:

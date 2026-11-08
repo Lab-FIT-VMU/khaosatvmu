@@ -1053,6 +1053,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
 
         var departmentNameById = await db.Departments
             .ToDictionaryAsync(x => x.DepartmentId, x => x.DepartmentName, cancellationToken);
+        var departmentFacultyById = await db.Departments
+            .ToDictionaryAsync(x => x.DepartmentId, x => x.FacultyId, cancellationToken);
         var departmentIdByName = await LoadDepartmentIdByNameAsync(cancellationToken);
         var facultyIdByName = await LoadFacultyIdByNameAsync(cancellationToken);
 
@@ -1124,16 +1126,29 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 continue;
             }
 
+            // Khoa: tên trong file khớp danh mục thì dùng như trước. File lớp thật ghi tên viết
+            // tắt ("Hàng hải", "Điện- ĐTTB") còn danh mục ghi đủ ("Khoa Hàng hải"), nên khi tên
+            // không khớp mà đã biết bộ môn thì lấy khoa của bộ môn (bộ luật B-T1: khoa suy từ bộ
+            // môn), thay vì bỏ cả dòng. Chỉ báo lỗi khi không suy được từ đâu.
             int? facultyId = null;
             var facultyName = row.FacultyName?.Trim() ?? string.Empty;
-            if (facultyName.Length > 0)
+            if (CourseSectionImportRules.IsSpreadsheetError(facultyName))
             {
-                if (!facultyIdByName.TryGet(facultyName, out var foundFaculty))
-                {
-                    itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.FacultyNotFound);
-                    continue;
-                }
+                facultyName = string.Empty;
+            }
+            if (facultyName.Length > 0 && facultyIdByName.TryGet(facultyName, out var foundFaculty))
+            {
                 facultyId = foundFaculty;
+            }
+            else if (departmentId is { } resolvedDepartment
+                && departmentFacultyById.GetValueOrDefault(resolvedDepartment) is { } departmentFaculty)
+            {
+                facultyId = departmentFaculty;
+            }
+            else if (facultyName.Length > 0)
+            {
+                itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.FacultyNotFound);
+                continue;
             }
 
             var courseKey = NormalizeKey(courseCode);
