@@ -1,0 +1,154 @@
+{
+  "_ghi_chu": "Bộ luật E – mẫu câu nhận xét của Hồ sơ một lớp (xem BO_LUAT_E_GOI_Y_DOC_HO_SO_LOP.md). Điều kiện viết bằng biểu thức đơn giản (and, or, not, so sánh, + - * /, co(x) = x có giá trị, abs(x)). Chỗ trống {ten} hoặc {ten|dinh_dang}; định dạng: so1, so2, abs2, dau2, pct, pct0, nguyen. **...** là chữ đậm. Ngưỡng lấy từ tham_so_chi_so.json (nhóm goi_y_ho_so và các nhóm của bộ luật D).",
+  "phien_ban": 1,
+
+  "ten_canh_bao": {
+    "H1": "Điểm quá trình chênh lệch giữa các lớp",
+    "H2": "Điểm thi chênh lệch giữa các lớp",
+    "H3": "Điểm quá trình ít phản ánh điểm thi",
+    "H4": "Tỷ lệ mất tư cách không đồng đều giữa các lớp",
+    "H5": "Tỷ lệ trượt do điểm thi cao",
+    "H6": "Điểm thi thay đổi so với lần mở gần nhất"
+  },
+  "ten_on_dinh": {
+    "O1": ["Điểm quá trình đồng đều giữa các lớp", "Khoảng tin cậy cho thấy mức chênh lệch điểm quá trình giữa các lớp nằm dưới ngưỡng lưu ý (ngược với “Điểm quá trình chênh lệch giữa các lớp”).", "H1"],
+    "O2": ["Điểm thi đồng đều giữa các lớp", "Khoảng tin cậy cho thấy mức chênh lệch điểm thi giữa các lớp nằm dưới ngưỡng lưu ý (ngược với “Điểm thi chênh lệch giữa các lớp”).", "H2"],
+    "O3": ["Điểm quá trình khớp tốt với điểm thi", "Hệ số tương quan giữa điểm quá trình và điểm thi của cả học phần từ {d3_r_hp} trở lên, cận dưới khoảng tin cậy không thấp hơn ngưỡng lưu ý (ngược với “Điểm quá trình ít phản ánh điểm thi”).", "H3"],
+    "O4": ["Tỷ lệ mất tư cách đồng đều giữa các lớp", "Khoảng tin cậy cho thấy chênh lệch tỷ lệ mất tư cách giữa các lớp nằm dưới ngưỡng lưu ý.", "H4"],
+    "O5": ["Tỷ lệ trượt do điểm thi ở mức thông thường", "Khoảng tin cậy cho thấy tỷ lệ trượt do điểm thi của học phần nằm dưới ngưỡng lưu ý, và tỷ lệ này không cao hơn rõ so với các kỳ trước của chính học phần.", "H5"],
+    "O6": ["Điểm thi ổn định so với lần mở gần nhất", "Khoảng tin cậy cho thấy mức thay đổi điểm thi trung bình so với học kỳ gần nhất có mở học phần (có thể cách 6 tháng, 12 tháng hoặc hơn) nằm dưới ngưỡng lưu ý.", "H6"]
+  },
+  "chua_du_du_lieu": {
+    "O1": "Điểm quá trình giữa các lớp: chưa đủ căn cứ để kết luận",
+    "O2": "Điểm thi giữa các lớp: chưa đủ căn cứ để kết luận",
+    "O3": "Mức khớp giữa điểm quá trình và điểm thi: chưa đủ căn cứ để kết luận",
+    "O4": "Tỷ lệ mất tư cách giữa các lớp: chưa đủ căn cứ để kết luận",
+    "O5": "Tỷ lệ trượt do điểm thi: chưa đủ căn cứ để kết luận",
+    "O6": "Thay đổi điểm thi so với lần mở gần nhất: chưa đủ căn cứ để kết luận",
+    "mo_ta": "Học phần so sánh được và chưa có điểm lưu ý, nhưng khoảng tin cậy chưa đủ hẹp để ghi trạng thái ổn định, hoặc chỉ số nằm giữa hai ngưỡng."
+  },
+  "nhan_ngan_canh_bao": {
+    "H1": "Chênh điểm quá trình", "H2": "Chênh điểm thi", "H3": "Khớp X–Y thấp",
+    "H4": "Mất tư cách không đồng đều", "H5": "Tỷ lệ F cao"
+  },
+  "ten_dau_hieu": {
+    "D1": ["Điểm quá trình cao hơn mức kỳ vọng", "Ở cùng mức điểm thi, sinh viên của lớp có điểm quá trình cao hơn sinh viên các lớp khác."],
+    "D2": ["Điểm quá trình thấp hơn mức kỳ vọng", "Ở cùng mức điểm thi, sinh viên của lớp có điểm quá trình thấp hơn sinh viên các lớp khác."],
+    "D3": ["Điểm quá trình ít phản ánh điểm thi", "Trong lớp, điểm quá trình và điểm thi có tương quan rất thấp, trong khi trên toàn học phần hai loại điểm này tương quan rõ."],
+    "D4": ["Phân bố điểm quá trình khác các lớp còn lại", "Hình dạng phân bố điểm quá trình của lớp khác hẳn các lớp còn lại của học phần. Đặc điểm này chưa xét đến điểm thi nên cần đọc cùng mức điểm quá trình so với kỳ vọng."],
+    "D5": ["Tỷ lệ mất tư cách cao hơn hẳn các lớp khác", "Lớp có tỷ lệ mất tư cách dự thi cao hơn hẳn các lớp còn lại."],
+    "D6": ["Điểm thi cao hơn mức kỳ vọng", "Sinh viên của lớp đạt điểm thi cao hơn mức dự đoán từ năng lực chung. Cách tổ chức dạy học của lớp có thể là kinh nghiệm để chia sẻ."],
+    "D7": ["Điểm thi thấp hơn mức kỳ vọng", "Sinh viên của lớp đạt điểm thi thấp hơn mức dự đoán từ năng lực chung."]
+  },
+
+  "gop_phan": {
+    "H1": { "loai": "lech", "chi_so": "i7", "q": "i7_q", "ten_diem": "điểm quá trình",
+            "mau": "{ten_diem} {chieu} kỳ vọng {gia_tri|abs2} điểm, có ý nghĩa thống kê",
+            "mau_lon_nhat": "chênh nhiều nhất: {ten_diem} {chieu} kỳ vọng {gia_tri|abs2} điểm",
+            "ghi_khong_co": "Không lớp nào chênh có ý nghĩa thống kê khi xét riêng; độ tản mát đến từ nhiều lớp cộng lại." },
+    "H2": { "loai": "lech", "chi_so": "i8", "q": "i8_q", "ten_diem": "điểm thi",
+            "mau": "{ten_diem} {chieu} kỳ vọng {gia_tri|abs2} điểm, có ý nghĩa thống kê",
+            "mau_lon_nhat": "chênh nhiều nhất: {ten_diem} {chieu} kỳ vọng {gia_tri|abs2} điểm",
+            "ghi_khong_co": "Không lớp nào chênh có ý nghĩa thống kê khi xét riêng; độ tản mát đến từ nhiều lớp cộng lại." },
+    "H3": { "loai": "duoi_nguong", "chi_so": "r", "nguong": "h3_r_hp",
+            "mau": "mức khớp X–Y {gia_tri|so2} (dưới {nguong|so2})",
+            "mau_lon_nhat": "mức khớp X–Y thấp nhất: {gia_tri|so2}" },
+    "H4": { "loai": "cao_hon_khac", "chi_so": "i1", "so_sanh": "i1_khac", "q": "fisher_q",
+            "mau": "tỷ lệ mất tư cách {gia_tri|pct}% (các lớp khác {so_sanh|pct}%), có ý nghĩa thống kê",
+            "mau_lon_nhat": "cao nhất: tỷ lệ mất tư cách {gia_tri|pct}% (các lớp khác {so_sanh|pct}%)" },
+    "H5": { "loai": "tren_muc_hp", "chi_so": "i2", "muc_hp": "hp_i2",
+            "mau": "tỷ lệ F do điểm thi {gia_tri|pct}% (cả học phần {muc_hp|pct}%)" },
+    "H6": { "loai": "ca_hoc_phan",
+            "ghi": "Điểm lưu ý này so sánh cả học phần với {hp_ky_truoc} (điểm thi trung bình {hp_y_tb|so2}, kỳ đó {hp_y_tb_truoc|so2}); không gắn với lớp cụ thể.",
+            "ghi_khong_so": "Điểm lưu ý này so sánh cả học phần với học kỳ gần nhất có mở học phần; không gắn với lớp cụ thể." }
+  },
+  "chieu": { "duong": "cao hơn", "am": "thấp hơn" },
+
+  "tieu_de_buoc": [
+    "Lớp liên quan thế nào đến điểm lưu ý của học phần?",
+    "Số liệu của lớp so với cả học phần",
+    "Giảng viên qua các học kỳ",
+    "Câu hỏi gợi ý để trao đổi"
+  ],
+
+  "buoc1": {
+    "gop_phan": "Liên quan đến điểm lưu ý **“{ten_canh_bao}”**: {mo_ta}.",
+    "dau_hieu": "Đặc điểm lớp **“{ten_dau_hieu}”**: {mo_ta_dau_hieu}",
+    "khong_co": "Lớp không liên quan nổi bật đến điểm lưu ý nào của học phần và không có đặc điểm lớp.",
+    "ghi_hai_he": "Học phần có cả lớp đại trà và lớp chất lượng cao. Số điểm thành phần của hai hệ có thể khác nhau, nên tỷ lệ mất tư cách và phân bố điểm quá trình cần đọc có tính đến điều này."
+  },
+
+  "buoc2": {
+    "chi_so": [
+      { "ten": "Số sinh viên đủ tư cách dự thi", "lop": "n_p", "hp": null, "dinh_dang": "nguyen", "kem_lop": " / sĩ số {si_so}",
+        "nhan_xet": [ { "dieu_kien": "tct", "mau": "Ít sinh viên – đọc thận trọng (dưới {so_sv_tin_cay_thap} sinh viên)" } ] },
+      { "ten": "Tỷ lệ mất tư cách dự thi", "lop": "i1", "hp": "hp_i1", "dinh_dang": "pct", "don_vi": "%", "nhan_xet": "chung" },
+      { "ten": "Tỷ lệ trượt do điểm thi (điểm F do Y)", "lop": "i2", "hp": "hp_i2", "dinh_dang": "pct", "don_vi": "%", "nhan_xet": "chung" },
+      { "ten": "Điểm quá trình X trung bình", "lop": "x_tb", "hp": "hp_x_tb", "dinh_dang": "so1", "nhan_xet": "chung" },
+      { "ten": "Điểm thi Y trung bình", "lop": "y_tb", "hp": "hp_y_tb", "dinh_dang": "so1", "nhan_xet": "chung" },
+      { "ten": "Độ chênh lệch X − Y", "lop": "i5", "hp": "hp_x_tru_y", "dinh_dang": "dau2", "nhan_xet": "chung" },
+      { "ten": "Mức khớp X–Y", "lop": "r", "hp": "hp_r", "dinh_dang": "so2",
+        "nhan_xet": [ { "dieu_kien": "co(gia_tri) and gia_tri < h3_r_hp", "mau": "thấp (dưới {h3_r_hp|so2})" }, "chung" ] },
+      { "ten": "Điểm quá trình so với kỳ vọng", "lop": "i7", "hp": "MOC_0", "dinh_dang": "dau2", "don_vi": " điểm",
+        "nhan_xet": [ { "dieu_kien": "co(gia_tri) and co(i7_q) and i7_q < fdr_q", "mau": "có ý nghĩa thống kê" },
+                      { "dieu_kien": "co(gia_tri)", "mau": "chưa có ý nghĩa thống kê" } ] },
+      { "ten": "Điểm thi so với kỳ vọng", "lop": "i8", "hp": "MOC_0", "dinh_dang": "dau2", "don_vi": " điểm",
+        "nhan_xet": [ { "dieu_kien": "co(gia_tri) and co(i8_q) and i8_q < fdr_q", "mau": "có ý nghĩa thống kê" },
+                      { "dieu_kien": "co(gia_tri)", "mau": "chưa có ý nghĩa thống kê" } ] }
+    ],
+    "nhan_xet_chung": [
+      { "dieu_kien": "so_lop >= 3 and la_cao_nhat", "mau": "cao nhất học phần" },
+      { "dieu_kien": "so_lop >= 3 and la_thap_nhat", "mau": "thấp nhất học phần" }
+    ],
+    "moc_0": "0 (mốc)"
+  },
+
+  "buoc3": {
+    "mo_dau": "Giảng viên của lớp dạy học phần này ở {so_ky} học kỳ (tính đến {ky_hien_tai}). Mức điểm quá trình so với kỳ vọng (trung bình các lớp của giảng viên trong mỗi kỳ) {xu_huong}.",
+    "ky_duong": "dương ở {so_ky_duong}/{so_ky} học kỳ", "ky_am": "âm ở {so_ky_am}/{so_ky} học kỳ", "ky_gan_0": "gần 0 ở {so_ky_gan_0}/{so_ky} học kỳ",
+    "xu_huong": [
+      { "dieu_kien": "so_ky < 2", "mau": "mới có 1 học kỳ, chưa xác định được xu hướng" },
+      { "dieu_kien": "so_ky_duong == 0 and so_ky_am == 0", "mau": "gần 0 ở cả {so_ky} học kỳ (trong khoảng ±{vung_gan_0|so2} điểm)" },
+      { "dieu_kien": "cung_chieu and ky_tb > 0", "mau": "{cac_ky}; trung bình các kỳ {ky_tb|dau2} điểm (khoảng tin cậy từ {ky_lo|dau2} đến {ky_hi|dau2}) – có xu hướng **cao hơn** mức kỳ vọng qua các kỳ" },
+      { "dieu_kien": "cung_chieu and ky_tb < 0", "mau": "{cac_ky}; trung bình các kỳ {ky_tb|dau2} điểm (khoảng tin cậy từ {ky_lo|dau2} đến {ky_hi|dau2}) – có xu hướng **thấp hơn** mức kỳ vọng qua các kỳ" },
+      { "dieu_kien": "1", "mau": "{cac_ky} – chưa đủ căn cứ để nói về xu hướng" }
+    ],
+    "dau_hieu_da_co": "Đặc điểm lớp đã xuất hiện: {ds_dau_hieu}.",
+    "mot_dau_hieu": "“{ten_dau_hieu}” ở {ds_ky}",
+    "khong_dau_hieu": "Chưa có đặc điểm lớp nào ở học phần này qua các kỳ.",
+    "lap_lai": "**Lặp lại qua nhiều học kỳ** (trong {g1_cua_so_ky} kỳ gần nhất, từ {g1_so_ky_lap} học kỳ trở lên và chiếm từ {g1_ty_le_ky|pct0}% số kỳ dạy học phần): {ds_lap}.",
+    "mot_lap_dang": "“{ten_dau_hieu}” đang tiếp diễn ở kỳ này",
+    "mot_lap_truoc": "“{ten_dau_hieu}” đã ghi nhận trước đây, không xuất hiện ở kỳ này",
+    "chua_lap_lai": "Chưa lặp lại qua nhiều học kỳ.",
+    "lop_cung_gv": "Trong học kỳ này, giảng viên còn dạy {so_lop} lớp khác của học phần: {ds_lop}.",
+    "mot_lop": "{nhom} (điểm quá trình so với kỳ vọng {i7|dau2}{kem_y_nghia})",
+    "kem_y_nghia": ", có ý nghĩa thống kê",
+    "khong_du_lieu": "Chưa có dữ liệu của giảng viên ở học phần này qua các kỳ."
+  },
+
+  "buoc4": {
+    "cau_hoi": [
+      { "ma": "Q1", "dieu_kien": "co(i7) and co(i7_q) and i7_q < fdr_q and i7 > 0",
+        "mau": "Tiêu chí, thang điểm chấm điểm quá trình của lớp có rộng hơn chuẩn chung của bộ môn không? Bài kiểm tra quá trình đánh giá những nội dung nào mà đề thi không kiểm tra?" },
+      { "ma": "Q2", "dieu_kien": "co(i7) and co(i7_q) and i7_q < fdr_q and i7 < 0",
+        "mau": "Tiêu chí chấm điểm quá trình của lớp có chặt hơn chuẩn chung không? Sinh viên có bị thiệt so với các lớp khác cùng học phần không?" },
+      { "ma": "Q3", "dieu_kien": "co(i8) and co(i8_q) and i8_q < fdr_q and i8 < 0",
+        "mau": "Vì sao sinh viên của lớp thi thấp hơn mức dự đoán từ năng lực chung: nội dung giảng dạy có bám sát đề cương, sinh viên có được ôn tập theo cấu trúc đề chung không?" },
+      { "ma": "Q4", "dieu_kien": "co(i8) and co(i8_q) and i8_q < fdr_q and i8 > 0",
+        "mau": "Lớp có cách dạy hoặc cách ôn tập nào giúp sinh viên thi tốt hơn mức dự đoán, có thể chia sẻ cho các lớp khác?" },
+      { "ma": "Q5", "dieu_kien": "co(r_hi) and r_hi < h3_r_hp",
+        "mau": "Điểm quá trình của lớp đang phản ánh điều gì (chuyên cần, nộp bài, thái độ…) nếu nó gần như không liên quan đến kết quả thi?" },
+      { "ma": "Q6", "dieu_kien": "co(i1) and co(i1_khac) and i1 - i1_khac >= d5_chenh_mat_tu_cach * ty_le_nguong_d5",
+        "mau": "Nguyên nhân sinh viên mất tư cách ở lớp này (vắng học, điểm thành phần dưới 4…)? Lớp có nhắc sớm sinh viên trước khi mất tư cách không?" },
+      { "ma": "Q7", "dieu_kien": "co(i2) and co(hp_i2) and i2 > hp_i2 * he_so_ty_le_f and i2 > ty_le_f_toi_thieu",
+        "mau": "Sinh viên trượt do điểm thi tập trung ở những nội dung nào của đề? Có cần hỗ trợ thêm trước kỳ thi không?" },
+      { "ma": "Q8", "dieu_kien": "gv_cung_chieu",
+        "mau": "Mức điểm quá trình so với kỳ vọng có xu hướng cùng một chiều qua nhiều học kỳ: bộ môn có cần trao đổi lại rubric và chấm chéo bài mẫu giữa các giảng viên không?" },
+      { "ma": "Q9", "dieu_kien": "tct",
+        "mau": "Lớp có ít sinh viên nên chỉ số dễ dao động: nên xem thêm số liệu các học kỳ khác trước khi trao đổi." }
+    ],
+    "cau_cuoi_co": { "ma": "Q10", "mau": "Lớp có đặc thù nào (đối tượng sinh viên, lịch học, hình thức kiểm tra, sự cố khi thi) giải thích được các khác biệt trên không?" },
+    "cau_cuoi_khong": { "ma": "Q11", "mau": "Chưa thấy khác biệt nổi bật so với các lớp khác cùng học phần. Điều này chưa khẳng định lớp có cùng chuẩn đánh giá, nhất là khi học phần có ít lớp." },
+    "luu_y": "Các câu hỏi chỉ để gợi ý nội dung trao đổi chuyên môn trong bộ môn, không phải kết luận và không dùng để đánh giá giảng viên."
+  }
+}

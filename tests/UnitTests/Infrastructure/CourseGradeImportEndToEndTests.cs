@@ -29,7 +29,12 @@ using Xunit.Abstractions;
 /// </summary>
 public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
 {
-    private static readonly string TestKey = Convert.ToBase64String(Enumerable.Range(7, 32).Select(i => (byte)i).ToArray());
+    // Ghi đè được bằng COURSE_GRADE_E2E_KEY để dữ liệu nạp ra dùng chung khóa với API/worker
+    // đang chạy trên cùng CSDL thử (ví dụ khóa dev trong appsettings.Development.json).
+    private static readonly string TestKey =
+        Environment.GetEnvironmentVariable("COURSE_GRADE_E2E_KEY") is { Length: > 0 } key
+            ? key
+            : Convert.ToBase64String(Enumerable.Range(7, 32).Select(i => (byte)i).ToArray());
 
     private sealed class FixedScopeResolver : IUserScopeResolver
     {

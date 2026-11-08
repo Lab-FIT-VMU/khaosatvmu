@@ -90,6 +90,8 @@ postgres-data/
 # Mọi tệp .sql ở đây đều là bản dump (có email giảng viên, sắp tới có cả sinh viên và
 # điểm); lược đồ đã nằm trong EF migrations nên không cần tệp .sql nào trong repo.
 *.sql
+# Ngoại lệ: script cấp quyền viết tay (không chứa dữ liệu).
+!deploy/postgres/*.sql
 pgadmin-servers.json
 
 # Local source/import workbooks can contain student or lecturer data.

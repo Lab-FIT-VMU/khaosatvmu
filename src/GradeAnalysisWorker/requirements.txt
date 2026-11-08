@@ -1,0 +1,7 @@
+# Phiên bản đã kiểm chứng: kết quả trùng bản gốc trên 4 kỳ dữ liệu thật (docs/plans/tich-hop-phan-tich-diem-hoc-phan.md).
+# Đổi phiên bản numpy / scipy / statsmodels có thể đổi vài chữ số của mô hình hỗn hợp: chạy lại kiểm thử đối chiếu.
+numpy==2.5.4
+scipy==1.18.1
+statsmodels==0.15.0
+psycopg[binary]==3.3.8
+cryptography==50.0.2

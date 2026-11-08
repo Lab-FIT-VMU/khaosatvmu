@@ -15,7 +15,7 @@
 | 1. Schema và quyền | Xong | 9 bảng, view `GradeAnalysisInputs`, 33 ngưỡng, 3 quyền |
 | 2. Import lớp theo bộ luật B | Xong | Gộp bộ môn, `#N/A`, khoa suy từ bộ môn khi tên khoa trong file không khớp |
 | 3. Nạp điểm | Xong | Bộ luật A khớp bản Python từng dòng trên 4 kỳ thật; mã hóa AES-GCM; API xem trước / xác nhận / gỡ kỳ |
-| 4. Worker Python | Chưa | Lượt tính đang được xếp hàng (`GradeAnalysisRuns`) nhưng chưa có worker chạy |
+| 4. Worker Python | Xong | `src/GradeAnalysisWorker`: kết quả trùng bộ tính gốc trên 4 kỳ thật (trừ 5 học phần X ≡ Y, xem README của worker), Windows và Linux cho cùng số; user CSDL `grade_worker` hạn quyền; systemd timer 5 phút |
 | 5. API báo cáo | Chưa | |
 | 6. Giao diện | Một phần | Trang "Tải lên dữ liệu điểm" đã có; báo cáo vẫn là link chỉ xem; trang ngưỡng chưa có |
 | 7. Thí điểm | Chưa | |
@@ -177,7 +177,7 @@ Bộ tính hiện coi mỗi năm có 2 kỳ cách nhau 6 tháng (`stt_ky`, `thu_
 | Thứ tự kỳ | Theo mã `2425_HK1` | Theo `AcademicYear.StartDate`, trong năm: phụ → HK1 → HK2 (Q10) |
 | Số thứ tự kỳ (`stt_ky`) | năm × 2 + kỳ | năm × 3 + vị trí trong năm |
 | H6: "cách bao nhiêu tháng" | Hiệu số kỳ × 6 | Bỏ số tháng; câu nhận xét chỉ ghi tên kỳ được so (`hp_ky_truoc`), bỏ đoạn "cách {hp_thang_truoc} tháng" trong `mau_nhan_xet.json` |
-| G1: cửa sổ `g1_cua_so_ky` = 4 ("4 kỳ là 2 năm") | 4 kỳ gần nhất | Đếm theo **kỳ chính** (HK1, HK2); học kỳ phụ nằm trong khoảng đó vẫn được xét. Như vậy giữ nguyên nghĩa 2 năm |
+| G1: cửa sổ `g1_cua_so_ky` = 4 ("4 kỳ là 2 năm") | 4 kỳ gần nhất | Đếm theo **kỳ chính** (HK1, HK2): 4 kỳ = trọn 2 năm học, gồm cả học kỳ phụ đầu mỗi năm học đó |
 | H5 (so với các kỳ trước) và H6 (so với lần mở gần nhất) | So với mọi kỳ trước | Giữ nguyên: so với mọi kỳ trước, kể cả học kỳ phụ, không tách theo loại kỳ |
 | So sánh trong cùng một kỳ (I1–I10, H1–H4, D1–D7) | | Không đổi |
 | Xác định kỳ của file | Đọc từ tên file và `f_nhhk` | **Chọn kỳ rồi nạp**, giống trang Lớp học phần. Không cần biết mã `f_nhhk` của học kỳ phụ |

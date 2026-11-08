@@ -1,0 +1,14 @@
+[Unit]
+Description=Phân tích điểm học phần (chạy hết các lượt tính đang chờ rồi thoát)
+Documentation=file:///home/khaosatvmu/src/GradeAnalysisWorker/README.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+# Không chạy chồng với phân tích cảm xúc: hai worker cùng lúc dễ vượt RAM máy 4 GB.
+Conflicts=khaosatvmu-sentiment.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/khaosatvmu
+ExecStart=/usr/bin/docker compose --profile grade-analysis run --rm grade-analysis-worker
+TimeoutStartSec=3600

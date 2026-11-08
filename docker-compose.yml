@@ -147,6 +147,33 @@ services:
       db:
         condition: service_healthy
 
+  # Worker phân tích điểm học phần (Python: bộ luật D, E). Giống sentiment-worker: KHÔNG nằm
+  # trong nhóm khởi động mặc định, chạy một lượt rồi thoát:
+  #
+  #   docker compose --profile grade-analysis run --rm grade-analysis-worker
+  #
+  # Khuyến nghị chạy theo systemd timer mỗi 5 phút (deploy/systemd/). Lượt không có việc thoát
+  # sau vài giây; có việc thì khoảng 3 phút cho 4 kỳ, đo được ~450 MB RAM ở chế độ một tiến trình.
+  # Không cho chạy cùng lúc với sentiment-worker trên máy 4 GB.
+  grade-analysis-worker:
+    build:
+      context: ./src/GradeAnalysisWorker
+    container_name: khaosatvmu_grade_analysis_worker
+    profiles: ["grade-analysis"]
+    cpus: ${GRADE_WORKER_CPU_LIMIT:-1.0}
+    mem_limit: ${GRADE_WORKER_MEM_LIMIT:-768m}
+    environment:
+      # Nên dùng user CSDL riêng chỉ đọc được view GradeAnalysisInputs (deploy/postgres/).
+      # Bỏ trống thì dùng chung chuỗi kết nối với API.
+      GRADE_WORKER_DATABASE: ${GRADE_WORKER_DATABASE:-}
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-khaosatvmu};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?can-i-please-have-a-postgres-password}
+      # PHẢI trùng khóa của API, nếu không worker không giải mã được điểm.
+      CourseGrades__EncryptionKeys__1: ${COURSE_GRADE_ENCRYPTION_KEY:-}
+      GRADE_WORKER_PROCESSES: ${GRADE_WORKER_PROCESSES:-1}
+    depends_on:
+      db:
+        condition: service_healthy
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: khaosatvmu_pgadmin
