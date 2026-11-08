@@ -7,6 +7,19 @@
 
 ---
 
+## Tiến độ (nhánh `hoang12345`)
+
+| Giai đoạn | Trạng thái | Ghi chú |
+|---|---|---|
+| 0. Bảo mật | Xong một phần | Đã gỡ 11 dump khỏi git, bắt buộc `POSTGRES_PASSWORD`. Chưa: xóa dump khỏi lịch sử git, HTTPS |
+| 1. Schema và quyền | Xong | 9 bảng, view `GradeAnalysisInputs`, 33 ngưỡng, 3 quyền |
+| 2. Import lớp theo bộ luật B | Xong | Gộp bộ môn, `#N/A`, khoa suy từ bộ môn khi tên khoa trong file không khớp |
+| 3. Nạp điểm | Xong | Bộ luật A khớp bản Python từng dòng trên 4 kỳ thật; mã hóa AES-GCM; API xem trước / xác nhận / gỡ kỳ |
+| 4. Worker Python | Chưa | Lượt tính đang được xếp hàng (`GradeAnalysisRuns`) nhưng chưa có worker chạy |
+| 5. API báo cáo | Chưa | |
+| 6. Giao diện | Một phần | Trang "Tải lên dữ liệu điểm" đã có; báo cáo vẫn là link chỉ xem; trang ngưỡng chưa có |
+| 7. Thí điểm | Chưa | |
+
 ## 1. Hiện trạng
 
 | | Module audit (bản đang dùng) | khaosatvmu |

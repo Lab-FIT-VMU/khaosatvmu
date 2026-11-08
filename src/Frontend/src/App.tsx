@@ -66,6 +66,7 @@ const SurveyStatisticsPage = lazy(() => import('./pages/SurveyStatisticsPage').t
 const SurveyAnalysisPage = lazy(() => import('./pages/SurveyAnalysisPage').then(m => ({ default: m.SurveyAnalysisPage })));
 const SurveyDashboardPage = lazy(() => import('./pages/SurveyDashboardPage').then(m => ({ default: m.SurveyDashboardPage })));
 const GraduationAnalytics2Page = lazy(() => import('./pages/GraduationAnalytics2Page').then(m => ({ default: m.GraduationAnalytics2Page })));
+const CourseGradeUploadPage = lazy(() => import('./pages/CourseGradeUploadPage').then(m => ({ default: m.CourseGradeUploadPage })));
 const StudentSurveyView = lazy(() => import('./pages/StudentSurveyView').then(m => ({ default: m.StudentSurveyView })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const ProfileSelectionPage = lazy(() => import('./pages/ProfileSelectionPage').then(m => ({ default: m.ProfileSelectionPage })));
@@ -670,6 +671,8 @@ function DashboardApp() {
             {currentTab === 'graduation-statistics' && (
               <GraduationAnalytics2Page view="explore" />
             )}
+
+            {currentTab === 'course-grade-upload' && <CourseGradeUploadPage />}
 
             {currentTab === 'academic-years' && <AcademicYearsPage />}
 
