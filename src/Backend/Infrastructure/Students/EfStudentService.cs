@@ -101,6 +101,9 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
 
         var now = DateTime.UtcNow;
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        // Khóa ngành còn thiếu mà suy được khóa, ngành: thêm vào danh mục trước rồi mới gắn sinh viên.
+        var newIds = await CohortMajorLookup.CreateMissingAsync(db, plan.ToCreate, cancellationToken);
+        int CohortMajorOf(PlannedRow r) => r.CohortMajorId ?? newIds[r.CohortMajorCode];
         var codes = plan.Rows.Select(r => r.Code).ToList();
         var tracked = await db.Students.IgnoreQueryFilters()
             .Where(s => codes.Contains(s.StudentCode))
@@ -112,14 +115,14 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
             if (!tracked.TryGetValue(row.Code, out var student))
             {
                 student = new Student { StudentCode = row.Code, CreatedAtUtc = now };
-                Apply(student, row);
+                Apply(student, row, CohortMajorOf(row));
                 student.UpdatedAtUtc = now;
                 db.Students.Add(student);
                 created++;
                 continue;
             }
 
-            if (Apply(student, row))
+            if (Apply(student, row, CohortMajorOf(row)))
             {
                 student.UpdatedAtUtc = now;
                 updated++;
@@ -132,7 +135,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return new StudentImportResultDto(created, updated, unchanged, plan.Preview.ErrorCount);
+        return new StudentImportResultDto(created, updated, unchanged, plan.Preview.ErrorCount, newIds.Values.Distinct().Count());
     }
 
     // ------------------------------------------------------------------ kiểm tra và đối chiếu
@@ -142,14 +145,16 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
         int RowNumber,
         string Code,
         string FullName,
-        int CohortMajorId,
+        /// <summary>Mã lớp đã chuẩn hóa; CohortMajorId null nghĩa là khóa ngành sẽ được tự thêm.</summary>
+        string CohortMajorCode,
+        int? CohortMajorId,
         DateOnly? DateOfBirth,
         string? Gender,
         string? Email,
         string? PhoneNumber,
         string? StudyStatus);
 
-    private sealed record Plan(IReadOnlyList<PlannedRow> Rows, StudentImportPreviewDto Preview);
+    private sealed record Plan(IReadOnlyList<PlannedRow> Rows, IReadOnlyList<CohortMajorMatch> ToCreate, StudentImportPreviewDto Preview);
 
     private async Task<Plan> PlanAsync(StudentImportRequest request, CancellationToken cancellationToken)
     {
@@ -170,10 +175,13 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
             join cohort in db.Cohorts.IgnoreQueryFilters().AsNoTracking() on cm.CohortId equals cohort.CohortId
             select new { cm.CohortMajorId, cohort.CohortName })
             .ToDictionaryAsync(x => x.CohortMajorId, x => x.CohortName, cancellationToken);
+        var cohortNames = await db.Cohorts.IgnoreQueryFilters().AsNoTracking().ToDictionaryAsync(x => x.CohortId, x => x.CohortName, cancellationToken);
+        var majorNames = await db.Majors.IgnoreQueryFilters().AsNoTracking().ToDictionaryAsync(x => x.MajorId, x => x.MajorName, cancellationToken);
+        var toCreate = new Dictionary<string, (CohortMajorMatch Match, int Students)>(StringComparer.Ordinal);
 
         var errors = new List<StudentImportIssueDto>();
         var warnings = new List<StudentImportIssueDto>();
-        var missing = new Dictionary<string, int>(StringComparer.Ordinal);
+        var missing = new Dictionary<string, (int Students, string Reason)>(StringComparer.Ordinal);
         var errorCount = 0;
         void Error(StudentImportRow r, string? code, string message)
         {
@@ -223,12 +231,12 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
                 Error(r, code, "Thiếu mã khóa ngành đào tạo (lớp hành chính).");
                 continue;
             }
-            if (cohortMajors.Find(classText) is not { } cohortMajorId)
+            var match = cohortMajors.Match(classText)!;
+            if (match.Problem is not null)
             {
-                // Không liệt kê từng dòng: gom theo lớp để người dùng thêm khóa ngành một lần.
+                // Không liệt kê từng dòng: gom theo lớp để người dùng thêm ngành / khóa một lần.
                 errorCount++;
-                var key = CohortMajorLookup.Key(classText);
-                missing[key] = missing.GetValueOrDefault(key) + 1;
+                missing[match.Code] = (missing.GetValueOrDefault(match.Code).Students + 1, match.Problem);
                 continue;
             }
 
@@ -261,7 +269,12 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
                 continue;
             }
 
-            planned.Add(new PlannedRow(r.SheetName, r.RowNumber, code, name, cohortMajorId, dateOfBirth, gender, email, phone, status));
+            if (match.NeedsCreate)
+            {
+                toCreate[match.Code] = (match, toCreate.GetValueOrDefault(match.Code).Students + 1);
+            }
+            planned.Add(new PlannedRow(r.SheetName, r.RowNumber, code, name, match.Code, match.CohortMajorId,
+                dateOfBirth, gender, email, phone, status));
         }
 
         // Đối chiếu với sinh viên đang có (kể cả đã xóa mềm: nạp lại thì khôi phục).
@@ -274,7 +287,9 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
         var byCohort = new Dictionary<string, (int Rows, int New, int Updated)>(StringComparer.Ordinal);
         foreach (var row in planned)
         {
-            var cohortLabel = cohortNameByCohortMajor.GetValueOrDefault(row.CohortMajorId) ?? NoCohort;
+            var cohortLabel = (row.CohortMajorId is { } cmId
+                ? cohortNameByCohortMajor.GetValueOrDefault(cmId)
+                : cohortNames.GetValueOrDefault(toCreate[row.CohortMajorCode].Match.NewCohortId!.Value)) ?? NoCohort;
             var current = byCohort.GetValueOrDefault(cohortLabel);
             if (!existing.TryGetValue(row.Code, out var student))
             {
@@ -283,7 +298,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
                 continue;
             }
 
-            if (Apply(Clone(student), row))
+            if (Apply(Clone(student), row, row.CohortMajorId ?? -1))
             {
                 changed++;
                 if (!string.Equals(student.FullName, row.FullName, StringComparison.Ordinal)) renamed++;
@@ -296,19 +311,29 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
             }
         }
 
-        var hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(planned)));
+        var hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            planned,
+            create = toCreate.Values.Select(x => new { x.Match.Code, x.Match.NewCohortId, x.Match.NewMajorId }).OrderBy(x => x.Code),
+        })));
         var preview = new StudentImportPreviewDto(
             rows.Count, created, changed, same, errorCount, renamed,
             byCohort.OrderBy(x => x.Key, StringComparer.Ordinal)
                 .Select(x => new StudentImportCohortDto(x.Key, x.Value.Rows, x.Value.New, x.Value.Updated)).ToList(),
+            toCreate.OrderBy(x => x.Key, StringComparer.Ordinal)
+                .Select(x => new StudentNewCohortMajorDto(
+                    x.Key,
+                    cohortNames.GetValueOrDefault(x.Value.Match.NewCohortId!.Value) ?? string.Empty,
+                    majorNames.GetValueOrDefault(x.Value.Match.NewMajorId!.Value) ?? string.Empty,
+                    x.Value.Students)).ToList(),
             missing.OrderBy(x => x.Key, StringComparer.Ordinal)
-                .Select(x => new StudentMissingCohortMajorDto(x.Key, x.Value)).ToList(),
+                .Select(x => new StudentMissingCohortMajorDto(x.Key, x.Value.Students, x.Value.Reason)).ToList(),
             errors, warnings, hash);
-        return new Plan(planned, preview);
+        return new Plan(planned, toCreate.Values.Select(x => x.Match).ToList(), preview);
     }
 
     /// <summary>Ghi dòng vào sinh viên; trả true nếu có thay đổi. Ô trống không xóa giá trị đang có.</summary>
-    private static bool Apply(Student student, PlannedRow row)
+    private static bool Apply(Student student, PlannedRow row, int cohortMajorId)
     {
         var changed = false;
         void Set<T>(T current, T next, Action<T> assign)
@@ -321,7 +346,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
         }
 
         Set(student.FullName, row.FullName, v => student.FullName = v);
-        Set(student.CohortMajorId, row.CohortMajorId, v => student.CohortMajorId = v);
+        Set(student.CohortMajorId, (int?)cohortMajorId, v => student.CohortMajorId = v);
         if (row.DateOfBirth is not null) Set(student.DateOfBirth, row.DateOfBirth, v => student.DateOfBirth = v);
         if (row.Gender is not null) Set(student.Gender, row.Gender, v => student.Gender = v);
         if (row.Email is not null) Set(student.Email, row.Email, v => student.Email = v);

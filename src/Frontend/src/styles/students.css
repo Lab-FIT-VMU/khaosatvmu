@@ -28,4 +28,7 @@
 @media (prefers-reduced-motion: reduce) { .student-import .spin { animation: none; } }
 @media (max-width: 560px) { .student-import__counts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .student-import__missing { padding: 8px 10px; border: 1px solid var(--border-color); background: var(--bg-main); font-size: 13px; }
-.student-import__missing p { margin: 6px 0 0; max-height: 120px; overflow: auto; line-height: 1.6; }
+
+.student-import__new summary { cursor: pointer; }
+.student-import__new table { margin-top: 6px; }
+.student-import__missing ul { margin: 6px 0 0; padding-left: 20px; max-height: 140px; overflow: auto; }

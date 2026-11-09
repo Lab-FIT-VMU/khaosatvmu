@@ -83,8 +83,9 @@ public class StudentServiceTests
             preview.NewCount.Should().Be(2);
             preview.ErrorCount.Should().Be(6);
             preview.Errors.Select(e => e.RowNumber).Should().BeEquivalentTo([4, 5, 6, 7]);
-            preview.MissingCohortMajors.Should().ContainSingle()
-                .Which.Should().Be(new StudentMissingCohortMajorDto("ZZZ99ĐH", 2));
+            var missing = preview.MissingCohortMajors.Should().ContainSingle().Which;
+            missing.CohortMajorCode.Should().Be("ZZZ99ĐH");
+            missing.StudentCount.Should().Be(2);
 
             var result = await admin.ImportAsync(new StudentImportRequest(first, preview.PreviewHash));
             result.CreatedCount.Should().Be(2);
@@ -115,6 +116,52 @@ public class StudentServiceTests
             // Mã băm khác bản xem trước thì từ chối.
             var stale = () => admin.ImportAsync(new StudentImportRequest(first, again.PreviewHash));
             (await stale.Should().ThrowAsync<StudentException>()).Which.ErrorCode.Should().Be(StudentErrorCodes.PreviewMismatch);
+        });
+    }
+
+    [Fact]
+    public async Task MissingCohortMajor_IsCreated_WhenCohortAndMajorAreKnown()
+    {
+        await RunAsync(async (db, serviceFor, p) =>
+        {
+            // Khóa chưa có khóa ngành nào của ngành mẫu, và ngành mẫu có mã lớp dạng chuẩn ở khóa khác.
+            var sample = await (
+                from cm in db.CohortMajors.AsNoTracking()
+                join m in db.Majors.AsNoTracking() on cm.MajorId equals m.MajorId
+                select new { cm.CohortMajorCode, cm.MajorId, cm.CohortId }).ToListAsync();
+            var pattern = new System.Text.RegularExpressions.Regex(@"^(\p{L}{2,10})\d{2}(ĐH)$");
+            var source = sample.FirstOrDefault(x => pattern.IsMatch(x.CohortMajorCode)
+                && sample.Where(y => y.CohortMajorCode.StartsWith(pattern.Match(x.CohortMajorCode).Groups[1].Value)
+                        && y.CohortMajorCode.EndsWith("ĐH"))
+                    .Select(y => y.MajorId).Distinct().Count() == 1);
+            if (source is null) return;
+            var cohorts = await db.Cohorts.AsNoTracking().ToListAsync();
+            var target = cohorts.FirstOrDefault(c => c.CohortCode.Length == 2 && !sample.Any(x => x.CohortId == c.CohortId && x.MajorId == source.MajorId));
+            if (target is null) return;
+            var newCode = pattern.Match(source.CohortMajorCode).Groups[1].Value + target.CohortCode + "ĐH";
+            if (sample.Any(x => x.CohortMajorCode == newCode)) return;
+
+            var admin = serviceFor(UserScope.Unrestricted(RoleCodes.Admin));
+            StudentImportRow[] rows = [Row(2, $"{p}7", "Sinh viên khóa mới", newCode), Row(3, $"{p}8", "Sinh viên khóa mới 2", newCode)];
+            try
+            {
+                var preview = await admin.PreviewImportAsync(new StudentImportRequest(rows, null));
+                preview.NewCohortMajors.Should().ContainSingle(x => x.CohortMajorCode == newCode && x.StudentCount == 2);
+                (await db.CohortMajors.AnyAsync(x => x.CohortMajorCode == newCode)).Should().BeFalse("xem trước không ghi");
+
+                var result = await admin.ImportAsync(new StudentImportRequest(rows, preview.PreviewHash));
+                result.CreatedCohortMajorCount.Should().Be(1);
+                var created = await db.CohortMajors.AsNoTracking().SingleAsync(x => x.CohortMajorCode == newCode);
+                created.CohortId.Should().Be(target.CohortId);
+                created.MajorId.Should().Be(source.MajorId, "ngành theo cùng mã ngành ở khóa khác");
+                (await db.Students.AsNoTracking().Where(x => x.StudentCode.StartsWith(p)).Select(x => x.CohortMajorId).ToListAsync())
+                    .Should().OnlyContain(id => id == created.CohortMajorId);
+            }
+            finally
+            {
+                await db.Students.IgnoreQueryFilters().Where(x => x.StudentCode.StartsWith(p)).ExecuteDeleteAsync();
+                await db.CohortMajors.IgnoreQueryFilters().Where(x => x.CohortMajorCode == newCode).ExecuteDeleteAsync();
+            }
         });
     }
 

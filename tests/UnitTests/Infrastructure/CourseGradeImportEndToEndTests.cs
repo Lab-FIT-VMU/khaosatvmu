@@ -193,8 +193,8 @@ public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
 
             var student = await h.Db.Students.AsNoTracking().SingleAsync(x => x.StudentCode == sv[0]);
             student.CohortMajorId.Should().BeNull("lớp ĐKT98ĐH chưa có trong Khoá ngành đào tạo: không tự tạo");
-            preview.Warnings.Should().Contain(w => w.Contains("ĐKT98ĐH (3)") && w.Contains("chưa có trong Khoá ngành đào tạo"),
-                "lớp chưa có được liệt kê để người dùng thêm (Ð trong file đã đổi thành Đ)");
+            preview.Warnings.Should().Contain(w => w.Contains("ĐKT98ĐH (3)") && w.Contains("không suy được khóa ngành"),
+                "khóa 98 chưa có nên không tự tạo khóa ngành; lớp được liệt kê (Ð trong file đã đổi thành Đ)");
 
             var run = await h.Grades.GetLatestRunAsync();
             run!.Status.Should().Be("Queued");

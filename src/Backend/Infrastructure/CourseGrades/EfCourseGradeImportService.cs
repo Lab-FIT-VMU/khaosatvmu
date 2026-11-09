@@ -194,19 +194,24 @@ public sealed partial class EfCourseGradeImportService(
         // Lớp hành chính chưa có trong danh mục Khoá ngành đào tạo: sinh viên vẫn được nạp điểm nhưng chưa
         // gắn lớp. Báo danh sách để người dùng thêm khóa ngành rồi nạp lại.
         var cohortMajors = await CohortMajorLookup.LoadAsync(db, cancellationToken);
-        var missingClasses = storable
+        var classMatches = storable
             .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
-            .Select(g => g.First().AdministrativeClassCode)
-            .Where(c => !string.IsNullOrWhiteSpace(c) && cohortMajors.Find(c) is null)
-            .GroupBy(c => CohortMajorLookup.Key(c!), StringComparer.Ordinal)
-            .OrderByDescending(g => g.Count())
-            .Select(g => $"{g.Key} ({g.Count()})")
+            .Select(g => cohortMajors.Match(g.First().AdministrativeClassCode))
+            .OfType<CohortMajorMatch>()
             .ToList();
-        if (missingClasses.Count > 0)
+        static string List(IEnumerable<IGrouping<string, CohortMajorMatch>> groups) =>
+            string.Join(", ", groups.OrderByDescending(g => g.Count()).Take(40).Select(g => $"{g.Key} ({g.Count()})"));
+        var toCreate = classMatches.Where(m => m.NeedsCreate).GroupBy(m => m.Code, StringComparer.Ordinal).ToList();
+        if (toCreate.Count > 0)
         {
-            warnings.Add($"{missingClasses.Count} lớp chưa có trong Khoá ngành đào tạo, sinh viên các lớp này chưa được gắn lớp: "
-                + string.Join(", ", missingClasses.Take(40)) + (missingClasses.Count > 40 ? ", …" : string.Empty)
-                + ". Hãy thêm các khóa ngành này rồi nạp lại.");
+            warnings.Add($"{toCreate.Count} lớp chưa có trong Khoá ngành đào tạo sẽ được tự thêm khi nạp (sĩ số đầu vào để 0): {List(toCreate)}"
+                + (toCreate.Count > 40 ? ", …" : string.Empty) + ".");
+        }
+        var unresolved = classMatches.Where(m => m.Problem is not null).GroupBy(m => m.Code, StringComparer.Ordinal).ToList();
+        if (unresolved.Count > 0)
+        {
+            warnings.Add($"{unresolved.Count} lớp không suy được khóa ngành (ngành hoặc khóa chưa có trong danh mục), sinh viên các lớp này chưa được gắn lớp: "
+                + List(unresolved) + (unresolved.Count > 40 ? ", …" : string.Empty) + ". Hãy thêm ngành / khóa rồi nạp lại.");
         }
 
         var expectedTerm = SemesterOrdering.ExpectedTermCode(semester.AcademicYearName, semester.SemesterName);
@@ -385,6 +390,18 @@ public sealed partial class EfCourseGradeImportService(
         var firstRowByCode = analysis.StorableRows
             .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        // Lớp chưa có khóa ngành mà suy được khóa, ngành: tự thêm khóa ngành (như nạp danh sách sinh viên).
+        var matches = firstRowByCode.Values
+            .Select(r => cohortMajors.Match(r.AdministrativeClassCode))
+            .OfType<CohortMajorMatch>()
+            .ToList();
+        var newIds = await CohortMajorLookup.CreateMissingAsync(db, matches, cancellationToken);
+        int? CohortMajorOf(string? classCode) => cohortMajors.Match(classCode) switch
+        {
+            { CohortMajorId: { } id } => id,
+            { NeedsCreate: true } m => newIds[m.Code],
+            _ => null,
+        };
 
         var codes = firstRowByCode.Keys.ToList();
         var tracked = await db.Students.IgnoreQueryFilters()
@@ -394,7 +411,7 @@ public sealed partial class EfCourseGradeImportService(
         foreach (var (code, row) in firstRowByCode)
         {
             // Lớp hành chính = khóa ngành đào tạo; lớp chưa có trong danh mục thì giữ liên kết đang có.
-            var cohortMajorId = cohortMajors.Find(row.AdministrativeClassCode);
+            var cohortMajorId = CohortMajorOf(row.AdministrativeClassCode);
             if (!tracked.TryGetValue(code, out var student))
             {
                 student = new Student

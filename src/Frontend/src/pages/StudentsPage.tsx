@@ -82,7 +82,7 @@ export function StudentsPage() {
 
   const imported = (result: StudentImportResult) => {
     setIsImportOpen(false);
-    toast.success(`Đã nạp: ${numberFormat.format(result.createdCount)} sinh viên mới, ${numberFormat.format(result.updatedCount)} cập nhật${result.skippedCount ? `, bỏ qua ${numberFormat.format(result.skippedCount)} dòng lỗi` : ''}.`);
+    toast.success(`Đã nạp: ${numberFormat.format(result.createdCount)} sinh viên mới, ${numberFormat.format(result.updatedCount)} cập nhật${result.createdCohortMajorCount ? `, thêm ${numberFormat.format(result.createdCohortMajorCount)} khoá ngành đào tạo` : ''}${result.skippedCount ? `, bỏ qua ${numberFormat.format(result.skippedCount)} dòng lỗi` : ''}.`);
     void load(filter);
   };
 

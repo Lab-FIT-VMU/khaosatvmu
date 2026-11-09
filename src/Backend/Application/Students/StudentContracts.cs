@@ -58,8 +58,11 @@ public sealed record StudentImportIssueDto(string? SheetName, int RowNumber, str
 
 public sealed record StudentImportCohortDto(string CohortName, int RowCount, int NewCount, int UpdatedCount);
 
-/// <summary>Mã khóa ngành có trong file nhưng chưa có trong danh mục, kèm số sinh viên.</summary>
-public sealed record StudentMissingCohortMajorDto(string CohortMajorCode, int StudentCount);
+/// <summary>Lớp không suy được khóa ngành (khóa hoặc ngành chưa có trong danh mục), kèm số sinh viên và lý do.</summary>
+public sealed record StudentMissingCohortMajorDto(string CohortMajorCode, int StudentCount, string Reason);
+
+/// <summary>Khóa ngành chưa có trong danh mục, sẽ được tự thêm khi xác nhận nạp.</summary>
+public sealed record StudentNewCohortMajorDto(string CohortMajorCode, string CohortName, string MajorName, int StudentCount);
 
 public sealed record StudentImportPreviewDto(
     int RowCount,
@@ -70,14 +73,16 @@ public sealed record StudentImportPreviewDto(
     /// <summary>Sinh viên đã có mà họ tên trong file khác: nạp sẽ đổi theo file.</summary>
     int RenamedCount,
     IReadOnlyList<StudentImportCohortDto> Cohorts,
-    /// <summary>Khóa ngành cần thêm ở trang Khoá ngành đào tạo (dòng của các lớp này bị bỏ qua).</summary>
+    /// <summary>Khóa ngành sẽ tự thêm vào danh mục (sĩ số đầu vào 0, sửa sau).</summary>
+    IReadOnlyList<StudentNewCohortMajorDto> NewCohortMajors,
+    /// <summary>Lớp không suy được khóa ngành: cần thêm ngành / khóa trước (dòng của các lớp này bị bỏ qua).</summary>
     IReadOnlyList<StudentMissingCohortMajorDto> MissingCohortMajors,
     IReadOnlyList<StudentImportIssueDto> Errors,
     IReadOnlyList<StudentImportIssueDto> Warnings,
     /// <summary>Mã băm của các dòng hợp lệ; gửi lại khi xác nhận để chắc là đúng dữ liệu đã xem.</summary>
     string PreviewHash);
 
-public sealed record StudentImportResultDto(int CreatedCount, int UpdatedCount, int UnchangedCount, int SkippedCount);
+public sealed record StudentImportResultDto(int CreatedCount, int UpdatedCount, int UnchangedCount, int SkippedCount, int CreatedCohortMajorCount);
 
 public interface IStudentService
 {

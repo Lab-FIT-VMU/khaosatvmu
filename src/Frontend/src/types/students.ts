@@ -60,8 +60,10 @@ export interface StudentImportPreview {
   errorCount: number;
   renamedCount: number;
   cohorts: { cohortName: string; rowCount: number; newCount: number; updatedCount: number }[];
-  /** Khóa ngành cần thêm ở trang Khoá ngành đào tạo (dòng của các lớp này bị bỏ qua). */
-  missingCohortMajors: { cohortMajorCode: string; studentCount: number }[];
+  /** Khóa ngành sẽ tự thêm vào danh mục khi xác nhận (sĩ số đầu vào 0). */
+  newCohortMajors: { cohortMajorCode: string; cohortName: string; majorName: string; studentCount: number }[];
+  /** Lớp không suy được khóa ngành (ngành / khóa chưa có): dòng bị bỏ qua. */
+  missingCohortMajors: { cohortMajorCode: string; studentCount: number; reason: string }[];
   errors: StudentImportIssue[];
   warnings: StudentImportIssue[];
   previewHash: string;
@@ -72,4 +74,5 @@ export interface StudentImportResult {
   updatedCount: number;
   unchangedCount: number;
   skippedCount: number;
+  createdCohortMajorCount: number;
 }

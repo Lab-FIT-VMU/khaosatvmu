@@ -175,14 +175,34 @@ export function StudentImportDialog({ isOpen, onClose, onImported }: Props) {
             {preview.renamedCount > 0 && (
               <p className="student-import__muted">{n(preview.renamedCount)} sinh viên đã có sẽ được đổi họ tên theo file.</p>
             )}
+            {preview.newCohortMajors.length > 0 && (
+              <details className="student-import__new">
+                <summary>
+                  Sẽ tự thêm {n(preview.newCohortMajors.length)} khoá ngành đào tạo chưa có trong danh mục
+                  (sĩ số đầu vào để 0, sửa sau ở trang Khoá ngành đào tạo)
+                </summary>
+                <table className="student-import__table">
+                  <thead><tr><th>Khoá ngành</th><th>Khóa</th><th>Ngành</th><th>Sinh viên</th></tr></thead>
+                  <tbody>
+                    {preview.newCohortMajors.map((m) => (
+                      <tr key={m.cohortMajorCode}><td>{m.cohortMajorCode}</td><td>{m.cohortName}</td><td>{m.majorName}</td><td>{n(m.studentCount)}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            )}
             {preview.missingCohortMajors.length > 0 && (
               <div className="student-import__missing" role="alert">
                 <strong>
-                  {n(preview.missingCohortMajors.length)} khoá ngành đào tạo chưa có trong danh mục
+                  {n(preview.missingCohortMajors.length)} lớp không suy được khoá ngành
                   ({n(preview.missingCohortMajors.reduce((sum, m) => sum + m.studentCount, 0))} sinh viên sẽ bị bỏ qua).
                 </strong>
-                <span> Hãy thêm các khoá ngành này ở trang Khoá ngành đào tạo rồi nạp lại:</span>
-                <p>{preview.missingCohortMajors.map((m) => `${m.cohortMajorCode} (${n(m.studentCount)})`).join(', ')}</p>
+                <span> Thêm ngành / khóa còn thiếu rồi nạp lại:</span>
+                <ul>
+                  {preview.missingCohortMajors.map((m) => (
+                    <li key={m.cohortMajorCode}><strong>{m.cohortMajorCode}</strong> ({n(m.studentCount)} sinh viên): {m.reason}</li>
+                  ))}
+                </ul>
               </div>
             )}
             <table className="student-import__table">
