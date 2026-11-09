@@ -44,7 +44,11 @@ public sealed record CourseGradeAnalysisOverviewDto(
     /// (cấp unit chỉ có học phần trong đơn vị).</summary>
     JsonNode? CrossTerm,
     IReadOnlyList<GradeAnalysisRepetitionDto> Repetition,
-    GradeAnalysisRunDto? LatestRun);
+    GradeAnalysisRunDto? LatestRun,
+    /// <summary>Học phần có kết quả ở bất kỳ kỳ nào (trong phạm vi), để gọi tên ở bảng qua các kỳ.</summary>
+    IReadOnlyList<GradeAnalysisCourseCatalogDto> Courses);
+
+public sealed record GradeAnalysisCourseCatalogDto(string BaseCourseCode, string Name, int? DepartmentId, int? FacultyId);
 
 /// <summary>Kết quả một học phần trong một kỳ.</summary>
 public sealed record GradeAnalysisCourseDto(

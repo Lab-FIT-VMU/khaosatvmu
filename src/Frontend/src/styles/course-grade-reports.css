@@ -53,7 +53,7 @@
 }
 .cga-description { margin: 2px 0 0; font-size: 12px; }
 
-.cga-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.cga-chips { display: inline-flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; }
 .cga-chip {
   display: inline-flex; align-items: baseline; gap: 4px; padding: 1px 6px;
   border: 1px solid #b8c6d4; background: #fff; color: var(--vmu-navy); font-size: 12px; font-weight: 600; white-space: nowrap;
@@ -131,3 +131,15 @@
 .cga-gloss dt { font-weight: 600; }
 .cga-gloss dd { margin: 0; line-height: 1.5; }
 @media (max-width: 720px) { .cga-gloss > div { grid-template-columns: 1fr; gap: 4px; } }
+
+/* Bản đồ học phần */
+.cga-map { display: grid; gap: 10px; }
+.cga-zones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; font-size: 13px; }
+.cga-zones strong { display: inline-block; min-width: 2.5em; text-align: right; margin-right: 4px; }
+.cga-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; }
+.cga-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.cga-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.cga-legend i.cga-legend-hollow { background: #fff; border: 2px solid #64748b; box-sizing: border-box; }
+@media (max-width: 640px) { .cga-zones { grid-template-columns: 1fr; } }
+/* Mã điểm lưu ý thể hiện bằng chữ, không tô màu (bộ luật D, M1, M5). */
+.cga-related__group > strong { color: var(--text-dark); }

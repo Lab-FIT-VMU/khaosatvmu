@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import { Modal } from '../Modal';
+import { ClassDumbbell } from './ClassDumbbell';
 import { courseGradeAnalysisApi } from '../../services/courseGradeAnalysisApi';
 import { courseGradeErrorMessage } from '../../services/courseGradesApi';
 import type { AnalysisCourse, AnalysisOverview, AnalysisSection } from '../../types/courseGradeAnalysis';
@@ -72,6 +73,7 @@ export function SectionsView({ overview, semesterId, courses, departmentId, cour
 
   const sorted = [...sections].sort((a, b) => a.data.nhom.localeCompare(b.data.nhom) || a.data.ma.localeCompare(b.data.ma));
   const profile = profileOf?.profile;
+  const termLabel = new Map(overview.terms.map((t) => [t.termCode, t.label]));
 
   return (
     <div className="cga-stack">
@@ -110,6 +112,14 @@ export function SectionsView({ overview, semesterId, courses, departmentId, cour
             <div><span>Tương quan X–Y (r)</span>{vi(course.data.r)}</div>
             <div><span>ICC điểm quá trình / điểm thi</span>{vi(course.data.icc_x, 3)} / {vi(course.data.icc_y, 3)}</div>
           </div>
+          {typeof course.data.ky_truoc === 'string' && (
+            <p className="cga-note">Điểm thi được so sánh với {termLabel.get(course.data.ky_truoc) ?? course.data.ky_truoc} (lần mở gần nhất trước đó).</p>
+          )}
+          {course.data.h5_ly_do === 'lich_su' && (
+            <p className="cga-note">
+              Tỷ lệ trượt do điểm thi kỳ này {pct(course.data.i2)}, cao hơn rõ so với {pct(Number(course.data.i2_lich_su ?? 0))} của các kỳ trước của chính học phần.
+            </p>
+          )}
           {related.length > 0 && (
             <div className="cga-related">
               <h4>Lớp liên quan đến điểm lưu ý</h4>
@@ -175,6 +185,15 @@ export function SectionsView({ overview, semesterId, courses, departmentId, cour
             </table>
           </div>
           <p className="cga-note">* Ít sinh viên – đọc thận trọng. Dòng mờ: lớp không đưa vào thống kê (vẫn dạy bình thường, chỉ ít sinh viên đủ tư cách dự thi).</p>
+        </SectionCard>
+      )}
+
+      {course && !loading && sections.length > 0 && (
+        <SectionCard
+          title="Điểm quá trình và điểm thi trung bình của từng lớp"
+          description="Mỗi dòng là một lớp được đưa vào thống kê. Lớp có điểm quá trình lệch hẳn trong khi điểm thi không khác các lớp khác là chỗ bộ môn nên tìm hiểu thêm; nguyên nhân có thể là cách đánh giá, đặc thù lớp hoặc yếu tố chưa đo được."
+        >
+          <ClassDumbbell sections={sections} baseCourseCode={course.baseCourseCode} />
         </SectionCard>
       )}
 

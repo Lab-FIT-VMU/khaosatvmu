@@ -77,6 +77,8 @@ export interface AnalysisOverview {
   crossTerm: CrossTerm | null;
   repetition: RepetitionCount[];
   latestRun: GradeAnalysisRun | null;
+  /** Học phần có kết quả ở bất kỳ kỳ nào trong phạm vi (tên, đơn vị theo kỳ gần nhất có mở). */
+  courses: { baseCourseCode: string; name: string; departmentId: number | null; facultyId: number | null }[];
 }
 
 /** Bản ghi học phần (hp) của bộ tính. */
@@ -103,6 +105,8 @@ export interface CourseData {
   co: string[];
   od?: string[];
   cdl?: string[];
+  /** Tổng các lớp đưa vào thống kê (API thêm): mất tư cách, số SV có điểm, r từng lớp. */
+  lop_tk?: { n_mat: number; n_diem: number; r: number[] };
   [key: string]: unknown;
 }
 

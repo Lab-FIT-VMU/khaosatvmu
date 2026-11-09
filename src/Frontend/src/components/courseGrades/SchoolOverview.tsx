@@ -1,21 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
-  Scatter,
-  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
-  ZAxis,
 } from 'recharts';
 import type { AnalysisCourse, AnalysisOverview } from '../../types/courseGradeAnalysis';
-import { FLAG_CODES, FLAG_LABELS, MARKER_CODES, MARKER_LABELS, STABLE_LABELS } from './courseGradeLabels';
+import { FLAG_CODES, FLAG_LABELS, MARKER_CODES, MARKER_LABELS } from './courseGradeLabels';
 import { COLORS, median, pct, vi, viInt } from './courseGradeFormat';
+import { CourseMap } from './CourseMap';
+import { TwoWayTable } from './TwoWayTable';
 import { Kpi, SectionCard } from './courseGradeUi';
 
 interface Props {
@@ -24,11 +21,10 @@ interface Props {
   courses: AnalysisCourse[];
 }
 
-type Axis = 'icc' | 'tau';
-
 /** Cấp toàn trường (hoặc toàn đơn vị với quản lý khoa / bộ môn): số tổng, xu hướng, bản đồ học phần, so sánh khoa. */
 export function SchoolOverview({ overview, semesterId, courses }: Props) {
-  const [axis, setAxis] = useState<Axis>('icc');
+  // Tỷ lệ học phần có điểm lưu ý theo khoa: mọi loại hoặc từng loại H1–H6 (bộ luật D mục 9.3).
+  const [flagFilter, setFlagFilter] = useState<string>('');
   const term = overview.terms.find((t) => t.semesterId === semesterId);
   const summary = term?.summary;
   const thresholds = overview.thresholds ?? {};
@@ -36,21 +32,13 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
     () => new Map(overview.faculties.map((f) => [f.id, f.name])),
     [overview.faculties],
   );
-  const facultyColor = useMemo(() => {
-    const map = new Map<number, string>();
-    overview.faculties.forEach((f, index) => map.set(f.id, COLORS.categories[index % COLORS.categories.length]));
-    return map;
-  }, [overview.faculties]);
-
-  // Bảng hai chiều: mỗi dòng một cặp điểm lưu ý H – trạng thái ổn định O ngược với nó.
-  const twoWay = FLAG_CODES.map((flag, index) => {
-    const stable = `O${index + 1}`;
-    const flagged = courses.filter((c) => c.flags.includes(flag)).length;
-    const steady = courses.filter((c) => c.stableStates.includes(stable)).length;
-    const pending = courses.filter((c) => (c.data.cdl ?? []).includes(stable)).length;
-    const comparable = flagged + steady + pending;
-    return { flag, stable, flagged, steady, pending, comparable, notComparable: courses.length - comparable };
-  });
+  // Bản đồ: hơn 6 khoa nên không tô mỗi khoa một màu (bộ luật D, M4); chọn một khoa để tô, còn lại xám.
+  const [mapFaculty, setMapFaculty] = useState<number | null>(null);
+  const mapColor = useCallback(() => COLORS.scale[3], []);
+  const mapHighlight = useCallback(
+    (course: AnalysisCourse) => mapFaculty === null || course.facultyId === mapFaculty,
+    [mapFaculty],
+  );
 
   const trend = overview.terms.map((t) => ({
     label: t.label,
@@ -60,22 +48,10 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
     i6: t.summary?.i6 ?? null,
   }));
 
-  const comparableCourses = courses.filter((c) => c.data.du_dk && c.data.tau_x != null && c.data.tau_y != null);
-  const scatterByFaculty = useMemo(() => {
-    const groups = new Map<number, { x: number; y: number; name: string; flags: string }[]>();
-    for (const c of comparableCourses) {
-      const key = c.facultyId ?? -1;
-      const point = {
-        x: (axis === 'icc' ? c.data.icc_x : c.data.tau_x) ?? 0,
-        y: (axis === 'icc' ? c.data.icc_y : c.data.tau_y) ?? 0,
-        name: `${c.data.ten} (${c.baseCourseCode})`,
-        flags: c.flags.join(', '),
-      };
-      groups.set(key, [...(groups.get(key) ?? []), point]);
-    }
-    return [...groups.entries()];
-  }, [comparableCourses, axis]);
-
+  const comparableCourses = useMemo(
+    () => courses.filter((c) => c.data.du_dk && c.data.tau_x != null && c.data.tau_y != null),
+    [courses],
+  );
   const facultyRows = overview.faculties.map((f) => {
     const list = courses.filter((c) => c.facultyId === f.id);
     const comparable = list.filter((c) => c.data.du_dk);
@@ -85,7 +61,7 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
       faculty: f,
       total: list.length,
       comparable: comparable.length,
-      flagged: list.filter((c) => c.flags.length > 0).length,
+      flagged: list.filter((c) => (flagFilter ? c.flags.includes(flagFilter) : c.flags.length > 0)).length,
       iccX: median(withX.map((c) => c.data.icc_x)),
       tauX: median(withX.map((c) => c.data.tau_x)),
       h1: withX.length ? withX.filter((c) => c.flags.includes('H1')).length / withX.length : null,
@@ -115,34 +91,7 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
         />
       </dl>
 
-      <SectionCard
-        title="Điểm lưu ý và trạng thái ổn định"
-        description="Mỗi dòng một câu hỏi về học phần. Tỷ lệ tính trên các học phần so sánh được của dòng đó. “Chưa đủ căn cứ” không có nghĩa là đồng đều."
-      >
-        <div className="cga-table-wrap">
-          <table className="cga-table">
-            <thead>
-              <tr>
-                <th>Điểm lưu ý</th><th className="num">Số học phần</th>
-                <th>Ổn định, đồng đều</th><th className="num">Số học phần</th>
-                <th className="num">Chưa đủ căn cứ</th><th className="num">Không so sánh được</th>
-              </tr>
-            </thead>
-            <tbody>
-              {twoWay.map((row) => (
-                <tr key={row.flag}>
-                  <td><span className="cga-code">{row.flag}</span> {FLAG_LABELS[row.flag]?.name}</td>
-                  <td className="num">{viInt(row.flagged)} <small>({pct(row.comparable ? row.flagged / row.comparable : 0, 0)})</small></td>
-                  <td><span className="cga-code">{row.stable}</span> {STABLE_LABELS[row.stable]?.name}</td>
-                  <td className="num">{viInt(row.steady)} <small>({pct(row.comparable ? row.steady / row.comparable : 0, 0)})</small></td>
-                  <td className="num">{viInt(row.pending)} <small>({pct(row.comparable ? row.pending / row.comparable : 0, 0)})</small></td>
-                  <td className="num cga-muted">{viInt(row.notComparable)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </SectionCard>
+      <TwoWayTable courses={courses} />
 
       <SectionCard title="Xu hướng qua các học kỳ" description="Số mô tả toàn bộ phạm vi đang xem; không dùng để xếp hạng chất lượng.">
         <div className="cga-grid-2">
@@ -157,10 +106,10 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={trend} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="#e3e8ec" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} />
                   <YAxis tick={{ fontSize: 11 }} width={44} domain={['auto', 'auto']} />
                   <Tooltip formatter={(value) => vi(typeof value === 'number' ? value : null, digits)} />
-                  <Line type="linear" dataKey={key} stroke={COLORS.categories[index]} strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="linear" isAnimationActive={false} dataKey={key} stroke={COLORS.categories[index]} strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -170,69 +119,47 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
 
       <SectionCard
         title="Bản đồ học phần: mức chênh giữa các lớp"
-        description={`Mỗi điểm là một học phần đủ lớp để so sánh (${viInt(comparableCourses.length)} học phần). Trục ngang: điểm quá trình; trục dọc: điểm thi sau khi điều chỉnh năng lực nền.`}
-        actions={(
-          <label className="cga-inline-field">
-            Thang đo
-            <select value={axis} onChange={(event) => setAxis(event.target.value as Axis)}>
-              <option value="icc">Tỷ lệ phương sai giữa các lớp (ICC)</option>
-              <option value="tau">Độ lệch chuẩn giữa các lớp (τ, điểm)</option>
-            </select>
-          </label>
-        )}
+        description={`Mỗi chấm là một học phần đủ lớp để so sánh (${viInt(comparableCourses.length)} học phần), không ghi tên học phần; chọn một khoa để tô nổi. Trục ngang: điểm quá trình; trục dọc: điểm thi sau khi điều chỉnh năng lực nền.`}
       >
-        <ResponsiveContainer width="100%" height={380}>
-          <ScatterChart margin={{ top: 12, right: 24, bottom: 24, left: 8 }}>
-            <CartesianGrid stroke="#e3e8ec" />
-            <XAxis type="number" dataKey="x" name="X" tick={{ fontSize: 11 }}
-              label={{ value: axis === 'icc' ? 'ICC điểm quá trình' : 'τ điểm quá trình', position: 'insideBottom', offset: -12, fontSize: 12 }} />
-            <YAxis type="number" dataKey="y" name="Y" tick={{ fontSize: 11 }} width={48}
-              label={{ value: axis === 'icc' ? 'ICC điểm thi' : 'τ điểm thi', angle: -90, position: 'insideLeft', fontSize: 12 }} />
-            <ZAxis range={[36, 36]} />
-            {axis === 'icc' && typeof thresholds.h1_icc_x === 'number' && (
-              <ReferenceLine x={thresholds.h1_icc_x} stroke="#64748b" strokeDasharray="4 4" />
-            )}
-            {axis === 'icc' && typeof thresholds.h2_icc_y === 'number' && (
-              <ReferenceLine y={thresholds.h2_icc_y} stroke="#64748b" strokeDasharray="4 4" />
-            )}
-            <Tooltip
-              cursor={{ strokeDasharray: '3 3' }}
-              content={({ payload }) => {
-                const point = payload?.[0]?.payload as { name: string; x: number; y: number; flags: string } | undefined;
-                if (!point) return null;
-                return (
-                  <div className="cga-tooltip">
-                    <strong>{point.name}</strong>
-                    <div>Điểm quá trình: {vi(point.x, 3)} · Điểm thi: {vi(point.y, 3)}</div>
-                    {point.flags && <div>Điểm lưu ý: {point.flags}</div>}
-                  </div>
-                );
-              }}
-            />
-            <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} />
-            {scatterByFaculty.map(([facultyId, points]) => (
-              <Scatter
-                key={facultyId}
-                name={facultyName.get(facultyId) ?? 'Chưa rõ khoa'}
-                data={points}
-                fill={facultyColor.get(facultyId) ?? COLORS.categories[3]}
-                fillOpacity={0.75}
-              />
-            ))}
-          </ScatterChart>
-        </ResponsiveContainer>
+        <CourseMap
+          courses={comparableCourses}
+          thresholds={thresholds}
+          colorOf={mapColor}
+          highlight={mapHighlight}
+          legend={mapFaculty === null
+            ? [{ label: 'Học phần', color: COLORS.scale[3] }]
+            : [{ label: `Học phần của ${facultyName.get(mapFaculty) ?? 'khoa đã chọn'}`, color: COLORS.scale[3] }, { label: 'Học phần khác', color: '#B8C2D3' }]}
+          controls={overview.faculties.length > 1 && (
+            <label className="cga-inline-field">
+              Khoa
+              <select value={mapFaculty ?? ''} onChange={(event) => setMapFaculty(event.target.value ? Number(event.target.value) : null)}>
+                <option value="">Tất cả khoa (cùng một màu)</option>
+                {overview.faculties.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </label>
+          )}
+        />
       </SectionCard>
 
       <SectionCard
         title="So sánh theo khoa"
         description="Chỉ so sánh các chỉ số rút ra bên trong từng học phần (bộ luật D, R2, R4): trung vị qua các học phần đủ lớp để so sánh, kèm tỷ lệ học phần có điểm lưu ý."
+        actions={(
+          <label className="cga-inline-field">
+            Loại điểm lưu ý
+            <select value={flagFilter} onChange={(event) => setFlagFilter(event.target.value)}>
+              <option value="">Mọi loại</option>
+              {FLAG_CODES.map((code) => <option key={code} value={code}>{code} · {FLAG_LABELS[code]?.name}</option>)}
+            </select>
+          </label>
+        )}
       >
         <div className="cga-table-wrap">
           <table className="cga-table">
             <thead>
               <tr>
                 <th>Khoa</th><th className="num">Học phần</th><th className="num">Đủ lớp so sánh</th>
-                <th className="num">Có điểm lưu ý</th>
+                <th className="num">{flagFilter ? `Có ${flagFilter}` : 'Có điểm lưu ý'}</th>
                 <th className="num">ICC / τ điểm quá trình</th><th className="num">Có H1</th>
                 <th className="num">ICC / τ điểm thi</th><th className="num">Có H2</th>
               </tr>

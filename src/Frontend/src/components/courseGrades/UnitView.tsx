@@ -1,6 +1,12 @@
-import { useMemo } from 'react';
-import type { AnalysisCourse, AnalysisOverview } from '../../types/courseGradeAnalysis';
-import { median, pct, vi, viInt } from './courseGradeFormat';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LoaderCircle } from 'lucide-react';
+import { courseGradeAnalysisApi } from '../../services/courseGradeAnalysisApi';
+import { courseGradeErrorMessage } from '../../services/courseGradesApi';
+import type { AnalysisCourse, AnalysisLecturerCourse, AnalysisOverview } from '../../types/courseGradeAnalysis';
+import { CourseMap } from './CourseMap';
+import { TwoWayTable } from './TwoWayTable';
+import { MARKER_LABELS } from './courseGradeLabels';
+import { COLORS, median, pct, vi, viInt } from './courseGradeFormat';
 import { FlagChips, SectionCard, StableChips } from './courseGradeUi';
 
 interface Props {
@@ -10,15 +16,61 @@ interface Props {
   facultyId: number | null;
   onFacultyChange: (facultyId: number | null) => void;
   onOpenCourse: (departmentId: number | null, courseCode: string) => void;
+  onOpenTrends: (departmentId: number | null) => void;
 }
 
-/** Cấp khoa / bộ môn: bảng bộ môn × chỉ số và danh sách học phần có điểm lưu ý. */
-export function UnitView({ overview, termCode, courses, facultyId, onFacultyChange, onOpenCourse }: Props) {
-  const departments = overview.departments.filter((d) => facultyId === null || d.facultyId === facultyId);
+interface RepeatRow {
+  key: string;
+  lecturer: string;
+  courseName: string;
+  courseCode: string;
+  departmentId: number | null;
+  marker: string;
+  terms: string[];
+  ongoing: boolean;
+}
+
+/**
+ * Cấp khoa (bộ luật D mục 9.4; trang "Cấp khoa / viện" của bản audit): bảng hai chiều, bảng bộ môn
+ * × chỉ số, bản đồ học phần của khoa, danh sách học phần có điểm lưu ý và đặc điểm lặp lại (G1, có tên
+ * giảng viên).
+ */
+export function UnitView({ overview, termCode, courses, facultyId, onFacultyChange, onOpenCourse, onOpenTrends }: Props) {
+  const [mapDepartment, setMapDepartment] = useState<number | null>(null);
+  const [onlyFlagged, setOnlyFlagged] = useState(false);
+  const [lecturerRows, setLecturerRows] = useState<AnalysisLecturerCourse[]>([]);
+  const [loadingRepeat, setLoadingRepeat] = useState(true);
+  const [repeatError, setRepeatError] = useState<string | null>(null);
+
+  const departments = useMemo(
+    () => overview.departments.filter((d) => facultyId === null || d.facultyId === facultyId),
+    [overview.departments, facultyId],
+  );
   const departmentName = new Map(overview.departments.map((d) => [d.id, d.name]));
-  const inFaculty = courses.filter((c) => facultyId === null || c.facultyId === facultyId);
-  const termIndex = overview.crossTerm?.ky.indexOf(termCode) ?? -1;
-  const termsUpToNow = termIndex >= 0 ? overview.crossTerm!.ky.slice(0, termIndex + 1) : [];
+  const inFaculty = useMemo(
+    () => courses.filter((c) => facultyId === null || c.facultyId === facultyId),
+    [courses, facultyId],
+  );
+  const terms = overview.crossTerm?.ky ?? [];
+  const termIndex = terms.indexOf(termCode);
+  const termsUpToNow = termIndex >= 0 ? terms.slice(0, termIndex + 1) : [];
+  const termLabel = new Map(overview.terms.map((t) => [t.termCode, t.label]));
+  const facultyLabel = facultyId === null
+    ? (overview.viewLevel === 'full' ? 'Toàn trường' : 'Đơn vị của bạn')
+    : overview.faculties.find((f) => f.id === facultyId)?.name ?? 'Khoa đã chọn';
+
+  useEffect(() => { setMapDepartment(null); }, [facultyId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRepeat(true);
+    setRepeatError(null);
+    courseGradeAnalysisApi.lecturerCourses()
+      .then((rows) => { if (!cancelled) setLecturerRows(rows); })
+      .catch((error) => { if (!cancelled) setRepeatError(courseGradeErrorMessage(error, 'Không tải được danh sách đặc điểm lặp lại.')); })
+      .finally(() => { if (!cancelled) setLoadingRepeat(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const rows = useMemo(() => departments.map((department) => {
     const list = inFaculty.filter((c) => c.departmentId === department.id);
@@ -27,6 +79,9 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
     const comparable = list.filter((c) => c.data.du_dk);
     const withX = comparable.filter((c) => c.data.tau_x != null);
     const withY = comparable.filter((c) => c.data.tau_y != null);
+    // Như bản audit: tỷ lệ trên các lớp đưa vào thống kê, r là trung vị r của các lớp đó.
+    const lost = list.reduce((sum, c) => sum + (c.data.lop_tk?.n_mat ?? 0), 0);
+    const graded = list.reduce((sum, c) => sum + (c.data.lop_tk?.n_diem ?? 0), 0);
     const studentsP = list.reduce((sum, c) => sum + (c.data.n_p ?? 0), 0);
     return {
       department,
@@ -35,14 +90,42 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
       comparable: comparable.length,
       flagged: list.filter((c) => c.flags.length > 0).length,
       topFlags: [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([code]) => code),
+      i1: graded ? lost / graded : null,
       i2: studentsP ? list.reduce((sum, c) => sum + (c.data.i2 ?? 0) * (c.data.n_p ?? 0), 0) / studentsP : null,
-      r: median(list.map((c) => c.data.r)),
+      r: median(list.flatMap((c) => c.data.lop_tk?.r ?? [])),
       iccX: median(withX.map((c) => c.data.icc_x)),
+      tauX: median(withX.map((c) => c.data.tau_x)),
       h1: withX.length ? withX.filter((c) => c.flags.includes('H1')).length / withX.length : null,
       iccY: median(withY.map((c) => c.data.icc_y)),
+      tauY: median(withY.map((c) => c.data.tau_y)),
       h2: withY.length ? withY.filter((c) => c.flags.includes('H2')).length / withY.length : null,
     };
   }).filter((row) => row.courses > 0), [departments, inFaculty]);
+
+  // Bản đồ: mỗi bộ môn một màu trung tính (M4); lọc một bộ môn hoặc chỉ học phần có điểm lưu ý thì phần còn lại xám.
+  const mapCourses = useMemo(
+    () => inFaculty.filter((c) => c.data.du_dk && c.data.tau_x != null && c.data.tau_y != null),
+    [inFaculty],
+  );
+  const mapDepartments = useMemo(
+    () => departments.filter((d) => mapCourses.some((c) => c.departmentId === d.id)),
+    [departments, mapCourses],
+  );
+  const departmentColor = useMemo(() => {
+    const map = new Map<number, string>();
+    mapDepartments.forEach((d, index) => map.set(d.id, COLORS.categories[index % COLORS.categories.length]));
+    return map;
+  }, [mapDepartments]);
+  const colorOf = useCallback(
+    (course: AnalysisCourse) => departmentColor.get(course.departmentId ?? -1) ?? COLORS.categories[3],
+    [departmentColor],
+  );
+  const highlight = useCallback(
+    (course: AnalysisCourse) => (mapDepartment === null || course.departmentId === mapDepartment)
+      && (!onlyFlagged || course.flags.length > 0),
+    [mapDepartment, onlyFlagged],
+  );
+  const showMap = facultyId !== null || overview.viewLevel === 'unit';
 
   const flagged = inFaculty
     .filter((c) => c.flags.length > 0)
@@ -50,6 +133,23 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
       || a.baseCourseCode.localeCompare(b.baseCourseCode));
   const flaggedTermsOf = (code: string) =>
     termsUpToNow.filter((ky) => (overview.crossTerm?.co_hp?.[code]?.[ky] ?? []).length > 0).length;
+
+  // G1 của kỳ đang xem, trong khoa (theo bộ môn của học phần). Đang tiếp diễn xếp trước.
+  const departmentIds = new Set(departments.map((d) => d.id));
+  const minRepeatTerms = Math.max(2, Number(overview.thresholds?.g1_so_ky_lap ?? 2));
+  const repeats: RepeatRow[] = lecturerRows
+    .filter((r) => facultyId === null || (r.departmentId !== null && departmentIds.has(r.departmentId)))
+    .flatMap((r) => Object.entries(r.data.g1_ky?.[termCode] ?? {}).map(([marker, detail]) => ({
+      key: `${r.lecturerId}|${r.baseCourseCode}|${marker}`,
+      lecturer: r.lecturerName ?? `Giảng viên #${r.lecturerId}`,
+      courseName: r.data.ten,
+      courseCode: r.baseCourseCode,
+      departmentId: r.departmentId,
+      marker,
+      terms: detail.ky,
+      ongoing: detail.dang,
+    })))
+    .sort((a, b) => Number(b.ongoing) - Number(a.ongoing) || a.lecturer.localeCompare(b.lecturer, 'vi'));
 
   return (
     <div className="cga-stack">
@@ -63,9 +163,11 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
         </label>
       )}
 
+      <TwoWayTable courses={inFaculty} scope={facultyLabel} />
+
       <SectionCard
         title="Các bộ môn"
-        description="Tỷ lệ trượt và tương quan chỉ để mô tả, không dùng xếp hạng chất lượng. So sánh giữa bộ môn dựa trên mức chênh giữa các lớp bên trong từng học phần (trung vị ICC) và tỷ lệ học phần có điểm lưu ý."
+        description="Tỷ lệ mất tư cách, tỷ lệ trượt và tương quan chỉ để mô tả, không dùng xếp hạng chất lượng. So sánh giữa bộ môn dựa trên mức chênh giữa các lớp bên trong từng học phần (trung vị ICC, τ) và tỷ lệ học phần có điểm lưu ý."
       >
         <div className="cga-table-wrap">
           <table className="cga-table">
@@ -73,9 +175,9 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
               <tr>
                 <th>Bộ môn</th><th className="num">Học phần</th><th className="num">Lớp</th><th className="num">Đủ lớp so sánh</th>
                 <th className="num">Có điểm lưu ý</th><th>Gặp nhiều nhất</th>
-                <th className="num">Trượt do điểm thi</th><th className="num">r (trung vị)</th>
-                <th className="num">ICC điểm quá trình</th><th className="num">Có H1</th>
-                <th className="num">ICC điểm thi</th><th className="num">Có H2</th>
+                <th className="num">Mất tư cách</th><th className="num">Trượt do điểm thi</th><th className="num">r (trung vị lớp)</th>
+                <th className="num">ICC / τ điểm quá trình</th><th className="num">Có H1</th>
+                <th className="num">ICC / τ điểm thi</th><th className="num">Có H2</th>
               </tr>
             </thead>
             <tbody>
@@ -87,17 +189,54 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
                   <td className="num">{viInt(row.comparable)}</td>
                   <td className="num">{viInt(row.flagged)} <small>({pct(row.courses ? row.flagged / row.courses : 0, 0)})</small></td>
                   <td><FlagChips codes={row.topFlags} empty="—" compact /></td>
+                  <td className="num">{pct(row.i1)}</td>
                   <td className="num">{pct(row.i2)}</td>
                   <td className="num">{vi(row.r, 2)}</td>
-                  <td className="num">{vi(row.iccX, 2)}</td>
+                  <td className="num">{vi(row.iccX, 2)} / {vi(row.tauX, 2)}</td>
                   <td className="num">{pct(row.h1, 0)}</td>
-                  <td className="num">{vi(row.iccY, 2)}</td>
+                  <td className="num">{vi(row.iccY, 2)} / {vi(row.tauY, 2)}</td>
                   <td className="num">{pct(row.h2, 0)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Bản đồ học phần của khoa"
+        description={showMap
+          ? `Mỗi chấm là một học phần đủ điều kiện so sánh (${viInt(mapCourses.length)} học phần), tô màu theo bộ môn. Ghi tên tối đa 6 học phần có điểm lưu ý nằm xa nhất; di chuột vào các chấm khác để xem tên.`
+          : 'Chọn một khoa ở trên để xem bản đồ học phần của khoa đó.'}
+      >
+        {showMap && (
+          <CourseMap
+            courses={mapCourses}
+            thresholds={overview.thresholds ?? {}}
+            colorOf={colorOf}
+            highlight={highlight}
+            maxLabels={6}
+            legend={mapDepartments.map((d) => ({ label: d.name, color: departmentColor.get(d.id) ?? COLORS.categories[3] }))}
+            controls={(
+              <>
+                <label className="cga-inline-field">
+                  Bộ môn
+                  <select value={mapDepartment ?? ''} onChange={(event) => setMapDepartment(event.target.value ? Number(event.target.value) : null)}>
+                    <option value="">Tất cả bộ môn</option>
+                    {mapDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </label>
+                <label className="cga-inline-field">
+                  Học phần hiển thị
+                  <select value={onlyFlagged ? '1' : ''} onChange={(event) => setOnlyFlagged(event.target.value === '1')}>
+                    <option value="">Tất cả học phần</option>
+                    <option value="1">Chỉ học phần có điểm lưu ý</option>
+                  </select>
+                </label>
+              </>
+            )}
+          />
+        )}
       </SectionCard>
 
       <SectionCard
@@ -131,6 +270,44 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
             </tbody>
           </table>
         </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Đặc điểm lặp lại qua nhiều học kỳ (G1)"
+        description={`Cùng giảng viên, cùng học phần, cùng một đặc điểm ở nhiều học kỳ trong ${viInt(Number(overview.thresholds?.g1_cua_so_ky ?? 4))} kỳ gần nhất tính đến ${termLabel.get(termCode) ?? termCode}. ${viInt(repeats.length)} lượt, ${viInt(repeats.filter((r) => r.ongoing).length)} đang tiếp diễn. Sự lặp lại có thể do ngẫu nhiên; đây là căn cứ để trao đổi, không phải kết luận.`}
+      >
+        {termsUpToNow.length < minRepeatTerms ? (
+          <p className="cga-muted">Cần ít nhất {viInt(minRepeatTerms)} học kỳ đã nạp để xét đặc điểm lặp lại.</p>
+        ) : loadingRepeat ? (
+          <div className="cga-state"><LoaderCircle className="spin" /> Đang tải...</div>
+        ) : repeatError ? (
+          <div className="cga-alert" role="alert">{repeatError}</div>
+        ) : (
+          <div className="cga-table-wrap">
+            <table className="cga-table">
+              <thead>
+                <tr><th>Giảng viên</th><th>Học phần</th><th>Đặc điểm lặp lại</th><th>Các học kỳ có đặc điểm</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr>
+              </thead>
+              <tbody>
+                {repeats.map((r) => (
+                  <tr key={r.key}>
+                    <td className="cga-name-col">{r.lecturer}</td>
+                    <td className="cga-name-col">{r.courseName}<br /><small className="cga-muted">{r.courseCode}</small></td>
+                    <td><span className="cga-code">{r.marker}</span> {MARKER_LABELS[r.marker]?.name}</td>
+                    <td>{r.terms.map((ky) => termLabel.get(ky) ?? ky).join(', ')}</td>
+                    <td>{r.ongoing ? 'Đang tiếp diễn' : 'Đã ghi nhận trước đây'}</td>
+                    <td>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => onOpenTrends(r.departmentId)}>
+                        Xem diễn biến
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {repeats.length === 0 && <tr><td colSpan={6} className="cga-muted">Không có đặc điểm nào lặp lại trong học kỳ này.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
       </SectionCard>
     </div>
   );

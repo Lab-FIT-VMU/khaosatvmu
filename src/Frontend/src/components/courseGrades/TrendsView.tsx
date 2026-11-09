@@ -3,9 +3,9 @@ import { LoaderCircle } from 'lucide-react';
 import { courseGradeAnalysisApi } from '../../services/courseGradeAnalysisApi';
 import { courseGradeErrorMessage } from '../../services/courseGradesApi';
 import type { AnalysisCourse, AnalysisLecturerCourse, AnalysisOverview } from '../../types/courseGradeAnalysis';
-import { MARKER_LABELS } from './courseGradeLabels';
+import { FLAG_CODES, FLAG_LABELS, MARKER_LABELS } from './courseGradeLabels';
 import { deviationColor, signed, vi, viInt } from './courseGradeFormat';
-import { SectionCard } from './courseGradeUi';
+import { FlagChips, SectionCard } from './courseGradeUi';
 
 interface Props {
   overview: AnalysisOverview;
@@ -24,6 +24,9 @@ export function TrendsView({ overview, termCode, courses, departmentId, onDepart
   const [rows, setRows] = useState<AnalysisLecturerCourse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [flagFilter, setFlagFilter] = useState('');
+  const [repeatedOnly, setRepeatedOnly] = useState(true);
   const terms = overview.crossTerm?.ky ?? [];
   const termIndex = terms.indexOf(termCode);
   const visibleTerms = termIndex >= 0 ? terms.slice(0, termIndex + 1) : terms;
@@ -49,6 +52,19 @@ export function TrendsView({ overview, termCode, courses, departmentId, onDepart
     [rows, visibleTerms],
   );
 
+  // Học phần qua các kỳ (trang Diễn biến, thẻ "học phần" của bản audit): điểm lưu ý ở từng kỳ đến kỳ đang xem.
+  const departmentName = new Map(overview.departments.map((d) => [d.id, d.name]));
+  const flagHistory = (overview.courses ?? [])
+    .filter((c) => departmentId === null || c.departmentId === departmentId)
+    .map((c) => ({ course: c, flags: visibleTerms.map((ky) => overview.crossTerm?.co_hp?.[c.baseCourseCode]?.[ky] ?? []) }))
+    .filter((row) => {
+      const hits = row.flags.filter((f) => (flagFilter ? f.includes(flagFilter) : f.length > 0)).length;
+      const text = `${row.course.name} ${row.course.baseCourseCode}`.toLowerCase();
+      return hits >= (repeatedOnly ? 2 : 1) && (!search.trim() || text.includes(search.trim().toLowerCase()));
+    })
+    .sort((a, b) => b.flags.filter((f) => f.length).length - a.flags.filter((f) => f.length).length
+      || a.course.name.localeCompare(b.course.name, 'vi'));
+
   const examCourses = courses
     .filter((c) => departmentId === null || c.departmentId === departmentId)
     .filter((c) => visibleTerms.filter((ky) => overview.crossTerm?.de_thi?.[c.baseCourseCode]?.[ky] != null).length >= 2)
@@ -63,6 +79,63 @@ export function TrendsView({ overview, termCode, courses, departmentId, onDepart
           {overview.departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </label>
+
+      <SectionCard
+        title="Điểm lưu ý của học phần qua các học kỳ"
+        description={`${viInt(flagHistory.length)} học phần. Mỗi ô là các điểm lưu ý của học phần trong kỳ đó; học phần có điểm lưu ý ở nhiều kỳ là nơi nên xem trước.`}
+        actions={(
+          <div className="cga-actions">
+            <label className="cga-inline-field">
+              Tìm học phần
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tên hoặc mã học phần" />
+            </label>
+            <label className="cga-inline-field">
+              Loại điểm lưu ý
+              <select value={flagFilter} onChange={(event) => setFlagFilter(event.target.value)}>
+                <option value="">Mọi loại</option>
+                {FLAG_CODES.map((code) => <option key={code} value={code}>{code} · {FLAG_LABELS[code]?.name}</option>)}
+              </select>
+            </label>
+            <label className="cga-inline-field">
+              Lặp lại
+              <select value={repeatedOnly ? '2' : '1'} onChange={(event) => setRepeatedOnly(event.target.value === '2')}>
+                <option value="2">Có điểm lưu ý từ 2 học kỳ trở lên</option>
+                <option value="1">Có điểm lưu ý ở ít nhất 1 học kỳ</option>
+              </select>
+            </label>
+          </div>
+        )}
+      >
+        {flagHistory.length === 0 ? <p className="cga-muted">Không có học phần nào phù hợp bộ lọc.</p> : (
+          <div className="cga-table-wrap">
+            <table className="cga-table">
+              <thead>
+                <tr>
+                  <th>Học phần</th><th>Bộ môn</th>
+                  {visibleTerms.map((ky) => <th key={ky}>{labelOf.get(ky) ?? ky}</th>)}
+                  <th className="num">Số kỳ có điểm lưu ý</th><th>Số kỳ theo từng loại</th>
+                </tr>
+              </thead>
+              <tbody>
+                {flagHistory.map(({ course, flags }) => (
+                  <tr key={course.baseCourseCode}>
+                    <td className="cga-name-col">{course.name}<br /><small className="cga-muted">{course.baseCourseCode}</small></td>
+                    <td>{departmentName.get(course.departmentId ?? -1) ?? '—'}</td>
+                    {flags.map((f, i) => <td key={visibleTerms[i]}><FlagChips codes={f} empty="—" compact /></td>)}
+                    <td className="num"><strong>{viInt(flags.filter((f) => f.length).length)}</strong></td>
+                    <td>
+                      {FLAG_CODES.map((code) => [code, flags.filter((f) => f.includes(code)).length] as const)
+                        .filter(([, n]) => n > 0)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([code, n]) => <div key={code}><span className="cga-code">{code}</span> {viInt(n)} kỳ</div>)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
 
       {error && <div className="cga-alert" role="alert">{error}</div>}
 
@@ -116,7 +189,19 @@ export function TrendsView({ overview, termCode, courses, departmentId, onDepart
                           </div>
                         ))}
                       </td>
-                      <td className="cga-wrap">{r.data.theo_ky?.[termCode]?.xu_huong ?? ''}</td>
+                      <td className="cga-wrap">
+                        {r.data.theo_ky?.[termCode]?.xu_huong ?? ''}
+                        {r.data.theo_ky?.[termCode]?.tuong_duong && (
+                          <div>
+                            <span
+                              className="cga-chip cga-chip--stable"
+                              title={`Mức điểm quá trình so với kỳ vọng nằm trong vùng gần 0 (±${vi(nearZero, 2)} điểm) ở mọi học kỳ đã dạy học phần. Đây là mô tả số liệu; khi học phần có ít lớp, điều này chưa khẳng định các lớp tương đương nhau.`}
+                            >
+                              Điểm quá trình gần mức kỳ vọng ở các kỳ đã dạy
+                            </span>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}

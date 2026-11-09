@@ -156,11 +156,20 @@ public sealed partial class EfCourseGradeImportService(
 
         // B-G2: lớp có trong file lớp nhưng chưa có dòng điểm nào. Chỉ xét lớp thuộc phạm vi
         // phân tích (bỏ B-L1–B-L4), giống bản Python.
+        // Nhãn "Tên HP – Nhóm" (bộ luật B mục 0); hai mã khác nhau cùng tên, cùng nhóm (đại trà và
+        // đuôi H/E) thì thêm mã để không lẫn.
+        var ambiguousLabels = sections
+            .GroupBy(s => (s.CourseName, s.SectionName))
+            .Where(g => g.Select(s => s.CourseCode).Distinct(StringComparer.Ordinal).Count() > 1)
+            .Select(g => g.Key)
+            .ToHashSet();
         var sectionsWithoutGrades = sections
             .Where(s => CourseSectionImportRules.AnalysisExclusionReason(s.CourseCode, s.CourseName) is null)
             .Where(s => !matchedRows.ContainsKey(s.CourseSectionId))
-            .OrderBy(s => s.CourseName).ThenBy(s => s.SectionName)
-            .Select(s => $"{s.CourseName} – {s.SectionName}")
+            .OrderBy(s => s.CourseName).ThenBy(s => s.SectionName).ThenBy(s => s.CourseCode)
+            .Select(s => ambiguousLabels.Contains((s.CourseName, s.SectionName))
+                ? $"{s.CourseName} – {s.SectionName} (mã {s.CourseCode})"
+                : $"{s.CourseName} – {s.SectionName}")
             .ToList();
 
         var codes = storable.Select(r => r.StudentCode).Distinct(StringComparer.Ordinal).ToList();
@@ -181,6 +190,12 @@ public sealed partial class EfCourseGradeImportService(
             .Where(r => r.StudentName is not null)
             .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First().StudentName!, StringComparer.Ordinal);
+        var expectedTerm = SemesterOrdering.ExpectedTermCode(semester.AcademicYearName, semester.SemesterName);
+        if (expectedTerm is not null && rules.MostCommonTermCode is { } fileTerm && fileTerm != expectedTerm)
+        {
+            warnings.Add($"Mã học kỳ trong file điểm là {fileTerm}, khác với mã {expectedTerm} của {semesterLabel}. Hãy kiểm tra lại đã chọn đúng học kỳ chưa.");
+        }
+
         var renamed = existing.Count(x => nameByCode.TryGetValue(x.StudentCode, out var name)
             && !string.Equals(name, x.FullName, StringComparison.Ordinal));
         if (renamed > 0)

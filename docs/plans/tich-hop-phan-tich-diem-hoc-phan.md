@@ -392,3 +392,19 @@ Tổng này khớp bảng tham chiếu ở bộ luật A mục 7. Chênh 120 dò
 | `Data/Bo luat/van_ban_giao_dien.json` | Chuyển sang frontend |
 | `Data/Bo luat/tham_so_chi_so.json` | Dữ liệu seed cho `GradeAnalysisThresholds` |
 | `tests/` | Giữ; thêm kiểm thử đối chiếu luồng file với luồng CSDL |
+
+## 10. Đối chiếu với các bộ luật (rà lại 09/11/2026)
+
+| Bộ luật | Kết quả |
+|---|---|
+| A – điểm học tập | Đủ N1–N5, L1–L8, X/Y/Z, làm tròn half-up, chống trùng. Số dòng khớp mục 7 của bộ luật, chênh đúng 120 dòng do L8 thêm sau. Bổ sung lúc rà: cảnh báo khi mã `f_nhhk` của file khác kỳ đã chọn (bản Python có, bản C# trước đó chưa có) |
+| B – lớp học phần | Đủ B-N, B-L1–B-L4 (áp ở bước phân tích), B-T1 (gộp 194/195 → 191, 121 → 122, `#N/A` suy từ mã), ghép B-G1, B-G2, B-G4. Bổ sung lúc rà: nhãn lớp chưa có điểm thêm mã khi hai mã cùng tên, cùng nhóm (mục 0) |
+| C – quy đổi Z | Chỉ dùng `he4()` cho năng lực nền khi chọn thang 4, như bản gốc. Phân bố điểm chữ theo lớp, TBCHK, xếp loại sinh viên: bản gốc ghi "không làm", bản tích hợp cũng chưa làm |
+| D – chỉ số và báo cáo | Phần tính chạy nguyên mã Python gốc; 31 test gốc (`tests/test_nhan_xet.py`, `test_thoi_gian.py`, `test_van_ban.py`) qua trên mã của worker. 33 ngưỡng khớp `tham_so_chi_so.json`; màu M2–M4 khớp. Bổ sung lúc rà các phần báo cáo còn thiếu so với bản gốc: bảng hai chiều và bản đồ học phần có nhãn ở cấp khoa, danh sách G1 có tên giảng viên, I1 và τ trong bảng bộ môn (tính trên lớp đưa vào thống kê như bản gốc), dumbbell X̄/Ȳ theo lớp, bảng học phần × kỳ, số học phần ở mỗi vùng bản đồ, lọc loại điểm lưu ý theo khoa, ghi chú H5/H6 ở trang học phần |
+| E – hồ sơ lớp | Chạy nguyên `nhan_xet.py`; T1–T3, T7 và O1–O6 qua. T4–T6 của bộ luật dùng dữ liệu giả lập (tên giảng viên và điểm khác dữ liệu thật) nên không so trực tiếp với kết quả trên dữ liệu thật |
+
+**Khác bộ luật có chủ ý (đã chốt với người dùng):**
+- R1 (cấp Ban giám hiệu không có tên giảng viên): bỏ, Quản trị hệ thống và Ban giám hiệu xem được hết.
+- Khoa của học phần lấy theo CSDL (Q11). Lệch bản gốc ở 2 bộ môn: 301 (bản gốc ép về Khoa Kinh tế theo B-T1, CSDL thuộc Trung tâm Logistics, 8 lớp trong 4 kỳ) và 291 IMET (chỉ khác tên đơn vị).
+- Lớp trùng (mã HP, nhóm) trong file lớp: giữ dòng đầu và báo lỗi dòng sau, bản gốc giữ lớp sĩ số lớn hơn. Dữ liệu thật có 0 dòng trùng.
+- Câu nhận xét không ghi số tháng giữa hai kỳ.

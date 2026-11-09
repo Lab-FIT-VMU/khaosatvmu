@@ -79,6 +79,10 @@ export function CourseGradeReportsPage() {
     setCourseCode(code);
     setTab('sections');
   }, []);
+  const openTrends = useCallback((department: number | null) => {
+    if (department !== null) setDepartmentId(department);
+    setTab('trends');
+  }, []);
 
   if (error) {
     return <div className="cga-page"><div className="cga-alert" role="alert"><CircleAlert size={16} /> {error}</div></div>;
@@ -148,6 +152,7 @@ export function CourseGradeReportsPage() {
                   facultyId={facultyId}
                   onFacultyChange={setFacultyId}
                   onOpenCourse={openCourse}
+                  onOpenTrends={openTrends}
                 />
               )}
               {tab === 'sections' && (

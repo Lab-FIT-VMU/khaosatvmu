@@ -61,7 +61,7 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
         if (run is null)
         {
             return new CourseGradeAnalysisOverviewDto(
-                view.Level, view.FacultyId, view.DepartmentId, null, null, null, null, [], [], [], null, [], latestDto);
+                view.Level, view.FacultyId, view.DepartmentId, null, null, null, null, [], [], [], null, [], latestDto, []);
         }
 
         var crossTerm = string.IsNullOrEmpty(run.CrossTermJson) ? null : JsonNode.Parse(run.CrossTermJson);
@@ -90,7 +90,7 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
         var courseUnits = await InScope(
                 db.GradeAnalysisCourseResults.AsNoTracking().Where(x => x.RunId == run.RunId), view,
                 (q, f) => q.Where(x => x.FacultyId == f), (q, d) => q.Where(x => x.DepartmentId == d))
-            .Select(x => new { x.BaseCourseCode, x.DepartmentId, x.FacultyId })
+            .Select(x => new { x.BaseCourseCode, x.DepartmentId, x.FacultyId, x.SemesterId })
             .ToListAsync(cancellationToken);
         var facultyIds = courseUnits.Where(x => x.FacultyId != null).Select(x => x.FacultyId!.Value).ToHashSet();
         var departmentIds = courseUnits.Where(x => x.DepartmentId != null).Select(x => x.DepartmentId!.Value).ToHashSet();
@@ -122,6 +122,32 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
         }
 
         var repetition = await RepetitionAsync(run.RunId, view, semesterByTerm, cancellationToken);
+
+        // Danh mục học phần qua các kỳ: đơn vị lấy theo kỳ gần nhất có mở; tên theo danh mục
+        // Courses (mã gốc, nếu không có thì mã đuôi H/E).
+        var latestUnit = courseUnits
+            .GroupBy(x => x.BaseCourseCode, StringComparer.Ordinal)
+            .Select(g => g.MaxBy(x => order.GetValueOrDefault(x.SemesterId, -1))!)
+            .ToList();
+        var codes = latestUnit.SelectMany(x => new[] { x.BaseCourseCode, x.BaseCourseCode + "H", x.BaseCourseCode + "E" }).ToList();
+        var courseNames = (await db.Courses.AsNoTracking()
+                .Where(x => codes.Contains(x.CourseCode))
+                .Select(x => new { x.CourseCode, x.CourseName })
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.CourseCode, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First().CourseName, StringComparer.Ordinal);
+        var catalog = latestUnit
+            .Select(x => new GradeAnalysisCourseCatalogDto(
+                x.BaseCourseCode,
+                courseNames.GetValueOrDefault(x.BaseCourseCode)
+                    ?? courseNames.GetValueOrDefault(x.BaseCourseCode + "H")
+                    ?? courseNames.GetValueOrDefault(x.BaseCourseCode + "E")
+                    ?? x.BaseCourseCode,
+                x.DepartmentId,
+                x.FacultyId))
+            .OrderBy(x => x.BaseCourseCode, StringComparer.Ordinal)
+            .ToList();
+
         return new CourseGradeAnalysisOverviewDto(
             view.Level,
             view.FacultyId,
@@ -135,7 +161,8 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
             departments,
             crossTerm,
             repetition,
-            latestDto);
+            latestDto,
+            catalog);
     }
 
     /// <summary>Số lượt G1 theo kỳ, đếm từ chuỗi giảng viên – học phần (g1_ky) trong phạm vi.</summary>
@@ -233,6 +260,32 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
                     entry["lecturer_name"] = id is { } value ? names.GetValueOrDefault(value) : null;
                 }
             }
+        }
+
+        // Tổng các lớp đưa vào thống kê của từng học phần (bảng bộ môn ở cấp khoa, như bản audit:
+        // tỷ lệ mất tư cách = Σ n_mat / Σ n_diem và trung vị r trên các lớp này).
+        var codesInPage = parsed.Select(x => x.Row.BaseCourseCode).ToList();
+        var statsSections = await db.GradeAnalysisSectionResults.AsNoTracking()
+            .Where(x => x.RunId == run.RunId && x.SemesterId == semesterId && x.IncludedInStats
+                && codesInPage.Contains(x.BaseCourseCode))
+            .Select(x => new { x.BaseCourseCode, x.DataJson })
+            .ToListAsync(cancellationToken);
+        var statsByCourse = statsSections
+            .GroupBy(x => x.BaseCourseCode, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Select(x => JsonNode.Parse(x.DataJson)!).ToList(), StringComparer.Ordinal);
+        foreach (var (row, data) in parsed)
+        {
+            var sections = statsByCourse.GetValueOrDefault(row.BaseCourseCode) ?? [];
+            data["lop_tk"] = new JsonObject
+            {
+                ["n_mat"] = sections.Sum(s => s["n_mat"]?.GetValue<int>() ?? 0),
+                ["n_diem"] = sections.Sum(s => s["n_diem"]?.GetValue<int>() ?? 0),
+                ["r"] = new JsonArray(sections
+                    .Select(s => s["r"] is JsonValue r && r.TryGetValue<double>(out var value) ? value : (double?)null)
+                    .OfType<double>()
+                    .Select(value => (JsonNode)JsonValue.Create(value))
+                    .ToArray()),
+            };
         }
 
         return parsed.Select(x => new GradeAnalysisCourseDto(
