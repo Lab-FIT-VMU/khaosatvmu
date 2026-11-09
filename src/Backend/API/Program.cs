@@ -174,6 +174,9 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     Application.CourseGrades.ICourseGradeAnalysisService,
     Infrastructure.CourseGrades.EfCourseGradeAnalysisService>();
+builder.Services.AddScoped<
+    Application.CourseGrades.IGradeAnalysisThresholdService,
+    Infrastructure.CourseGrades.EfGradeAnalysisThresholdService>();
 builder.Services.AddScoped<ApplicationCookieEvents>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();

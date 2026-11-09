@@ -20,6 +20,12 @@ internal sealed class AuditInterceptor(ICurrentUserAccessor currentUser) : SaveC
         // ChangeAuditLog cho từng dòng sẽ phình nhật ký mà không ai đọc. Việc hiệu chỉnh
         // thủ công và chạy lại model mới là thao tác cần vết, và hai chỗ đó tự ghi nhật ký.
         typeof(OpenCommentAnalysisResult),
+        // Phân tích điểm học phần: một lần nạp tạo hàng chục nghìn sinh viên; chép họ tên và
+        // mã sinh viên sang nhật ký chung là nhân bản dữ liệu cá nhân. Vết của lần nạp nằm ở
+        // GradeImportRevisions (người nạp, lúc nào, file nào). Lượt tính do worker cập nhật
+        // liên tục nên cũng không ghi. Ngưỡng phân tích VẪN được ghi nhật ký.
+        typeof(Student),
+        typeof(GradeAnalysisRun),
     ];
 
     private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };

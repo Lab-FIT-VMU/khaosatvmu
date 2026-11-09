@@ -40,8 +40,36 @@ public static class CourseGradeAnalysisEndpoints
             [FromServices] ICourseGradeAnalysisService service,
             CancellationToken ct) => Handle(() => service.GetLecturerCoursesAsync(departmentId, courseCode, ct)));
 
+        // Ngưỡng của bộ luật D, E. Lưu hoặc khôi phục mặc định thì xếp lượt tính lại mọi kỳ.
+        var thresholds = app.MapGroup("/api/v1/course-grade-thresholds")
+            .RequireAuthorization(AuthPolicies.CourseGradeThresholdsAccess);
+
+        thresholds.MapGet("", (
+            [FromServices] IGradeAnalysisThresholdService service,
+            CancellationToken ct) => Handle(() => service.GetAsync(ct)));
+
+        thresholds.MapPut("", (
+            [FromBody] UpdateThresholdsRequest request,
+            [FromServices] IGradeAnalysisThresholdService service,
+            CancellationToken ct) => Handle(() => service.UpdateAsync(
+                (request.Thresholds ?? [])
+                    .Select(x => new GradeAnalysisThresholdUpdate(x.Code ?? string.Empty, x.NumericValue, x.BooleanValue, x.TextListValue))
+                    .ToList(),
+                ct)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
+        thresholds.MapPost("/reset", (
+            [FromServices] IGradeAnalysisThresholdService service,
+            CancellationToken ct) => Handle(() => service.ResetToDefaultsAsync(ct)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
         return app;
     }
+
+    public sealed record UpdateThresholdsRequest(IReadOnlyList<ThresholdValueRequest>? Thresholds);
+
+    public sealed record ThresholdValueRequest(
+        string? Code, decimal? NumericValue, bool? BooleanValue, IReadOnlyList<string>? TextListValue);
 
     private static async Task<IResult> Handle<T>(Func<Task<T>> action)
     {
