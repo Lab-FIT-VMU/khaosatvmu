@@ -388,12 +388,16 @@ public sealed partial class EfCourseGradeImportService(
                 db.Students.Add(student);
                 tracked[code] = student;
             }
-            else if (string.Equals(student.AdministrativeClassCode, classCode, StringComparison.Ordinal))
+            else if (string.Equals(student.AdministrativeClassCode, classCode, StringComparison.Ordinal)
+                && (placement.CohortId ?? student.CohortId) == student.CohortId
+                && (placement.MajorId ?? student.MajorId) == student.MajorId
+                && (placement.FacultyId ?? student.FacultyId) == student.FacultyId)
             {
                 continue;
             }
 
-            // Họ tên đã lưu không bị ghi đè; lớp hành chính, khóa, ngành theo file mới nhất.
+            // Họ tên đã lưu không bị ghi đè; lớp hành chính, khóa, ngành theo file mới nhất. Lớp không đổi
+            // vẫn cập nhật khi danh mục khóa ngành vừa cho suy được ngành, khoa.
             student.AdministrativeClassCode = classCode;
             student.CohortId = placement.CohortId ?? student.CohortId;
             student.MajorId = placement.MajorId ?? student.MajorId;

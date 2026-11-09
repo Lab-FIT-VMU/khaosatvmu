@@ -52,6 +52,17 @@ public static class StudentEndpoints
             catch (StudentException exception) { return ToError(exception); }
         }).AddEndpointFilter<RequireAntiforgeryFilter>();
 
+        group.MapPost("/refresh-placement", async (
+            [FromServices] IStudentService service,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await service.RefreshPlacementAsync(ct));
+            }
+            catch (StudentException exception) { return ToError(exception); }
+        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+
         return app;
     }
 

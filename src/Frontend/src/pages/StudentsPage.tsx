@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet, LoaderCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '../components/DataTable';
 import { StudentImportDialog } from '../components/StudentImportDialog';
@@ -32,6 +32,7 @@ export function StudentsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (next: CohortFilter | null) => {
     setLoading(true);
@@ -84,6 +85,20 @@ export function StudentsPage() {
     setIsImportOpen(false);
     toast.success(`Đã nạp: ${numberFormat.format(result.createdCount)} sinh viên mới, ${numberFormat.format(result.updatedCount)} cập nhật${result.skippedCount ? `, bỏ qua ${numberFormat.format(result.skippedCount)} dòng lỗi` : ''}.`);
     void load(filter);
+  };
+
+  // Suy lại khóa, ngành, khoa từ lớp hành chính, ví dụ sau khi bổ sung khóa ngành đào tạo.
+  const refreshPlacement = async () => {
+    setRefreshing(true);
+    try {
+      const result = await studentsApi.refreshPlacement();
+      toast.success(`Đã cập nhật khóa, ngành cho ${numberFormat.format(result.updatedCount)} sinh viên${result.withoutMajorCount ? `; ${numberFormat.format(result.withoutMajorCount)} sinh viên chưa xác định được ngành (lớp chưa có trong danh mục Khoá ngành đào tạo)` : ''}.`);
+      await load(filter);
+    } catch (error) {
+      toast.error(error instanceof ApiError && typeof error.body.message === 'string' ? error.body.message : 'Không cập nhật được khóa, ngành.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const filtered = useMemo(() => {
@@ -147,7 +162,8 @@ export function StudentsPage() {
         <div>
           <h2>Danh mục sinh viên</h2>
           <p>
-            Sinh viên được thêm khi nạp file điểm hoặc nạp danh sách sinh viên. Khóa, ngành suy từ lớp hành chính.
+            Sinh viên được thêm khi nạp file điểm hoặc nạp danh sách sinh viên. Khóa, ngành suy từ lớp hành chính theo danh mục
+            Khoá ngành đào tạo; khóa chưa nhập khóa ngành thì lấy ngành của cùng mã ngành ở khóa trước (BMM64ĐH → như BMM63ĐH).
             Trang này không hiện điểm.
           </p>
         </div>
@@ -168,10 +184,22 @@ export function StudentsPage() {
           breadcrumb: ['Sinh viên'],
         }}
         toolbarActions={canImport && (
-          <button type="button" className="btn btn-secondary btn-sm catalog-add-button" onClick={() => setIsImportOpen(true)}>
-            <FileSpreadsheet aria-hidden="true" size={16} />
-            <span>Nạp danh sách</span>
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm catalog-add-button"
+              onClick={() => void refreshPlacement()}
+              disabled={refreshing}
+              title="Suy lại khóa, ngành, khoa của mọi sinh viên từ lớp hành chính theo danh mục Khoá ngành đào tạo hiện tại"
+            >
+              {refreshing ? <LoaderCircle aria-hidden="true" size={16} className="student-spin" /> : <RefreshCw aria-hidden="true" size={16} />}
+              <span>Cập nhật khóa, ngành</span>
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm catalog-add-button" onClick={() => setIsImportOpen(true)}>
+              <FileSpreadsheet aria-hidden="true" size={16} />
+              <span>Nạp danh sách</span>
+            </button>
+          </>
         )}
         emptyMessage={loading ? 'Đang tải danh sách sinh viên...' : 'Chưa có sinh viên nào.'}
         keyExtractor={(s) => String(s.studentId)}

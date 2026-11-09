@@ -16,4 +16,6 @@ export const studentsApi = {
     csrfRequest<StudentImportPreview>(`${basePath}/import/preview`, 'POST', { rows, previewHash: null }),
   commitImport: (rows: StudentImportRow[], previewHash: string) =>
     csrfRequest<StudentImportResult>(`${basePath}/import/commit`, 'POST', { rows, previewHash }),
+  refreshPlacement: () =>
+    csrfRequest<{ studentCount: number; updatedCount: number; withoutMajorCount: number }>(`${basePath}/refresh-placement`, 'POST'),
 };

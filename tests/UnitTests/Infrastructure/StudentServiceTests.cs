@@ -104,6 +104,45 @@ public class StudentServiceTests
     }
 
     [Fact]
+    public async Task ClassOfCohortWithoutCohortMajors_TakesMajorOfSameProgram()
+    {
+        await RunAsync(async (db, serviceFor, p) =>
+        {
+            // Một mã khóa ngành có sẵn (ví dụ BMM63ĐH) mà phần chữ + hệ chỉ ứng với một ngành.
+            var catalog = await (
+                from cm in db.CohortMajors.AsNoTracking()
+                join m in db.Majors.AsNoTracking() on cm.MajorId equals m.MajorId
+                select new { cm.CohortMajorCode, cm.MajorId, m.FacultyId }).ToListAsync();
+            var pattern = new System.Text.RegularExpressions.Regex(@"^(\p{L}{2,10})\d{2}(ĐH|CL)$");
+            var sample = catalog
+                .Select(x => new { x, Match = pattern.Match(x.CohortMajorCode) })
+                .Where(x => x.Match.Success)
+                .GroupBy(x => x.Match.Groups[1].Value + x.Match.Groups[2].Value)
+                .FirstOrDefault(g => g.Select(x => x.x.MajorId).Distinct().Count() == 1);
+            if (sample is null) return;
+            var first = sample.First();
+            var program = first.Match.Groups[1].Value;
+            var system = first.Match.Groups[2].Value;
+
+            var admin = serviceFor(UserScope.Unrestricted(RoleCodes.Admin));
+            // Khóa 99 chưa có khóa ngành; hệ CL viết thành NC như các khóa mới.
+            StudentImportRow[] rows =
+            [
+                Row(2, $"{p}5", "Sinh viên khóa mới", $"{program}99{system}"),
+                Row(3, $"{p}6", "Sinh viên hệ NC", $"{program}99{(system == "CL" ? "NC" : system)}"),
+            ];
+            var preview = await admin.PreviewImportAsync(new StudentImportRequest(rows, null));
+            await admin.ImportAsync(new StudentImportRequest(rows, preview.PreviewHash));
+
+            var created = await db.Students.AsNoTracking().Where(x => x.StudentCode.StartsWith(p)).ToListAsync();
+            created.Should().OnlyContain(x => x.MajorId == first.x.MajorId && x.FacultyId == first.x.FacultyId);
+
+            var refresh = await admin.RefreshPlacementAsync();
+            refresh.StudentCount.Should().BeGreaterThan(0);
+        });
+    }
+
+    [Fact]
     public async Task ReadOnlyRoles_CannotImport_ButCanList()
     {
         await RunAsync(async (_, serviceFor, p) =>

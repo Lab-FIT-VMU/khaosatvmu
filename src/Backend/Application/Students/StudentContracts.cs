@@ -82,4 +82,12 @@ public interface IStudentService
     Task<StudentImportPreviewDto> PreviewImportAsync(StudentImportRequest request, CancellationToken cancellationToken = default);
 
     Task<StudentImportResultDto> ImportAsync(StudentImportRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Suy lại khóa, ngành, khoa của mọi sinh viên từ lớp hành chính theo danh mục hiện tại (sau khi bổ
+    /// sung khóa ngành). Không suy được thì giữ giá trị đang có.
+    /// </summary>
+    Task<StudentPlacementRefreshDto> RefreshPlacementAsync(CancellationToken cancellationToken = default);
 }
+
+public sealed record StudentPlacementRefreshDto(int StudentCount, int UpdatedCount, int WithoutMajorCount);

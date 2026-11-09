@@ -15,13 +15,16 @@ internal sealed record StudentPlacement(int? CohortId, int? MajorId, int? Facult
 internal sealed partial class StudentClassPlacement
 {
     private readonly IReadOnlyDictionary<string, StudentPlacement> byCohortMajorCode;
+    private readonly IReadOnlyDictionary<string, StudentPlacement> byProgram;
     private readonly IReadOnlyDictionary<string, int> cohortIdByCode;
 
     private StudentClassPlacement(
         IReadOnlyDictionary<string, StudentPlacement> byCohortMajorCode,
+        IReadOnlyDictionary<string, StudentPlacement> byProgram,
         IReadOnlyDictionary<string, int> cohortIdByCode)
     {
         this.byCohortMajorCode = byCohortMajorCode;
+        this.byProgram = byProgram;
         this.cohortIdByCode = cohortIdByCode;
     }
 
@@ -43,6 +46,15 @@ internal sealed partial class StudentClassPlacement
             }
         }
 
+        // Mã ngành + hệ (BMM|ĐH) ứng với đúng một ngành ở mọi khóa đã có trong danh mục: dùng cho khóa
+        // chưa nhập khóa ngành (BMM64ĐH → ngành của BMM59ĐH…BMM63ĐH). Nhiều ngành thì không đoán.
+        var program = cohortMajors
+            .Select(x => (Key: ProgramKey(ClassKey(x.CohortMajorCode)), x.MajorId, x.FacultyId))
+            .Where(x => x.Key is not null)
+            .GroupBy(x => x.Key!, StringComparer.Ordinal)
+            .Where(g => g.Select(x => x.MajorId).Distinct().Count() == 1)
+            .ToDictionary(g => g.Key, g => new StudentPlacement(null, g.First().MajorId, g.First().FacultyId), StringComparer.Ordinal);
+
         var cohorts = await db.Cohorts.AsNoTracking()
             .Select(x => new { x.CohortId, x.CohortCode })
             .ToListAsync(cancellationToken);
@@ -51,7 +63,7 @@ internal sealed partial class StudentClassPlacement
             .Where(g => g.Key.Length > 0 && g.Count() == 1)
             .ToDictionary(g => g.Key, g => g.Single().CohortId, StringComparer.Ordinal);
 
-        return new StudentClassPlacement(byCode, cohortIds);
+        return new StudentClassPlacement(byCode, program, cohortIds);
     }
 
     /// <summary>
@@ -72,9 +84,26 @@ internal sealed partial class StudentClassPlacement
         }
 
         var match = ClassCodePattern().Match(key);
-        return match.Success && cohortIdByCode.TryGetValue(match.Groups["cohort"].Value, out var cohortId)
-            ? new StudentPlacement(cohortId, null, null)
-            : new StudentPlacement(null, null, null);
+        if (!match.Success)
+        {
+            return new StudentPlacement(null, null, null);
+        }
+
+        int? cohort = cohortIdByCode.TryGetValue(match.Groups["cohort"].Value, out var cohortId) ? cohortId : null;
+        var major = byProgram.GetValueOrDefault(ProgramKey(key) ?? string.Empty);
+        return new StudentPlacement(cohort, major?.MajorId, major?.FacultyId);
+    }
+
+    /// <summary>
+    /// Phần chữ của mã lớp không kèm khóa: "BMM64ĐH" → "BMM|ĐH". Hệ NC (nâng cao, dùng từ khóa 64)
+    /// là hệ CL (chất lượng cao) đổi tên, nên gộp làm một.
+    /// </summary>
+    private static string? ProgramKey(string classKey)
+    {
+        var match = ClassCodePattern().Match(classKey);
+        if (!match.Success) return null;
+        var system = match.Groups["system"].Value;
+        return $"{match.Groups["program"].Value}|{(system == "NC" ? "CL" : system)}";
     }
 
     /// <summary>Khóa theo số ("66", "K66", "Khóa 66"); không có trong danh mục thì null.</summary>
@@ -98,7 +127,7 @@ internal sealed partial class StudentClassPlacement
     [GeneratedRegex(@"[\s\-_.\/]+")]
     private static partial Regex ClassSeparator();
 
-    [GeneratedRegex(@"^(?<program>\p{L}{2,10})(?<cohort>\d{2})\p{L}{2}\d{0,2}$")]
+    [GeneratedRegex(@"^(?<program>\p{L}{2,10})(?<cohort>\d{2})(?<system>\p{L}{2})\d{0,2}$")]
     private static partial Regex ClassCodePattern();
 
     [GeneratedRegex(@"\d+")]

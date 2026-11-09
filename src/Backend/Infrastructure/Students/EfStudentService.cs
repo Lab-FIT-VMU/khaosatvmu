@@ -143,6 +143,31 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
         return new StudentImportResultDto(created, updated, unchanged, plan.Preview.ErrorCount);
     }
 
+    public async Task<StudentPlacementRefreshDto> RefreshPlacementAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureCanWriteAsync(cancellationToken);
+        var placement = await StudentClassPlacement.LoadAsync(db, cancellationToken);
+        var students = await db.Students.ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        var updated = 0;
+        foreach (var student in students)
+        {
+            var place = placement.Resolve(student.AdministrativeClassCode);
+            var cohort = place.CohortId ?? student.CohortId;
+            var major = place.MajorId ?? student.MajorId;
+            var faculty = place.FacultyId ?? student.FacultyId;
+            if (cohort == student.CohortId && major == student.MajorId && faculty == student.FacultyId) continue;
+            student.CohortId = cohort;
+            student.MajorId = major;
+            student.FacultyId = faculty;
+            student.UpdatedAtUtc = now;
+            updated++;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return new StudentPlacementRefreshDto(students.Count, updated, students.Count(s => s.MajorId is null));
+    }
+
     // ------------------------------------------------------------------ kiểm tra và đối chiếu
 
     private sealed record PlannedRow(
