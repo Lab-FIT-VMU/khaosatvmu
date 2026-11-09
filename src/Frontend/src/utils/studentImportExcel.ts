@@ -13,15 +13,14 @@ const maximumFileSize = 20 * 1024 * 1024;
 export const studentImportColumns = [
   'Mã sinh viên',
   'Họ và tên',
-  'Lớp hành chính',
-  'Khóa',
+  'Khoá ngành đào tạo',
   'Ngày sinh',
   'Giới tính',
   'Email',
   'Số điện thoại',
   'Tình trạng học tập',
 ];
-export const studentImportColumnWidths = [14, 30, 16, 8, 12, 10, 30, 16, 20];
+export const studentImportColumnWidths = [14, 30, 20, 12, 10, 30, 16, 20];
 export const studentTemplateFileName = 'mau-import-sinh-vien.xlsx';
 
 type Field = keyof Omit<StudentImportRow, 'sheetName' | 'rowNumber'>;
@@ -30,8 +29,10 @@ type Field = keyof Omit<StudentImportRow, 'sheetName' | 'rowNumber'>;
 const headerAliases: Record<Field, string[]> = {
   studentCode: ['ma sinh vien', 'ma sv', 'masv', 'mssv', 'f_masv', 'student code'],
   fullName: ['ho va ten', 'ho ten', 'ten sinh vien', 'ho va ten sinh vien', 'f_tensv', 'full name'],
-  administrativeClassCode: ['lop hanh chinh', 'lop', 'lop sinh hoat', 'ma lop', 'f_tenlop'],
-  cohort: ['khoa', 'khoa hoc', 'nien khoa'],
+  cohortMajorCode: [
+    'khoa nganh dao tao', 'ma khoa nganh dao tao', 'ma khoa nganh', 'khoa nganh',
+    'lop hanh chinh', 'lop', 'lop sinh hoat', 'ma lop', 'f_tenlop',
+  ],
   dateOfBirth: ['ngay sinh', 'ngay thang nam sinh'],
   gender: ['gioi tinh'],
   email: ['email', 'e-mail', 'thu dien tu'],
@@ -57,10 +58,9 @@ export const studentImportFileErrorMessages: Record<StudentImportFileErrorCode, 
   NO_STUDENT_SHEET: 'Không có sheet nào có cột "Mã sinh viên" và "Họ và tên".',
 };
 
-/** Một sheet đọc được từ file: tên, khóa đoán từ tên sheet, các dòng. */
+/** Một sheet đọc được từ file: tên và các dòng. */
 export interface StudentImportSheet {
   name: string;
-  cohortHint: string | null;
   rows: StudentImportRow[];
 }
 
@@ -80,12 +80,6 @@ function cellText(value: CellValue | null | undefined): string {
   }
   if (typeof value === 'number' && Number.isInteger(value)) return String(value);
   return String(value).trim();
-}
-
-/** "Khóa 66", "K66", "66" → "66". */
-export function cohortFromSheetName(name: string): string | null {
-  const match = name.match(/\d{2,3}/);
-  return match ? match[0] : null;
 }
 
 export async function parseStudentImportFile(file: File): Promise<StudentImportSheet[]> {
@@ -109,7 +103,6 @@ export async function parseStudentImportFile(file: File): Promise<StudentImportS
     ) as Record<Field, number>;
     if (index.studentCode < 0 || index.fullName < 0) continue;
 
-    const cohortHint = cohortFromSheetName(sheet);
     const text = (row: CellValue[], field: Field) => (index[field] >= 0 ? cellText(row[index[field]]) : '');
     const optional = (row: CellValue[], field: Field) => text(row, field) || null;
     const rows = data.slice(1)
@@ -118,8 +111,7 @@ export async function parseStudentImportFile(file: File): Promise<StudentImportS
         rowNumber: i + 2,
         studentCode: text(row, 'studentCode'),
         fullName: text(row, 'fullName'),
-        administrativeClassCode: optional(row, 'administrativeClassCode'),
-        cohort: optional(row, 'cohort') ?? cohortHint,
+        cohortMajorCode: optional(row, 'cohortMajorCode'),
         dateOfBirth: optional(row, 'dateOfBirth'),
         gender: optional(row, 'gender'),
         email: optional(row, 'email'),
@@ -127,7 +119,7 @@ export async function parseStudentImportFile(file: File): Promise<StudentImportS
         studyStatus: optional(row, 'studyStatus'),
       }))
       .filter((row) => row.studentCode.length > 0 || row.fullName.length > 0);
-    if (rows.length > 0) result.push({ name: sheet, cohortHint, rows });
+    if (rows.length > 0) result.push({ name: sheet, rows });
   }
 
   if (result.length === 0) throw new StudentImportFileError('NO_STUDENT_SHEET');
@@ -141,7 +133,6 @@ export async function downloadStudentImportTemplate(): Promise<void> {
       { value: '100018', type: String },
       { value: 'Nguyễn Văn A', type: String },
       { value: 'ĐKT66ĐH', type: String },
-      { value: '66', type: String },
       { value: '14/03/2007', type: String },
       { value: 'Nam', type: String },
       null,
@@ -156,10 +147,10 @@ export async function downloadStudentImportTemplate(): Promise<void> {
         data: [
           [{ value: 'HƯỚNG DẪN NẠP DANH SÁCH SINH VIÊN', type: String }],
           [{ value: 'Mỗi sheet là một khóa, đặt tên dạng "Khóa 66". Khi nạp, chọn các sheet (khóa) cần nạp.', type: String }],
-          [{ value: 'Bắt buộc: Mã sinh viên, Họ và tên. Các cột khác có thể để trống; ô trống không xóa thông tin đang có.', type: String }],
-          [{ value: 'Khóa và ngành được suy từ Lớp hành chính (ĐKT66ĐH → Khóa 66); lớp không suy được thì lấy cột Khóa, rồi tên sheet.', type: String }],
+          [{ value: 'Bắt buộc: Mã sinh viên, Họ và tên, Khoá ngành đào tạo (lớp hành chính, ví dụ ĐKT66ĐH). Các cột khác có thể để trống; ô trống không xóa thông tin đang có.', type: String }],
+          [{ value: 'Khoá ngành đào tạo phải có sẵn ở trang Khoá ngành đào tạo; khóa, ngành, khoa của sinh viên lấy theo khóa ngành đó. Lớp chưa có thì bị bỏ qua và được liệt kê để bổ sung.', type: String }],
           [{ value: 'Ngày sinh dạng ngày/tháng/năm. Giới tính: Nam, Nữ hoặc Khác.', type: String }],
-          [{ value: 'Sinh viên đã có: họ tên và lớp hành chính được cập nhật theo file.', type: String }],
+          [{ value: 'Sinh viên đã có: họ tên và khoá ngành đào tạo được cập nhật theo file.', type: String }],
         ],
         sheet: 'Huong dan',
         columns: [{ width: 110 }],

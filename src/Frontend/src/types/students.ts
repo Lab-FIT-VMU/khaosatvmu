@@ -4,12 +4,12 @@ export interface Student {
   studentId: number;
   studentCode: string;
   fullName: string;
-  administrativeClassCode: string | null;
+  /** Khóa ngoại sang khóa ngành đào tạo; mã, khóa, ngành, khoa do API tra ra để hiển thị. */
+  cohortMajorId: number | null;
+  cohortMajorCode: string | null;
   cohortId: number | null;
   cohortName: string | null;
-  majorId: number | null;
   majorName: string | null;
-  facultyId: number | null;
   facultyName: string | null;
   email: string | null;
   phoneNumber: string | null;
@@ -36,8 +36,8 @@ export interface StudentImportRow {
   rowNumber: number;
   studentCode: string;
   fullName: string;
-  administrativeClassCode: string | null;
-  cohort: string | null;
+  /** Mã khóa ngành đào tạo (lớp hành chính), phải có trong danh mục. */
+  cohortMajorCode: string | null;
   dateOfBirth: string | null;
   gender: string | null;
   email: string | null;
@@ -59,8 +59,9 @@ export interface StudentImportPreview {
   unchangedCount: number;
   errorCount: number;
   renamedCount: number;
-  withoutCohortCount: number;
   cohorts: { cohortName: string; rowCount: number; newCount: number; updatedCount: number }[];
+  /** Khóa ngành cần thêm ở trang Khoá ngành đào tạo (dòng của các lớp này bị bỏ qua). */
+  missingCohortMajors: { cohortMajorCode: string; studentCount: number }[];
   errors: StudentImportIssue[];
   warnings: StudentImportIssue[];
   previewHash: string;

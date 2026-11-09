@@ -12,14 +12,16 @@ using Microsoft.EntityFrameworkCore;
 namespace Infrastructure.Students;
 
 /// <summary>
-/// Danh mục sinh viên (Danh mục đào tạo → Sinh viên). Đọc: mọi vai trò có quyền xem. Nạp danh sách:
-/// chỉ vai trò quản lý toàn trường, như nạp điểm. Nạp hai bước: xem trước rồi xác nhận với mã băm
-/// của bản xem trước. Ô trống trong file không xóa giá trị đang có; họ tên và lớp theo file.
+/// Danh mục sinh viên (Danh mục đào tạo → Sinh viên). Sinh viên gắn với khóa ngành đào tạo (lớp hành
+/// chính) qua khóa ngoại; khóa, ngành, khoa tra qua khóa ngành. Đọc: mọi vai trò có quyền xem. Nạp danh
+/// sách: chỉ vai trò quản lý toàn trường. Nạp hai bước: xem trước rồi xác nhận với mã băm của bản xem
+/// trước. Lớp chưa có trong danh mục không tự tạo: dòng bị bỏ qua và báo để người dùng thêm khóa ngành.
 /// </summary>
 public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver userScope) : IStudentService
 {
     public const int MaxImportRows = 40_000;
     private const int MaxIssues = 300;
+    private const string NoCohort = "Chưa có khóa ngành";
 
     public async Task<StudentListDto> ListAsync(int? cohortId, bool unassigned, CancellationToken cancellationToken = default)
     {
@@ -29,56 +31,46 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
             throw new StudentException(StudentErrorCodes.OutOfScope, "Vai trò của bạn không được xem danh sách sinh viên.");
         }
 
+        // Số sinh viên theo khóa (qua khóa ngành); khóa mới nhất lên trước.
         var counts = await (
             from student in db.Students.AsNoTracking()
-            group student by student.CohortId into g
+            join cm in db.CohortMajors.IgnoreQueryFilters().AsNoTracking() on student.CohortMajorId equals cm.CohortMajorId into cmJoin
+            from cm in cmJoin.DefaultIfEmpty()
+            group student by cm != null ? (int?)cm.CohortId : null into g
             select new { CohortId = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
-        var cohortNames = await db.Cohorts.AsNoTracking()
-            .Select(x => new { x.CohortId, x.CohortName, x.CohortCode })
-            .ToListAsync(cancellationToken);
+        var cohortInfo = await db.Cohorts.IgnoreQueryFilters().AsNoTracking()
+            .ToDictionaryAsync(x => x.CohortId, x => new { x.CohortName, x.CohortCode }, cancellationToken);
         var cohorts = counts
-            .Select(c => new
-            {
-                c.CohortId,
-                Name = c.CohortId is { } id ? cohortNames.FirstOrDefault(x => x.CohortId == id)?.CohortName ?? $"Khóa #{id}" : "Chưa xác định khóa",
-                Order = c.CohortId is { } key ? StudentClassPlacement.CohortNumber(cohortNames.FirstOrDefault(x => x.CohortId == key)?.CohortCode) : string.Empty,
-                c.Count,
-            })
             .OrderByDescending(x => x.CohortId.HasValue)
-            .ThenByDescending(x => int.TryParse(x.Order, out var n) ? n : 0)
-            .Select(x => new StudentCohortCountDto(x.CohortId, x.Name, x.Count))
+            .ThenByDescending(x => x.CohortId is { } id && cohortInfo.TryGetValue(id, out var c) ? CohortNumber(c.CohortCode) : 0)
+            .Select(x => new StudentCohortCountDto(
+                x.CohortId,
+                x.CohortId is { } id ? cohortInfo.GetValueOrDefault(id)?.CohortName ?? $"Khóa #{id}" : NoCohort,
+                x.Count))
             .ToList();
 
-        var query = db.Students.AsNoTracking();
-        if (unassigned)
-        {
-            query = query.Where(x => x.CohortId == null);
-        }
-        else if (cohortId is { } selected)
-        {
-            query = query.Where(x => x.CohortId == selected);
-        }
-
         var students = await (
-            from student in query
-            join cohort in db.Cohorts.AsNoTracking() on student.CohortId equals cohort.CohortId into cohortJoin
+            from student in db.Students.AsNoTracking()
+            join cm in db.CohortMajors.IgnoreQueryFilters().AsNoTracking() on student.CohortMajorId equals cm.CohortMajorId into cmJoin
+            from cm in cmJoin.DefaultIfEmpty()
+            join cohort in db.Cohorts.IgnoreQueryFilters().AsNoTracking() on cm.CohortId equals cohort.CohortId into cohortJoin
             from cohort in cohortJoin.DefaultIfEmpty()
-            join major in db.Majors.AsNoTracking() on student.MajorId equals major.MajorId into majorJoin
+            join major in db.Majors.IgnoreQueryFilters().AsNoTracking() on cm.MajorId equals major.MajorId into majorJoin
             from major in majorJoin.DefaultIfEmpty()
-            join faculty in db.Faculties.AsNoTracking() on student.FacultyId equals faculty.FacultyId into facultyJoin
+            join faculty in db.Faculties.IgnoreQueryFilters().AsNoTracking() on major.FacultyId equals faculty.FacultyId into facultyJoin
             from faculty in facultyJoin.DefaultIfEmpty()
+            where unassigned ? student.CohortMajorId == null : cohortId == null || (cm != null && cm.CohortId == cohortId)
             orderby student.StudentCode
             select new StudentDto(
                 student.StudentId,
                 student.StudentCode,
                 student.FullName,
-                student.AdministrativeClassCode,
-                student.CohortId,
+                student.CohortMajorId,
+                cm != null ? cm.CohortMajorCode : null,
+                cm != null ? cm.CohortId : null,
                 cohort != null ? cohort.CohortName : null,
-                student.MajorId,
                 major != null ? major.MajorName : null,
-                student.FacultyId,
                 faculty != null ? faculty.FacultyName : null,
                 student.Email,
                 student.PhoneNumber,
@@ -143,31 +135,6 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
         return new StudentImportResultDto(created, updated, unchanged, plan.Preview.ErrorCount);
     }
 
-    public async Task<StudentPlacementRefreshDto> RefreshPlacementAsync(CancellationToken cancellationToken = default)
-    {
-        await EnsureCanWriteAsync(cancellationToken);
-        var placement = await StudentClassPlacement.LoadAsync(db, cancellationToken);
-        var students = await db.Students.ToListAsync(cancellationToken);
-        var now = DateTime.UtcNow;
-        var updated = 0;
-        foreach (var student in students)
-        {
-            var place = placement.Resolve(student.AdministrativeClassCode);
-            var cohort = place.CohortId ?? student.CohortId;
-            var major = place.MajorId ?? student.MajorId;
-            var faculty = place.FacultyId ?? student.FacultyId;
-            if (cohort == student.CohortId && major == student.MajorId && faculty == student.FacultyId) continue;
-            student.CohortId = cohort;
-            student.MajorId = major;
-            student.FacultyId = faculty;
-            student.UpdatedAtUtc = now;
-            updated++;
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-        return new StudentPlacementRefreshDto(students.Count, updated, students.Count(s => s.MajorId is null));
-    }
-
     // ------------------------------------------------------------------ kiểm tra và đối chiếu
 
     private sealed record PlannedRow(
@@ -175,10 +142,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
         int RowNumber,
         string Code,
         string FullName,
-        string? ClassCode,
-        int? CohortId,
-        int? MajorId,
-        int? FacultyId,
+        int CohortMajorId,
         DateOnly? DateOfBirth,
         string? Gender,
         string? Email,
@@ -200,24 +164,25 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
                 $"Mỗi lần nạp tối đa {MaxImportRows:N0} sinh viên; hãy chọn bớt sheet (khóa).");
         }
 
-        var placement = await StudentClassPlacement.LoadAsync(db, cancellationToken);
-        var cohortNames = await db.Cohorts.AsNoTracking().ToDictionaryAsync(x => x.CohortId, x => x.CohortName, cancellationToken);
+        var cohortMajors = await CohortMajorLookup.LoadAsync(db, cancellationToken);
+        var cohortNameByCohortMajor = await (
+            from cm in db.CohortMajors.AsNoTracking()
+            join cohort in db.Cohorts.IgnoreQueryFilters().AsNoTracking() on cm.CohortId equals cohort.CohortId
+            select new { cm.CohortMajorId, cohort.CohortName })
+            .ToDictionaryAsync(x => x.CohortMajorId, x => x.CohortName, cancellationToken);
+
         var errors = new List<StudentImportIssueDto>();
         var warnings = new List<StudentImportIssueDto>();
+        var missing = new Dictionary<string, int>(StringComparer.Ordinal);
         var errorCount = 0;
         void Error(StudentImportRow r, string? code, string message)
         {
             errorCount++;
             if (errors.Count < MaxIssues) errors.Add(new StudentImportIssueDto(r.SheetName, r.RowNumber, code, message));
         }
-        void Warn(StudentImportRow r, string? code, string message)
-        {
-            if (warnings.Count < MaxIssues) warnings.Add(new StudentImportIssueDto(r.SheetName, r.RowNumber, code, message));
-        }
 
         var planned = new List<PlannedRow>();
         var seen = new Dictionary<string, StudentImportRow>(StringComparer.Ordinal);
-        var withoutCohort = 0;
         foreach (var r in rows)
         {
             var code = (r.StudentCode ?? string.Empty).Trim();
@@ -251,11 +216,19 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
                 continue;
             }
 
-            var classCode = Blank(CourseSectionImportRules.NormalizeText(r.AdministrativeClassCode));
-            if (classCode is not null && CourseSectionImportRules.IsSpreadsheetError(classCode)) classCode = null;
-            if (classCode?.Length > 32)
+            // Khóa ngành đào tạo (lớp hành chính): bắt buộc, phải có trong danh mục.
+            var classText = CourseSectionImportRules.NormalizeText(r.CohortMajorCode);
+            if (string.IsNullOrEmpty(classText) || CourseSectionImportRules.IsSpreadsheetError(classText))
             {
-                Error(r, code, "Lớp hành chính dài quá 32 ký tự.");
+                Error(r, code, "Thiếu mã khóa ngành đào tạo (lớp hành chính).");
+                continue;
+            }
+            if (cohortMajors.Find(classText) is not { } cohortMajorId)
+            {
+                // Không liệt kê từng dòng: gom theo lớp để người dùng thêm khóa ngành một lần.
+                errorCount++;
+                var key = CohortMajorLookup.Key(classText);
+                missing[key] = missing.GetValueOrDefault(key) + 1;
                 continue;
             }
 
@@ -288,24 +261,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
                 continue;
             }
 
-            // Khóa: theo lớp hành chính (như nạp điểm); lớp không suy được thì theo cột Khóa / tên sheet.
-            var place = placement.Resolve(classCode);
-            var cohortFromFile = placement.CohortIdFor(r.Cohort);
-            var cohortId = place.CohortId ?? cohortFromFile;
-            if (place.CohortId is { } fromClass && cohortFromFile is { } declared && fromClass != declared)
-            {
-                Warn(r, code, $"Khóa ghi trong file ({cohortNames.GetValueOrDefault(declared)}) khác khóa theo lớp {classCode} ({cohortNames.GetValueOrDefault(fromClass)}); lấy theo lớp.");
-            }
-            if (cohortId is null)
-            {
-                withoutCohort++;
-                Warn(r, code, string.IsNullOrWhiteSpace(r.Cohort)
-                    ? $"Không xác định được khóa từ lớp \"{classCode}\"."
-                    : $"Khóa \"{r.Cohort}\" chưa có trong danh mục Khóa.");
-            }
-
-            planned.Add(new PlannedRow(r.SheetName, r.RowNumber, code, name, classCode, cohortId, place.MajorId, place.FacultyId,
-                dateOfBirth, gender, email, phone, status));
+            planned.Add(new PlannedRow(r.SheetName, r.RowNumber, code, name, cohortMajorId, dateOfBirth, gender, email, phone, status));
         }
 
         // Đối chiếu với sinh viên đang có (kể cả đã xóa mềm: nạp lại thì khôi phục).
@@ -318,7 +274,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
         var byCohort = new Dictionary<string, (int Rows, int New, int Updated)>(StringComparer.Ordinal);
         foreach (var row in planned)
         {
-            var cohortLabel = row.CohortId is { } id ? cohortNames.GetValueOrDefault(id) ?? $"Khóa #{id}" : "Chưa xác định khóa";
+            var cohortLabel = cohortNameByCohortMajor.GetValueOrDefault(row.CohortMajorId) ?? NoCohort;
             var current = byCohort.GetValueOrDefault(cohortLabel);
             if (!existing.TryGetValue(row.Code, out var student))
             {
@@ -327,8 +283,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
                 continue;
             }
 
-            var copy = Clone(student);
-            if (Apply(copy, row))
+            if (Apply(Clone(student), row))
             {
                 changed++;
                 if (!string.Equals(student.FullName, row.FullName, StringComparison.Ordinal)) renamed++;
@@ -343,9 +298,11 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
 
         var hash = Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(planned)));
         var preview = new StudentImportPreviewDto(
-            rows.Count, created, changed, same, errorCount, renamed, withoutCohort,
+            rows.Count, created, changed, same, errorCount, renamed,
             byCohort.OrderBy(x => x.Key, StringComparer.Ordinal)
                 .Select(x => new StudentImportCohortDto(x.Key, x.Value.Rows, x.Value.New, x.Value.Updated)).ToList(),
+            missing.OrderBy(x => x.Key, StringComparer.Ordinal)
+                .Select(x => new StudentMissingCohortMajorDto(x.Key, x.Value)).ToList(),
             errors, warnings, hash);
         return new Plan(planned, preview);
     }
@@ -364,10 +321,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
         }
 
         Set(student.FullName, row.FullName, v => student.FullName = v);
-        if (row.ClassCode is not null) Set(student.AdministrativeClassCode, row.ClassCode, v => student.AdministrativeClassCode = v);
-        if (row.CohortId is not null) Set(student.CohortId, row.CohortId, v => student.CohortId = v);
-        if (row.MajorId is not null) Set(student.MajorId, row.MajorId, v => student.MajorId = v);
-        if (row.FacultyId is not null) Set(student.FacultyId, row.FacultyId, v => student.FacultyId = v);
+        Set(student.CohortMajorId, row.CohortMajorId, v => student.CohortMajorId = v);
         if (row.DateOfBirth is not null) Set(student.DateOfBirth, row.DateOfBirth, v => student.DateOfBirth = v);
         if (row.Gender is not null) Set(student.Gender, row.Gender, v => student.Gender = v);
         if (row.Email is not null) Set(student.Email, row.Email, v => student.Email = v);
@@ -386,10 +340,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
     {
         StudentCode = s.StudentCode,
         FullName = s.FullName,
-        AdministrativeClassCode = s.AdministrativeClassCode,
-        CohortId = s.CohortId,
-        MajorId = s.MajorId,
-        FacultyId = s.FacultyId,
+        CohortMajorId = s.CohortMajorId,
         DateOfBirth = s.DateOfBirth,
         Gender = s.Gender,
         Email = s.Email,
@@ -397,6 +348,13 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
         StudyStatus = s.StudyStatus,
         IsDeleted = s.IsDeleted,
     };
+
+    /// <summary>Phần số của mã khóa ("K66", "66") để xếp khóa mới nhất lên trước.</summary>
+    private static int CohortNumber(string? code)
+    {
+        var digits = Digits().Match(code ?? string.Empty);
+        return digits.Success && int.TryParse(digits.Value, out var n) ? n : 0;
+    }
 
     private static readonly string[] DateFormats = ["yyyy-MM-dd", "d/M/yyyy", "dd/MM/yyyy", "d-M-yyyy", "d.M.yyyy"];
 
@@ -450,4 +408,7 @@ public sealed partial class EfStudentService(AppDbContext db, IUserScopeResolver
 
     [GeneratedRegex(@"^[0-9+()\s.\-]{6,30}$")]
     private static partial Regex PhonePattern();
+
+    [GeneratedRegex(@"\d+")]
+    private static partial Regex Digits();
 }

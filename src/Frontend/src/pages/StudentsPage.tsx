@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileSpreadsheet, LoaderCircle, RefreshCw } from 'lucide-react';
+import { FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { DataTable, type Column } from '../components/DataTable';
 import { StudentImportDialog } from '../components/StudentImportDialog';
@@ -32,7 +32,6 @@ export function StudentsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (next: CohortFilter | null) => {
     setLoading(true);
@@ -87,24 +86,10 @@ export function StudentsPage() {
     void load(filter);
   };
 
-  // Suy lại khóa, ngành, khoa từ lớp hành chính, ví dụ sau khi bổ sung khóa ngành đào tạo.
-  const refreshPlacement = async () => {
-    setRefreshing(true);
-    try {
-      const result = await studentsApi.refreshPlacement();
-      toast.success(`Đã cập nhật khóa, ngành cho ${numberFormat.format(result.updatedCount)} sinh viên${result.withoutMajorCount ? `; ${numberFormat.format(result.withoutMajorCount)} sinh viên chưa xác định được ngành (lớp chưa có trong danh mục Khoá ngành đào tạo)` : ''}.`);
-      await load(filter);
-    } catch (error) {
-      toast.error(error instanceof ApiError && typeof error.body.message === 'string' ? error.body.message : 'Không cập nhật được khóa, ngành.');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   const filtered = useMemo(() => {
     const term = foldVietnamese(search.trim());
     if (!term) return students;
-    return students.filter((s) => foldVietnamese(`${s.studentCode} ${s.fullName} ${s.administrativeClassCode ?? ''} ${s.email ?? ''}`).includes(term));
+    return students.filter((s) => foldVietnamese(`${s.studentCode} ${s.fullName} ${s.cohortMajorCode ?? ''} ${s.email ?? ''}`).includes(term));
   }, [students, search]);
 
   const total = cohorts.reduce((sum, c) => sum + c.studentCount, 0);
@@ -125,30 +110,30 @@ export function StudentsPage() {
       sortValue: (s) => s.fullName.split(' ').slice(-1)[0] + s.fullName,
     },
     {
-      key: 'class',
-      header: 'Lớp hành chính',
-      render: (s) => s.administrativeClassCode ?? '',
-      sortValue: (s) => s.administrativeClassCode ?? '',
-      filterValue: (s) => s.administrativeClassCode ?? '(Trống)',
+      key: 'cohortMajor',
+      header: 'Khoá ngành đào tạo',
+      render: (s) => s.cohortMajorCode ?? <span className="student-muted">Chưa có</span>,
+      exportFormat: (s) => s.cohortMajorCode ?? '',
+      sortValue: (s) => s.cohortMajorCode ?? '',
+      filterValue: (s) => s.cohortMajorCode ?? '(Chưa có)',
     },
     {
       key: 'cohort',
       header: 'Khóa',
       render: (s) => s.cohortName ?? '',
-      filterValue: (s) => s.cohortName ?? '(Chưa xác định)',
+      filterValue: (s) => s.cohortName ?? '(Chưa có)',
     },
     {
       key: 'major',
       header: 'Ngành',
-      render: (s) => s.majorName ?? <span className="student-muted">Chưa xác định</span>,
-      exportFormat: (s) => s.majorName ?? '',
-      filterValue: (s) => s.majorName ?? '(Chưa xác định)',
+      render: (s) => s.majorName ?? '',
+      filterValue: (s) => s.majorName ?? '(Chưa có)',
     },
     {
       key: 'faculty',
       header: 'Khoa',
       render: (s) => s.facultyName ?? '',
-      filterValue: (s) => s.facultyName ?? '(Chưa xác định)',
+      filterValue: (s) => s.facultyName ?? '(Chưa có)',
     },
     { key: 'dateOfBirth', header: 'Ngày sinh', render: (s) => formatDate(s.dateOfBirth), exportFormat: (s) => formatDate(s.dateOfBirth) },
     { key: 'gender', header: 'Giới tính', render: (s) => s.gender ?? '', filterValue: (s) => s.gender ?? '(Trống)' },
@@ -162,9 +147,8 @@ export function StudentsPage() {
         <div>
           <h2>Danh mục sinh viên</h2>
           <p>
-            Sinh viên được thêm khi nạp file điểm hoặc nạp danh sách sinh viên. Khóa, ngành suy từ lớp hành chính theo danh mục
-            Khoá ngành đào tạo; khóa chưa nhập khóa ngành thì lấy ngành của cùng mã ngành ở khóa trước (BMM64ĐH → như BMM63ĐH).
-            Trang này không hiện điểm.
+            Mỗi sinh viên gắn với một khoá ngành đào tạo (lớp hành chính, ví dụ ĐKT66ĐH); khóa, ngành, khoa lấy theo khoá ngành
+            đó. Sinh viên được thêm khi nạp file điểm hoặc nạp danh sách sinh viên. Trang này không hiện điểm.
           </p>
         </div>
       </header>
@@ -184,22 +168,10 @@ export function StudentsPage() {
           breadcrumb: ['Sinh viên'],
         }}
         toolbarActions={canImport && (
-          <>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm catalog-add-button"
-              onClick={() => void refreshPlacement()}
-              disabled={refreshing}
-              title="Suy lại khóa, ngành, khoa của mọi sinh viên từ lớp hành chính theo danh mục Khoá ngành đào tạo hiện tại"
-            >
-              {refreshing ? <LoaderCircle aria-hidden="true" size={16} className="student-spin" /> : <RefreshCw aria-hidden="true" size={16} />}
-              <span>Cập nhật khóa, ngành</span>
-            </button>
-            <button type="button" className="btn btn-secondary btn-sm catalog-add-button" onClick={() => setIsImportOpen(true)}>
-              <FileSpreadsheet aria-hidden="true" size={16} />
-              <span>Nạp danh sách</span>
-            </button>
-          </>
+          <button type="button" className="btn btn-secondary btn-sm catalog-add-button" onClick={() => setIsImportOpen(true)}>
+            <FileSpreadsheet aria-hidden="true" size={16} />
+            <span>Nạp danh sách</span>
+          </button>
         )}
         emptyMessage={loading ? 'Đang tải danh sách sinh viên...' : 'Chưa có sinh viên nào.'}
         keyExtractor={(s) => String(s.studentId)}

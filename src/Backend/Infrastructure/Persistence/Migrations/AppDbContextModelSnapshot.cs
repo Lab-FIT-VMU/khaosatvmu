@@ -2001,11 +2001,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("StudentId"));
 
-                    b.Property<string>("AdministrativeClassCode")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<int?>("CohortId")
+                    b.Property<int?>("CohortMajorId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -2021,9 +2017,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
-                    b.Property<int?>("FacultyId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -2035,9 +2028,6 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
-
-                    b.Property<int?>("MajorId")
-                        .HasColumnType("integer");
 
                     b.Property<string>("PhoneNumber")
                         .HasMaxLength(30)
@@ -2057,11 +2047,7 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasKey("StudentId");
 
-                    b.HasIndex("CohortId");
-
-                    b.HasIndex("FacultyId");
-
-                    b.HasIndex("MajorId");
+                    b.HasIndex("CohortMajorId");
 
                     b.HasIndex("StudentCode")
                         .IsUnique();
@@ -2990,20 +2976,10 @@ namespace Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Domain.Student", b =>
                 {
-                    b.HasOne("Domain.Cohort", null)
+                    b.HasOne("Domain.CohortMajor", null)
                         .WithMany()
-                        .HasForeignKey("CohortId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Domain.Faculty", null)
-                        .WithMany()
-                        .HasForeignKey("FacultyId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Domain.Major", null)
-                        .WithMany()
-                        .HasForeignKey("MajorId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .HasForeignKey("CohortMajorId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Domain.StudentCourseGrade", b =>

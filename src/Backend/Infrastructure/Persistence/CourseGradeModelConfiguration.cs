@@ -18,18 +18,13 @@ internal static class CourseGradeModelConfiguration
             entity.HasKey(x => x.StudentId);
             entity.Property(x => x.StudentCode).HasMaxLength(16).IsRequired();
             entity.Property(x => x.FullName).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.AdministrativeClassCode).HasMaxLength(32);
             entity.Property(x => x.Email).HasMaxLength(320);
             entity.Property(x => x.PhoneNumber).HasMaxLength(30);
             entity.Property(x => x.Gender).HasMaxLength(10);
             entity.Property(x => x.StudyStatus).HasMaxLength(50);
             entity.HasIndex(x => x.StudentCode).IsUnique();
-            entity.HasIndex(x => x.CohortId);
-            entity.HasIndex(x => x.MajorId);
-            entity.HasIndex(x => x.FacultyId);
-            entity.HasOne<Cohort>().WithMany().HasForeignKey(x => x.CohortId).OnDelete(DeleteBehavior.SetNull);
-            entity.HasOne<Major>().WithMany().HasForeignKey(x => x.MajorId).OnDelete(DeleteBehavior.SetNull);
-            entity.HasOne<Faculty>().WithMany().HasForeignKey(x => x.FacultyId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => x.CohortMajorId);
+            entity.HasOne<CohortMajor>().WithMany().HasForeignKey(x => x.CohortMajorId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<GradeImportRevision>(entity =>

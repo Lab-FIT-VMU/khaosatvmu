@@ -191,6 +191,24 @@ public sealed partial class EfCourseGradeImportService(
             .Where(r => r.StudentName is not null)
             .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First().StudentName!, StringComparer.Ordinal);
+        // Lớp hành chính chưa có trong danh mục Khoá ngành đào tạo: sinh viên vẫn được nạp điểm nhưng chưa
+        // gắn lớp. Báo danh sách để người dùng thêm khóa ngành rồi nạp lại.
+        var cohortMajors = await CohortMajorLookup.LoadAsync(db, cancellationToken);
+        var missingClasses = storable
+            .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
+            .Select(g => g.First().AdministrativeClassCode)
+            .Where(c => !string.IsNullOrWhiteSpace(c) && cohortMajors.Find(c) is null)
+            .GroupBy(c => CohortMajorLookup.Key(c!), StringComparer.Ordinal)
+            .OrderByDescending(g => g.Count())
+            .Select(g => $"{g.Key} ({g.Count()})")
+            .ToList();
+        if (missingClasses.Count > 0)
+        {
+            warnings.Add($"{missingClasses.Count} lớp chưa có trong Khoá ngành đào tạo, sinh viên các lớp này chưa được gắn lớp: "
+                + string.Join(", ", missingClasses.Take(40)) + (missingClasses.Count > 40 ? ", …" : string.Empty)
+                + ". Hãy thêm các khóa ngành này rồi nạp lại.");
+        }
+
         var expectedTerm = SemesterOrdering.ExpectedTermCode(semester.AcademicYearName, semester.SemesterName);
         if (expectedTerm is not null && rules.MostCommonTermCode is { } fileTerm && fileTerm != expectedTerm)
         {
@@ -363,7 +381,7 @@ public sealed partial class EfCourseGradeImportService(
     private async Task<Dictionary<string, long>> UpsertStudentsAsync(
         ImportAnalysis analysis, DateTime now, CancellationToken cancellationToken)
     {
-        var classes = await StudentClassPlacement.LoadAsync(db, cancellationToken);
+        var cohortMajors = await CohortMajorLookup.LoadAsync(db, cancellationToken);
         var firstRowByCode = analysis.StorableRows
             .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
@@ -375,34 +393,29 @@ public sealed partial class EfCourseGradeImportService(
 
         foreach (var (code, row) in firstRowByCode)
         {
-            var classCode = Truncate(row.AdministrativeClassCode, 32);
-            var placement = classes.Resolve(classCode);
+            // Lớp hành chính = khóa ngành đào tạo; lớp chưa có trong danh mục thì giữ liên kết đang có.
+            var cohortMajorId = cohortMajors.Find(row.AdministrativeClassCode);
             if (!tracked.TryGetValue(code, out var student))
             {
                 student = new Student
                 {
                     StudentCode = code,
                     FullName = Truncate(row.StudentName, 200) ?? string.Empty,
+                    CohortMajorId = cohortMajorId,
                     CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
                 };
                 db.Students.Add(student);
                 tracked[code] = student;
-            }
-            else if (string.Equals(student.AdministrativeClassCode, classCode, StringComparison.Ordinal)
-                && (placement.CohortId ?? student.CohortId) == student.CohortId
-                && (placement.MajorId ?? student.MajorId) == student.MajorId
-                && (placement.FacultyId ?? student.FacultyId) == student.FacultyId)
-            {
                 continue;
             }
 
-            // Họ tên đã lưu không bị ghi đè; lớp hành chính, khóa, ngành theo file mới nhất. Lớp không đổi
-            // vẫn cập nhật khi danh mục khóa ngành vừa cho suy được ngành, khoa.
-            student.AdministrativeClassCode = classCode;
-            student.CohortId = placement.CohortId ?? student.CohortId;
-            student.MajorId = placement.MajorId ?? student.MajorId;
-            student.FacultyId = placement.FacultyId ?? student.FacultyId;
-            student.UpdatedAtUtc = now;
+            // Họ tên đã lưu không bị ghi đè; khóa ngành theo file mới nhất.
+            if (cohortMajorId is not null && cohortMajorId != student.CohortMajorId)
+            {
+                student.CohortMajorId = cohortMajorId;
+                student.UpdatedAtUtc = now;
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

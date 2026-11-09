@@ -121,8 +121,8 @@ export function StudentImportDialog({ isOpen, onClose, onImported }: Props) {
     <Modal isOpen={isOpen} onClose={close} title="Nạp danh sách sinh viên" size="import">
       <div className="student-import">
         <p className="student-import__hint">
-          Mỗi sheet là một khóa (ví dụ “Khóa 66”). Bắt buộc có cột Mã sinh viên và Họ và tên; các cột khác có thể trống và
-          không xóa thông tin đang có. Khóa, ngành suy từ lớp hành chính.
+          Mỗi sheet là một khóa (ví dụ “Khóa 66”). Bắt buộc: Mã sinh viên, Họ và tên, Khoá ngành đào tạo (lớp hành chính,
+          phải có sẵn trong danh mục Khoá ngành đào tạo). Các cột khác có thể trống và không xóa thông tin đang có.
         </p>
         <div className="student-import__file">
           <label className="btn btn-secondary btn-sm">
@@ -175,8 +175,15 @@ export function StudentImportDialog({ isOpen, onClose, onImported }: Props) {
             {preview.renamedCount > 0 && (
               <p className="student-import__muted">{n(preview.renamedCount)} sinh viên đã có sẽ được đổi họ tên theo file.</p>
             )}
-            {preview.withoutCohortCount > 0 && (
-              <p className="student-import__muted">{n(preview.withoutCohortCount)} sinh viên chưa xác định được khóa.</p>
+            {preview.missingCohortMajors.length > 0 && (
+              <div className="student-import__missing" role="alert">
+                <strong>
+                  {n(preview.missingCohortMajors.length)} khoá ngành đào tạo chưa có trong danh mục
+                  ({n(preview.missingCohortMajors.reduce((sum, m) => sum + m.studentCount, 0))} sinh viên sẽ bị bỏ qua).
+                </strong>
+                <span> Hãy thêm các khoá ngành này ở trang Khoá ngành đào tạo rồi nạp lại:</span>
+                <p>{preview.missingCohortMajors.map((m) => `${m.cohortMajorCode} (${n(m.studentCount)})`).join(', ')}</p>
+              </div>
             )}
             <table className="student-import__table">
               <thead><tr><th>Khóa</th><th>Số sinh viên</th><th>Thêm mới</th><th>Cập nhật</th></tr></thead>

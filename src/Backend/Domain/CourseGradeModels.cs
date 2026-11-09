@@ -26,16 +26,11 @@ public sealed class Student : ISoftDeletable
     /// <summary>Cột f_tensv.</summary>
     public string FullName { get; set; } = string.Empty;
 
-    /// <summary>Khóa, suy từ số trong mã lớp hành chính (ĐKT66ĐH → Khoá 66). Không đọc được thì để trống.</summary>
-    public int? CohortId { get; set; }
-
-    /// <summary>Ngành, suy từ phần chữ đầu của mã lớp hành chính.</summary>
-    public int? MajorId { get; set; }
-
-    public int? FacultyId { get; set; }
-
-    /// <summary>Lớp hành chính (cột f_tenlop), đã đổi Ð (U+00D0) thành Đ.</summary>
-    public string? AdministrativeClassCode { get; set; }
+    /// <summary>
+    /// Lớp hành chính = khóa ngành đào tạo (ĐKT66ĐH), khóa ngoại sang CohortMajors. Khóa, ngành, khoa
+    /// không lưu ở đây mà tra qua khóa ngành. Lớp chưa có trong danh mục thì để trống và báo khi nạp.
+    /// </summary>
+    public int? CohortMajorId { get; set; }
 
     public string? Email { get; set; }
     public string? PhoneNumber { get; set; }

@@ -192,7 +192,9 @@ public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
             Convert.ToHexString(firstRow.ZEnc!).Should().NotContain(Convert.ToHexString("6.6"u8.ToArray()));
 
             var student = await h.Db.Students.AsNoTracking().SingleAsync(x => x.StudentCode == sv[0]);
-            student.AdministrativeClassCode.Should().Be("ĐKT98ĐH");
+            student.CohortMajorId.Should().BeNull("lớp ĐKT98ĐH chưa có trong Khoá ngành đào tạo: không tự tạo");
+            preview.Warnings.Should().Contain(w => w.Contains("ĐKT98ĐH (3)") && w.Contains("chưa có trong Khoá ngành đào tạo"),
+                "lớp chưa có được liệt kê để người dùng thêm (Ð trong file đã đổi thành Đ)");
 
             var run = await h.Grades.GetLatestRunAsync();
             run!.Status.Should().Be("Queued");

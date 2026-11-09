@@ -13,16 +13,19 @@ public sealed class StudentException(string errorCode, string message) : Excepti
     public string ErrorCode { get; } = errorCode;
 }
 
+/// <summary>
+/// Sinh viên. Bảng chỉ lưu khóa ngoại sang khóa ngành đào tạo; mã khóa ngành, khóa, ngành, khoa ở đây
+/// được tra qua CohortMajors → Cohorts / Majors → Faculties để hiển thị.
+/// </summary>
 public sealed record StudentDto(
     long StudentId,
     string StudentCode,
     string FullName,
-    string? AdministrativeClassCode,
+    int? CohortMajorId,
+    string? CohortMajorCode,
     int? CohortId,
     string? CohortName,
-    int? MajorId,
     string? MajorName,
-    int? FacultyId,
     string? FacultyName,
     string? Email,
     string? PhoneNumber,
@@ -41,9 +44,8 @@ public sealed record StudentImportRow(
     int RowNumber,
     string? StudentCode,
     string? FullName,
-    string? AdministrativeClassCode,
-    /// <summary>Khóa ghi trong file ("66", "K66"); hoặc lấy từ tên sheet "Khóa 66".</summary>
-    string? Cohort,
+    /// <summary>Mã khóa ngành đào tạo (lớp hành chính), ví dụ ĐKT66ĐH; phải có trong danh mục.</summary>
+    string? CohortMajorCode,
     string? DateOfBirth,
     string? Gender,
     string? Email,
@@ -56,6 +58,9 @@ public sealed record StudentImportIssueDto(string? SheetName, int RowNumber, str
 
 public sealed record StudentImportCohortDto(string CohortName, int RowCount, int NewCount, int UpdatedCount);
 
+/// <summary>Mã khóa ngành có trong file nhưng chưa có trong danh mục, kèm số sinh viên.</summary>
+public sealed record StudentMissingCohortMajorDto(string CohortMajorCode, int StudentCount);
+
 public sealed record StudentImportPreviewDto(
     int RowCount,
     int NewCount,
@@ -64,9 +69,9 @@ public sealed record StudentImportPreviewDto(
     int ErrorCount,
     /// <summary>Sinh viên đã có mà họ tên trong file khác: nạp sẽ đổi theo file.</summary>
     int RenamedCount,
-    /// <summary>Lớp hành chính không suy được khóa từ danh mục Khóa.</summary>
-    int WithoutCohortCount,
     IReadOnlyList<StudentImportCohortDto> Cohorts,
+    /// <summary>Khóa ngành cần thêm ở trang Khoá ngành đào tạo (dòng của các lớp này bị bỏ qua).</summary>
+    IReadOnlyList<StudentMissingCohortMajorDto> MissingCohortMajors,
     IReadOnlyList<StudentImportIssueDto> Errors,
     IReadOnlyList<StudentImportIssueDto> Warnings,
     /// <summary>Mã băm của các dòng hợp lệ; gửi lại khi xác nhận để chắc là đúng dữ liệu đã xem.</summary>
@@ -76,18 +81,10 @@ public sealed record StudentImportResultDto(int CreatedCount, int UpdatedCount, 
 
 public interface IStudentService
 {
-    /// <summary>cohortId null: mọi khóa; unassigned true: sinh viên chưa xác định khóa.</summary>
+    /// <summary>cohortId null: mọi khóa; unassigned true: sinh viên chưa có khóa ngành.</summary>
     Task<StudentListDto> ListAsync(int? cohortId, bool unassigned, CancellationToken cancellationToken = default);
 
     Task<StudentImportPreviewDto> PreviewImportAsync(StudentImportRequest request, CancellationToken cancellationToken = default);
 
     Task<StudentImportResultDto> ImportAsync(StudentImportRequest request, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Suy lại khóa, ngành, khoa của mọi sinh viên từ lớp hành chính theo danh mục hiện tại (sau khi bổ
-    /// sung khóa ngành). Không suy được thì giữ giá trị đang có.
-    /// </summary>
-    Task<StudentPlacementRefreshDto> RefreshPlacementAsync(CancellationToken cancellationToken = default);
 }
-
-public sealed record StudentPlacementRefreshDto(int StudentCount, int UpdatedCount, int WithoutMajorCount);
