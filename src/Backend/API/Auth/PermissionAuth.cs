@@ -13,6 +13,7 @@ public static class AuthPolicies
     public const string MajorsAccess = "PERMISSION_MAJORS_ACCESS";
     public const string CoursesAccess = "PERMISSION_COURSES_ACCESS";
     public const string CourseSectionsAccess = "PERMISSION_COURSE_SECTIONS_ACCESS";
+    public const string StudentsAccess = "PERMISSION_STUDENTS_ACCESS";
     public const string AcademicYearsAccess = "PERMISSION_ACADEMIC_YEARS_ACCESS";
     public const string FacultiesRead = "PERMISSION_FACULTIES_READ";
     public const string DepartmentsRead = "PERMISSION_DEPARTMENTS_READ";

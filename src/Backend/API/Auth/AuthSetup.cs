@@ -41,6 +41,7 @@ public static class AuthSetup
             AddPermissionPolicy(AuthPolicies.MajorsAccess, "MAJORS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CoursesAccess, "COURSES_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseSectionsAccess, "COURSE_SECTIONS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.StudentsAccess, "STUDENTS_ACCESS");
             AddPermissionPolicy(AuthPolicies.AcademicYearsAccess, "ACADEMIC_YEARS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseQuestionSetsAccess, "COURSE_QUESTION_SETS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseCampaignsAccess, "COURSE_CAMPAIGNS_ACCESS");

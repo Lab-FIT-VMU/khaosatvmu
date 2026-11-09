@@ -26,6 +26,7 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   lecturers: 'LECTURERS_ACCESS',
   majors: 'MAJORS_ACCESS',
   'cohort-majors': 'COHORT_MAJORS_ACCESS',
+  students: 'STUDENTS_ACCESS',
   courses: 'COURSES_ACCESS',
   classes: 'COURSE_SECTIONS_ACCESS',
   'course-question-sets': 'COURSE_QUESTION_SETS_ACCESS',

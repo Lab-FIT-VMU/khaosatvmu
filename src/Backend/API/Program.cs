@@ -2,6 +2,7 @@
 using API.Catalog;
 using API.Cohorts;
 using API.CourseGrades;
+using API.Students;
 using API.GraduationAnalytics2;
 using API.Middleware;
 using API.Reports;
@@ -177,6 +178,9 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     Application.CourseGrades.IGradeAnalysisThresholdService,
     Infrastructure.CourseGrades.EfGradeAnalysisThresholdService>();
+builder.Services.AddScoped<
+    Application.Students.IStudentService,
+    Infrastructure.Students.EfStudentService>();
 builder.Services.AddScoped<ApplicationCookieEvents>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
@@ -219,6 +223,7 @@ app.MapReportEndpoints();
 app.MapGraduationAnalytics2Endpoints();
 app.MapCourseGradeEndpoints();
 app.MapCourseGradeAnalysisEndpoints();
+app.MapStudentEndpoints();
 
 app.MapHealthChecks("/healthz");
 app.MapHealthChecks("/api/health");

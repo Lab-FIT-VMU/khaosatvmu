@@ -8,6 +8,7 @@ using Application.CourseGrades;
 using DocumentFormat.OpenXml.Packaging;
 using Domain;
 using Infrastructure.Persistence;
+using Infrastructure.Students;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -362,7 +363,7 @@ public sealed partial class EfCourseGradeImportService(
     private async Task<Dictionary<string, long>> UpsertStudentsAsync(
         ImportAnalysis analysis, DateTime now, CancellationToken cancellationToken)
     {
-        var classes = await LoadClassLookupAsync(cancellationToken);
+        var classes = await StudentClassPlacement.LoadAsync(db, cancellationToken);
         var firstRowByCode = analysis.StorableRows
             .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
@@ -597,75 +598,4 @@ public sealed partial class EfCourseGradeImportService(
 
     private static string? Truncate(string? value, int maxLength) =>
         value is null || value.Length <= maxLength ? value : value[..maxLength];
-
-    // ------------------------------------------------------------------ khóa, ngành từ lớp hành chính
-
-    private sealed record ClassPlacement(int? CohortId, int? MajorId, int? FacultyId);
-
-    private sealed class ClassLookup(
-        IReadOnlyDictionary<string, ClassPlacement> byCohortMajorCode,
-        IReadOnlyDictionary<string, int> cohortIdByCode)
-    {
-        /// <summary>
-        /// Lớp hành chính (ĐKT66ĐH) có cùng dạng với CohortMajors.CohortMajorCode: khớp thì lấy
-        /// đủ khóa, ngành, khoa; không khớp thì chỉ suy khóa từ hai chữ số (Cohorts.CohortCode).
-        /// </summary>
-        public ClassPlacement Resolve(string? classCode)
-        {
-            if (string.IsNullOrWhiteSpace(classCode) || CourseSectionImportRules.IsSpreadsheetError(classCode))
-            {
-                return new ClassPlacement(null, null, null);
-            }
-
-            var key = ClassKey(classCode);
-            if (byCohortMajorCode.TryGetValue(key, out var placement))
-            {
-                return placement;
-            }
-
-            var match = ClassCodePattern().Match(key);
-            return match.Success && cohortIdByCode.TryGetValue(match.Groups["cohort"].Value, out var cohortId)
-                ? new ClassPlacement(cohortId, null, null)
-                : new ClassPlacement(null, null, null);
-        }
-    }
-
-    private async Task<ClassLookup> LoadClassLookupAsync(CancellationToken cancellationToken)
-    {
-        var cohortMajors = await (
-            from cohortMajor in db.CohortMajors.AsNoTracking()
-            join major in db.Majors.AsNoTracking() on cohortMajor.MajorId equals major.MajorId
-            select new { cohortMajor.CohortMajorCode, cohortMajor.CohortId, cohortMajor.MajorId, major.FacultyId })
-            .ToListAsync(cancellationToken);
-        var byCode = new Dictionary<string, ClassPlacement>(StringComparer.Ordinal);
-        foreach (var group in cohortMajors.GroupBy(x => ClassKey(x.CohortMajorCode)))
-        {
-            // Mã trùng ở nhiều khóa thì không đoán.
-            if (group.Count() == 1)
-            {
-                var entry = group.Single();
-                byCode[group.Key] = new ClassPlacement(entry.CohortId, entry.MajorId, entry.FacultyId);
-            }
-        }
-
-        var cohorts = await db.Cohorts.AsNoTracking()
-            .Select(x => new { x.CohortId, x.CohortCode })
-            .ToListAsync(cancellationToken);
-        var cohortIdByCode = cohorts
-            .GroupBy(x => x.CohortCode.Trim().TrimStart('K', 'k'))
-            .Where(g => g.Count() == 1)
-            .ToDictionary(g => g.Key, g => g.Single().CohortId, StringComparer.Ordinal);
-
-        return new ClassLookup(byCode, cohortIdByCode);
-    }
-
-    private static string ClassKey(string value) =>
-        ClassSeparator().Replace(CourseSectionImportRules.NormalizeText(value) ?? string.Empty, string.Empty)
-            .ToUpperInvariant();
-
-    [GeneratedRegex(@"[\s\-_.\/]+")]
-    private static partial Regex ClassSeparator();
-
-    [GeneratedRegex(@"^(?<program>\p{L}{2,10})(?<cohort>\d{2})\p{L}{2}\d{0,2}$")]
-    private static partial Regex ClassCodePattern();
 }

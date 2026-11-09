@@ -481,6 +481,7 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         ["COHORT_MAJORS_ACCESS"] = 6,
         ["COURSES_ACCESS"] = 7,
         ["COURSE_SECTIONS_ACCESS"] = 8,
+        ["STUDENTS_ACCESS"] = 9,
         // Khảo sát học phần
         ["COURSE_QUESTION_SETS_ACCESS"] = 1,
         ["COURSE_CAMPAIGNS_ACCESS"] = 2,
