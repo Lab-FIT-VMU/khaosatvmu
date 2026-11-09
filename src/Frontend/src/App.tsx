@@ -67,6 +67,8 @@ const SurveyAnalysisPage = lazy(() => import('./pages/SurveyAnalysisPage').then(
 const SurveyDashboardPage = lazy(() => import('./pages/SurveyDashboardPage').then(m => ({ default: m.SurveyDashboardPage })));
 const GraduationAnalytics2Page = lazy(() => import('./pages/GraduationAnalytics2Page').then(m => ({ default: m.GraduationAnalytics2Page })));
 const CourseGradeUploadPage = lazy(() => import('./pages/CourseGradeUploadPage').then(m => ({ default: m.CourseGradeUploadPage })));
+const CourseGradeReportsPage = lazy(() => import('./pages/CourseGradeReportsPage').then(m => ({ default: m.CourseGradeReportsPage })));
+const CourseGradeThresholdsPage = lazy(() => import('./pages/CourseGradeThresholdsPage').then(m => ({ default: m.CourseGradeThresholdsPage })));
 const StudentSurveyView = lazy(() => import('./pages/StudentSurveyView').then(m => ({ default: m.StudentSurveyView })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const ProfileSelectionPage = lazy(() => import('./pages/ProfileSelectionPage').then(m => ({ default: m.ProfileSelectionPage })));
@@ -673,6 +675,8 @@ function DashboardApp() {
             )}
 
             {currentTab === 'course-grade-upload' && <CourseGradeUploadPage />}
+            {currentTab === 'course-grade-reports' && <CourseGradeReportsPage />}
+            {currentTab === 'course-grade-thresholds' && <CourseGradeThresholdsPage />}
 
             {currentTab === 'academic-years' && <AcademicYearsPage />}
 

@@ -17,6 +17,7 @@ import {
   Presentation,
   ShieldCheck,
   Sigma,
+  SlidersHorizontal,
   Table2,
   Upload,
   UserCog,
@@ -30,7 +31,7 @@ import { unitStatisticsTabId, type SurveyStatisticsPage } from './surveyStatisti
   Mục điều hướng của sidebar: nhãn và thứ tự.
 
   Tối đa hai tầng: nhóm (bấm để sổ xuống) → mục. Mục đứng một mình ở tầng trên cũng
-  được. Mục trong nhóm cũng có thể là trang ngoài (externalUrl), như "Báo cáo phân tích".
+  được. Mục trong nhóm cũng có thể là trang ngoài (externalUrl).
 
   Khai riêng khỏi component vì thanh trên cùng cũng đọc nhãn ở đây để mở đầu đường dẫn
   điều hướng. Một nguồn duy nhất nên đổi tên mục ở sidebar là đường dẫn đổi theo, không
@@ -103,19 +104,15 @@ export const menuStructure: SidebarMenuEntry[] = [
   unitStatisticsGroup('PROGRAM', 'Thống kê khảo sát chương trình đào tạo', GraduationCap),
   unitStatisticsGroup('LECTURER', 'Thống kê khảo sát giảng viên', Presentation),
   {
-    // Tải lên là trang trong hệ thống. Báo cáo tạm vẫn là trang chỉ xem bên ngoài cho tới
-    // khi các trang báo cáo nội bộ xong (docs/plans/tich-hop-phan-tich-diem-hoc-phan.md).
+    // Ba mục, ba quyền riêng (docs/plans/tich-hop-phan-tich-diem-hoc-phan.md). Báo cáo nay là
+    // trang trong hệ thống, thay cho trang chỉ xem bên ngoài của module audit.
     id: 'course-grade-analysis',
     label: 'Phân tích điểm học phần',
     icon: ChartNoAxesCombined,
     items: [
       { id: 'course-grade-upload', label: 'Tải lên dữ liệu điểm', icon: Upload },
-      {
-        id: 'course-grade-reports',
-        label: 'Báo cáo phân tích',
-        icon: BarChart3,
-        externalUrl: 'https://minhvima.github.io/Publish-PT-Diem-HP/',
-      },
+      { id: 'course-grade-thresholds', label: 'Ngưỡng phân tích', icon: SlidersHorizontal },
+      { id: 'course-grade-reports', label: 'Báo cáo phân tích', icon: BarChart3 },
     ],
   },
   {

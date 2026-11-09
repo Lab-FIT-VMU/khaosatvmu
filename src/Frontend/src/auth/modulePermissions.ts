@@ -11,9 +11,10 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   // Tải lên tách khỏi xem: đây là thao tác ghi trên dữ liệu toàn trường.
   'graduation-data-upload': 'GRADUATION_UPLOAD_ACCESS',
   'graduation-statistics': 'GRADUATION_ANALYTICS_ACCESS',
-  // Phân tích điểm học phần: tải lên tách khỏi xem, như module tốt nghiệp. Mục "Báo cáo
-  // phân tích" tạm là trang ngoài nên chưa gắn quyền.
+  // Phân tích điểm học phần: tải lên, ngưỡng và báo cáo là ba quyền riêng.
   'course-grade-upload': 'COURSE_GRADE_UPLOAD_ACCESS',
+  'course-grade-thresholds': 'COURSE_GRADE_THRESHOLDS_ACCESS',
+  'course-grade-reports': 'COURSE_GRADE_ANALYSIS_ACCESS',
   // Giữ hash cũ để bookmark tự chuyển vào module thống nhất.
   'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
   'graduation-analytics-2': 'GRADUATION_ANALYTICS_ACCESS',

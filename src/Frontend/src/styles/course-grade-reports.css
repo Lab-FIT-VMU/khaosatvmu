@@ -1,0 +1,125 @@
+/* Phân tích điểm học phần → Báo cáo phân tích, Ngưỡng phân tích. Màu theo bộ luật D mục 9.2. */
+
+.cga-page { display: grid; gap: 12px; min-width: 0; padding: 16px 18px 28px; color: var(--text-dark); }
+.cga-stack { display: grid; gap: 12px; min-width: 0; }
+
+.cga-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 14px; border: 1px solid var(--border-color); background: var(--bg-card);
+}
+.cga-heading__title { display: flex; align-items: flex-start; gap: 10px; }
+.cga-heading__title svg { margin-top: 3px; color: var(--vmu-blue); flex-shrink: 0; }
+.cga-heading__title h2 { margin: 0; font-size: 17px; }
+.cga-heading__title p { margin: 3px 0 0; max-width: 820px; color: var(--text-muted); font-size: 13px; }
+.cga-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.cga-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+
+.cga-tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--border-color); }
+.cga-tabs button {
+  padding: 8px 14px; border: 1px solid transparent; border-bottom: 0; background: none;
+  color: var(--text-muted); font: inherit; font-size: 14px; cursor: pointer;
+}
+.cga-tabs button.is-active { border-color: var(--border-color); background: var(--bg-card); color: var(--vmu-navy); font-weight: 600; margin-bottom: -1px; }
+
+.cga-card { display: grid; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--border-color); background: var(--bg-card); }
+.cga-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cga-card__header h3 { margin: 0; font-size: 15px; }
+.cga-card__header p { margin: 3px 0 0; max-width: 900px; color: var(--text-muted); font-size: 12.5px; }
+
+.cga-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border: 1px solid var(--border-color); background: var(--bg-card); }
+.cga-kpi { padding: 12px 14px; border-right: 1px solid var(--border-color); }
+.cga-kpi:last-child { border-right: 0; }
+.cga-kpi dt { color: var(--text-muted); font-size: 12px; }
+.cga-kpi dd { margin: 2px 0 0; font-size: 22px; font-weight: 700; color: var(--vmu-navy); }
+.cga-kpi p { margin: 2px 0 0; color: var(--text-muted); font-size: 12px; }
+
+.cga-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cga-chart h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+
+.cga-table-wrap { min-width: 0; overflow-x: auto; }
+.cga-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cga-table th, .cga-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); text-align: left; vertical-align: top; }
+.cga-table th { background: var(--bg-main); color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+.cga-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cga-table small { color: var(--text-muted); }
+.cga-table--compact { max-width: 760px; }
+.cga-row-muted td { color: var(--text-light); }
+.cga-row-changed td { background: var(--vmu-blue-light); }
+.cga-wrap { min-width: 260px; max-width: 420px; }
+.cga-col-input { width: 220px; }
+.cga-col-input input, .cga-col-input select {
+  box-sizing: border-box; width: 150px; min-height: 30px; padding: 4px 6px;
+  border: 1px solid var(--field-border); background: var(--bg-card); font: inherit;
+}
+.cga-description { margin: 2px 0 0; font-size: 12px; }
+
+.cga-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.cga-chip {
+  display: inline-flex; align-items: baseline; gap: 4px; padding: 1px 6px;
+  border: 1px solid #b8c6d4; background: #fff; color: var(--vmu-navy); font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.cga-chip small { color: var(--text-muted); font-weight: 400; }
+.cga-chip--stable { border-color: #9fcfcf; color: #1d6b6b; }
+.cga-chip--pending { border-style: dashed; color: var(--text-muted); font-weight: 400; }
+.cga-chip--marker { border-color: #c4bde0; color: #4e4380; }
+.cga-code { display: inline-block; min-width: 24px; font-weight: 700; color: var(--vmu-navy); }
+
+.cga-muted { color: var(--text-muted); }
+.cga-note { margin: 0; color: var(--text-muted); font-size: 12px; }
+.cga-info { padding: 8px 10px; border: 1px solid #b8dceb; background: var(--vmu-blue-light); color: var(--vmu-navy); font-size: 13px; }
+.cga-alert {
+  display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+  border: 1px solid #e3b7b7; background: var(--danger-bg); color: var(--danger-text); font-size: 13px;
+}
+.cga-state { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 120px; color: var(--text-muted); }
+.cga-empty { display: grid; justify-items: center; gap: 4px; padding: 40px 0; border: 1px solid var(--border-color); background: var(--bg-card); }
+.cga-empty p { margin: 0; }
+
+.cga-filters { display: flex; flex-wrap: wrap; gap: 12px; }
+.cga-inline-field { display: inline-flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px; font-weight: 600; }
+.cga-inline-field select {
+  min-width: 220px; max-width: 520px; min-height: 34px; padding: 4px 8px;
+  border: 1px solid var(--field-border); background: var(--bg-card); color: var(--text-dark); font: inherit; font-weight: 400;
+}
+
+.cga-tooltip { padding: 8px 10px; border: 1px solid var(--border-color); background: #fff; font-size: 12px; box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12); }
+
+.cga-course-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 16px; font-size: 13px; }
+.cga-course-summary > div { display: grid; gap: 3px; }
+.cga-course-summary span:first-child { color: var(--text-muted); font-size: 12px; }
+.cga-related h4 { margin: 4px 0; font-size: 13px; }
+.cga-related__group { margin-top: 6px; font-size: 13px; }
+.cga-related__group ul { margin: 4px 0; padding-left: 20px; }
+
+.cga-ci { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.cga-profile { display: grid; gap: 14px; font-size: 14px; line-height: 1.5; }
+.cga-profile section { padding-left: 14px; border-left: 4px solid var(--vmu-navy); }
+.cga-profile h4 { margin: 0 0 6px; font-size: 14px; }
+.cga-profile ul { margin: 0; padding-left: 20px; }
+.cga-profile p { margin: 4px 0; }
+.cga-series { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.cga-series span { display: grid; padding: 4px 8px; border: 1px solid var(--border-color); font-variant-numeric: tabular-nums; }
+.cga-series small { color: var(--text-muted); font-size: 11px; }
+
+.cga-page .spin { animation: cga-spin 0.8s linear infinite; }
+@keyframes cga-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cga-page .spin { animation: none; } }
+
+@media (max-width: 900px) {
+  .cga-page { padding: 10px 9px 20px; }
+  .cga-heading { align-items: flex-start; flex-direction: column; }
+  .cga-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cga-kpi:nth-child(2) { border-right: 0; }
+  .cga-kpi:nth-child(-n + 2) { border-bottom: 1px solid var(--border-color); }
+  .cga-grid-2 { grid-template-columns: 1fr; }
+  .cga-inline-field { flex-wrap: wrap; }
+  .cga-inline-field select { min-width: 0; width: 100%; }
+}
+
+/* Hộp hồ sơ lớp cần đủ rộng cho bảng 5 cột ở bước 2. */
+.catalog-modal-card--workspace.modal-card:has(.cga-profile) { width: min(980px, calc(100vw - 32px)); max-width: none; }
+.cga-profile .cga-table td:first-child { min-width: 180px; }
+.cga-table .btn-sm { white-space: nowrap; }
+.cga-table .cga-name-col { min-width: 160px; }
+.cga-unit { white-space: nowrap; }

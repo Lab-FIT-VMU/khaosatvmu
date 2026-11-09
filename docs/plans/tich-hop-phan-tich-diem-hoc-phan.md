@@ -17,7 +17,7 @@
 | 3. Nạp điểm | Xong | Bộ luật A khớp bản Python từng dòng trên 4 kỳ thật; mã hóa AES-GCM; API xem trước / xác nhận / gỡ kỳ |
 | 4. Worker Python | Xong | `src/GradeAnalysisWorker`: kết quả trùng bộ tính gốc trên 4 kỳ thật (trừ 5 học phần X ≡ Y, xem README của worker), Windows và Linux cho cùng số; user CSDL `grade_worker` hạn quyền; systemd timer 5 phút |
 | 5. API báo cáo | Xong | `/api/v1/course-grade-analysis`: tổng quan, học phần, lớp (kèm hồ sơ), giảng viên – học phần. Quản trị và Ban giám hiệu xem hết; quản lý khoa / bộ môn chỉ đơn vị mình (kiểm thử trên kết quả thật) |
-| 6. Giao diện | Một phần | Trang "Tải lên dữ liệu điểm" đã có; báo cáo vẫn là link chỉ xem; trang ngưỡng chưa có |
+| 6. Giao diện | Xong | Nhóm menu "Phân tích điểm học phần": Tải lên dữ liệu điểm, Ngưỡng phân tích (sửa / khôi phục mặc định, lưu thì xếp lượt tính lại), Báo cáo phân tích (toàn trường, khoa / bộ môn, lớp và hồ sơ lớp, diễn biến qua các kỳ). Bỏ link GitHub Pages. Đã chạy thử trên Edge với kết quả 4 kỳ thật |
 | 7. Thí điểm | Chưa | |
 
 ## 1. Hiện trạng
