@@ -9,6 +9,7 @@ public static class CourseGradeErrorCodes
     public const string ConcurrentReplace = "COURSE_GRADE_CONCURRENT_REPLACE";
     public const string ReplaceReasonRequired = "COURSE_GRADE_REPLACE_REASON_REQUIRED";
     public const string NothingToRemove = "COURSE_GRADE_NOTHING_TO_REMOVE";
+    public const string NothingToAnalyze = "COURSE_GRADE_NOTHING_TO_ANALYZE";
     public const string OutOfScope = "COURSE_GRADE_OUT_OF_SCOPE";
     public const string EncryptionNotConfigured = "COURSE_GRADE_ENCRYPTION_NOT_CONFIGURED";
     public const string InvalidQuery = "COURSE_GRADE_INVALID_QUERY";
@@ -146,4 +147,7 @@ public interface ICourseGradeImportService
         int semesterId, string? reason, CancellationToken cancellationToken = default);
 
     Task<GradeAnalysisRunDto?> GetLatestRunAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Xếp một lượt tính lại mọi kỳ đang có điểm (ví dụ sau khi sửa lớp học phần hoặc khi lượt trước lỗi).</summary>
+    Task<GradeAnalysisRunDto> RecomputeAsync(CancellationToken cancellationToken = default);
 }

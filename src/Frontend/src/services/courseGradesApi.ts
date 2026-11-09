@@ -15,6 +15,7 @@ const basePath = '/api/v1/course-grades';
 export const courseGradesApi = {
   semesters: () => apiRequest<CourseGradeSemester[]>(`${basePath}/semesters`),
   latestRun: () => apiRequest<GradeAnalysisRun | undefined>(`${basePath}/runs/latest`),
+  recompute: () => csrfRequest<GradeAnalysisRun>(`${basePath}/runs`, 'POST'),
   previewImport: (semesterId: number, file: File) => {
     const form = new FormData();
     form.append('semesterId', String(semesterId));

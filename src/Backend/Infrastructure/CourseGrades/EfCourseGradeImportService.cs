@@ -518,6 +518,23 @@ public sealed partial class EfCourseGradeImportService(
         return GradeAnalysisRunMapping.ToDto(run);
     }
 
+    public async Task<GradeAnalysisRunDto> RecomputeAsync(CancellationToken cancellationToken = default)
+    {
+        await EnsureCanWriteAsync(cancellationToken);
+        var (actorId, _) = Actor();
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        if (!await db.GradeImportRevisions.AnyAsync(x => x.IsActive, cancellationToken))
+        {
+            throw new CourseGradeException(CourseGradeErrorCodes.NothingToAnalyze, "Chưa có kỳ nào được nạp điểm để tính.");
+        }
+
+        var run = await GradeAnalysisRunQueue.QueueAsync(
+            db, GradeAnalysisRunTriggers.Recompute, actorId, DateTime.UtcNow, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return GradeAnalysisRunMapping.ToDto(run);
+    }
+
     public async Task<GradeAnalysisRunDto?> GetLatestRunAsync(CancellationToken cancellationToken = default)
     {
         var run = await db.GradeAnalysisRuns.AsNoTracking()

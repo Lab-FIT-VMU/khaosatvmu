@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart3, CircleAlert, LoaderCircle } from 'lucide-react';
+import { GlossaryView } from '../components/courseGrades/GlossaryView';
 import { SchoolOverview } from '../components/courseGrades/SchoolOverview';
 import { SectionsView } from '../components/courseGrades/SectionsView';
 import { TrendsView } from '../components/courseGrades/TrendsView';
@@ -14,16 +15,18 @@ import '../styles/course-grade-reports.css';
 
   Đọc kết quả của lượt tính hiện hành (worker Python). Phạm vi do backend lọc: quản trị hệ thống,
   quản trị khảo sát, Ban giám hiệu xem hết; quản lý khoa / bộ môn chỉ thấy đơn vị mình.
-  Bốn tab tương ứng các trang của module audit: toàn trường, khoa / bộ môn, lớp và hồ sơ, diễn biến.
+  Các tab tương ứng các trang của module audit: toàn trường, khoa / bộ môn, lớp và hồ sơ, diễn biến,
+  giải thích thuật ngữ.
 */
 
-type Tab = 'school' | 'unit' | 'sections' | 'trends';
+type Tab = 'school' | 'unit' | 'sections' | 'trends' | 'glossary';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'school', label: 'Toàn trường' },
   { id: 'unit', label: 'Khoa / bộ môn' },
   { id: 'sections', label: 'Lớp và hồ sơ lớp' },
   { id: 'trends', label: 'Diễn biến qua các kỳ' },
+  { id: 'glossary', label: 'Thuật ngữ' },
 ];
 
 const RUN_STATUS: Record<string, string> = {
@@ -132,8 +135,9 @@ export function CourseGradeReportsPage() {
               </button>
             ))}
           </nav>
-          {loadingCourses && <div className="cga-state"><LoaderCircle className="spin" /> Đang tải kết quả học kỳ...</div>}
-          {!loadingCourses && term && semesterId !== null && (
+          {tab === 'glossary' && <GlossaryView overview={overview} />}
+          {tab !== 'glossary' && loadingCourses && <div className="cga-state"><LoaderCircle className="spin" /> Đang tải kết quả học kỳ...</div>}
+          {tab !== 'glossary' && !loadingCourses && term && semesterId !== null && (
             <>
               {tab === 'school' && <SchoolOverview overview={overview} semesterId={semesterId} courses={courses} />}
               {tab === 'unit' && (

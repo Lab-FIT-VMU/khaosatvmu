@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CircleAlert, Eye, FileSpreadsheet, LoaderCircle, RotateCcw, Trash2, Upload } from 'lucide-react';
+import { CircleAlert, Eye, FileSpreadsheet, LoaderCircle, RefreshCw, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal } from '../components/Modal';
 import { useSemester } from '../context/semesterContext';
@@ -46,6 +46,7 @@ export function CourseGradeUploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [semesters, setSemesters] = useState<CourseGradeSemester[]>([]);
   const [latestRun, setLatestRun] = useState<GradeAnalysisRun | null>(null);
+  const [recomputing, setRecomputing] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [removing, setRemoving] = useState<CourseGradeSemester | null>(null);
   const [removeReason, setRemoveReason] = useState('');
@@ -81,6 +82,19 @@ export function CourseGradeUploadPage() {
   }, []);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  // Tính lại mọi kỳ, ví dụ sau khi sửa danh sách lớp học phần hoặc khi lượt trước bị lỗi.
+  const recompute = async () => {
+    setRecomputing(true);
+    setError(null);
+    try {
+      setLatestRun(await courseGradesApi.recompute());
+    } catch (recomputeError) {
+      setError(courseGradeErrorMessage(recomputeError, 'Không xếp được lượt tính lại.'));
+    } finally {
+      setRecomputing(false);
+    }
+  };
 
   const resetPreview = () => {
     setPreview(null);
@@ -172,6 +186,18 @@ export function CourseGradeUploadPage() {
               Phân tích: {RUN_STATUS_LABEL[latestRun.status]}
               <small>{formatDateTime(latestRun.finishedAtUtc ?? latestRun.requestedAtUtc)}</small>
             </span>
+          )}
+          {semesters.length > 0 && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => void recompute()}
+              disabled={recomputing || latestRun?.status === 'Queued'}
+              title="Tính lại kết quả của mọi kỳ đã nạp, ví dụ sau khi sửa danh sách lớp học phần"
+            >
+              {recomputing ? <LoaderCircle size={14} className="spin" aria-hidden="true" /> : <RefreshCw size={14} aria-hidden="true" />}
+              Tính lại
+            </button>
           )}
         </div>
       </header>

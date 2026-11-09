@@ -215,6 +215,12 @@ public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
             (await h.Db.StudentCourseGrades.CountAsync(x => x.RevisionId == first.RevisionId)).Should().Be(0, "điểm của lần cũ bị xóa hẳn");
             (await h.Db.GradeImportRevisions.SingleAsync(x => x.RevisionId == second.RevisionId)).ReplacedRevisionId.Should().Be(first.RevisionId);
 
+            // Tính lại thủ công: thay lượt đang chờ, không để hai lượt chờ cùng lúc.
+            var recompute = await h.Grades.RecomputeAsync();
+            recompute.Trigger.Should().Be(GradeAnalysisRunTriggers.Recompute);
+            recompute.SemesterIds.Should().Contain(semester.SemesterId);
+            (await h.Db.GradeAnalysisRuns.CountAsync(x => x.Status == GradeAnalysisRunStatus.Queued)).Should().Be(1);
+
             var removed = await h.Grades.RemoveSemesterAsync(semester.SemesterId, "thử gỡ");
             removed.Trigger.Should().Be(GradeAnalysisRunTriggers.RemoveTerm);
             removed.SemesterIds.Should().NotContain(semester.SemesterId);

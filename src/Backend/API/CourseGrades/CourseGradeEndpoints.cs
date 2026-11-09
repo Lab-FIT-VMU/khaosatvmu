@@ -29,6 +29,17 @@ public static class CourseGradeEndpoints
             return run is null ? Results.NoContent() : Results.Ok(run);
         });
 
+        group.MapPost("/runs", async (
+            [FromServices] ICourseGradeImportService service,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await service.RecomputeAsync(ct));
+            }
+            catch (CourseGradeException exception) { return ToError(exception); }
+        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+
         group.MapPost("/imports/preview", async (
             HttpRequest request,
             [FromServices] ICourseGradeImportService service,
@@ -89,7 +100,7 @@ public static class CourseGradeEndpoints
         var statusCode = exception.ErrorCode switch
         {
             CourseGradeErrorCodes.OutOfScope => StatusCodes.Status403Forbidden,
-            CourseGradeErrorCodes.SemesterNotFound or CourseGradeErrorCodes.NothingToRemove => StatusCodes.Status404NotFound,
+            CourseGradeErrorCodes.SemesterNotFound or CourseGradeErrorCodes.NothingToRemove or CourseGradeErrorCodes.NothingToAnalyze => StatusCodes.Status404NotFound,
             CourseGradeErrorCodes.ConcurrentReplace => StatusCodes.Status409Conflict,
             CourseGradeErrorCodes.EncryptionNotConfigured => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest,

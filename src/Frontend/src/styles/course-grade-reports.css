@@ -123,3 +123,11 @@
 .cga-table .btn-sm { white-space: nowrap; }
 .cga-table .cga-name-col { min-width: 160px; }
 .cga-unit { white-space: nowrap; }
+
+/* Giải thích thuật ngữ */
+.cga-gloss { display: grid; gap: 0; margin: 0; }
+.cga-gloss > div { display: grid; grid-template-columns: minmax(200px, 320px) 1fr; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--border-color); }
+.cga-gloss > div:last-child { border-bottom: 0; }
+.cga-gloss dt { font-weight: 600; }
+.cga-gloss dd { margin: 0; line-height: 1.5; }
+@media (max-width: 720px) { .cga-gloss > div { grid-template-columns: 1fr; gap: 4px; } }
