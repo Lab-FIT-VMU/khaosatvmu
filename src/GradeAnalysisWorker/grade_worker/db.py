@@ -63,7 +63,9 @@ def load_sections(conn, semester_id):
     return conn.execute(
         """SELECT cs."CourseSectionId", c."CourseCode", c."CourseName", c."Credits",
                   cs."SectionName", cs."ClassSize", cs."LecturerId", l."FullName" AS "LecturerName",
-                  c."DepartmentId", COALESCE(d."FacultyId", c."FacultyId") AS "FacultyId"
+                  -- Cùng thứ tự với AcademicScopeQuery bên C#: khoa của học phần trước, rồi
+                  -- khoa của bộ môn, để lọc theo phạm vi người xem khớp các module khác.
+                  c."DepartmentId", COALESCE(c."FacultyId", d."FacultyId") AS "FacultyId"
            FROM "CourseSections" cs
            JOIN "Courses" c ON c."CourseId" = cs."CourseId"
            LEFT JOIN "Lecturers" l ON l."LecturerId" = cs."LecturerId"

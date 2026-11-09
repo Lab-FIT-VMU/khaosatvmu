@@ -258,7 +258,7 @@ public static class DatabaseSeeder
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "SURVEY_STATISTICS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "SURVEY_ANALYSIS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "GRADUATION_ANALYTICS_ACCESS"),
-            // Báo cáo cấp Ban giám hiệu: server cắt tên giảng viên và mã lớp (quy tắc R1).
+            // Ban giám hiệu xem được hết báo cáo phân tích điểm, như quản trị hệ thống (chốt 09/11/2026).
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COURSE_GRADE_ANALYSIS_ACCESS"),
             // Ban Giám hiệu xem được danh sách năm học; thêm / sửa vẫn bị service chặn.
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "ACADEMIC_YEARS_ACCESS"),

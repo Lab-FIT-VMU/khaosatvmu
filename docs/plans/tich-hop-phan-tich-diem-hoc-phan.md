@@ -16,7 +16,7 @@
 | 2. Import lớp theo bộ luật B | Xong | Gộp bộ môn, `#N/A`, khoa suy từ bộ môn khi tên khoa trong file không khớp |
 | 3. Nạp điểm | Xong | Bộ luật A khớp bản Python từng dòng trên 4 kỳ thật; mã hóa AES-GCM; API xem trước / xác nhận / gỡ kỳ |
 | 4. Worker Python | Xong | `src/GradeAnalysisWorker`: kết quả trùng bộ tính gốc trên 4 kỳ thật (trừ 5 học phần X ≡ Y, xem README của worker), Windows và Linux cho cùng số; user CSDL `grade_worker` hạn quyền; systemd timer 5 phút |
-| 5. API báo cáo | Chưa | |
+| 5. API báo cáo | Xong | `/api/v1/course-grade-analysis`: tổng quan, học phần, lớp (kèm hồ sơ), giảng viên – học phần. Quản trị và Ban giám hiệu xem hết; quản lý khoa / bộ môn chỉ đơn vị mình (kiểm thử trên kết quả thật) |
 | 6. Giao diện | Một phần | Trang "Tải lên dữ liệu điểm" đã có; báo cáo vẫn là link chỉ xem; trang ngưỡng chưa có |
 | 7. Thí điểm | Chưa | |
 
@@ -291,10 +291,10 @@ Giữ nguyên luồng email hiện tại (Q3). Chỉ bổ sung các luật viế
 | Lượt tính | `GET /api/course-grade-analysis/runs/{id}`, `POST .../runs` (tính lại) | upload / thresholds |
 | Báo cáo | `GET .../board`, `.../faculties/{id}`, `.../departments/{id}`, `.../trends` | `COURSE_GRADE_ANALYSIS_ACCESS` + `UserScope` |
 
-- **Cấp Ban giám hiệu:** server không trả `LecturerId`, mã lớp hay dữ liệu từ `GradeAnalysisLecturerCourseResults`, chỉ trả số lượng (quy tắc R1).
+- **Mức xem (chốt 09/11/2026):** quản trị hệ thống, quản trị khảo sát và **Ban giám hiệu xem được hết**, kể cả tên giảng viên và dữ liệu cấp lớp (bỏ quy tắc R1 của bản audit). Quản lý khoa / bộ môn chỉ thấy đơn vị của mình (`UserScope`).
 - **Không có đường dẫn nào trả dòng điểm của từng sinh viên.**
 
-**Nghiệm thu:** kiểm thử phân quyền cho từng vai trò và từng phạm vi; tài khoản Ban giám hiệu không nhận được tên GV ở bất kỳ đường dẫn nào.
+**Nghiệm thu:** kiểm thử phân quyền cho từng vai trò và từng phạm vi; quản lý bộ môn / khoa không nhận được dữ liệu ngoài đơn vị mình ở bất kỳ đường dẫn nào.
 
 ### Giai đoạn 6. Giao diện React
 

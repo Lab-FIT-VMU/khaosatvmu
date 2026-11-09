@@ -515,7 +515,7 @@ public sealed partial class EfCourseGradeImportService(
 
         var run = await QueueRunAsync(GradeAnalysisRunTriggers.RemoveTerm, actorId, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return ToRunDto(run);
+        return GradeAnalysisRunMapping.ToDto(run);
     }
 
     public async Task<GradeAnalysisRunDto?> GetLatestRunAsync(CancellationToken cancellationToken = default)
@@ -523,7 +523,7 @@ public sealed partial class EfCourseGradeImportService(
         var run = await db.GradeAnalysisRuns.AsNoTracking()
             .OrderByDescending(x => x.RunId)
             .FirstOrDefaultAsync(cancellationToken);
-        return run is null ? null : ToRunDto(run);
+        return run is null ? null : GradeAnalysisRunMapping.ToDto(run);
     }
 
     /// <summary>
@@ -574,18 +574,6 @@ public sealed partial class EfCourseGradeImportService(
         await db.SaveChangesAsync(cancellationToken);
         return run;
     }
-
-    private static GradeAnalysisRunDto ToRunDto(GradeAnalysisRun run) => new(
-        run.RunId,
-        run.Status.ToString(),
-        run.Trigger,
-        run.SemesterIds,
-        run.ThresholdVersion,
-        run.RequestedAtUtc,
-        run.StartedAtUtc,
-        run.FinishedAtUtc,
-        run.ErrorMessage,
-        run.IsCurrent);
 
     // ------------------------------------------------------------------ tiện ích
 

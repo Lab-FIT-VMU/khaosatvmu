@@ -171,6 +171,9 @@ builder.Services.AddSingleton<
 builder.Services.AddScoped<
     Application.CourseGrades.ICourseGradeImportService,
     Infrastructure.CourseGrades.EfCourseGradeImportService>();
+builder.Services.AddScoped<
+    Application.CourseGrades.ICourseGradeAnalysisService,
+    Infrastructure.CourseGrades.EfCourseGradeAnalysisService>();
 builder.Services.AddScoped<ApplicationCookieEvents>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
@@ -212,6 +215,7 @@ app.MapSurveyEndpoints();
 app.MapReportEndpoints();
 app.MapGraduationAnalytics2Endpoints();
 app.MapCourseGradeEndpoints();
+app.MapCourseGradeAnalysisEndpoints();
 
 app.MapHealthChecks("/healthz");
 app.MapHealthChecks("/api/health");

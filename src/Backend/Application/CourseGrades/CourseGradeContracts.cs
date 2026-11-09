@@ -11,6 +11,7 @@ public static class CourseGradeErrorCodes
     public const string NothingToRemove = "COURSE_GRADE_NOTHING_TO_REMOVE";
     public const string OutOfScope = "COURSE_GRADE_OUT_OF_SCOPE";
     public const string EncryptionNotConfigured = "COURSE_GRADE_ENCRYPTION_NOT_CONFIGURED";
+    public const string InvalidQuery = "COURSE_GRADE_INVALID_QUERY";
 }
 
 /// <summary>Lỗi nghiệp vụ của nạp điểm. Thông điệp không bao giờ chứa giá trị của dòng điểm nào.</summary>

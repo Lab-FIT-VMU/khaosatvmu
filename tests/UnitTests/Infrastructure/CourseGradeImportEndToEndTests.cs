@@ -295,7 +295,10 @@ public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
     /// <summary>Đọc file lớp như trang Lớp học phần gửi lên: mỗi dòng của sheet Thongke thành một lệnh import.</summary>
     private static List<ImportCourseSectionRowCommand> ReadClassFile(string path)
     {
-        using var workbook = new XLWorkbook(path);
+        // Mở chỉ đọc: thư mục dữ liệu thật thường được gắn read-only (ClosedXML mở theo đường
+        // dẫn là xin cả quyền ghi).
+        using var stream = File.OpenRead(path);
+        using var workbook = new XLWorkbook(stream);
         var sheet = workbook.Worksheets.TryGetWorksheet("Thongke", out var named) ? named : workbook.Worksheet(1);
         var header = sheet.Row(1).CellsUsed().ToDictionary(c => c.GetString().Trim().ToLowerInvariant(), c => c.Address.ColumnNumber);
         string? Value(IXLRow row, string column) =>
