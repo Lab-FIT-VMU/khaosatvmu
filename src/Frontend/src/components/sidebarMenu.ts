@@ -2,20 +2,24 @@ import {
   Award,
   BarChart3,
   BookOpen,
+  Building,
   Building2,
   CalendarRange,
   ChartColumn,
   ChartNoAxesCombined,
+  CircleHelp,
   ClipboardCheck,
   ClipboardList,
   FolderTree,
   Gauge,
   GraduationCap,
+  History,
   IdCard,
   LayoutDashboard,
   ListChecks,
   Network,
   Presentation,
+  School,
   ShieldCheck,
   Sigma,
   SlidersHorizontal,
@@ -48,6 +52,11 @@ export interface SidebarMenuItem {
    * trong. Mục loại này không có quyền module riêng nên mọi vai trò đều thấy.
    */
   externalUrl?: string;
+  /**
+   * Tiêu đề nhỏ đứng trên mục trong nhóm (ví dụ "Báo cáo"). Các mục liền nhau cùng tiêu đề
+   * chỉ hiện tiêu đề một lần, ở mục đầu.
+   */
+  section?: string;
 }
 
 export interface SidebarMenuGroup {
@@ -111,9 +120,14 @@ export const menuStructure: SidebarMenuEntry[] = [
     label: 'Phân tích điểm học phần',
     icon: ChartNoAxesCombined,
     items: [
-      { id: 'course-grade-upload', label: 'Tải lên dữ liệu điểm', icon: Upload },
-      { id: 'course-grade-thresholds', label: 'Ngưỡng phân tích', icon: SlidersHorizontal },
-      { id: 'course-grade-reports', label: 'Báo cáo phân tích', icon: BarChart3 },
+      { id: 'course-grade-upload', label: 'Tải lên dữ liệu điểm', icon: Upload, section: 'Dữ liệu' },
+      { id: 'course-grade-thresholds', label: 'Ngưỡng phân tích', icon: SlidersHorizontal, section: 'Dữ liệu' },
+      // Bốn cấp báo cáo như bản audit; cùng một quyền COURSE_GRADE_ANALYSIS_ACCESS.
+      { id: 'course-grade-report-school', label: 'Cấp Ban giám hiệu', icon: School, section: 'Báo cáo' },
+      { id: 'course-grade-report-faculty', label: 'Cấp khoa / viện', icon: Building, section: 'Báo cáo' },
+      { id: 'course-grade-report-department', label: 'Cấp bộ môn', icon: BookOpen, section: 'Báo cáo' },
+      { id: 'course-grade-report-trends', label: 'Diễn biến qua các học kỳ', icon: History, section: 'Báo cáo' },
+      { id: 'course-grade-glossary', label: 'Giải thích thuật ngữ', icon: CircleHelp, section: 'Trợ giúp' },
     ],
   },
   {

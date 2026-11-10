@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AnalysisSection } from '../../types/courseGradeAnalysis';
 import { vi } from './courseGradeFormat';
+import { Field, Filters } from './courseGradeUi';
 
 /** Màu hai loại điểm của bản audit (--score-qt, --score-thi). */
 const SCORE_X = '#1D63D6';
@@ -39,14 +40,15 @@ export function ClassDumbbell({ sections, baseCourseCode }: { sections: Analysis
 
   return (
     <div className="cga-dumbbell">
-      <label className="cga-inline-field">
-        Sắp xếp các lớp theo
-        <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
-          <option value="gap">Chênh lệch giữa hai loại điểm (lớn nhất ở trên)</option>
-          <option value="x">Điểm quá trình trung bình (cao nhất ở trên)</option>
-          <option value="name">Tên nhóm lớp</option>
-        </select>
-      </label>
+      <Filters>
+        <Field label="Sắp xếp các lớp theo">
+          <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
+            <option value="gap">Chênh lệch giữa hai loại điểm (lớn nhất ở trên)</option>
+            <option value="x">Điểm quá trình trung bình (cao nhất ở trên)</option>
+            <option value="name">Tên nhóm lớp</option>
+          </select>
+        </Field>
+      </Filters>
       <div className="cga-table-wrap">
         <svg viewBox={`0 0 ${width} ${height}`} width="100%" role="img"
           aria-label="Điểm quá trình và điểm thi trung bình của từng lớp" style={{ minWidth: 640 }}>

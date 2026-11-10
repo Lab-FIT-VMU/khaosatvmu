@@ -178,6 +178,11 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     Application.CourseGrades.IGradeAnalysisThresholdService,
     Infrastructure.CourseGrades.EfGradeAnalysisThresholdService>();
+// Tự chạy worker phân tích điểm ngay khi có lượt tính đang chờ (bật ở môi trường phát triển).
+builder.Services.Configure<GradeAnalysisWorkerOptions>(
+    builder.Configuration.GetSection(GradeAnalysisWorkerOptions.SectionName));
+builder.Services.AddSingleton<GradeAnalysisWorkerLauncher>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<GradeAnalysisWorkerLauncher>());
 builder.Services.AddScoped<
     Application.Students.IStudentService,
     Infrastructure.Students.EfStudentService>();

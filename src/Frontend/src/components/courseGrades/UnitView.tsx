@@ -5,16 +5,15 @@ import { courseGradeErrorMessage } from '../../services/courseGradesApi';
 import type { AnalysisCourse, AnalysisLecturerCourse, AnalysisOverview } from '../../types/courseGradeAnalysis';
 import { CourseMap } from './CourseMap';
 import { TwoWayTable } from './TwoWayTable';
-import { MARKER_LABELS } from './courseGradeLabels';
+import { EXPLAIN } from './courseGradeExplanations';
 import { COLORS, median, pct, vi, viInt } from './courseGradeFormat';
-import { FlagChips, SectionCard, StableChips } from './courseGradeUi';
+import { Field, FlagChips, MarkerChips, SectionCard, StableChips } from './courseGradeUi';
 
 interface Props {
   overview: AnalysisOverview;
   termCode: string;
   courses: AnalysisCourse[];
   facultyId: number | null;
-  onFacultyChange: (facultyId: number | null) => void;
   onOpenCourse: (departmentId: number | null, courseCode: string) => void;
   onOpenTrends: (departmentId: number | null) => void;
 }
@@ -35,7 +34,7 @@ interface RepeatRow {
  * × chỉ số, bản đồ học phần của khoa, danh sách học phần có điểm lưu ý và đặc điểm lặp lại (G1, có tên
  * giảng viên).
  */
-export function UnitView({ overview, termCode, courses, facultyId, onFacultyChange, onOpenCourse, onOpenTrends }: Props) {
+export function UnitView({ overview, termCode, courses, facultyId, onOpenCourse, onOpenTrends }: Props) {
   const [mapDepartment, setMapDepartment] = useState<number | null>(null);
   const [onlyFlagged, setOnlyFlagged] = useState(false);
   const [lecturerRows, setLecturerRows] = useState<AnalysisLecturerCourse[]>([]);
@@ -153,37 +152,34 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
 
   return (
     <div className="cga-stack">
-      {overview.viewLevel === 'full' && (
-        <label className="cga-inline-field">
-          Khoa / viện
-          <select value={facultyId ?? ''} onChange={(event) => onFacultyChange(event.target.value ? Number(event.target.value) : null)}>
-            <option value="">Tất cả khoa</option>
-            {overview.faculties.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
-        </label>
-      )}
-
-      <TwoWayTable courses={inFaculty} scope={facultyLabel} />
+      <TwoWayTable courses={inFaculty} scope={`${facultyLabel}, ${termLabel.get(termCode) ?? termCode}`} thresholds={overview.thresholds} />
 
       <SectionCard
-        title="Các bộ môn"
-        description="Tỷ lệ mất tư cách, tỷ lệ trượt và tương quan chỉ để mô tả, không dùng xếp hạng chất lượng. So sánh giữa bộ môn dựa trên mức chênh giữa các lớp bên trong từng học phần (trung vị ICC, τ) và tỷ lệ học phần có điểm lưu ý."
+        title="Tổng hợp chỉ số theo bộ môn"
+        description="Tỷ lệ mất tư cách, tỷ lệ trượt và mức độ khớp chỉ để mô tả, không dùng xếp hạng. So sánh giữa bộ môn dựa trên mức chênh giữa các lớp bên trong từng học phần và tỷ lệ học phần có điểm lưu ý. Di chuột vào tên điểm lưu ý để xem giải thích."
+        explain={EXPLAIN.facultyDepartments}
+        explainKind="table"
       >
         <div className="cga-table-wrap">
           <table className="cga-table">
             <thead>
               <tr>
-                <th>Bộ môn</th><th className="num">Học phần</th><th className="num">Lớp</th><th className="num">Đủ lớp so sánh</th>
-                <th className="num">Có điểm lưu ý</th><th>Gặp nhiều nhất</th>
-                <th className="num">Mất tư cách</th><th className="num">Trượt do điểm thi</th><th className="num">r (trung vị lớp)</th>
-                <th className="num">ICC / τ điểm quá trình</th><th className="num">Có H1</th>
-                <th className="num">ICC / τ điểm thi</th><th className="num">Có H2</th>
+                <th className="cga-sticky">Bộ môn</th><th className="num">Số học phần</th><th className="num">Số lớp</th>
+                <th className="num">Học phần có từ 2 lớp<span className="cga-unit">đủ điều kiện so sánh</span></th>
+                <th className="num">Học phần có điểm lưu ý</th><th>Điểm lưu ý gặp nhiều nhất</th>
+                <th className="num">Tỷ lệ mất tư cách<span className="cga-unit">%</span></th>
+                <th className="num">Tỷ lệ trượt do điểm thi<span className="cga-unit">%</span></th>
+                <th className="num">Mức độ khớp<span className="cga-unit">trung vị r, 0 đến 1</span></th>
+                <th className="num">Chênh lệch giữa các lớp – điểm quá trình<span className="cga-unit">trung vị ICC / τ</span></th>
+                <th className="num">Có điểm lưu ý chênh điểm quá trình<span className="cga-unit">%</span></th>
+                <th className="num">Chênh lệch giữa các lớp – điểm thi<span className="cga-unit">trung vị ICC / τ</span></th>
+                <th className="num">Có điểm lưu ý chênh điểm thi<span className="cga-unit">%</span></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.department.id}>
-                  <td className="cga-name-col">{row.department.name}</td>
+                  <td className="cga-name-col cga-sticky"><strong>{row.department.name}</strong></td>
                   <td className="num">{viInt(row.courses)}</td>
                   <td className="num">{viInt(row.sections)}</td>
                   <td className="num">{viInt(row.comparable)}</td>
@@ -205,6 +201,7 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
 
       <SectionCard
         title="Bản đồ học phần của khoa"
+        explain={EXPLAIN.facultyMap}
         description={showMap
           ? `Mỗi chấm là một học phần đủ điều kiện so sánh (${viInt(mapCourses.length)} học phần), tô màu theo bộ môn. Ghi tên tối đa 6 học phần có điểm lưu ý nằm xa nhất; di chuột vào các chấm khác để xem tên.`
           : 'Chọn một khoa ở trên để xem bản đồ học phần của khoa đó.'}
@@ -219,20 +216,18 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
             legend={mapDepartments.map((d) => ({ label: d.name, color: departmentColor.get(d.id) ?? COLORS.categories[3] }))}
             controls={(
               <>
-                <label className="cga-inline-field">
-                  Bộ môn
+                <Field label="Bộ môn">
                   <select value={mapDepartment ?? ''} onChange={(event) => setMapDepartment(event.target.value ? Number(event.target.value) : null)}>
                     <option value="">Tất cả bộ môn</option>
                     {mapDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
-                </label>
-                <label className="cga-inline-field">
-                  Học phần hiển thị
+                </Field>
+                <Field label="Học phần hiển thị">
                   <select value={onlyFlagged ? '1' : ''} onChange={(event) => setOnlyFlagged(event.target.value === '1')}>
                     <option value="">Tất cả học phần</option>
                     <option value="1">Chỉ học phần có điểm lưu ý</option>
                   </select>
-                </label>
+                </Field>
               </>
             )}
           />
@@ -240,21 +235,23 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
       </SectionCard>
 
       <SectionCard
-        title="Học phần có điểm lưu ý"
-        description={`${viInt(flagged.length)} học phần. Điểm lưu ý mang nghĩa “cần xem xét”, không kết luận và không đánh giá giảng viên.`}
+        title="Danh sách học phần có điểm lưu ý"
+        description={`${viInt(flagged.length)} học phần. Điểm lưu ý mang nghĩa “cần xem xét”, không kết luận và không đánh giá giảng viên. Bấm “Xem các lớp” để mở trang cấp bộ môn của học phần.`}
+        explain={EXPLAIN.facultyFlagged}
+        explainKind="table"
       >
         <div className="cga-table-wrap">
           <table className="cga-table">
             <thead>
               <tr>
-                <th>Học phần</th><th>Bộ môn</th><th>Điểm lưu ý</th><th>Ổn định / chưa đủ căn cứ</th>
-                <th className="num">Số kỳ có điểm lưu ý</th><th aria-label="Thao tác" />
+                <th>Học phần</th><th>Bộ môn</th><th>Điểm lưu ý trong học kỳ này</th><th>Ổn định, đồng đều</th>
+                <th className="num">Số học kỳ có điểm lưu ý<span className="cga-unit">trên số kỳ đã nạp</span></th><th aria-label="Thao tác" />
               </tr>
             </thead>
             <tbody>
               {flagged.map((c) => (
                 <tr key={c.baseCourseCode}>
-                  <td><strong>{c.data.ten}</strong><br /><small className="cga-muted">{c.baseCourseCode}{c.data.hai_he ? ' · có cả lớp đại trà và chất lượng cao' : ''}</small></td>
+                  <td><span className="cga-course-name">{c.data.ten}</span><span className="cga-course-code">Mã học phần {c.baseCourseCode}{c.data.hai_he ? ' · có cả lớp đại trà và chất lượng cao' : ''}</span></td>
                   <td>{departmentName.get(c.departmentId ?? -1) ?? '—'}</td>
                   <td><FlagChips codes={c.flags} /></td>
                   <td><StableChips codes={c.stableStates} pending={c.data.cdl} /></td>
@@ -273,7 +270,10 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
       </SectionCard>
 
       <SectionCard
-        title="Đặc điểm lặp lại qua nhiều học kỳ (G1)"
+        title="Đặc điểm lặp lại qua nhiều học kỳ – có tên giảng viên"
+        explain={EXPLAIN.facultyRepeat}
+        explainKind="table"
+        explainValues={{ cua_so: viInt(Number(overview.thresholds?.g1_cua_so_ky ?? 4)) }}
         description={`Cùng giảng viên, cùng học phần, cùng một đặc điểm ở nhiều học kỳ trong ${viInt(Number(overview.thresholds?.g1_cua_so_ky ?? 4))} kỳ gần nhất tính đến ${termLabel.get(termCode) ?? termCode}. ${viInt(repeats.length)} lượt, ${viInt(repeats.filter((r) => r.ongoing).length)} đang tiếp diễn. Sự lặp lại có thể do ngẫu nhiên; đây là căn cứ để trao đổi, không phải kết luận.`}
       >
         {termsUpToNow.length < minRepeatTerms ? (
@@ -292,8 +292,8 @@ export function UnitView({ overview, termCode, courses, facultyId, onFacultyChan
                 {repeats.map((r) => (
                   <tr key={r.key}>
                     <td className="cga-name-col">{r.lecturer}</td>
-                    <td className="cga-name-col">{r.courseName}<br /><small className="cga-muted">{r.courseCode}</small></td>
-                    <td><span className="cga-code">{r.marker}</span> {MARKER_LABELS[r.marker]?.name}</td>
+                    <td className="cga-name-col"><span className="cga-course-name">{r.courseName}</span><span className="cga-course-code">Mã học phần {r.courseCode}</span></td>
+                    <td><MarkerChips codes={[r.marker]} /></td>
                     <td>{r.terms.map((ky) => termLabel.get(ky) ?? ky).join(', ')}</td>
                     <td>{r.ongoing ? 'Đang tiếp diễn' : 'Đã ghi nhận trước đây'}</td>
                     <td>

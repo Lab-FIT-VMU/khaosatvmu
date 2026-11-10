@@ -69,6 +69,16 @@ const GraduationAnalytics2Page = lazy(() => import('./pages/GraduationAnalytics2
 const StudentsPage = lazy(() => import('./pages/StudentsPage').then(m => ({ default: m.StudentsPage })));
 const CourseGradeUploadPage = lazy(() => import('./pages/CourseGradeUploadPage').then(m => ({ default: m.CourseGradeUploadPage })));
 const CourseGradeReportsPage = lazy(() => import('./pages/CourseGradeReportsPage').then(m => ({ default: m.CourseGradeReportsPage })));
+/** Mục sidebar của báo cáo phân tích điểm → cấp báo cáo (CourseGradeReportsPage). */
+const COURSE_GRADE_REPORT_VIEWS: Record<string, CourseGradeReportView> = {
+  'course-grade-report-school': 'school',
+  'course-grade-report-faculty': 'faculty',
+  'course-grade-report-department': 'department',
+  'course-grade-report-trends': 'trends',
+  'course-grade-glossary': 'glossary',
+};
+const courseGradeReportTab = (view: CourseGradeReportView) =>
+  Object.keys(COURSE_GRADE_REPORT_VIEWS).find((tab) => COURSE_GRADE_REPORT_VIEWS[tab] === view) ?? 'course-grade-report-school';
 const CourseGradeThresholdsPage = lazy(() => import('./pages/CourseGradeThresholdsPage').then(m => ({ default: m.CourseGradeThresholdsPage })));
 const StudentSurveyView = lazy(() => import('./pages/StudentSurveyView').then(m => ({ default: m.StudentSurveyView })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
@@ -89,6 +99,7 @@ import type { ImportMajorRow } from './utils/majorImportExcel';
 import type { ImportCourseRow } from './utils/courseImportExcel';
 import type { ImportLecturerRow } from './utils/lecturerImportExcel';
 import { surveyApi, surveyErrorMessage } from './services/surveyApi';
+import type { CourseGradeReportView } from './components/courseGrades/reportViews';
 import type {
   Faculty,
   Department,
@@ -204,6 +215,11 @@ function DashboardApp() {
     ? 'overview'
     : ['progress', 'course-campaigns', 'survey-statistics', 'reports', 'classes', 'users-admin']
         .find((moduleId) => canAccessModule(permissions, moduleId)) ?? 'progress';
+
+  // Báo cáo phân tích điểm cũ là một trang có thanh tab; nay tách thành bốn mục trên sidebar.
+  useEffect(() => {
+    if (currentTab === 'course-grade-reports') setCurrentTab(courseGradeReportTab('school'));
+  }, [currentTab, setCurrentTab]);
 
   useEffect(() => {
     const blocked =
@@ -676,7 +692,13 @@ function DashboardApp() {
             )}
 
             {currentTab === 'course-grade-upload' && <CourseGradeUploadPage />}
-            {currentTab === 'course-grade-reports' && <CourseGradeReportsPage />}
+            {COURSE_GRADE_REPORT_VIEWS[currentTab] && (
+              <CourseGradeReportsPage
+                key={currentTab}
+                view={COURSE_GRADE_REPORT_VIEWS[currentTab]}
+                onNavigate={(view) => setCurrentTab(courseGradeReportTab(view))}
+              />
+            )}
             {currentTab === 'course-grade-thresholds' && <CourseGradeThresholdsPage />}
 
             {currentTab === 'students' && <StudentsPage />}

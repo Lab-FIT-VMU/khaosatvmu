@@ -14,7 +14,13 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   // Phân tích điểm học phần: tải lên, ngưỡng và báo cáo là ba quyền riêng.
   'course-grade-upload': 'COURSE_GRADE_UPLOAD_ACCESS',
   'course-grade-thresholds': 'COURSE_GRADE_THRESHOLDS_ACCESS',
+  // Báo cáo tách thành bốn cấp và trang thuật ngữ, cùng một quyền; mã cũ giữ cho bookmark.
   'course-grade-reports': 'COURSE_GRADE_ANALYSIS_ACCESS',
+  'course-grade-report-school': 'COURSE_GRADE_ANALYSIS_ACCESS',
+  'course-grade-report-faculty': 'COURSE_GRADE_ANALYSIS_ACCESS',
+  'course-grade-report-department': 'COURSE_GRADE_ANALYSIS_ACCESS',
+  'course-grade-report-trends': 'COURSE_GRADE_ANALYSIS_ACCESS',
+  'course-grade-glossary': 'COURSE_GRADE_ANALYSIS_ACCESS',
   // Giữ hash cũ để bookmark tự chuyển vào module thống nhất.
   'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
   'graduation-analytics-2': 'GRADUATION_ANALYTICS_ACCESS',

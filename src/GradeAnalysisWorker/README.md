@@ -26,7 +26,11 @@ worker:  nhận lượt cũ nhất  ──►  đọc view GradeAnalysisInputs, 
 ## Chạy
 
 ```bash
-# Một lượt (hết việc thì thoát) — dùng với systemd timer mỗi 5 phút (deploy/systemd/)
+# Máy chủ: chạy nền, quét lượt chờ mỗi 10 giây (deploy/systemd/khaosatvmu-grade-analysis.service)
+docker compose --profile grade-analysis run --rm grade-analysis-worker --watch --interval 10
+
+# Một lượt (hết việc thì thoát). Máy phát triển: API tự chạy lệnh này sau mỗi lần nạp điểm
+# (CourseGrades:AnalysisWorker trong appsettings.Development.json).
 docker compose --profile grade-analysis run --rm grade-analysis-worker
 
 # Trên máy phát triển

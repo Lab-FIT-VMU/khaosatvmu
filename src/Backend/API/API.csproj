@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>khaosatvmu-api-local-google-oauth</UserSecretsId>
+    <!-- Không tạo API.exe; `dotnet run` chạy thẳng API.dll. -->
+    <UseAppHost>false</UseAppHost>
   </PropertyGroup>
 
   <ItemGroup>

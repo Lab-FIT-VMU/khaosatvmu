@@ -152,8 +152,9 @@ services:
   #
   #   docker compose --profile grade-analysis run --rm grade-analysis-worker
   #
-  # Khuyến nghị chạy theo systemd timer mỗi 5 phút (deploy/systemd/). Lượt không có việc thoát
-  # sau vài giây; có việc thì khoảng 3 phút cho 4 kỳ, đo được ~450 MB RAM ở chế độ một tiến trình.
+  # Trên máy chủ chạy nền bằng systemd (deploy/systemd/khaosatvmu-grade-analysis.service, thêm
+  # --watch) để điểm nạp xong là được tính ngay. Máy phát triển: API tự gọi lệnh trên sau mỗi lần
+  # nạp (CourseGrades:AnalysisWorker). Có việc thì khoảng 3 phút cho 4 kỳ, ~450 MB RAM.
   # Không cho chạy cùng lúc với sentiment-worker trên máy 4 GB.
   grade-analysis-worker:
     build:

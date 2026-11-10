@@ -13,6 +13,7 @@ import {
 import type { AnalysisCourse } from '../../types/courseGradeAnalysis';
 import { FLAG_LABELS } from './courseGradeLabels';
 import { median, vi, viInt } from './courseGradeFormat';
+import { Field, Filters } from './courseGradeUi';
 
 type Axis = 'icc' | 'tau';
 
@@ -27,6 +28,8 @@ interface Props {
   maxLabels?: number;
   legend: { label: string; color: string }[];
   controls?: ReactNode;
+  /** Cấp trường: không ghi tên hay mã học phần, kể cả khi rê chuột. */
+  anonymous?: boolean;
 }
 
 interface Point {
@@ -48,7 +51,7 @@ const ZONES_MEDIAN = ['dưới trung vị ở cả hai loại điểm', 'chỉ t
  * hoặc trung vị các học phần (thang τ); ghi số học phần ở mỗi vùng. Chấm rỗng: mô hình không phát hiện
  * chênh lệch giữa các lớp ở ít nhất một loại điểm (τ = 0).
  */
-export function CourseMap({ courses, thresholds, colorOf, highlight = () => true, maxLabels = 0, legend, controls }: Props) {
+export function CourseMap({ courses, thresholds, colorOf, highlight = () => true, maxLabels = 0, legend, controls, anonymous = false }: Props) {
   const [axis, setAxis] = useState<Axis>('icc');
 
   const { points, refX, refY, zones, zeroX, zeroY } = useMemo(() => {
@@ -102,16 +105,15 @@ export function CourseMap({ courses, thresholds, colorOf, highlight = () => true
 
   return (
     <div className="cga-map">
-      <div className="cga-actions">
-        <label className="cga-inline-field">
-          Thang đo
+      <Filters>
+        <Field label="Thang đo">
           <select value={axis} onChange={(event) => setAxis(event.target.value as Axis)}>
             <option value="icc">Tỷ lệ phương sai giữa các lớp (ICC)</option>
             <option value="tau">Độ lệch chuẩn giữa các lớp (τ, điểm)</option>
           </select>
-        </label>
+        </Field>
         {controls}
-      </div>
+      </Filters>
       {points.length === 0 ? <p className="cga-muted">Chưa có học phần đủ điều kiện so sánh.</p> : (
         <>
           <ResponsiveContainer width="100%" height={420}>
@@ -122,8 +124,8 @@ export function CourseMap({ courses, thresholds, colorOf, highlight = () => true
               <YAxis type="number" dataKey="y" tick={{ fontSize: 11 }} width={48}
                 label={{ value: 'Các lớp chênh lệch về điểm thi →', angle: -90, position: 'insideLeft', fontSize: 12, dy: 90 }} />
               <ZAxis range={[40, 40]} />
-              <ReferenceLine x={refX} stroke="#64748b" strokeDasharray="4 4" />
-              <ReferenceLine y={refY} stroke="#64748b" strokeDasharray="4 4" />
+              <ReferenceLine x={refX} stroke="#D32F2F" strokeDasharray="5 4" strokeWidth={1.5} />
+              <ReferenceLine y={refY} stroke="#D32F2F" strokeDasharray="5 4" strokeWidth={1.5} />
               <Tooltip
                 cursor={{ strokeDasharray: '3 3' }}
                 content={({ payload }) => {
@@ -131,7 +133,7 @@ export function CourseMap({ courses, thresholds, colorOf, highlight = () => true
                   if (!point) return null;
                   return (
                     <div className="cga-tooltip">
-                      <strong>{point.course.data.ten} ({point.course.baseCourseCode})</strong>
+                      {anonymous ? <strong>Học phần</strong> : <strong>{point.course.data.ten} ({point.course.baseCourseCode})</strong>}
                       <div>Điểm quá trình: {vi(point.x, 3)} · Điểm thi: {vi(point.y, 3)}</div>
                       {point.course.flags.length > 0 && (
                         <div>Điểm lưu ý: {point.course.flags.map((c) => FLAG_LABELS[c]?.name ?? c).join('; ')}</div>

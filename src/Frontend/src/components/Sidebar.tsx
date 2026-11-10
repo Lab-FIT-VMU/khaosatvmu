@@ -27,6 +27,7 @@ interface SidebarItem {
   icon: LucideIcon;
   badge?: number;
   externalUrl?: string;
+  section?: string;
 }
 
 interface SidebarGroup {
@@ -261,7 +262,13 @@ export function Sidebar({
 
                 {isOpen && (
                   <div className="menu-group-items" id={panelId}>
-                    {entry.items.map((item) => renderItem(item, true))}
+                    {entry.items.map((item, index) => {
+                      // Tiêu đề nhỏ ("Báo cáo"…) đứng trước mục đầu tiên của mỗi phần.
+                      const heading = item.section && item.section !== entry.items[index - 1]?.section
+                        ? <div className="menu-section-label" key={`section-${item.section}`}>{item.section}</div>
+                        : null;
+                      return heading ? [heading, renderItem(item, true)] : renderItem(item, true);
+                    })}
                   </div>
                 )}
               </div>

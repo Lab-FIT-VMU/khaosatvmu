@@ -35,6 +35,7 @@ const RUN_STATUS_LABEL: Record<GradeAnalysisRun['status'], string> = {
 };
 
 const LIST_PREVIEW_LIMIT = 8;
+const RUN_POLL_MS = 5000;
 
 export function CourseGradeUploadPage() {
   const { academicYears, activeSemesterId } = useSemester();
@@ -82,6 +83,22 @@ export function CourseGradeUploadPage() {
   }, []);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  // API tự chạy worker ngay sau khi nạp / gỡ / tính lại: hỏi lại trạng thái tới khi tính xong.
+  const runPending = latestRun?.status === 'Queued' || latestRun?.status === 'Running';
+  useEffect(() => {
+    if (!runPending) return undefined;
+    const timer = window.setInterval(() => {
+      courseGradesApi.latestRun()
+        .then((run) => {
+          if (run?.status === 'Succeeded') toast.success('Đã tính xong phân tích điểm.');
+          else if (run?.status === 'Failed') toast.error('Tính phân tích điểm bị lỗi. Bấm "Tính lại" để thử lại.');
+          setLatestRun(run ?? null);
+        })
+        .catch(() => undefined);
+    }, RUN_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [runPending]);
 
   // Tính lại mọi kỳ, ví dụ sau khi sửa danh sách lớp học phần hoặc khi lượt trước bị lỗi.
   const recompute = async () => {

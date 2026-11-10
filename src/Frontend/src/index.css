@@ -332,6 +332,21 @@ textarea:focus-visible {
   border-left: 1px solid #DFE4E8;
 }
 
+/* Tiêu đề phần trong nhóm (Dữ liệu, Báo cáo, Trợ giúp của Phân tích điểm học phần). */
+.menu-section-label {
+  margin: 8px 0 2px;
+  padding: 0 10px;
+  color: var(--sidebar-accent-strong);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.menu-group-items > .menu-section-label:first-child {
+  margin-top: 4px;
+}
+
 .menu-item--child {
   min-height: 34px;
   padding: 6px 10px;

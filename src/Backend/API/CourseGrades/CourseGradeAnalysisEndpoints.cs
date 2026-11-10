@@ -56,12 +56,14 @@ public static class CourseGradeAnalysisEndpoints
                     .Select(x => new GradeAnalysisThresholdUpdate(x.Code ?? string.Empty, x.NumericValue, x.BooleanValue, x.TextListValue))
                     .ToList(),
                 ct)))
-            .AddEndpointFilter<RequireAntiforgeryFilter>();
+            .AddEndpointFilter<RequireAntiforgeryFilter>()
+            .AddEndpointFilter<WakeGradeAnalysisWorkerFilter>();
 
         thresholds.MapPost("/reset", (
             [FromServices] IGradeAnalysisThresholdService service,
             CancellationToken ct) => Handle(() => service.ResetToDefaultsAsync(ct)))
-            .AddEndpointFilter<RequireAntiforgeryFilter>();
+            .AddEndpointFilter<RequireAntiforgeryFilter>()
+            .AddEndpointFilter<WakeGradeAnalysisWorkerFilter>();
 
         return app;
     }

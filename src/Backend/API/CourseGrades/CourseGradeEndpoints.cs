@@ -38,7 +38,8 @@ public static class CourseGradeEndpoints
                 return Results.Ok(await service.RecomputeAsync(ct));
             }
             catch (CourseGradeException exception) { return ToError(exception); }
-        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+        }).AddEndpointFilter<RequireAntiforgeryFilter>()
+            .AddEndpointFilter<WakeGradeAnalysisWorkerFilter>();
 
         group.MapPost("/imports/preview", async (
             HttpRequest request,
@@ -75,7 +76,8 @@ public static class CourseGradeEndpoints
                 return Results.Ok(result);
             }
             catch (CourseGradeException exception) { return ToError(exception); }
-        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+        }).AddEndpointFilter<RequireAntiforgeryFilter>()
+            .AddEndpointFilter<WakeGradeAnalysisWorkerFilter>();
 
         group.MapDelete("/semesters/{semesterId:int}", async (
             int semesterId,
@@ -88,7 +90,8 @@ public static class CourseGradeEndpoints
                 return Results.Ok(await service.RemoveSemesterAsync(semesterId, request?.Reason, ct));
             }
             catch (CourseGradeException exception) { return ToError(exception); }
-        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+        }).AddEndpointFilter<RequireAntiforgeryFilter>()
+            .AddEndpointFilter<WakeGradeAnalysisWorkerFilter>();
 
         return app;
     }

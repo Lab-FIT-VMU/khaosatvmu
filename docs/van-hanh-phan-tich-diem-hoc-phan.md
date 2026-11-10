@@ -69,14 +69,18 @@ Mỗi ô điểm ghi kèm phiên bản khóa đã dùng để mã hóa. Vì vậ
    ```bash
    docker compose --profile grade-analysis build grade-analysis-worker
    ```
-5. **Lịch chạy:** cài [systemd timer](../deploy/systemd/) để chạy 5 phút một lần:
+5. **Chạy nền:** cài [systemd service](../deploy/systemd/khaosatvmu-grade-analysis.service), worker quét lượt chờ
+   mỗi 10 giây nên điểm nạp xong là được tính ngay:
    ```bash
-   sudo cp deploy/systemd/khaosatvmu-grade-analysis.* /etc/systemd/system/
+   sudo cp deploy/systemd/khaosatvmu-grade-analysis.service /etc/systemd/system/
    sudo systemctl daemon-reload
-   sudo systemctl enable --now khaosatvmu-grade-analysis.timer
+   sudo systemctl enable --now khaosatvmu-grade-analysis.service
    ```
-   Worker không chạy chồng với `khaosatvmu-sentiment.service`. Mỗi lượt dùng tối đa 1 CPU và 768 MB,
-   tính 4 kỳ mất khoảng 3 phút.
+   Máy cũ đã cài timer thì gỡ đi: `sudo systemctl disable --now khaosatvmu-grade-analysis.timer`.
+   Mỗi lượt dùng tối đa 1 CPU và 768 MB, tính 4 kỳ mất khoảng 3 phút.
+
+   Khi API chạy thẳng trên máy có Python hay Docker (máy phát triển, `dotnet run`), API tự chạy worker ngay
+   sau khi nạp, không cần service này: bật mục `CourseGrades:AnalysisWorker` (xem `appsettings.Development.json`).
 6. **Quyền:** seeder tạo 3 quyền trong nhóm "Phân tích điểm học phần":
 
    | Quyền | Mở | Cấp sẵn cho |
@@ -108,7 +112,7 @@ lớp học phần, hoặc khi lượt trước bị lỗi.
 | Hiện tượng | Xử lý |
 |---|---|
 | "Phân tích: Tính lỗi" | Xem `ErrorMessage` của lượt cuối trong `GradeAnalysisRuns` và log `journalctl -u khaosatvmu-grade-analysis`. Sửa nguyên nhân rồi bấm **Tính lại** |
-| Đứng ở "Đang chờ tính" quá 10 phút | Kiểm tra timer: `systemctl list-timers khaosatvmu-grade-analysis*`. Chạy tay `docker compose --profile grade-analysis run --rm grade-analysis-worker` |
+| Đứng ở "Đang chờ tính" quá 1 phút | Kiểm tra service: `systemctl status khaosatvmu-grade-analysis`. Chạy tay `docker compose --profile grade-analysis run --rm grade-analysis-worker` |
 | Worker thoát mã 2 | Sai cấu hình: thiếu khóa, khóa không phải 32 byte base64, hoặc sai chuỗi kết nối |
 | Lượt tính lỗi khi giải mã | API và worker đang dùng khóa khác nhau. So khóa của hai service |
 | Nạp điểm báo "… chưa có lớp học phần nào" | Nạp file lớp cho kỳ đó trước, ở trang Lớp học phần |
