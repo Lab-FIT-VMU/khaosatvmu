@@ -1,8 +1,9 @@
 namespace Application.UserAdministration;
 
 /// <summary>
-/// Quyền của ba nhóm "Thống kê khảo sát ..." trên thanh điều hướng. Mỗi nhóm có sáu trang
-/// giống hệt nhau (Bảng điều khiển → Phân tích chuyên sâu); nhóm học phần dùng quyền gốc,
+/// Quyền của ba nhóm "Thống kê khảo sát ..." trên thanh điều hướng. Nhóm học phần có sáu
+/// trang (Bảng điều khiển → Phân tích chuyên sâu), hai nhóm còn lại không có Phân tích
+/// chuyên sâu; nhóm học phần dùng quyền gốc,
 /// hai nhóm CTĐT và giảng viên có quyền riêng mang tiền tố loại khảo sát, ví dụ
 /// <c>PROGRAM_PROGRESS_ACCESS</c>, để trang Phân quyền Module bật tắt được từng mục.
 /// <para>
@@ -38,8 +39,22 @@ public static class SurveyStatisticsPermissions
 
     public static string UnitCode(Group group, Page page) => $"{group.Prefix}_{page.CourseCode}";
 
-    /// <summary>Mười hai quyền của hai nhóm CTĐT và giảng viên.</summary>
+    /// <summary>
+    /// Trang của nhóm CTĐT / giảng viên: không có Phân tích chuyên sâu. Quyền "Bảng điều
+    /// khiển" của hai nhóm vẫn giữ — nó quyết định đợt của loại đó có hiện trong Bảng điều
+    /// khiển chung ở đầu thanh điều hướng không.
+    /// </summary>
+    public static readonly IReadOnlyList<Page> UnitPages = Pages
+        .Where(page => page.CourseCode != "SURVEY_ANALYSIS_ACCESS")
+        .ToList();
+
+    /// <summary>Mười quyền của hai nhóm CTĐT và giảng viên.</summary>
     public static readonly IReadOnlyList<string> AllUnitCodes = UnitGroups
-        .SelectMany(group => Pages.Select(page => UnitCode(group, page)))
+        .SelectMany(group => UnitPages.Select(page => UnitCode(group, page)))
+        .ToList();
+
+    /// <summary>Quyền đã bỏ cùng trang Phân tích chuyên sâu của CTĐT / giảng viên; seeder xoá khỏi CSDL.</summary>
+    public static readonly IReadOnlyList<string> RetiredUnitCodes = UnitGroups
+        .Select(group => $"{group.Prefix}_SURVEY_ANALYSIS_ACCESS")
         .ToList();
 }
