@@ -14,7 +14,9 @@ import { Sidebar } from './components/Sidebar';
 import { ScoringChangeNotifier } from './components/ScoringChangeNotifier';
 import {
   parseUnitStatisticsTab,
+  retiredUnitTabs,
   surveyStatisticsPages,
+  unitStatisticsPages,
   unitStatisticsTabId,
 } from './components/surveyStatisticsTabs';
 
@@ -22,13 +24,13 @@ import {
  * Các trang thống kê, báo cáo đọc điểm theo cấu hình tính điểm. Đang mở một trong
  * các trang này thì nhận thông báo khi người khác đổi cấu hình hoặc cập nhật điểm.
  */
-const scoringNotificationTabs = new Set<string>(
-  surveyStatisticsPages.flatMap((page) => [
-    page,
+const scoringNotificationTabs = new Set<string>([
+  ...surveyStatisticsPages,
+  ...unitStatisticsPages.flatMap((page) => [
     unitStatisticsTabId('PROGRAM', page),
     unitStatisticsTabId('LECTURER', page),
   ]),
-);
+]);
 import { QRCodeModal } from './components/QRCodeModal';
 
 // Lazy-loaded Pages (Code Splitting for Production Performance)
@@ -47,18 +49,14 @@ const CriteriaPage = lazy(() => import('./pages/CriteriaPage').then(m => ({ defa
 const SurveyTemplatesPage = lazy(() => import('./pages/SurveyTemplatesPage').then(m => ({ default: m.SurveyTemplatesPage })));
 const SurveyCampaignsPage = lazy(() => import('./pages/SurveyCampaignsPage').then(m => ({ default: m.SurveyCampaignsPage })));
 // Thống kê CTĐT và giảng viên: mỗi loại một file riêng cho từng trang.
-const ProgramDashboardView = lazy(() => import('./components/programReports/ProgramDashboardView').then(m => ({ default: m.ProgramDashboardView })));
 const ProgramSurveyDashboardView = lazy(() => import('./components/programReports/ProgramSurveyDashboardView').then(m => ({ default: m.ProgramSurveyDashboardView })));
 const ProgramProgressView = lazy(() => import('./components/programReports/ProgramProgressView').then(m => ({ default: m.ProgramProgressView })));
 const ProgramStatisticsView = lazy(() => import('./components/programReports/ProgramStatisticsView').then(m => ({ default: m.ProgramStatisticsView })));
 const ProgramReportView = lazy(() => import('./components/programReports/ProgramReportView').then(m => ({ default: m.ProgramReportView })));
-const ProgramAnalysisView = lazy(() => import('./components/programReports/ProgramAnalysisView').then(m => ({ default: m.ProgramAnalysisView })));
-const LecturerDashboardView = lazy(() => import('./components/lecturerReports/LecturerDashboardView').then(m => ({ default: m.LecturerDashboardView })));
 const LecturerSurveyDashboardView = lazy(() => import('./components/lecturerReports/LecturerSurveyDashboardView').then(m => ({ default: m.LecturerSurveyDashboardView })));
 const LecturerProgressView = lazy(() => import('./components/lecturerReports/LecturerProgressView').then(m => ({ default: m.LecturerProgressView })));
 const LecturerStatisticsView = lazy(() => import('./components/lecturerReports/LecturerStatisticsView').then(m => ({ default: m.LecturerStatisticsView })));
 const LecturerReportView = lazy(() => import('./components/lecturerReports/LecturerReportView').then(m => ({ default: m.LecturerReportView })));
-const LecturerAnalysisView = lazy(() => import('./components/lecturerReports/LecturerAnalysisView').then(m => ({ default: m.LecturerAnalysisView })));
 const PublicSurveyPage = lazy(() => import('./pages/PublicSurveyPage').then(m => ({ default: m.PublicSurveyPage })));
 const SurveyProgressPage = lazy(() => import('./pages/SurveyProgressPage').then(m => ({ default: m.SurveyProgressPage })));
 const ReportsOverviewPage = lazy(() => import('./pages/ReportsOverviewPage').then(m => ({ default: m.ReportsOverviewPage })));
@@ -202,9 +200,16 @@ function DashboardApp() {
         .find((moduleId) => canAccessModule(permissions, moduleId)) ?? 'progress';
 
   useEffect(() => {
+    // Bảng điều khiển CTĐT / giảng viên đã gộp vào Bảng điều khiển chung, Phân tích chuyên
+    // sâu của hai loại đó đã bỏ: địa chỉ cũ còn lưu thì đưa về Bảng điều khiển chung (nếu
+    // vai trò không mở được thì lượt kiểm tra sau đưa tiếp về trang đầu).
+    if (retiredUnitTabs.has(currentTab)) {
+      setCurrentTab('overview');
+      return;
+    }
     const blocked =
       !canAccessModule(permissions, currentTab)
-      || ((currentTab === 'overview' || unitStatisticsTab?.page === 'overview') && !dashboardAllowed)
+      || (currentTab === 'overview' && !dashboardAllowed)
       || (unitStatisticsTab !== null && !isUnrestrictedRole(auth.activeProfile?.roleCode))
       // Trang Thống kê theo mục đã bỏ khỏi menu; địa chỉ cũ còn lưu thì đưa về trang đầu.
       || currentTab === 'survey-section-scores';
@@ -621,6 +626,7 @@ function DashboardApp() {
                   surveyLoading={surveyLoading}
                   surveyLoadError={surveyLoadError}
                   permissions={permissions}
+                  showUnitSurveys={isUnrestrictedRole(auth.activeProfile?.roleCode)}
                   onNavigateTab={(tab) => setCurrentTab(tab)}
                 />
               ) : seesOnlyOwnSections(auth.activeProfile?.roleCode) ? (
@@ -647,21 +653,17 @@ function DashboardApp() {
 
             {currentTab === 'survey-analysis' && <SurveyAnalysisPage />}
 
-            {/* Thống kê CTĐT: cùng sáu trang như học phần, mỗi trang một file riêng. */}
-            {currentTab === 'program-overview' && <ProgramDashboardView onNavigateTab={(tab) => setCurrentTab(tab)} />}
+            {/* Thống kê CTĐT: mỗi trang một file riêng. Bảng điều khiển đã gộp vào `overview`. */}
             {currentTab === 'program-survey-dashboard' && <ProgramSurveyDashboardView />}
             {currentTab === 'program-progress' && <ProgramProgressView />}
             {currentTab === 'program-survey-statistics' && <ProgramStatisticsView />}
             {currentTab === 'program-reports' && <ProgramReportView />}
-            {currentTab === 'program-survey-analysis' && <ProgramAnalysisView />}
 
             {/* Thống kê khảo sát giảng viên. */}
-            {currentTab === 'lecturer-overview' && <LecturerDashboardView onNavigateTab={(tab) => setCurrentTab(tab)} />}
             {currentTab === 'lecturer-survey-dashboard' && <LecturerSurveyDashboardView />}
             {currentTab === 'lecturer-progress' && <LecturerProgressView />}
             {currentTab === 'lecturer-survey-statistics' && <LecturerStatisticsView />}
             {currentTab === 'lecturer-reports' && <LecturerReportView />}
-            {currentTab === 'lecturer-survey-analysis' && <LecturerAnalysisView />}
 
             {(currentTab === 'graduation-data-upload' || currentTab === 'graduation-analytics' || currentTab === 'graduation-analytics-2') && (
               <GraduationAnalytics2Page view="manage" />

@@ -120,11 +120,11 @@ public static class DatabaseSeeder
             (Code: "OPEN_COMMENT_MODEL_ADMIN",    Name: "Quản trị model cảm xúc",           Description: "Xem trạng thái model và chạy lại phân tích cảm xúc",     Category: "Quản trị"),
         };
 
-        // Thống kê CTĐT / giảng viên: cùng sáu trang như học phần, mỗi trang một quyền
-        // riêng, nằm trong nhóm riêng giống thanh điều hướng.
+        // Thống kê CTĐT / giảng viên: các trang như học phần trừ Phân tích chuyên sâu, mỗi
+        // trang một quyền riêng, nằm trong nhóm riêng giống thanh điều hướng.
         var definitions = moduleDefinitions
             .Concat(SurveyStatisticsPermissions.UnitGroups.SelectMany(group =>
-                SurveyStatisticsPermissions.Pages.Select(page => (
+                SurveyStatisticsPermissions.UnitPages.Select(page => (
                     Code: SurveyStatisticsPermissions.UnitCode(group, page),
                     page.Name,
                     Description: $"Truy cập module {page.Name.ToLowerInvariant()} của {group.Category.ToLowerInvariant()}",
@@ -142,6 +142,12 @@ public static class DatabaseSeeder
             categoryByCode[tab.Code] = category;
             allDefinitions.Add((tab.Code, tab.Name, $"Xem tab {tab.Name}", category, tab.ParentCode));
         }
+
+        // Trang đã bỏ thì xoá luôn quyền, không thì trang Phân quyền Module còn hiện mục bật
+        // tắt không có tác dụng gì. Dòng RolePermissions đi theo nhờ khoá ngoại xoá dây chuyền.
+        await db.Permissions
+            .Where(x => SurveyStatisticsPermissions.RetiredUnitCodes.Contains(x.Code))
+            .ExecuteDeleteAsync(cancellationToken);
 
         var permissions = new Dictionary<string, Permission>(StringComparer.OrdinalIgnoreCase);
         foreach (var definition in allDefinitions)

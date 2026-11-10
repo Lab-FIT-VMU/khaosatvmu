@@ -24,13 +24,18 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { UnitSurveyType } from './unitReports/unitReportModel';
-import { unitStatisticsTabId, type SurveyStatisticsPage } from './surveyStatisticsTabs';
+import {
+  unitStatisticsPages,
+  unitStatisticsTabId,
+  type SurveyStatisticsPage,
+  type UnitStatisticsPage,
+} from './surveyStatisticsTabs';
 
 /*
   Mục điều hướng của sidebar: nhãn và thứ tự.
 
   Tối đa hai tầng: nhóm (bấm để sổ xuống) → mục. Mục đứng một mình ở tầng trên cũng
-  được, như "Phân tích điểm học phần".
+  được, như "Bảng điều khiển" và "Phân tích điểm học phần".
 
   Khai riêng khỏi component vì thanh trên cùng cũng đọc nhãn ở đây để mở đầu đường dẫn
   điều hướng. Một nguồn duy nhất nên đổi tên mục ở sidebar là đường dẫn đổi theo, không
@@ -66,15 +71,20 @@ export type SidebarMenuEntry = SidebarMenuItem | SidebarMenuGroup;
 export const isMenuGroup = (entry: SidebarMenuEntry): entry is SidebarMenuGroup =>
   'items' in entry;
 
-/** Sáu trang thống kê, cùng nhãn và biểu tượng ở cả ba nhóm thống kê khảo sát. */
+/** Các trang thống kê, cùng nhãn và biểu tượng ở cả ba nhóm thống kê khảo sát. */
 const statisticsPageItems: { page: SurveyStatisticsPage; label: string; icon: LucideIcon }[] = [
-  { page: 'overview', label: 'Bảng điều khiển', icon: LayoutDashboard },
   { page: 'survey-dashboard', label: 'Tổng quan khảo sát', icon: Gauge },
   { page: 'progress', label: 'Tiến độ thu phiếu', icon: ChartColumn },
   { page: 'survey-statistics', label: 'Bảng dữ liệu khảo sát', icon: Table2 },
   { page: 'reports', label: 'Thống kê & Báo cáo', icon: BarChart3 },
   { page: 'survey-analysis', label: 'Phân tích chuyên sâu', icon: Sigma },
 ];
+
+/** Nhóm CTĐT / giảng viên không có Phân tích chuyên sâu. */
+const unitStatisticsPageItems = statisticsPageItems.filter(
+  (item): item is (typeof statisticsPageItems)[number] & { page: UnitStatisticsPage } =>
+    (unitStatisticsPages as readonly string[]).includes(item.page),
+);
 
 const unitStatisticsGroup = (
   surveyType: UnitSurveyType,
@@ -85,7 +95,7 @@ const unitStatisticsGroup = (
   label,
   icon,
   unrestrictedOnly: true,
-  items: statisticsPageItems.map(({ page, label: itemLabel, icon: itemIcon }) => ({
+  items: unitStatisticsPageItems.map(({ page, label: itemLabel, icon: itemIcon }) => ({
     id: unitStatisticsTabId(surveyType, page),
     label: itemLabel,
     icon: itemIcon,
@@ -93,6 +103,9 @@ const unitStatisticsGroup = (
 });
 
 export const menuStructure: SidebarMenuEntry[] = [
+  // Một bảng điều khiển chung cho cả ba loại khảo sát, đứng đầu sidebar. Giữ mã `overview`
+  // để bookmark cũ và trang đáp mặc định không đổi.
+  { id: 'overview', label: 'Bảng điều khiển', icon: LayoutDashboard },
   {
     // Nhóm học phần giữ mã tab cũ để bookmark và đường dẫn con của từng trang vẫn chạy.
     id: 'course-statistics',

@@ -1,17 +1,28 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ChevronRight,
   CircleAlert,
   LoaderCircle,
   RadioTower,
 } from 'lucide-react';
+import { canAccessModule } from '../auth/modulePermissions';
+import { unitStatisticsTabId } from '../components/surveyStatisticsTabs';
+import { messageFrom, type UnitSurveyType } from '../components/unitReports/unitReportModel';
 import { useSemester } from '../context/semesterContext';
+import { surveyApi } from '../services/surveyApi';
 import type {
   CourseSectionSurvey,
   SemesterSurvey,
 } from '../types';
 import '../styles/dashboard.css';
 import '../styles/survey-statistics.css';
+
+/*
+  Bảng điều khiển chung của ba loại khảo sát: học phần, chương trình đào tạo, giảng viên.
+  Trước là ba trang riêng giống hệt nhau, chỉ khác loại; giờ gộp vào một bảng, phân biệt
+  bằng cột Phân loại. CTĐT và giảng viên không có sĩ số nên cột tiến độ chỉ in số phiếu
+  hợp lệ, không có thanh tiến độ.
+*/
 
 interface DashboardOverviewProps {
   semesterSurveys: SemesterSurvey[];
@@ -20,7 +31,43 @@ interface DashboardOverviewProps {
   surveyLoadError: string | null;
   onNavigateTab: (tab: string) => void;
   permissions?: readonly string[];
+  /**
+   * Có hiện đợt khảo sát CTĐT / giảng viên không. Chỉ quản trị toàn trường xem được hai
+   * loại này (backend cũng chỉ trả số liệu cho họ); mỗi loại còn đòi quyền
+   * PROGRAM_DASHBOARD_ACCESS / LECTURER_DASHBOARD_ACCESS.
+   */
+  showUnitSurveys?: boolean;
 }
+
+type CampaignStatus = 'Sắp diễn ra' | 'Đang diễn ra' | 'Đã kết thúc';
+
+interface DashboardCampaign {
+  key: string;
+  title: string;
+  semester: string;
+  academicYear: string;
+  startDate: string;
+  endDate: string;
+  status: CampaignStatus;
+  typeLabel: string;
+  /** Dòng phụ dưới tên đợt, ví dụ "12 lớp" hay "8 khoá ngành". */
+  unitLabel: string;
+  actualResponses: number;
+  /** Sĩ số cần thu; null với loại không xét sĩ số. */
+  targetResponses: number | null;
+  /** Trang Danh sách bài khảo sát, mở thẳng vào tab của loại này. */
+  campaignTab: string;
+}
+
+const unitSurveyKinds: {
+  surveyType: UnitSurveyType;
+  typeLabel: string;
+  unitNoun: string;
+  campaignTab: string;
+}[] = [
+  { surveyType: 'PROGRAM', typeLabel: 'Chương trình đào tạo', unitNoun: 'khoá ngành', campaignTab: 'program-campaigns' },
+  { surveyType: 'LECTURER', typeLabel: 'Giảng viên', unitNoun: 'khoa / viện', campaignTab: 'lecturer-campaigns' },
+];
 
 const formatDate = (value: string) => {
   if (!value) return '—';
@@ -28,12 +75,25 @@ const formatDate = (value: string) => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('vi-VN');
 };
 
+const statusOf = (startTime: string, endTime: string, now: number): CampaignStatus => {
+  const start = new Date(startTime).getTime();
+  const end = new Date(endTime).getTime();
+  if (Number.isFinite(start) && now < start) return 'Sắp diễn ra';
+  if (Number.isFinite(end) && now > end) return 'Đã kết thúc';
+  return 'Đang diễn ra';
+};
+
+const statusClass = (status: CampaignStatus) =>
+  status === 'Đang diễn ra' ? 'is-active' : status === 'Sắp diễn ra' ? 'is-upcoming' : 'is-complete';
+
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   semesterSurveys,
   sectionSurveys,
   surveyLoading,
   surveyLoadError,
   onNavigateTab,
+  permissions,
+  showUnitSurveys = false,
 }) => {
   const { academicYears, activeSemesterId, setActiveSemesterId } = useSemester();
 
@@ -46,6 +106,63 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       }
     }
   }, [activeSemesterId, semesterSurveys, setActiveSemesterId]);
+
+  const visibleUnitKinds = useMemo(
+    () => (showUnitSurveys
+      ? unitSurveyKinds.filter(({ surveyType }) =>
+          canAccessModule(permissions, unitStatisticsTabId(surveyType, 'overview')))
+      : []),
+    [permissions, showUnitSurveys],
+  );
+
+  // Đợt CTĐT / giảng viên của học kỳ đang chọn. Một đợt chỉ vài chục đơn vị nên nạp đơn vị
+  // của từng đợt để có số phiếu hợp lệ.
+  const [unitCampaigns, setUnitCampaigns] = useState<DashboardCampaign[]>([]);
+  const [unitLoading, setUnitLoading] = useState(false);
+  const [unitLoadError, setUnitLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUnitCampaigns([]);
+    setUnitLoadError(null);
+    if (!activeSemesterId || visibleUnitKinds.length === 0) {
+      setUnitLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setUnitLoading(true);
+    const load = async () => {
+      try {
+        const now = Date.now();
+        const perKind = await Promise.all(visibleUnitKinds.map(async (kind) => {
+          const surveys = await surveyApi.semesterSurveys(activeSemesterId, controller.signal, kind.surveyType);
+          const units = await Promise.all(
+            surveys.map((survey) => surveyApi.surveyUnits(survey.semesterSurveyId, controller.signal)),
+          );
+          return surveys.map((survey, index): DashboardCampaign => ({
+            key: `${kind.surveyType}-${survey.semesterSurveyId}`,
+            title: survey.surveyName,
+            semester: survey.semesterName,
+            academicYear: survey.academicYearName,
+            startDate: survey.startTime,
+            endDate: survey.endTime,
+            status: statusOf(survey.startTime, survey.endTime, now),
+            typeLabel: kind.typeLabel,
+            unitLabel: `${survey.sectionSurveyCount} ${kind.unitNoun}`,
+            actualResponses: units[index].reduce((sum, unit) => sum + unit.validResponseCount, 0),
+            targetResponses: null,
+            campaignTab: kind.campaignTab,
+          }));
+        }));
+        setUnitCampaigns(perKind.flat());
+      } catch (error) {
+        if (!controller.signal.aborted) setUnitLoadError(messageFrom(error));
+      } finally {
+        if (!controller.signal.aborted) setUnitLoading(false);
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [activeSemesterId, visibleUnitKinds]);
 
   const currentSemesterSurveys = useMemo(
     () => (activeSemesterId ? semesterSurveys.filter((survey) => survey.semesterId === activeSemesterId) : semesterSurveys),
@@ -63,7 +180,8 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     [academicYears],
   );
 
-  // Dựng các đợt từ dữ liệu backend thật; gộp lớp bằng một danh sách đã tải sẵn, không gọi API theo từng đợt.
+  // Đợt học phần dựng từ dữ liệu đã tải sẵn, gộp lớp bằng một danh sách chứ không gọi API
+  // theo từng đợt; sau đó nối đợt CTĐT / giảng viên vào cuối.
   const displayedCampaigns = useMemo(() => {
     const sectionsBySurvey = new Map<number, CourseSectionSurvey[]>();
     sectionSurveys.forEach((section) => {
@@ -73,29 +191,28 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     });
 
     const now = Date.now();
-    return currentSemesterSurveys.map((survey) => {
+    const courseCampaigns = currentSemesterSurveys.map((survey): DashboardCampaign => {
       const sections = sectionsBySurvey.get(survey.semesterSurveyId) ?? [];
-      const start = new Date(survey.startTime).getTime();
-      const end = new Date(survey.endTime).getTime();
-      const status = Number.isFinite(start) && now < start
-        ? 'Sắp diễn ra'
-        : Number.isFinite(end) && now > end
-          ? 'Đã kết thúc'
-          : 'Đang diễn ra';
       return {
-        id: survey.semesterSurveyId,
+        key: `COURSE-${survey.semesterSurveyId}`,
         title: survey.surveyName,
         semester: survey.semesterName,
         academicYear: survey.academicYearName,
         startDate: survey.startTime,
         endDate: survey.endTime,
-        status,
-        totalTargetResponses: sections.reduce((sum, section) => sum + section.classSize, 0),
+        status: statusOf(survey.startTime, survey.endTime, now),
+        typeLabel: 'Học phần',
+        unitLabel: `${sections.length} lớp`,
         actualResponses: sections.reduce((sum, section) => sum + section.validResponseCount, 0),
-        sectionCount: sections.length,
+        targetResponses: sections.reduce((sum, section) => sum + section.classSize, 0),
+        campaignTab: 'course-campaigns',
       };
     });
-  }, [currentSemesterSurveys, sectionSurveys]);
+    return [...courseCampaigns, ...unitCampaigns];
+  }, [currentSemesterSurveys, sectionSurveys, unitCampaigns]);
+
+  const loading = surveyLoading || unitLoading;
+  const loadError = [surveyLoadError, unitLoadError].filter(Boolean).join(' · ') || null;
 
   return (
     <div className="executive-dashboard">
@@ -127,7 +244,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
           <div className="dashboard-heading-actions">
             <span className="dashboard-result-count">
-              {surveyLoading ? 'Đang tải...' : `${displayedCampaigns.length} đợt khảo sát`}
+              {loading ? 'Đang tải...' : `${displayedCampaigns.length} đợt khảo sát`}
             </span>
           </div>
         </header>
@@ -145,7 +262,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </tr>
             </thead>
             <tbody>
-              {surveyLoading ? (
+              {loading ? (
                 <tr>
                   <td colSpan={6} className="dashboard-empty-cell">
                     <LoaderCircle className="auth-spin" aria-hidden="true" />
@@ -153,87 +270,104 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                     <span>Hệ thống đang tổng hợp tiến độ phiếu hợp lệ của học kỳ.</span>
                   </td>
                 </tr>
-              ) : surveyLoadError ? (
-                <tr>
-                  <td colSpan={6} className="dashboard-empty-cell">
-                    <CircleAlert aria-hidden="true" />
-                    <strong>Không tải được dữ liệu đợt khảo sát</strong>
-                    <span>{surveyLoadError}</span>
-                  </td>
-                </tr>
-              ) : displayedCampaigns.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="dashboard-empty-cell">
-                    <RadioTower aria-hidden="true" />
-                    <strong>Chưa có đợt khảo sát đang mở</strong>
-                    <span>Các đợt khảo sát mới sẽ xuất hiện tại đây.</span>
-                  </td>
-                </tr>
               ) : (
-                displayedCampaigns.map((campaign) => {
-                  const progress = campaign.totalTargetResponses > 0
-                    ? Math.min(100, Math.round(
-                        (campaign.actualResponses / campaign.totalTargetResponses) * 100,
-                      ))
-                    : 0;
-                  return (
-                    <tr
-                      key={campaign.id}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => onNavigateTab('course-campaigns')}
-                    >
-                      <td className="dashboard-campaign-name">
-                        <strong title={campaign.title}>{campaign.title}</strong>
-                        <span>
-                          {campaign.semester} · {campaign.academicYear} · {campaign.sectionCount} lớp
-                        </span>
-                      </td>
-                      <td>
-                        <span className="dashboard-type-label">Học phần</span>
-                      </td>
-                      <td className="dashboard-date-cell">
-                        {formatDate(campaign.startDate)}
-                        <span aria-hidden="true"> - </span>
-                        {formatDate(campaign.endDate)}
-                      </td>
-                      <td>
-                        <div
-                          className="dashboard-progress"
-                          aria-label={`Đã thu ${campaign.actualResponses} trên ${campaign.totalTargetResponses} phiếu, đạt ${progress}%`}
-                        >
-                          <div className="dashboard-progress-track" aria-hidden="true">
-                            <span style={{ width: `${progress}%` }} />
-                          </div>
-                          <span className="dashboard-progress-value">
-                            {campaign.actualResponses.toLocaleString('vi-VN')}
-                            <small> / {campaign.totalTargetResponses.toLocaleString('vi-VN')}</small>
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`dashboard-status ${campaign.status === 'Đang diễn ra' ? 'is-active' : campaign.status === 'Sắp diễn ra' ? 'is-upcoming' : 'is-complete'}`}>
-                          <span aria-hidden="true" />
-                          {campaign.status}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          className="executive-action-link"
-                          aria-label={`Vào đợt khảo sát ${campaign.title}`}
-                          title="Vào đợt khảo sát"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onNavigateTab('course-campaigns');
-                          }}
-                        >
-                          Vào khảo sát
-                          <ChevronRight style={{ width: 14, height: 14 }} aria-hidden="true" />
-                        </button>
+                <>
+                  {/* Một loại lỗi không che mất đợt của các loại còn lại. */}
+                  {loadError && (
+                    <tr>
+                      <td colSpan={6} className="dashboard-empty-cell">
+                        <CircleAlert aria-hidden="true" />
+                        <strong>Không tải được dữ liệu đợt khảo sát</strong>
+                        <span>{loadError}</span>
                       </td>
                     </tr>
-                  );
-                })
+                  )}
+                  {!loadError && displayedCampaigns.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="dashboard-empty-cell">
+                        <RadioTower aria-hidden="true" />
+                        <strong>Chưa có đợt khảo sát đang mở</strong>
+                        <span>Các đợt khảo sát mới sẽ xuất hiện tại đây.</span>
+                      </td>
+                    </tr>
+                  )}
+                  {displayedCampaigns.map((campaign) => {
+                    const target = campaign.targetResponses;
+                    const progress = target !== null && target > 0
+                      ? Math.min(100, Math.round((campaign.actualResponses / target) * 100))
+                      : 0;
+                    return (
+                      <tr
+                        key={campaign.key}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => onNavigateTab(campaign.campaignTab)}
+                      >
+                        <td className="dashboard-campaign-name">
+                          <strong title={campaign.title}>{campaign.title}</strong>
+                          <span>
+                            {campaign.semester} · {campaign.academicYear} · {campaign.unitLabel}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="dashboard-type-label">{campaign.typeLabel}</span>
+                        </td>
+                        <td className="dashboard-date-cell">
+                          {formatDate(campaign.startDate)}
+                          <span aria-hidden="true"> - </span>
+                          {formatDate(campaign.endDate)}
+                        </td>
+                        <td>
+                          {target !== null ? (
+                            <div
+                              className="dashboard-progress"
+                              aria-label={`Đã thu ${campaign.actualResponses} trên ${target} phiếu, đạt ${progress}%`}
+                            >
+                              <div className="dashboard-progress-track" aria-hidden="true">
+                                <span style={{ width: `${progress}%` }} />
+                              </div>
+                              <span className="dashboard-progress-value">
+                                {campaign.actualResponses.toLocaleString('vi-VN')}
+                                <small> / {target.toLocaleString('vi-VN')}</small>
+                              </span>
+                            </div>
+                          ) : (
+                            // Không có sĩ số: chỉ có số phiếu hợp lệ, không có thanh tiến độ.
+                            <div
+                              className="dashboard-progress"
+                              aria-label={`Đã thu ${campaign.actualResponses} phiếu hợp lệ`}
+                            >
+                              <span className="dashboard-progress-value">
+                                {campaign.actualResponses.toLocaleString('vi-VN')}
+                                <small> phiếu hợp lệ</small>
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <span className={`dashboard-status ${statusClass(campaign.status)}`}>
+                            <span aria-hidden="true" />
+                            {campaign.status}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            className="executive-action-link"
+                            aria-label={`Vào đợt khảo sát ${campaign.title}`}
+                            title="Vào đợt khảo sát"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onNavigateTab(campaign.campaignTab);
+                            }}
+                          >
+                            Vào khảo sát
+                            <ChevronRight style={{ width: 14, height: 14 }} aria-hidden="true" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </>
               )}
             </tbody>
           </table>
