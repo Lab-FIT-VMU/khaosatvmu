@@ -12,21 +12,6 @@ internal static class CourseGradeModelConfiguration
 {
     public static void Configure(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Student>(entity =>
-        {
-            entity.ToTable("Students");
-            entity.HasKey(x => x.StudentId);
-            entity.Property(x => x.StudentCode).HasMaxLength(16).IsRequired();
-            entity.Property(x => x.FullName).HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Email).HasMaxLength(320);
-            entity.Property(x => x.PhoneNumber).HasMaxLength(30);
-            entity.Property(x => x.Gender).HasMaxLength(10);
-            entity.Property(x => x.StudyStatus).HasMaxLength(50);
-            entity.HasIndex(x => x.StudentCode).IsUnique();
-            entity.HasIndex(x => x.CohortMajorId);
-            entity.HasOne<CohortMajor>().WithMany().HasForeignKey(x => x.CohortMajorId).OnDelete(DeleteBehavior.Restrict);
-        });
-
         modelBuilder.Entity<GradeImportRevision>(entity =>
         {
             entity.ToTable("GradeImportRevisions", table =>
@@ -63,6 +48,8 @@ internal static class CourseGradeModelConfiguration
             entity.ToTable("StudentCourseGrades");
             entity.HasKey(x => x.StudentCourseGradeId);
             entity.Property(x => x.SourceTermCode).HasMaxLength(10);
+            entity.Property(x => x.StudentCode).HasMaxLength(16).IsRequired();
+            entity.Property(x => x.StudentName).HasMaxLength(200);
             entity.Property(x => x.CourseCode).HasMaxLength(16).IsRequired();
             entity.Property(x => x.CourseName).HasMaxLength(300);
             entity.Property(x => x.SectionName).HasMaxLength(32);
@@ -73,16 +60,19 @@ internal static class CourseGradeModelConfiguration
             entity.Property(x => x.ExclusionRule).HasMaxLength(4);
             // Bộ luật A mục 4: trong một lần nạp, mỗi cặp (sinh viên, mã học phần) chỉ giữ một
             // dòng được dùng; các dòng trùng còn lại mang ExclusionRule = 'T'.
-            entity.HasIndex(x => new { x.RevisionId, x.StudentId, x.CourseCode })
+            entity.HasIndex(x => new { x.RevisionId, x.StudentNumber, x.CourseCode })
                 .IsUnique()
                 .HasFilter("\"ExclusionRule\" IS NULL")
                 .HasDatabaseName("UX_StudentCourseGrades_Revision_Student_Course_Usable");
+            // Một mã sinh viên học được nhiều lớp học phần, nhưng một lớp học phần (của một môn,
+            // trong một kỳ) chỉ có một dòng được dùng của mỗi mã sinh viên.
+            entity.HasIndex(x => new { x.RevisionId, x.CourseSectionId, x.StudentCode })
+                .IsUnique()
+                .HasFilter("\"ExclusionRule\" IS NULL AND \"CourseSectionId\" IS NOT NULL")
+                .HasDatabaseName("UX_StudentCourseGrades_Revision_Section_Student_Usable");
             entity.HasIndex(x => new { x.SemesterId, x.CourseSectionId });
-            entity.HasIndex(x => new { x.SemesterId, x.StudentId });
-            entity.HasIndex(x => x.StudentId);
             entity.HasOne<GradeImportRevision>().WithMany().HasForeignKey(x => x.RevisionId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne<Semester>().WithMany().HasForeignKey(x => x.SemesterId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<CourseSection>().WithMany().HasForeignKey(x => x.CourseSectionId).OnDelete(DeleteBehavior.SetNull);
         });
 

@@ -9,18 +9,13 @@ import {
 const maximumFileSize = 5 * 1024 * 1024;
 
 /**
- * Các vai trò của hệ thống kèm tên tiếng Việt điền vào tệp Excel. Giữ đúng thứ tự
- * này ở cả bảng tra trong tệp mẫu lẫn phần kiểm tra khi đọc tệp, và phải khớp
- * ProfileNaming.ByRoleCode bên backend.
+ * Một vai trò điền được vào tệp Excel: tên tiếng Việt và mã. Danh sách lấy từ bảng
+ * "Roles" (màn quản trị truyền vào), nên vai trò người quản trị tự thêm cũng dùng được.
  */
-export const profileRoleOptions: { roleCode: string; label: string }[] = [
-  { roleCode: 'ADMIN', label: 'Quản trị hệ thống' },
-  { roleCode: 'BOARD_OF_DIRECTORS', label: 'Ban Giám hiệu' },
-  { roleCode: 'DEPARTMENT_MANAGER', label: 'Quản lý bộ môn' },
-  { roleCode: 'FACULTY_MANAGER', label: 'Quản lý khoa' },
-  { roleCode: 'LECTURER', label: 'Giảng viên' },
-  { roleCode: 'SURVEY_ADMIN', label: 'Quản trị khảo sát' },
-];
+export interface ProfileRoleOption {
+  roleCode: string;
+  label: string;
+}
 
 const fullNameHeaders = new Set([
   'ho ten',
@@ -105,7 +100,7 @@ function cellText(value: CellValue | null | undefined): string {
 }
 
 /** Tra vai trò từ tên tiếng Việt hoặc từ chính mã vai trò, bỏ qua dấu và hoa thường. */
-function roleCodeFromLabel(value: string): string | null {
+function roleCodeFromLabel(value: string, profileRoleOptions: ProfileRoleOption[]): string | null {
   const normalized = normalizeHeader(value);
   if (normalized.length === 0) return null;
 
@@ -140,13 +135,15 @@ export async function downloadProfileFailedRows(rows: FailedRowExport[]): Promis
  * chừa trống cột D và E, cột F là bảng tra vai trò. Có bảng tra thì người điền
  * không phải nhớ chính xác cách viết tên vai trò.
  */
-export async function downloadProfileImportTemplate(): Promise<void> {
+export async function downloadProfileImportTemplate(profileRoleOptions: ProfileRoleOption[]): Promise<void> {
   const { default: writeXlsxFile } = await import('write-excel-file/browser');
 
+  // Dòng mẫu dùng tên vai trò đang có thật, để tệp mẫu nạp lại được ngay.
+  const sampleRoles = profileRoleOptions.map((option) => option.label);
   const sampleRows = [
-    { fullName: 'Nguyễn Văn A', email: 'nguyenvana@vimaru.edu.vn', role: 'Giảng viên' },
-    { fullName: 'Trần Thị B', email: 'tranthib@vimaru.edu.vn', role: 'Quản lý bộ môn' },
-    { fullName: 'Lê Văn C', email: 'levanc@vimaru.edu.vn', role: 'Quản trị khảo sát' },
+    { fullName: 'Nguyễn Văn A', email: 'nguyenvana@vimaru.edu.vn', role: sampleRoles[0] ?? '' },
+    { fullName: 'Trần Thị B', email: 'tranthib@vimaru.edu.vn', role: sampleRoles[1] ?? sampleRoles[0] ?? '' },
+    { fullName: 'Lê Văn C', email: 'levanc@vimaru.edu.vn', role: sampleRoles[2] ?? sampleRoles[0] ?? '' },
   ];
 
   const [fullNameCell, emailCell, roleCell, , , roleLookupCell] = templateHeaderRow([
@@ -199,7 +196,10 @@ export async function downloadProfileImportTemplate(): Promise<void> {
  * Đọc tệp Excel cấp hồ sơ. Cột Họ tên chỉ để người điền đối chiếu cho khỏi nhầm
  * người — hệ thống khớp tài khoản bằng EMAIL, không bằng tên.
  */
-export async function parseProfileImportFile(file: File): Promise<ProfileImportResult> {
+export async function parseProfileImportFile(
+  file: File,
+  profileRoleOptions: ProfileRoleOption[],
+): Promise<ProfileImportResult> {
   if (!file.name.toLowerCase().endsWith('.xlsx')) {
     throw new ProfileImportFileError('FILE_TYPE');
   }
@@ -255,7 +255,7 @@ export async function parseProfileImportFile(file: File): Promise<ProfileImportR
   const invalidRoleRows: InvalidRoleRow[] = [];
 
   for (const row of dataRows) {
-    const roleCode = roleCodeFromLabel(row.rawRole);
+    const roleCode = roleCodeFromLabel(row.rawRole, profileRoleOptions);
     if (!roleCode) {
       invalidRoleRows.push({
         rowNumber: row.rowNumber,

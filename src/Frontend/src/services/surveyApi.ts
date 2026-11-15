@@ -1,6 +1,5 @@
 import type {
   AnswerScale,
-  AnswerScaleKind,
   CourseSectionSurvey,
   PublicSurvey,
   QuestionRating,
@@ -25,8 +24,6 @@ export interface SaveAnswerScaleOptionPayload {
 
 export interface SaveAnswerScalePayload {
   answerScaleName: string;
-  scaleKind: AnswerScaleKind;
-  /** Phải rỗng khi `scaleKind` là `Text`. */
   options: SaveAnswerScaleOptionPayload[];
 }
 
@@ -41,11 +38,9 @@ export interface SaveSurveyQuestionSectionPayload {
 
 export interface SaveSurveyQuestionPayload {
   questionText: string;
-  /** Thang trả lời của riêng câu này. */
-  answerScaleId: number;
   /**
    * Mức bắt buộc của câu bẫy độ tập trung; null là câu hỏi bình thường.
-   * Chỉ đặt được trên thang có mức chọn sẵn và phải là một mức có thật.
+   * Phải là một mức có thật của thang mà bộ đang dùng.
    */
   attentionCheckValue: number | null;
   /** Vị trí mục trong mảng `sections` gửi kèm — mục mới chưa có mã để trỏ tới. */
@@ -54,6 +49,8 @@ export interface SaveSurveyQuestionPayload {
 
 export interface SaveSurveyTemplatePayload {
   templateName: string;
+  /** Thang trả lời dùng chung cho mọi câu của bộ. */
+  answerScaleId: number;
   /** Ghi đè toàn bộ mục của bộ; mục cũ không còn trong danh sách sẽ bị xoá mềm. */
   sections: SaveSurveyQuestionSectionPayload[];
   /**
@@ -118,7 +115,7 @@ export interface NormalizedSection {
 export interface NormalizationQuestionSection {
   sectionId: number;
   sectionName: string;
-  /** Số câu được chấm điểm của mục: không đếm câu bẫy và câu tự nhập. */
+  /** Số câu được chấm điểm của mục: không đếm câu bẫy. */
   questionCount: number;
 }
 
@@ -921,7 +918,7 @@ export interface UpdateSemesterSurveyPayload {
 }
 
 export interface SubmitSurveyResponsePayload {
-  /** `answerValue`: số mức đã chọn dạng chuỗi, hoặc nội dung tự nhập. */
+  /** `answerValue`: số mức đã chọn dạng chuỗi. */
   answers: { questionId: number; answerValue: string }[];
   additionalComments: string | null;
   /**
@@ -983,12 +980,8 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_ANSWER_SCALE_NAME_EXISTS: 'Tên thang trả lời đã tồn tại.',
   SURVEY_ANSWER_SCALE_OPTIONS_INVALID: 'Thang trả lời cần từ 2 đến 5 mức, mỗi mức một giá trị 1-5.',
   SURVEY_ANSWER_SCALE_OPTION_TEXT_REQUIRED: 'Thiếu nhãn hiển thị của một mức trả lời.',
-  SURVEY_ANSWER_SCALE_IN_USE: 'Thang trả lời đang được câu hỏi sử dụng.',
-  SURVEY_ANSWER_SCALE_KIND_INVALID: 'Loại thang trả lời không hợp lệ.',
-  SURVEY_ANSWER_SCALE_TEXT_HAS_OPTIONS: 'Thang tự nhập không được có mức trả lời nào.',
-  SURVEY_ANSWER_SCALE_KIND_LOCKED:
-    'Không đổi được loại thang vì đã có câu hỏi dùng thang này.',
-  SURVEY_QUESTION_SCALE_NOT_FOUND: 'Một câu hỏi đang trỏ tới mã thang trả lời không tồn tại.',
+  SURVEY_ANSWER_SCALE_IN_USE: 'Thang trả lời đang được bộ câu hỏi sử dụng.',
+  SURVEY_TEMPLATE_SCALE_NOT_FOUND: 'Vui lòng chọn thang trả lời cho bộ câu hỏi.',
   SURVEY_TEMPLATE_NOT_FOUND: 'Không tìm thấy bộ câu hỏi.',
   SURVEY_TEMPLATE_NAME_REQUIRED: 'Thiếu tên bộ câu hỏi.',
   SURVEY_TEMPLATE_NAME_EXISTS: 'Tên bộ câu hỏi đã tồn tại.',
@@ -1049,7 +1042,6 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_CLASS_FULL: 'Đã thu đủ số phiếu theo sĩ số nên không nhận thêm. Nếu bạn chưa làm bài, vui lòng báo người phụ trách khảo sát.',
   SURVEY_ANSWERS_INCOMPLETE: 'Vui lòng trả lời đầy đủ tất cả câu hỏi.',
   SURVEY_ANSWER_VALUE_INVALID: 'Mức đánh giá không hợp lệ.',
-  SURVEY_ANSWER_TEXT_TOO_LONG: 'Câu trả lời tự nhập không được vượt quá 2000 ký tự.',
   SURVEY_COMMENTS_TOO_LONG: 'Ý kiến khác không được vượt quá 1000 ký tự.',
   SURVEY_TYPE_INVALID: 'Vui lòng chọn loại bài khảo sát.',
   SURVEY_TYPE_MISMATCH: 'Thao tác này không áp dụng cho loại khảo sát của đợt.',

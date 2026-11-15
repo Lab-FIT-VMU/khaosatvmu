@@ -1551,6 +1551,15 @@
   grid-template-columns: minmax(0, 2fr) minmax(150px, 1fr);
 }
 
+/* Các mức của thang đang chọn, hiện ngay dưới ô chọn thang của bộ. */
+.survey-template-import-scale-levels {
+  display: block;
+  margin-top: 4px;
+  color: #68737d;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .survey-question-editor {
   display: grid;
   gap: 8px;
@@ -1761,18 +1770,6 @@
 .survey-question-preview li {
   color: #000000;
   font-size: 13px;
-}
-
-/* Tên thang trả lời của từng câu trong màn xem trước bộ câu hỏi. */
-.survey-question-preview-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 10px;
-  background: #eef4f7;
-  color: #000000;
-  font-size: 13px;
-  white-space: nowrap;
 }
 
 .answer-scale-manager {

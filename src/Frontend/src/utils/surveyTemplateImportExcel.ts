@@ -31,17 +31,6 @@ const questionTextHeaders = new Set([
   'question',
 ]);
 
-// Cột mã thang trả lời nằm ngay cạnh cột nội dung câu hỏi.
-const answerScaleCodeHeaders = new Set([
-  'ma thang tra loi',
-  'ma thang',
-  'thang tra loi',
-  'ma thang tra loi cua he thong',
-  'answerscaleid',
-  'answer scale id',
-  'scale',
-]);
-
 // Cột mức bắt buộc của câu bẫy độ tập trung, để trống là câu hỏi bình thường.
 // So khớp CHÍNH XÁC chứ không so khớp chứa: "Mục" chuẩn hoá thành 'muc', mà ở đây
 // có 'muc bat buoc' và 'muc bay' — so khớp chứa là hai cột bắt nhầm nhau.
@@ -63,11 +52,12 @@ export interface ImportSurveyQuestionRow {
   /** Vị trí mục trong danh sách mục đọc được, dùng làm `sectionIndex` khi lưu. */
   sectionIndex: number;
   questionText: string;
-  /** Mã thang trả lời người dùng điền, đã đối chiếu với danh mục của hệ thống. */
-  answerScaleId: number;
-  answerScaleName: string;
-  /** Mức bắt buộc của câu bẫy; null là câu hỏi bình thường. */
-  attentionCheckValue: number | null;
+  /**
+   * Nội dung ô "Đáp án bắt buộc phải chọn" như trong tệp; rỗng là câu hỏi bình
+   * thường. Chưa đối chiếu với thang: thang do người dùng chọn trên hộp thoại và có
+   * thể đổi sau khi đã đọc tệp, xem `attentionCheckOf`.
+   */
+  rawAttention: string;
 }
 
 export type SurveyTemplateImportFileErrorCode =
@@ -76,7 +66,6 @@ export type SurveyTemplateImportFileErrorCode =
   | 'FILE_EMPTY'
   | 'SECTION_HEADER_MISSING'
   | 'QUESTION_HEADER_MISSING'
-  | 'SCALE_HEADER_MISSING'
   | 'NO_DATA_ROWS'
   | 'TOO_MANY_SECTIONS'
   | 'READ_FAILED';
@@ -90,19 +79,27 @@ export class SurveyTemplateImportFileError extends Error {
   }
 }
 
-/** Dòng có mã thang trả lời sai, hiển thị để người dùng sửa lại tệp. */
-export interface InvalidScaleCodeRow {
-  rowNumber: number;
-  questionText: string;
-  rawCode: string;
-}
-
-/** Dòng đặt câu bẫy nhưng mức bắt buộc không dùng được với thang của câu đó. */
+/** Dòng đặt câu bẫy nhưng mức bắt buộc không có trong thang của bộ. */
 export interface InvalidAttentionCheckRow {
   rowNumber: number;
   questionText: string;
   rawValue: string;
-  reason: 'TEXT_SCALE' | 'VALUE_NOT_IN_SCALE';
+}
+
+/**
+ * Mức bắt buộc của câu bẫy theo thang của bộ: null là câu thường, `undefined` là ô
+ * có điền nhưng không phải một mức của thang đó. Cùng luật với backend để người
+ * dùng thấy lỗi ngay lúc xem trước, khỏi gửi lên rồi mới bị trả về.
+ */
+export function attentionCheckOf(
+  row: ImportSurveyQuestionRow,
+  scale: AnswerScale | undefined
+): number | null | undefined {
+  if (row.rawAttention.length === 0) return null;
+  const required = Number(row.rawAttention);
+  return Number.isInteger(required) && scale?.options.some((option) => option.value === required)
+    ? required
+    : undefined;
 }
 
 /**
@@ -124,8 +121,6 @@ export interface SurveyTemplateImportResult {
   sections: string[];
   rows: ImportSurveyQuestionRow[];
   invalidSectionRows: InvalidSectionRow[];
-  invalidScaleRows: InvalidScaleCodeRow[];
-  invalidAttentionCheckRows: InvalidAttentionCheckRow[];
 }
 
 // Dấu thanh tiếng Việt sau khi normalize('NFD') nằm trong dải U+0300..U+036F.
@@ -169,17 +164,17 @@ export const surveyTemplateTemplateFileName = 'mau-import-bo-cau-hoi.xlsx';
 export const surveyTemplateImportColumns = [
   'Mục',
   'Câu hỏi',
-  'Mã thang trả lời',
   'Đáp án bắt buộc phải chọn (câu hỏi bẫy)',
 ];
-const surveyTemplateColumnWidths = [32, 70, 18, 30];
+const surveyTemplateColumnWidths = [32, 70, 30];
 
 /**
  * Tạo và tải tệp Excel mẫu cho một bộ câu hỏi khảo sát.
  *
- * Sheet 1 là bốn cột dùng để import. Bảng tra thang trả lời nằm ở sheet 2 chứ
- * không kẹp bên phải sheet 1 nữa: để chung một sheet thì người soạn hay chèn hay
- * xoá dòng ở phần câu hỏi và làm xô lệch luôn bảng tra bên cạnh.
+ * Sheet 1 là ba cột dùng để import. Tệp không có cột thang trả lời: cả bộ dùng một
+ * thang, chọn trên hộp thoại ngay cạnh tên bộ. Sheet 2 liệt kê các mức của từng
+ * thang để người soạn biết điền mức nào cho câu bẫy — nằm ở sheet riêng vì để chung
+ * thì chèn, xoá dòng câu hỏi là xô lệch luôn bảng tra bên cạnh.
  *
  * Câu mẫu cố ý trải trên ba mục và có một câu bẫy nằm giữa mục, để người soạn thấy
  * ngay ba điều: tên mục phải LẶP LẠI ở mọi dòng (không gộp ô), câu bẫy cũng phải có
@@ -187,13 +182,12 @@ const surveyTemplateColumnWidths = [32, 70, 18, 30];
  * `maximumSectionsPerTemplate` mục.
  */
 export async function downloadSurveyTemplateImportTemplate(
-  answerScales: AnswerScale[]
+  answerScales: AnswerScale[],
+  selectedScale?: AnswerScale
 ): Promise<void> {
-  // Câu mẫu gợi ý mã thang đầu tiên đang có để người dùng thấy cách điền.
-  const defaultScale = answerScales.find((scale) => scale.scaleKind === 'Options');
-  const defaultScaleId = defaultScale?.answerScaleId ?? answerScales[0]?.answerScaleId ?? 1;
-  // Mức mẫu cho câu bẫy phải là một mức có thật của chính thang đó.
-  const trapValue = defaultScale?.options?.[Math.floor((defaultScale.options.length - 1) / 2)]?.value;
+  // Mức mẫu cho câu bẫy phải là một mức có thật của thang đang chọn.
+  const sampleScale = selectedScale ?? answerScales[0];
+  const trapValue = sampleScale?.options?.[Math.floor((sampleScale.options.length - 1) / 2)]?.value;
 
   // Tên mục chỉ là ví dụ, người soạn đặt tên nào cũng được.
   const courseSection = 'Nội dung đánh giá học phần';
@@ -203,19 +197,16 @@ export async function downloadSurveyTemplateImportTemplate(
   const sampleRows: {
     sectionName: string;
     questionText: string;
-    answerScaleId: number;
     trap: number | null;
   }[] = [
     {
       sectionName: courseSection,
       questionText: 'Học phần trang bị đầy đủ kiến thức, kỹ năng nghề nghiệp cho người học.',
-      answerScaleId: defaultScaleId,
       trap: null,
     },
     {
       sectionName: courseSection,
       questionText: 'Học liệu và tài liệu tham khảo của học phần đầy đủ, cập nhật.',
-      answerScaleId: defaultScaleId,
       trap: null,
     },
     {
@@ -223,31 +214,27 @@ export async function downloadSurveyTemplateImportTemplate(
       questionText: trapValue
         ? `Đây là câu hỏi rà soát chất lượng phiếu khảo sát, không đánh giá học phần hay giảng viên. Xin Anh/Chị chọn phương án ${trapValue}.`
         : 'Cách kiểm tra, đánh giá của học phần phản ánh đúng năng lực người học.',
-      answerScaleId: defaultScaleId,
       trap: trapValue ?? null,
     },
     {
       sectionName: lecturerSection,
       questionText: 'Giảng viên trình bày nội dung bài giảng rõ ràng, dễ hiểu.',
-      answerScaleId: defaultScaleId,
       trap: null,
     },
     {
       sectionName: lecturerSection,
       questionText: 'Giảng viên thực hiện nghiêm túc giờ giảng, sử dụng hiệu quả thời gian lên lớp.',
-      answerScaleId: defaultScaleId,
       trap: null,
     },
     {
       sectionName: facilitiesSection,
       questionText: 'Phòng học, trang thiết bị đáp ứng yêu cầu học tập của học phần.',
-      answerScaleId: defaultScaleId,
       trap: null,
     },
   ];
 
-  // Lưu ý đặt ở cột F, cách bốn cột nhập một cột trống và gộp dọc suốt các dòng mẫu.
-  // Trình đọc tệp chỉ lấy đúng bốn cột có tiêu đề nên ô này không bị hiểu thành dữ liệu.
+  // Lưu ý đặt ở cột E, cách ba cột nhập một cột trống và gộp dọc suốt các dòng mẫu.
+  // Trình đọc tệp chỉ lấy đúng ba cột có tiêu đề nên ô này không bị hiểu thành dữ liệu.
   const sectionNote =
     `LƯU Ý: Tên mục ở cột "Mục" đặt tuỳ ý, mỗi bộ câu hỏi tối đa ${maximumSectionsPerTemplate} mục. `
     + 'Ghi lại tên mục ở từng dòng (không gộp ô) và để các câu cùng mục nằm liền nhau.';
@@ -269,7 +256,6 @@ export async function downloadSurveyTemplateImportTemplate(
     ...sampleRows.map((question) => [
       { value: question.sectionName, type: String },
       { value: question.questionText, type: String },
-      { value: question.answerScaleId, type: Number },
       question.trap ? { value: question.trap, type: Number } : null,
       null,
       null,
@@ -281,7 +267,7 @@ export async function downloadSurveyTemplateImportTemplate(
       {
         data,
         sheet: 'Bo cau hoi',
-        // Cột E để trống làm khoảng cách, cột F rộng cho dòng lưu ý.
+        // Cột D để trống làm khoảng cách, cột E rộng cho dòng lưu ý.
         columns: [...surveyTemplateColumnWidths, 4, 60].map((width) => ({ width })),
       } as never,
       buildAnswerScaleLookupSheet(answerScales),
@@ -291,29 +277,22 @@ export async function downloadSurveyTemplateImportTemplate(
 }
 
 /**
- * Sheet tra thang trả lời. Ngoài tên và mã còn trải luôn năm mức của thang ra năm
- * cột: thang nào không có mức nào thì bỏ trống đúng ô đó, nên nhìn phát biết ngay
- * thang "Có/Không" chỉ dùng mức 1 và 5. Thang tự nhập chữ không có mức nào nên
- * ghi thẳng "(Không có đáp án)" vào ngay cột tên.
+ * Sheet tra thang trả lời: tên thang và năm mức của nó trải ra năm cột. Thang nào
+ * không có mức nào thì bỏ trống đúng ô đó, nên nhìn phát biết ngay thang "Có/Không"
+ * chỉ dùng mức 1 và 5 — đó là các số điền được vào cột câu bẫy.
  */
 function buildAnswerScaleLookupSheet(answerScales: AnswerScale[]) {
   const rows = answerScales.map((scale) => {
-    const label =
-      scale.scaleKind === 'Text'
-        ? `${scale.answerScaleName} (Không có đáp án)`
-        : scale.answerScaleName;
-
     const optionByValue = new Map(scale.options.map((option) => [option.value, option.displayText]));
     const optionCells = [1, 2, 3, 4, 5].map((value) => optionByValue.get(value) ?? '');
 
-    return [label, scale.answerScaleId, ...optionCells];
+    return [scale.answerScaleName, ...optionCells];
   });
 
   return buildLookupSheet(
     'Danh sach thang tra loi',
     [
       'Thang trả lời của hệ thống',
-      'Mã thang trả lời',
       'Đáp án 1',
       'Đáp án 2',
       'Đáp án 3',
@@ -321,7 +300,7 @@ function buildAnswerScaleLookupSheet(answerScales: AnswerScale[]) {
       'Đáp án 5',
     ],
     rows,
-    [38, 18, 22, 22, 22, 22, 22]
+    [38, 22, 22, 22, 22, 22]
   );
 }
 
@@ -337,14 +316,12 @@ export async function downloadSurveyTemplateFailedRows(rows: FailedRowExport[]):
 }
 
 /**
- * Đọc tệp .xlsx chứa danh sách câu hỏi kèm mã thang trả lời của từng câu.
- * Mã thang được đối chiếu với danh mục hệ thống truyền vào; dòng sai mã được
- * tách riêng để hiển thị cho người dùng thay vì làm hỏng cả lần import.
+ * Đọc tệp .xlsx chứa danh sách câu hỏi theo mục. Tệp không mang thang trả lời —
+ * thang của cả bộ chọn trên hộp thoại — nên mức câu bẫy được đối chiếu sau, bằng
+ * `attentionCheckOf`. Dòng sai ở cột Mục được tách riêng để hiển thị cho người
+ * dùng thay vì làm hỏng cả lần import.
  */
-export async function parseSurveyTemplateImportFile(
-  file: File,
-  answerScales: AnswerScale[]
-): Promise<SurveyTemplateImportResult> {
+export async function parseSurveyTemplateImportFile(file: File): Promise<SurveyTemplateImportResult> {
   if (!file.name.toLowerCase().endsWith('.xlsx')) {
     throw new SurveyTemplateImportFileError('FILE_TYPE');
   }
@@ -377,25 +354,12 @@ export async function parseSurveyTemplateImportFile(
     throw new SurveyTemplateImportFileError('SECTION_HEADER_MISSING');
   }
 
-  // Tránh bắt trúng cột "Thang trả lời của hệ thống" của bảng tra bên phải.
-  const scaleIndex = headers.findIndex(
-    (header, index) =>
-      index !== questionIndex && index !== sectionIndex && answerScaleCodeHeaders.has(header)
-  );
-  if (scaleIndex < 0) {
-    throw new SurveyTemplateImportFileError('SCALE_HEADER_MISSING');
-  }
-
-  // Cột câu bẫy là tùy chọn: bộ không có câu bẫy nào thì bỏ hẳn cột cũng được.
+  // Cột câu bẫy là tùy chọn: bộ không có câu bẫy nào thì bỏ hẳn cột cũng được. Tệp
+  // theo mẫu cũ còn cột "Mã thang trả lời" thì cột đó bị bỏ qua.
   const attentionIndex = headers.findIndex(
     (header, index) =>
-      index !== questionIndex
-      && index !== sectionIndex
-      && index !== scaleIndex
-      && attentionCheckHeaders.has(header)
+      index !== questionIndex && index !== sectionIndex && attentionCheckHeaders.has(header)
   );
-
-  const scaleById = new Map(answerScales.map((scale) => [scale.answerScaleId, scale]));
 
   const dataRows = sheet
     .slice(1)
@@ -403,7 +367,6 @@ export async function parseSurveyTemplateImportFile(
       rowNumber: index + 2,
       sectionName: cellText(row[sectionIndex]),
       questionText: cellText(row[questionIndex]),
-      rawCode: cellText(row[scaleIndex]),
       rawAttention: attentionIndex < 0 ? '' : cellText(row[attentionIndex]),
     }))
     .filter((row) => row.questionText.length > 0);
@@ -462,61 +425,18 @@ export async function parseSurveyTemplateImportFile(
   }
 
   const rows: ImportSurveyQuestionRow[] = [];
-  const invalidScaleRows: InvalidScaleCodeRow[] = [];
-  const invalidAttentionCheckRows: InvalidAttentionCheckRow[] = [];
 
   for (const row of dataRows) {
     const rowSectionIndex = sectionOfRow.get(row.rowNumber);
     // Dòng đã bị bắt lỗi ở vòng đọc mục thì bỏ qua, khỏi báo lỗi chồng lên nhau.
     if (rowSectionIndex === undefined) continue;
 
-    const code = Number(row.rawCode);
-    const scale = Number.isInteger(code) ? scaleById.get(code) : undefined;
-
-    if (!scale) {
-      invalidScaleRows.push({
-        rowNumber: row.rowNumber,
-        questionText: row.questionText,
-        rawCode: row.rawCode,
-      });
-      continue;
-    }
-
-    // Kiểm cùng luật với backend để người dùng biết lỗi ngay tại chỗ xem trước,
-    // khỏi gửi lên rồi mới bị trả về.
-    let attentionCheckValue: number | null = null;
-    if (row.rawAttention.length > 0) {
-      if (scale.scaleKind !== 'Options') {
-        invalidAttentionCheckRows.push({
-          rowNumber: row.rowNumber,
-          questionText: row.questionText,
-          rawValue: row.rawAttention,
-          reason: 'TEXT_SCALE',
-        });
-        continue;
-      }
-
-      const required = Number(row.rawAttention);
-      if (!Number.isInteger(required) || !scale.options.some((o) => o.value === required)) {
-        invalidAttentionCheckRows.push({
-          rowNumber: row.rowNumber,
-          questionText: row.questionText,
-          rawValue: row.rawAttention,
-          reason: 'VALUE_NOT_IN_SCALE',
-        });
-        continue;
-      }
-      attentionCheckValue = required;
-    }
-
     rows.push({
       rowNumber: row.rowNumber,
       sectionName: sections[rowSectionIndex],
       sectionIndex: rowSectionIndex,
       questionText: row.questionText,
-      answerScaleId: scale.answerScaleId,
-      answerScaleName: scale.answerScaleName,
-      attentionCheckValue,
+      rawAttention: row.rawAttention,
     });
   }
 
@@ -537,7 +457,5 @@ export async function parseSurveyTemplateImportFile(
       sectionIndex: remappedIndexes.get(row.sectionIndex) ?? 0,
     })),
     invalidSectionRows,
-    invalidScaleRows,
-    invalidAttentionCheckRows,
   };
 }

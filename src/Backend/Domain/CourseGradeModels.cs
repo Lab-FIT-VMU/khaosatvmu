@@ -4,45 +4,13 @@ namespace Domain;
   Phân tích điểm học phần (docs/plans/tich-hop-phan-tich-diem-hoc-phan.md).
 
   Ba nhóm bảng:
-    1. Sinh viên và điểm: Students, GradeImportRevisions, StudentCourseGrades.
+    1. Điểm: GradeImportRevisions, StudentCourseGrades. Không có bảng sinh viên riêng: mã và
+       họ tên sinh viên nằm ngay trên dòng điểm (StudentCourseGrade.StudentCode / StudentName).
     2. Ngưỡng của bộ luật D, E: GradeAnalysisThresholds.
     3. Lượt tính và kết quả: GradeAnalysisRuns cùng bốn bảng kết quả.
 
   Bộ luật A, B (loại dòng, công thức X/Y/Z, gộp bộ môn) nằm trong code, không nằm ở đây.
 */
-
-/// <summary>
-/// Sinh viên của trường. Họ tên và mã để dạng thường như bảng Lecturers, được bảo vệ bằng
-/// phân quyền; phần cần mã hóa là điểm, nằm ở <see cref="StudentCourseGrade"/>.
-/// Không bao giờ nối bảng này với phiếu khảo sát: khảo sát cam kết ẩn danh.
-/// </summary>
-public sealed class Student : ISoftDeletable
-{
-    public long StudentId { get; set; }
-
-    /// <summary>Mã sinh viên của trường (cột f_masv), lưu dạng chuỗi vì dài 5–7 chữ số.</summary>
-    public string StudentCode { get; set; } = string.Empty;
-
-    /// <summary>Cột f_tensv.</summary>
-    public string FullName { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Lớp hành chính = khóa ngành đào tạo (ĐKT66ĐH), khóa ngoại sang CohortMajors. Khóa, ngành, khoa
-    /// không lưu ở đây mà tra qua khóa ngành. Lớp chưa có trong danh mục thì để trống và báo khi nạp.
-    /// </summary>
-    public int? CohortMajorId { get; set; }
-
-    public string? Email { get; set; }
-    public string? PhoneNumber { get; set; }
-    public DateOnly? DateOfBirth { get; set; }
-    public string? Gender { get; set; }
-    public string? StudyStatus { get; set; }
-
-    public DateTime CreatedAtUtc { get; set; }
-    public DateTime UpdatedAtUtc { get; set; }
-    public bool IsDeleted { get; set; }
-    public DateTime? DeletedAt { get; set; }
-}
 
 /// <summary>
 /// Một lần nạp file điểm cho một học kỳ, theo mẫu <see cref="GraduationImportRevision"/>.
@@ -101,7 +69,22 @@ public sealed class StudentCourseGrade
     public long StudentCourseGradeId { get; set; }
     public long RevisionId { get; set; }
     public int SemesterId { get; set; }
-    public long StudentId { get; set; }
+
+    /// <summary>
+    /// Số thứ tự của sinh viên trong lần nạp này (1, 2, 3… theo thứ tự xuất hiện trong file).
+    /// Bộ tính dùng nó để gom các dòng của cùng một người trong kỳ (năng lực nền D-N1..N4) mà
+    /// không phải đọc mã sinh viên. Nằm trong dữ liệu xác thực (AAD) của các ô điểm mã hóa.
+    /// </summary>
+    public long StudentNumber { get; set; }
+
+    /// <summary>
+    /// Cột f_masv. Trong một lần nạp, mỗi lớp học phần chỉ có một dòng được dùng của mỗi mã
+    /// sinh viên (chỉ mục UX_StudentCourseGrades_Revision_Section_Student_Usable).
+    /// </summary>
+    public string StudentCode { get; set; } = string.Empty;
+
+    /// <summary>Cột f_tensv; rỗng khi file để trống.</summary>
+    public string? StudentName { get; set; }
 
     /// <summary>Lớp ghép được theo (f_mamh, f_loptc). Rỗng khi lớp không có trong file lớp (B-G1).</summary>
     public int? CourseSectionId { get; set; }

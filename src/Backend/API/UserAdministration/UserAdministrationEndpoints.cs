@@ -151,6 +151,33 @@ public static class UserAdministrationEndpoints
             CancellationToken cancellationToken) =>
             Results.Ok(await service.GetRolesAsync(cancellationToken)));
 
+        group.MapPost("/roles", async (
+            SaveRoleRequest request,
+            IUserAdministrationService service,
+            CancellationToken cancellationToken) =>
+            ToResult(await service.CreateRoleAsync(request.ToCommand(), cancellationToken)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
+        group.MapPut("/roles/{roleId:guid}", async (
+            Guid roleId,
+            SaveRoleRequest request,
+            IUserAdministrationService service,
+            CancellationToken cancellationToken) =>
+            ToResult(await service.UpdateRoleAsync(roleId, request.ToCommand(), cancellationToken)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
+        group.MapDelete("/roles/{roleId:guid}", async (
+            Guid roleId,
+            ClaimsPrincipal principal,
+            IUserAdministrationService service,
+            CancellationToken cancellationToken) =>
+            ToResult(await service.DeleteRoleAsync(
+                roleId,
+                GetRequiredGuidClaim(principal, ClaimTypes.NameIdentifier),
+                GetRequiredGuidClaim(principal, AuthClaimTypes.ActiveProfileId),
+                cancellationToken)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
         group.MapGet("/audit-logs", async (
             Guid? userId,
             int page,
@@ -221,6 +248,12 @@ public static class UserAdministrationEndpoints
             UserAdministrationErrorCodes.CannotDisableSelf => StatusCodes.Status409Conflict,
             UserAdministrationErrorCodes.CannotModifyActiveProfile => StatusCodes.Status409Conflict,
             UserAdministrationErrorCodes.CannotRevokeRequiredPermission => StatusCodes.Status409Conflict,
+            UserAdministrationErrorCodes.RoleLimitReached => StatusCodes.Status409Conflict,
+            UserAdministrationErrorCodes.RoleNameExists => StatusCodes.Status409Conflict,
+            UserAdministrationErrorCodes.RoleSuffixExists => StatusCodes.Status409Conflict,
+            UserAdministrationErrorCodes.RoleSystemLocked => StatusCodes.Status409Conflict,
+            UserAdministrationErrorCodes.AdminRoleScopeLocked => StatusCodes.Status409Conflict,
+            UserAdministrationErrorCodes.CannotDeleteOwnRole => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
         return Results.Json(new { errorCode = result.ErrorCode }, statusCode: statusCode);
@@ -261,4 +294,20 @@ public static class UserAdministrationEndpoints
     public sealed record UpdateRolePermissionsRequest(IReadOnlyList<PermissionGrantRequest>? Grants);
 
     public sealed record PermissionGrantRequest(Guid PermissionId, bool IsGranted);
+
+    /// <summary><paramref name="DataScope"/>: ALL, FACULTY, DEPARTMENT hoặc OWN.</summary>
+    public sealed record SaveRoleRequest(
+        string? Name,
+        string? Description,
+        string? DataScope,
+        bool CanWrite,
+        string? ProfileCodeSuffix)
+    {
+        public SaveRoleCommand ToCommand() => new(
+            Name ?? string.Empty,
+            Description,
+            DataScope ?? string.Empty,
+            CanWrite,
+            ProfileCodeSuffix ?? string.Empty);
+    }
 }

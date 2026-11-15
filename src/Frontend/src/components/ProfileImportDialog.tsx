@@ -8,6 +8,7 @@ import {
   type ImportProfileRow,
   type InvalidRoleRow,
   type ProfileImportFileErrorCode,
+  type ProfileRoleOption,
 } from '../utils/profileImportExcel';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
 import { Modal } from './Modal';
@@ -16,6 +17,8 @@ import '../styles/auth-admin.css';
 interface ProfileImportDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Các vai trò đang có, đọc từ bảng "Roles". */
+  roleOptions: ProfileRoleOption[];
   /** Gửi các dòng lên API. Trả về thông báo lỗi, null nếu thành công. */
   onImport: (rows: ImportProfileRow[]) => Promise<string | null>;
 }
@@ -30,7 +33,7 @@ const fileErrorMessages: Record<ProfileImportFileErrorCode, string> = {
   READ_FAILED: 'Không thể đọc tệp Excel. Hãy kiểm tra tệp không bị hỏng hoặc đặt mật khẩu.',
 };
 
-export function ProfileImportDialog({ isOpen, onClose, onImport }: ProfileImportDialogProps) {
+export function ProfileImportDialog({ isOpen, onClose, roleOptions, onImport }: ProfileImportDialogProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
@@ -75,7 +78,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImport }: ProfileImport
     setFileName(file.name);
     setParsing(true);
     try {
-      const result = await parseProfileImportFile(file);
+      const result = await parseProfileImportFile(file, roleOptions);
       setRows(result.rows);
       setInvalidRoleRows(result.invalidRoleRows);
     } catch (error) {
@@ -126,7 +129,7 @@ export function ProfileImportDialog({ isOpen, onClose, onImport }: ProfileImport
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            onClick={() => void downloadProfileImportTemplate()}
+            onClick={() => void downloadProfileImportTemplate(roleOptions)}
           >
             <Download aria-hidden="true" />
             Tải file mẫu

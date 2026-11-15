@@ -214,11 +214,10 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
     index: q.questionOrder || idx + 1,
   }));
 
-  // Câu tự nhập không có điểm nên tách khỏi biểu đồ và bảng phân bố.
-  const chartData = coded.filter((q) => q.scaleKind !== 'Text');
-  const textQuestions = coded.filter((q) => q.scaleKind === 'Text');
+  const chartData = coded;
 
-  // Mỗi thang có bộ mức riêng nên bảng phân bố tách theo từng thang.
+  // Nhóm bảng phân bố theo thang. Mỗi bộ chỉ dùng một thang, nhưng một phân tích gộp
+  // nhiều đợt có thể gặp nhiều bộ khác thang nhau.
   const distributionGroups = chartData.reduce<Map<string, ChartDataItem[]>>((groups, question) => {
     const key = question.answerScaleName || 'Thang trả lời';
     const current = groups.get(key);
@@ -433,7 +432,7 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
         </div>
       </header>
 
-      {/* Khu vực Biểu đồ cột đứng. Bộ chỉ toàn câu tự nhập thì không có gì để vẽ. */}
+      {/* Khu vực Biểu đồ cột đứng. */}
       {chartData.length > 0 && (
       <div
         className="section-analysis-chart-container"
@@ -664,39 +663,6 @@ export const QuestionAnalysisChart: React.FC<QuestionAnalysisChartProps> = ({
           );
         })}
 
-      {/* Câu tự nhập: không có điểm nên liệt kê nội dung người học đã gõ. */}
-      {textQuestions.length > 0 && (
-        <div className="section-analysis-distribution">
-          <div className="distribution-table-header">
-            <h4 className="distribution-table-title">Câu hỏi tự nhập</h4>
-            <span className="distribution-table-subtitle">
-              Không tính vào điểm trung bình
-            </span>
-          </div>
-
-          <div className="analysis-text-answers">
-            {textQuestions.map((question) => (
-              <div className="analysis-text-question" key={question.questionId}>
-                <p className="analysis-text-question-title">
-                  <span className="analysis-code-badge">{question.code}</span>
-                  {question.questionText}
-                  <small>{question.totalAnswers} lượt trả lời</small>
-                </p>
-                {question.textAnswers && question.textAnswers.length > 0 ? (
-                  <ul>
-                    {question.textAnswers.map((answer, index) => (
-                      // Nội dung có thể trùng nhau nên dùng vị trí làm key.
-                      <li key={index}>{answer}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="analysis-text-empty">Chưa có nội dung nào.</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </section>
   );
 };

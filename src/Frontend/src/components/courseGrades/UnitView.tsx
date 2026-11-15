@@ -184,7 +184,7 @@ export function UnitView({ overview, termCode, courses, facultyId, onOpenCourse,
                   <td className="num">{viInt(row.sections)}</td>
                   <td className="num">{viInt(row.comparable)}</td>
                   <td className="num">{viInt(row.flagged)} <small>({pct(row.courses ? row.flagged / row.courses : 0, 0)})</small></td>
-                  <td><FlagChips codes={row.topFlags} empty="—" compact /></td>
+                  <td><FlagChips codes={row.topFlags} empty="—" /></td>
                   <td className="num">{pct(row.i1)}</td>
                   <td className="num">{pct(row.i2)}</td>
                   <td className="num">{vi(row.r, 2)}</td>

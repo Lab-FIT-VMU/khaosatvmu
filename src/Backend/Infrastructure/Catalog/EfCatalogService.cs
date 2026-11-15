@@ -2575,37 +2575,19 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .ToList();
         if (users.Count == 0) return;
 
-        var roleCodes = new[]
-        {
-            RoleCodes.Lecturer,
-            RoleCodes.DepartmentManager,
-            RoleCodes.FacultyManager
-        };
-        var rolesByCode = await db.Roles
-            .Where(x => roleCodes.Contains(x.Code))
-            .ToDictionaryAsync(x => x.Code, cancellationToken);
-        var lecturerRole = rolesByCode[RoleCodes.Lecturer];
-        var departmentManagerRole = rolesByCode[RoleCodes.DepartmentManager];
-        var facultyManagerRole = rolesByCode[RoleCodes.FacultyManager];
-
-        var positions = await db.Positions
-            .Select(x => new { x.PositionId, x.PositionName })
-            .ToListAsync(cancellationToken);
-        var departmentManagerPositionIds = positions
-            .Where(x => IsDepartmentManagerPosition(x.PositionName))
-            .Select(x => x.PositionId)
-            .ToHashSet();
-        var facultyManagerPositionIds = positions
-            .Where(x => IsFacultyManagerPosition(x.PositionName))
-            .Select(x => x.PositionId)
-            .ToHashSet();
+        // Mỗi tài khoản giảng viên tự có hồ sơ Giảng viên. Hồ sơ quản lý (khoa, bộ môn…)
+        // KHÔNG tự cấp theo chức vụ nữa: vai trò do người quản trị tạo và gán tay.
+        var lecturerRole = await db.Roles
+            .SingleOrDefaultAsync(x => x.Code == RoleCodes.Lecturer, cancellationToken);
+        if (lecturerRole is null) return;
 
         var userIds = users.Select(x => x.Id).ToList();
         var existingProfiles = await db.UserProfiles
             .Where(x => userIds.Contains(x.UserId))
             .ToListAsync(cancellationToken);
-        var profilesByRole = existingProfiles
-            .GroupBy(x => (x.UserId, x.RoleId))
+        var lecturerProfileByUser = existingProfiles
+            .Where(x => x.RoleId == lecturerRole.Id)
+            .GroupBy(x => x.UserId)
             .ToDictionary(x => x.Key, x => x.First());
         var usersWithActiveProfile = existingProfiles
             .Where(x => x.IsActive)
@@ -2613,20 +2595,17 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .ToHashSet();
         var now = DateTime.UtcNow;
 
-        foreach (var lecturer in lecturers)
+        foreach (var user in users)
         {
-            if (!userByLecturerId.TryGetValue(lecturer.LecturerId, out var user)) continue;
-
-            if (!profilesByRole.TryGetValue((user.Id, lecturerRole.Id), out var lecturerProfile))
+            if (!lecturerProfileByUser.TryGetValue(user.Id, out var lecturerProfile))
             {
                 var isDefault = !usersWithActiveProfile.Contains(user.Id);
-                lecturerProfile = await AddAutomaticProfileAsync(
+                lecturerProfileByUser[user.Id] = await AddAutomaticProfileAsync(
                     user,
                     lecturerRole,
                     isDefault,
                     now,
                     cancellationToken);
-                profilesByRole[(user.Id, lecturerRole.Id)] = lecturerProfile;
                 usersWithActiveProfile.Add(user.Id);
             }
             else if (!lecturerProfile.IsActive)
@@ -2635,97 +2614,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 lecturerProfile.UpdatedAt = now;
                 usersWithActiveProfile.Add(user.Id);
             }
-
-            // Trưởng bộ môn và Phó bộ môn cùng nhận hồ sơ Quản lý bộ môn; thôi giữ chức
-            // thì hồ sơ đó tắt đi.
-            var isDepartmentManager = lecturer.PositionId is { } positionId
-                && departmentManagerPositionIds.Contains(positionId);
-
-            await ReconcileDepartmentManagerProfileAsync(
-                user,
-                lecturerProfile,
-                isDepartmentManager,
-                departmentManagerRole,
-                profilesByRole,
-                now,
-                cancellationToken);
-
-            if (lecturer.PositionId is not { } currentPositionId) continue;
-
-            // Trưởng khoa và Phó trưởng khoa nhận hồ sơ Quản lý khoa. Hồ sơ từng bị tắt
-            // thì bật lại, vì chức vụ hiện tại đòi hồ sơ đó.
-            if (facultyManagerPositionIds.Contains(currentPositionId))
-            {
-                if (!profilesByRole.TryGetValue((user.Id, facultyManagerRole.Id), out var facultyProfile))
-                {
-                    facultyProfile = await AddAutomaticProfileAsync(
-                        user,
-                        facultyManagerRole,
-                        isDefault: false,
-                        now,
-                        cancellationToken);
-                    profilesByRole[(user.Id, facultyManagerRole.Id)] = facultyProfile;
-                }
-                else if (!facultyProfile.IsActive)
-                {
-                    facultyProfile.IsActive = true;
-                    facultyProfile.UpdatedAt = now;
-                }
-            }
         }
-    }
-
-    /// <summary>
-    /// Bật hoặc tắt hồ sơ Quản lý bộ môn theo chức vụ hiện tại của giảng viên: chưa có thì
-    /// tạo, đang tắt thì bật lại; không còn giữ chức thì tắt.
-    /// </summary>
-    private async Task ReconcileDepartmentManagerProfileAsync(
-        User user,
-        UserProfile lecturerProfile,
-        bool shouldHaveProfile,
-        Role departmentManagerRole,
-        IDictionary<(Guid UserId, Guid RoleId), UserProfile> profilesByRole,
-        DateTime now,
-        CancellationToken cancellationToken)
-    {
-        profilesByRole.TryGetValue((user.Id, departmentManagerRole.Id), out var managerProfile);
-
-        if (!shouldHaveProfile)
-        {
-            DeactivateAutomaticLeadershipProfile(managerProfile, lecturerProfile, now);
-            return;
-        }
-
-        if (managerProfile is null)
-        {
-            managerProfile = await AddAutomaticProfileAsync(
-                user,
-                departmentManagerRole,
-                isDefault: false,
-                now,
-                cancellationToken);
-            profilesByRole[(user.Id, departmentManagerRole.Id)] = managerProfile;
-        }
-        else if (!managerProfile.IsActive)
-        {
-            managerProfile.IsActive = true;
-            managerProfile.UpdatedAt = now;
-        }
-    }
-
-    private static void DeactivateAutomaticLeadershipProfile(
-        UserProfile? profile,
-        UserProfile lecturerProfile,
-        DateTime now)
-    {
-        if (profile is null || !profile.IsActive) return;
-        if (profile.IsDefault)
-        {
-            profile.IsDefault = false;
-            lecturerProfile.IsDefault = true;
-        }
-        profile.IsActive = false;
-        profile.UpdatedAt = now;
     }
 
     private async Task<UserProfile> AddAutomaticProfileAsync(
@@ -2735,7 +2624,6 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         DateTime now,
         CancellationToken cancellationToken)
     {
-        var naming = ProfileNaming.ByRoleCode[role.Code];
         var nextNumber = await db.Database
             .SqlQueryRaw<long>("SELECT nextval('\"UserProfileCodeSequence\"') AS \"Value\"")
             .SingleAsync(cancellationToken);
@@ -2745,8 +2633,8 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             Id = Guid.NewGuid(),
             UserId = user.Id,
             RoleId = role.Id,
-            ProfileName = naming.Name,
-            ProfileCode = ProfileNaming.CodeFor(nextNumber, naming.Suffix),
+            ProfileName = role.Name,
+            ProfileCode = ProfileNaming.CodeFor(nextNumber, role.ProfileCodeSuffix),
             IsActive = true,
             IsDefault = isDefault,
             CreatedAt = now,
@@ -2756,14 +2644,6 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         user.UpdatedAt = now;
         return profile;
     }
-
-    /// <summary>Trưởng bộ môn và Phó bộ môn đều nhận hồ sơ Quản lý bộ môn.</summary>
-    private static bool IsDepartmentManagerPosition(string positionName) =>
-        NormalizeLooseKey(positionName) is "truong bo mon" or "pho bo mon" or "pho truong bo mon";
-
-    /// <summary>Trưởng khoa và Phó trưởng khoa đều nhận hồ sơ Quản lý khoa.</summary>
-    private static bool IsFacultyManagerPosition(string positionName) =>
-        NormalizeLooseKey(positionName) is "truong khoa" or "pho khoa" or "pho truong khoa";
 
     private Task EnsureUserForLecturerAsync(
         Lecturer lecturer,

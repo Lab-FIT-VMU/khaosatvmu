@@ -23,24 +23,33 @@ public static class DatabaseSeeder
         }
     }
 
+    /// <summary>
+    /// Sáu vai trò mặc định, chỉ tạo khi chưa từng có (cài mới). Sau đó người quản trị tự
+    /// sửa tên, phạm vi, quyền ghi, hoặc xóa — trình khởi tạo không ghi đè và không tạo lại
+    /// vai trò đã bị xóa.
+    /// </summary>
+    internal static readonly (string Code, string Name, string Description, string DataScope, bool CanWrite, string Suffix, bool IsSystem)[] DefaultRoles =
+    [
+        ("ADMIN", "Quản trị hệ thống", "Hồ sơ quản trị toàn hệ thống", RoleDataScopes.All, true, "AD", true),
+        ("LECTURER", "Giảng viên", "Hồ sơ giảng viên, chỉ xem các lớp mình dạy", RoleDataScopes.Own, false, "GV", true),
+        ("DEPARTMENT_MANAGER", "Quản lý bộ môn", "Hồ sơ quản lý bộ môn, cấp cho Trưởng bộ môn và Phó bộ môn", RoleDataScopes.Department, true, "BM", false),
+        ("FACULTY_MANAGER", "Quản lý khoa", "Hồ sơ quản lý khoa/viện, cấp cho Trưởng khoa và Phó trưởng khoa, xem mọi bộ môn trong khoa", RoleDataScopes.Faculty, true, "KV", false),
+        ("SURVEY_ADMIN", "Quản trị khảo sát", "Hồ sơ quản trị nghiệp vụ khảo sát", RoleDataScopes.All, true, "QT", false),
+        ("BOARD_OF_DIRECTORS", "Ban Giám hiệu", "Hồ sơ xem toàn trường, chỉ đọc", RoleDataScopes.All, false, "GH", false),
+    ];
+
+    /// <summary>Trả về các vai trò mặc định CÒN DÙNG (chưa bị xóa), tra theo mã.</summary>
     private static async Task<Dictionary<string, Role>> EnsureRolesAsync(
         AppDbContext db,
         CancellationToken cancellationToken)
     {
-        var definitions = new[]
-        {
-            (Code: "ADMIN", Name: "Quản trị hệ thống", Description: "Hồ sơ quản trị toàn hệ thống"),
-            (Code: "LECTURER", Name: "Giảng viên", Description: "Hồ sơ giảng viên"),
-            (Code: "DEPARTMENT_MANAGER", Name: "Quản lý bộ môn", Description: "Hồ sơ quản lý bộ môn, cấp cho Trưởng bộ môn và Phó bộ môn"),
-            (Code: "FACULTY_MANAGER", Name: "Quản lý khoa", Description: "Hồ sơ quản lý khoa/viện, cấp cho Trưởng khoa và Phó trưởng khoa, xem mọi bộ môn trong khoa"),
-            (Code: "SURVEY_ADMIN", Name: "Quản trị khảo sát", Description: "Hồ sơ quản trị nghiệp vụ khảo sát"),
-            (Code: "BOARD_OF_DIRECTORS", Name: "Ban Giám hiệu", Description: "Hồ sơ xem toàn trường, chỉ đọc")
-        };
-
         var roles = new Dictionary<string, Role>(StringComparer.OrdinalIgnoreCase);
-        foreach (var definition in definitions)
+        foreach (var definition in DefaultRoles)
         {
-            var role = await db.Roles.SingleOrDefaultAsync(x => x.Code == definition.Code, cancellationToken);
+            // Nhìn cả dòng đã xóa mềm: vai trò người quản trị đã xóa thì để yên, không
+            // tạo lại mỗi lần API khởi động.
+            var role = await db.Roles.IgnoreQueryFilters()
+                .SingleOrDefaultAsync(x => x.Code == definition.Code, cancellationToken);
             if (role is null)
             {
                 role = new Role
@@ -49,37 +58,45 @@ public static class DatabaseSeeder
                     Code = definition.Code,
                     Name = definition.Name,
                     Description = definition.Description,
-                    IsSystem = true
+                    DataScope = definition.DataScope,
+                    CanWrite = definition.CanWrite,
+                    ProfileCodeSuffix = definition.Suffix,
+                    IsSystem = definition.IsSystem,
                 };
                 db.Roles.Add(role);
             }
-            else
+            else if (definition.IsSystem)
             {
-                // Vai trò đã tồn tại từ các bản cài đặt cũ vẫn phải được Việt hoá;
-                // nếu chỉ đổi dữ liệu khởi tạo thì CSDL đang chạy vẫn trả về tên cũ.
-                role.Name = definition.Name;
-                role.Description = definition.Description;
+                // Hai vai trò không xóa được luôn còn; ADMIN luôn thấy và ghi toàn trường,
+                // không thì không ai còn vào được trang phân quyền để sửa lại.
                 role.IsSystem = true;
+                role.IsDeleted = false;
+                role.DeletedAt = null;
+                if (definition.Code == RequiredRolePermissions.AdminRoleCode)
+                {
+                    role.DataScope = RoleDataScopes.All;
+                    role.CanWrite = true;
+                }
             }
 
-            roles[definition.Code] = role;
+            if (!role.IsDeleted)
+            {
+                roles[definition.Code] = role;
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);
 
-        // Tên hồ sơ do vai trò quyết định và giao diện không cho sửa tự do. Đồng bộ
-        // cả dữ liệu cũ để không còn chỗ hiện "Admin hệ thống" trong chi tiết tài khoản.
-        foreach (var (roleCode, role) in roles)
-        {
-            var profileName = ProfileNaming.ByRoleCode[roleCode].Name;
-            await db.UserProfiles
-                .Where(x => x.RoleId == role.Id && x.ProfileName != profileName)
-                .ExecuteUpdateAsync(
-                    setters => setters
-                        .SetProperty(x => x.ProfileName, profileName)
-                        .SetProperty(x => x.UpdatedAt, DateTime.UtcNow),
-                    cancellationToken);
-        }
+        // Tên hồ sơ là tên vai trò và giao diện không cho sửa tự do. Đồng bộ cả dữ liệu cũ
+        // (và hồ sơ của vai trò vừa đổi tên) để chi tiết tài khoản luôn khớp.
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE "UserProfiles" AS p
+            SET "ProfileName" = r."Name", "UpdatedAt" = now()
+            FROM "Roles" AS r
+            WHERE r."Id" = p."RoleId" AND p."ProfileName" <> r."Name"
+            """,
+            cancellationToken);
 
         return roles;
     }
@@ -114,7 +131,6 @@ public static class DatabaseSeeder
             (Code: "COHORT_MAJORS_ACCESS",        Name: "Khoá ngành đào tạo",                Description: "Truy cập module quản lý khoá học và khoá ngành đào tạo", Category: "Danh mục đào tạo"),
             (Code: "COURSES_ACCESS",              Name: "Học phần",                          Description: "Truy cập module quản lý học phần",                      Category: "Danh mục đào tạo"),
             (Code: "COURSE_SECTIONS_ACCESS",      Name: "Lớp học phần",                      Description: "Truy cập module quản lý lớp học phần",                  Category: "Danh mục đào tạo"),
-            (Code: "STUDENTS_ACCESS",             Name: "Sinh viên",                         Description: "Xem và nạp danh sách sinh viên (khóa, ngành, lớp hành chính)",Category: "Danh mục đào tạo"),
             (Code: "COURSE_QUESTION_SETS_ACCESS", Name: "Danh sách bộ câu hỏi",              Description: "Truy cập module bộ câu hỏi khảo sát học phần",         Category: "Khảo sát học phần"),
             (Code: "COURSE_CAMPAIGNS_ACCESS",     Name: "Danh sách bài khảo sát",            Description: "Truy cập module đợt khảo sát học phần",                Category: "Khảo sát học phần"),
             (Code: "PROGRAM_CAMPAIGNS_ACCESS",    Name: "Đợt khảo sát CTĐT",                 Description: "Truy cập module đợt khảo sát chương trình đào tạo",     Category: "Khảo sát chương trình"),
@@ -152,8 +168,12 @@ public static class DatabaseSeeder
 
         // Trang đã bỏ thì xoá luôn quyền, không thì trang Phân quyền Module còn hiện mục bật
         // tắt không có tác dụng gì. Dòng RolePermissions đi theo nhờ khoá ngoại xoá dây chuyền.
+        // STUDENTS_ACCESS: trang Danh mục sinh viên đã bỏ cùng bảng Students — hệ thống
+        // không lưu sinh viên nữa.
+        string[] retiredModuleCodes = ["STUDENTS_ACCESS"];
         await db.Permissions
-            .Where(x => SurveyStatisticsPermissions.RetiredUnitCodes.Contains(x.Code))
+            .Where(x => SurveyStatisticsPermissions.RetiredUnitCodes.Contains(x.Code)
+                || retiredModuleCodes.Contains(x.Code))
             .ExecuteDeleteAsync(cancellationToken);
 
         var permissions = new Dictionary<string, Permission>(StringComparer.OrdinalIgnoreCase);
@@ -219,7 +239,6 @@ public static class DatabaseSeeder
             (RoleCode: "ADMIN", PermissionCode: "COHORT_MAJORS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSES_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_SECTIONS_ACCESS"),
-            (RoleCode: "ADMIN", PermissionCode: "STUDENTS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_QUESTION_SETS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_CAMPAIGNS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "PROGRAM_CAMPAIGNS_ACCESS"),
@@ -248,7 +267,6 @@ public static class DatabaseSeeder
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COHORT_MAJORS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSES_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_SECTIONS_ACCESS"),
-            (RoleCode: "SURVEY_ADMIN", PermissionCode: "STUDENTS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_QUESTION_SETS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_CAMPAIGNS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "PROGRAM_CAMPAIGNS_ACCESS"),
@@ -312,7 +330,8 @@ public static class DatabaseSeeder
 
         foreach (var definition in definitions)
         {
-            var role = roles[definition.RoleCode];
+            // Vai trò mặc định đã bị người quản trị xóa thì thôi cấp quyền cho nó.
+            if (!roles.TryGetValue(definition.RoleCode, out var role)) continue;
             var permission = permissions[definition.PermissionCode];
             var existing = await db.RolePermissions.SingleOrDefaultAsync(x =>
                 x.RoleId == role.Id && x.PermissionId == permission.Id,
@@ -355,7 +374,9 @@ public static class DatabaseSeeder
         var rows = await db.RolePermissions.ToListAsync(cancellationToken);
         var rowByPair = rows.ToDictionary(x => (x.RoleId, x.PermissionId));
 
-        foreach (var role in roles.Values)
+        // Mọi vai trò còn dùng, kể cả vai trò người quản trị tự thêm.
+        var allRoles = await db.Roles.ToListAsync(cancellationToken);
+        foreach (var role in allRoles)
         {
             // Danh sách tab xếp tab cha trước tab con, nên tab con đọc được trạng thái
             // tab cha vừa thêm ở vòng trước.
@@ -374,7 +395,7 @@ public static class DatabaseSeeder
                     Id = Guid.NewGuid(),
                     RoleId = role.Id,
                     PermissionId = tabPermission.Id,
-                    IsGranted = ModuleTabPermissions.IsGrantedByDefault(role.Code, tab.Code),
+                    IsGranted = ModuleTabPermissions.IsGrantedByDefault(role.DataScope, tab.Code),
                     CreatedAt = DateTime.UtcNow
                 };
                 db.RolePermissions.Add(row);
@@ -417,38 +438,27 @@ public static class DatabaseSeeder
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        await EnsureProfileAsync(
-            db,
-            user,
-            roles["LECTURER"],
-            "LECTURER_MAIN",
-            ProfileNaming.ByRoleCode["LECTURER"].Name,
-            "CNTT",
-            "Khoa CNTT",
-            isDefault: true,
-            cancellationToken);
-
-        await EnsureProfileAsync(
-            db,
-            user,
-            roles["SURVEY_ADMIN"],
-            "SURVEY_ADMIN",
-            ProfileNaming.ByRoleCode["SURVEY_ADMIN"].Name,
-            "SURVEY",
-            "Phong khao sat",
-            isDefault: false,
-            cancellationToken);
-
-        await EnsureProfileAsync(
-            db,
-            user,
-            roles["ADMIN"],
-            "ADMIN_SYSTEM",
-            ProfileNaming.ByRoleCode["ADMIN"].Name,
-            null,
-            null,
-            isDefault: false,
-            cancellationToken);
+        // Hồ sơ thử của môi trường phát triển; vai trò nào đã bị xóa thì bỏ qua.
+        (string RoleCode, string ProfileCode, string? UnitCode, string? UnitName, bool IsDefault)[] devProfiles =
+        [
+            ("LECTURER", "LECTURER_MAIN", "CNTT", "Khoa CNTT", true),
+            ("SURVEY_ADMIN", "SURVEY_ADMIN", "SURVEY", "Phong khao sat", false),
+            ("ADMIN", "ADMIN_SYSTEM", null, null, false),
+        ];
+        foreach (var item in devProfiles)
+        {
+            if (!roles.TryGetValue(item.RoleCode, out var role)) continue;
+            await EnsureProfileAsync(
+                db,
+                user,
+                role,
+                item.ProfileCode,
+                role.Name,
+                item.UnitCode,
+                item.UnitName,
+                item.IsDefault,
+                cancellationToken);
+        }
     }
 
     private static async Task EnsureProfileAsync(

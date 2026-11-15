@@ -162,7 +162,6 @@ public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
             preview.MissingSectionRowCount.Should().Be(1);
             preview.SectionsWithoutGradesCount.Should().Be(0, "lớp 27xxx nằm ngoài phạm vi phân tích (B-L2)");
             preview.StudentCount.Should().Be(3);
-            preview.NewStudentCount.Should().Be(3);
             preview.ExcludedRows.Select(x => $"{x.Rule}={x.Count}").Should().BeEquivalentTo("L1=1", "T=1");
             preview.ActiveRevisionId.Should().BeNull();
 
@@ -175,7 +174,6 @@ public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
             first.RevisionNumber.Should().Be(1);
             first.ImportedRowCount.Should().Be(3);
             first.SkippedRowCount.Should().Be(2);
-            first.CreatedStudentCount.Should().Be(3);
 
             var stored = await h.Db.StudentCourseGrades.AsNoTracking().Where(x => x.RevisionId == first.RevisionId).ToListAsync();
             stored.Should().HaveCount(5, "lưu cả dòng bị loại để tính lại khi bộ luật A đổi");
@@ -185,16 +183,16 @@ public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
             inputs.Should().HaveCount(2, "view chỉ có dòng được dùng và ghép được lớp");
 
             var firstRow = stored.Single(x => x.SourceRowNumber == 2);
-            var aad = new GradeCellContext(first.RevisionId, firstRow.StudentId, firstRow.CourseCode, firstRow.SourceRowNumber, GradeCellColumns.Z);
+            var aad = new GradeCellContext(first.RevisionId, firstRow.StudentNumber, firstRow.CourseCode, firstRow.SourceRowNumber, GradeCellColumns.Z);
             h.Cipher.Decrypt(firstRow.ZEnc!, firstRow.KeyVersion, aad).Should().Be(6.6m);
             h.Cipher.Decrypt(firstRow.XEnc!, firstRow.KeyVersion, aad with { Column = GradeCellColumns.X }).Should().Be(6.3m);
             // Kiểm cả dãy byte "6.6" (không phải từng byte): điểm không nằm dạng rõ trong CSDL.
             Convert.ToHexString(firstRow.ZEnc!).Should().NotContain(Convert.ToHexString("6.6"u8.ToArray()));
 
-            var student = await h.Db.Students.AsNoTracking().SingleAsync(x => x.StudentCode == sv[0]);
-            student.CohortMajorId.Should().BeNull("lớp ĐKT98ĐH chưa có trong Khoá ngành đào tạo: không tự tạo");
-            preview.Warnings.Should().Contain(w => w.Contains("ĐKT98ĐH (3)") && w.Contains("không suy được khóa ngành"),
-                "khóa 98 chưa có nên không tự tạo khóa ngành; lớp được liệt kê (Ð trong file đã đổi thành Đ)");
+            // Mã sinh viên lưu trên dòng điểm; số thứ tự theo lần xuất hiện trong file.
+            stored.Select(x => (x.SourceRowNumber, x.StudentNumber, x.StudentCode)).Should().BeEquivalentTo(
+                [(2, 1L, sv[0]), (3, 2L, sv[1]), (4, 2L, sv[1]), (5, 3L, sv[2]), (6, 1L, sv[0])]);
+            preview.Warnings.Should().NotContain(w => w.Contains("khóa ngành") || w.Contains("họ tên"));
 
             var run = await h.Grades.GetLatestRunAsync();
             run!.Status.Should().Be("Queued");
@@ -213,7 +211,6 @@ public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
             var second = await h.Grades.ImportAsync(new CourseGradeImportCommand(
                 semester.SemesterId, "diem.xlsx", File(), preview2.FileHash, first.RevisionId, "Phòng Đào tạo gửi lại file"));
             second.RevisionNumber.Should().Be(2);
-            second.CreatedStudentCount.Should().Be(0);
             (await h.Db.StudentCourseGrades.CountAsync(x => x.RevisionId == first.RevisionId)).Should().Be(0, "điểm của lần cũ bị xóa hẳn");
             (await h.Db.GradeImportRevisions.SingleAsync(x => x.RevisionId == second.RevisionId)).ReplacedRevisionId.Should().Be(first.RevisionId);
 
@@ -291,7 +288,7 @@ public class CourseGradeImportEndToEndTests(ITestOutputHelper output)
             var result = await h.Grades.ImportAsync(new CourseGradeImportCommand(
                 semesterId, term + ".xlsx", commitStream, preview.FileHash, preview.ActiveRevisionId,
                 preview.ActiveRevisionId is null ? null : "Chạy lại kiểm thử đầu-cuối"));
-            output.WriteLine($"{term}: xác nhận {watch.Elapsed.TotalSeconds:F1}s, {result.ImportedRowCount} dòng dùng được, {result.CreatedStudentCount} sinh viên mới");
+            output.WriteLine($"{term}: xác nhận {watch.Elapsed.TotalSeconds:F1}s, {result.ImportedRowCount} dòng dùng được");
 
             var inputCount = await h.Db.Database
                 .SqlQuery<int>($"SELECT count(*)::int AS \"Value\" FROM \"GradeAnalysisInputs\" WHERE \"SemesterId\" = {semesterId}")

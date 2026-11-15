@@ -40,13 +40,57 @@ public sealed class UserProfile
     public DateTime UpdatedAt { get; set; }
 }
 
+/// <summary>Các giá trị hợp lệ của "Roles"."DataScope": vai trò thấy dữ liệu của ai.</summary>
+public static class RoleDataScopes
+{
+    /// <summary>Toàn trường, không lọc.</summary>
+    public const string All = "ALL";
+
+    /// <summary>Mọi bộ môn thuộc khoa của hồ sơ giảng viên gắn với tài khoản.</summary>
+    public const string Faculty = "FACULTY";
+
+    /// <summary>Bộ môn của hồ sơ giảng viên gắn với tài khoản.</summary>
+    public const string Department = "DEPARTMENT";
+
+    /// <summary>Chỉ các lớp chính mình dạy. Phạm vi này luôn chỉ đọc.</summary>
+    public const string Own = "OWN";
+
+    public static bool IsValid(string? value) => value is All or Faculty or Department or Own;
+}
+
+/// <summary>
+/// Vai trò của một hồ sơ. Quyết định ba thứ: được vào module nào ("RolePermissions"), thấy
+/// dữ liệu của ai (<see cref="DataScope"/>) và được ghi hay chỉ xem (<see cref="CanWrite"/>).
+/// Người quản trị thêm, sửa, xóa được vai trò; tối đa 8 vai trò.
+/// </summary>
 public sealed class Role : ISoftDeletable
 {
     public Guid Id { get; set; }
+
+    /// <summary>Mã nội bộ, UNIQUE kể cả dòng đã xóa. Vai trò tự tạo nhận mã sinh tự động.</summary>
     public string Code { get; set; } = string.Empty;
+
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+
+    /// <summary>
+    /// Vai trò không được xóa: ADMIN (luôn còn người vào được trang phân quyền) và LECTURER
+    /// (hồ sơ cơ bản tự cấp cho mọi tài khoản giảng viên).
+    /// </summary>
     public bool IsSystem { get; set; }
+
+    /// <summary>Một trong <see cref="RoleDataScopes"/>.</summary>
+    public string DataScope { get; set; } = RoleDataScopes.Department;
+
+    /// <summary>
+    /// Được ghi trong phạm vi của mình. False là chỉ xem. Phạm vi
+    /// <see cref="RoleDataScopes.Own"/> luôn là false.
+    /// </summary>
+    public bool CanWrite { get; set; }
+
+    /// <summary>Hai ký tự cuối của mã hồ sơ, vd "BM" trong 000036BM. UNIQUE.</summary>
+    public string ProfileCodeSuffix { get; set; } = string.Empty;
+
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
 }

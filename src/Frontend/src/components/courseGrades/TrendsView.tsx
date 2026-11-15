@@ -165,7 +165,7 @@ export function TrendsView({ overview, termCode, courses, facultyId, departmentI
                       <td>{departmentName.get(course.departmentId ?? -1) ?? '—'}</td>
                       {flags.map((f, i) => (
                         <td key={visibleTerms[i]} className={visibleTerms[i] === termCode ? 'cga-current' : undefined}>
-                          <FlagChips codes={f} empty="—" compact />
+                          <FlagChips codes={f} empty="—" />
                         </td>
                       ))}
                       <td className="num"><strong>{viInt(flags.filter((f) => f.length).length)}</strong></td>
@@ -175,7 +175,7 @@ export function TrendsView({ overview, termCode, courses, facultyId, departmentI
                             .filter(([, n]) => n > 0)
                             .sort((a, b) => b[1] - a[1])
                             .map(([code, n]) => (
-                              <span key={code} className="cga-chip cga-chip--flag" title={FLAG_LABELS[code]?.name}>{FLAG_LABELS[code]?.short ?? code}: {viInt(n)} kỳ</span>
+                              <span key={code} className="cga-chip cga-chip--flag" title={FLAG_LABELS[code]?.name}>{FLAG_LABELS[code]?.name ?? code}: {viInt(n)} kỳ</span>
                             ))}
                         </span>
                       </td>

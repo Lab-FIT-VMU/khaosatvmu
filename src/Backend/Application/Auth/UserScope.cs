@@ -36,19 +36,47 @@ public static class RoleCodes
 /// <param name="DepartmentId">Bộ môn của giảng viên đó.</param>
 /// <param name="FacultyId">Khoa của giảng viên đó.</param>
 /// <param name="SeesEverything">Không bị giới hạn phạm vi, thấy toàn bộ dữ liệu.</param>
+/// <param name="DataScope">
+/// Phạm vi của vai trò (Domain.RoleDataScopes), đọc từ bảng "Roles". Null chỉ gặp ở phạm vi
+/// dựng tay (test): khi đó suy theo mã của sáu vai trò mặc định.
+/// </param>
+/// <param name="CanWrite">Vai trò được ghi hay chỉ xem; null thì suy như <paramref name="DataScope"/>.</param>
 public sealed record UserScope(
     string RoleCode,
     int? LecturerId,
     int? DepartmentId,
     int? FacultyId,
-    bool SeesEverything)
+    bool SeesEverything,
+    string? DataScope = null,
+    bool? CanWrite = null)
 {
+    /// <summary>
+    /// Phạm vi đang áp. Vai trò đọc từ CSDL luôn có giá trị; chỉ phạm vi dựng tay mới rơi
+    /// về cách suy theo mã vai trò mặc định — mã lạ thì coi như phạm vi bộ môn, hẹp hơn
+    /// toàn trường nên không bao giờ mở rộng dữ liệu nhầm.
+    /// </summary>
+    public string EffectiveDataScope => DataScope ?? (SeesEverything
+        ? Domain.RoleDataScopes.All
+        : RoleCode switch
+        {
+            RoleCodes.Lecturer => Domain.RoleDataScopes.Own,
+            RoleCodes.FacultyManager => Domain.RoleDataScopes.Faculty,
+            _ => Domain.RoleDataScopes.Department,
+        });
+
+    private bool EffectiveCanWrite => CanWrite
+        ?? RoleCode is not (RoleCodes.Lecturer or RoleCodes.BoardOfDirectors);
+
     /// <summary>
     /// Phạm vi của quản trị viên: không lọc gì cả. Dùng cho <c>ADMIN</c> và
     /// <c>SURVEY_ADMIN</c> — hai vai trò cấp hệ thống, không gắn với bộ môn nào.
     /// </summary>
     public static UserScope Unrestricted(string roleCode) =>
         new(roleCode, null, null, null, SeesEverything: true);
+
+    /// <summary>Phạm vi toàn trường của một vai trò đọc từ CSDL.</summary>
+    public static UserScope Unrestricted(string roleCode, bool canWrite) =>
+        new(roleCode, null, null, null, SeesEverything: true, Domain.RoleDataScopes.All, canWrite);
 
     /// <summary>
     /// Phạm vi rỗng: chưa đăng nhập, hoặc tài khoản không tra ra được hồ sơ giảng
@@ -62,7 +90,7 @@ public sealed record UserScope(
     /// môn. Lớp học phần đi theo <c>CourseSections.LecturerId</c>, học phần đi theo
     /// các học phần có ít nhất một lớp mình dạy. Xem congviec3.md mục H2.
     /// </summary>
-    public bool SeesOnlyOwn => RoleCode == RoleCodes.Lecturer;
+    public bool SeesOnlyOwn => !SeesEverything && EffectiveDataScope == Domain.RoleDataScopes.Own;
 
     /// <summary>
     /// Phạm vi cả khoa: thấy mọi bộ môn thuộc khoa của mình, không chỉ bộ môn gắn với
@@ -72,14 +100,14 @@ public sealed record UserScope(
     /// phải hỏi cờ này TRƯỚC, nếu không trưởng khoa chỉ thấy đúng bộ môn mình đứng tên.
     /// </para>
     /// </summary>
-    public bool SeesWholeFaculty => RoleCode == RoleCodes.FacultyManager;
+    public bool SeesWholeFaculty => !SeesEverything && EffectiveDataScope == Domain.RoleDataScopes.Faculty;
 
     /// <summary>
     /// Không được ghi bất cứ thứ gì. Hai vai trò chỉ đọc: giảng viên (chỉ theo dõi lớp
     /// mình dạy) và Ban Giám hiệu (thấy toàn trường nhưng không can thiệp số liệu).
     /// Xem congviec3.md mục H3.
     /// </summary>
-    public bool IsReadOnly => SeesOnlyOwn || RoleCode == RoleCodes.BoardOfDirectors;
+    public bool IsReadOnly => SeesOnlyOwn || !EffectiveCanWrite;
 
     /// <summary>
     /// Thấy toàn bộ dữ liệu VÀ được ghi. Ban Giám hiệu thấy toàn trường nhưng chỉ đọc,
@@ -98,10 +126,14 @@ public sealed record UserScope(
     public bool CanResolveCourseSectionLecturer =>
         ManagesEverything || (ManagesOwnUnit && !SeesNothing);
 
-    /// <summary>Hai vai trò quản lý cấp đơn vị: quản lý bộ môn và quản lý khoa.</summary>
+    /// <summary>
+    /// Quản lý cấp đơn vị: phạm vi khoa hoặc bộ môn VÀ được ghi. Vai trò khoa / bộ môn chỉ
+    /// xem không lọt vào đây.
+    /// </summary>
     private bool ManagesOwnUnit =>
-        RoleCode is RoleCodes.DepartmentManager
-            or RoleCodes.FacultyManager;
+        !SeesEverything
+        && EffectiveDataScope is Domain.RoleDataScopes.Faculty or Domain.RoleDataScopes.Department
+        && !IsReadOnly;
 
     /// <summary>
     /// Bị giới hạn phạm vi nhưng lại không biết giới hạn vào đâu. Gặp trường hợp này

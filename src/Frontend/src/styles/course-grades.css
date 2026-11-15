@@ -97,7 +97,7 @@
 .course-grade-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .course-grade-table th,
 .course-grade-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); text-align: left; vertical-align: top; }
-.course-grade-table th { background: var(--bg-main); color: var(--text-muted); font-weight: 600; }
+.course-grade-table th { background: var(--bg-main); color: var(--text-muted); font-weight: 600; text-align: center; vertical-align: middle; }
 .course-grade-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .course-grade-table td[title] { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

@@ -884,9 +884,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
                       </thead>
                       <tbody>
                         {responseDetail.answers.map((ans, idx) => {
-                          const scale = responseDetail.answerScales?.find(
-                            (s) => s.answerScaleId === ans.answerScaleId
-                          );
+                          const scale = responseDetail.answerScale;
                           return (
                             <tr key={ans.questionId}>
                               <td style={{ textAlign: 'right', color: '#68737d' }}>{idx + 1}</td>
@@ -897,20 +895,14 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
                                 {scale?.answerScaleName || '—'}
                               </td>
                               <td style={{ textAlign: 'left' }}>
-                                {ans.scaleKind === 'Text' ? (
-                                  <span style={{ fontStyle: 'italic', color: '#334155' }}>
-                                    {ans.answerValue || 'Không trả lời.'}
-                                  </span>
-                                ) : (
-                                  <span style={{ fontWeight: 600, color: '#0f172a' }}>
-                                    {ans.selectedText || '—'}
-                                    {ans.selectedValue !== null && ans.selectedValue !== undefined && (
-                                      <small style={{ color: '#0284c7', marginLeft: '4px' }}>
-                                        ({ans.selectedValue})
-                                      </small>
-                                    )}
-                                  </span>
-                                )}
+                                <span style={{ fontWeight: 600, color: '#0f172a' }}>
+                                  {ans.selectedText || ans.answerValue || '—'}
+                                  {ans.selectedValue !== null && ans.selectedValue !== undefined && ans.selectedText && (
+                                    <small style={{ color: '#0284c7', marginLeft: '4px' }}>
+                                      ({ans.selectedValue})
+                                    </small>
+                                  )}
+                                </span>
                               </td>
                             </tr>
                           );

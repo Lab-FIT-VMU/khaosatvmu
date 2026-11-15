@@ -137,9 +137,6 @@ export const maximumSectionsPerTemplate = 3;
 /** Số mức tối đa của một thang trả lời ("AnswerScaleOptions"."Value" CHECK 1..5). */
 export const maximumAnswerScaleOptions = 5;
 
-/** Độ dài tối đa của câu trả lời tự nhập ("SurveyResponseAnswers"."AnswerValue"). */
-export const maximumTextAnswerLength = 2000;
-
 /** Bảng "AnswerScaleOptions" */
 export interface AnswerScaleOption {
   answerScaleOptionId: number;
@@ -150,35 +147,28 @@ export interface AnswerScaleOption {
 }
 
 /**
- * Loại thang trả lời ("AnswerScales"."ScaleKind").
- * - `Options`: có sẵn các mức chọn (Mức độ hài lòng, Có/Không, Phần trăm...).
- * - `Text`: người trả lời tự nhập chữ, không có mức nào.
+ * Bảng "AnswerScales", kèm các mức trả lời để hiển thị trong một lần gọi. Thang nào
+ * cũng có sẵn các mức chọn (Mức độ hài lòng, Có/Không, Phần trăm...).
  */
-export type AnswerScaleKind = 'Options' | 'Text';
-
-/** Bảng "AnswerScales", kèm các mức trả lời để hiển thị trong một lần gọi. */
 export interface AnswerScale {
   answerScaleId: number;
   answerScaleName: string;
-  scaleKind: AnswerScaleKind;
-  /** Rỗng với thang loại `Text`. */
   options: AnswerScaleOption[];
 }
 
-/** Bảng "SurveyQuestions". Thang trả lời gắn ở từng câu, không gắn cho cả bộ. */
 /** Bảng "SurveyQuestionSections": mục chia nhóm câu hỏi, thuộc riêng một bộ. */
 export interface SurveyQuestionSection {
   sectionId: number;
   sectionName: string;
 }
 
+/** Bảng "SurveyQuestions". Câu không mang thang riêng — mọi câu dùng thang của bộ. */
 export interface SurveyQuestion {
   questionId: number;
   surveyTemplateId: number;
   /** Mục chứa câu này; mọi câu đều thuộc một mục, kể cả câu bẫy. */
   sectionId: number;
   questionText: string;
-  answerScaleId: number;
   /**
    * Mức bắt buộc của câu bẫy độ tập trung; null là câu hỏi bình thường.
    * Chỉ có ở màn quản trị — phiếu sinh viên cố ý không nhận trường này.
@@ -190,6 +180,8 @@ export interface SurveyQuestion {
 export interface SurveyTemplate {
   surveyTemplateId: number;
   templateName: string;
+  /** Thang trả lời dùng chung cho mọi câu của bộ. */
+  answerScaleId: number;
   /** ISO 8601 */
   createdAt: string;
   /** Xếp theo thứ tự hiển thị, tức theo vị trí câu đầu tiên của từng mục. */
@@ -430,11 +422,9 @@ export function rejectionReasonTexts(reasons: string | null): string[] {
 export interface SurveyResponseAnswer {
   questionId: number;
   questionText: string;
-  answerScaleId: number;
-  scaleKind: AnswerScaleKind;
-  /** Giá trị thô: số mức đã chọn với thang `Options`, nội dung gõ với thang `Text`. */
+  /** Giá trị thô đã lưu: số mức đã chọn. */
   answerValue: string;
-  /** Chỉ có giá trị với câu thuộc thang `Options`. */
+  /** Null khi giá trị thô không đọc ra được số (dữ liệu cũ). */
   selectedValue: number | null;
   selectedText: string;
 }
@@ -451,8 +441,8 @@ export interface SurveyResponseDetail {
   courseName: string;
   sectionName: string;
   lecturerName: string;
-  /** Các thang mà bộ câu hỏi của phiếu đang dùng. */
-  answerScales: AnswerScale[];
+  /** Thang của bộ câu hỏi; null khi không còn đọc được. */
+  answerScale: AnswerScale | null;
   answers: SurveyResponseAnswer[];
 }
 
@@ -477,14 +467,13 @@ export interface PublicSurvey {
   startTime: string;
   endTime: string;
   isOpen: boolean;
-  /** Các thang mà bộ câu hỏi đang dùng; mỗi câu trỏ tới một thang qua `answerScaleId`. */
-  answerScales: AnswerScale[];
+  /** Thang của bộ câu hỏi, dùng chung cho mọi câu; null khi phiếu bị chặn. */
+  answerScale: AnswerScale | null;
   /** Mục của bộ, đã xếp đúng thứ tự phiếu hiển thị. */
   sections: SurveyQuestionSection[];
   questions: {
     questionId: number;
     questionText: string;
-    answerScaleId: number;
     sectionId: number;
   }[];
   /** Hình thức phiếu do quản trị đặt lúc tạo đợt; null là dùng mẫu mặc định. */
@@ -625,6 +614,10 @@ export interface AuthProfile {
   name: string;
   code: string;
   roleCode: string;
+  /** Tên vai trò, phạm vi dữ liệu và quyền ghi — lấy từ bảng "Roles". */
+  roleName?: string;
+  dataScope?: 'ALL' | 'FACULTY' | 'DEPARTMENT' | 'OWN';
+  canWrite?: boolean;
   organizationUnitCode: string | null;
   organizationUnitName: string | null;
   isDefault: boolean;
@@ -731,6 +724,27 @@ export interface AdminRole {
   code: string;
   name: string;
   description: string | null;
+  dataScope: 'ALL' | 'FACULTY' | 'DEPARTMENT' | 'OWN';
+  canWrite: boolean;
+  /** Hậu tố mã hồ sơ, vd "BM" trong 000036BM. */
+  profileCodeSuffix: string;
+  /** Không xóa được (Quản trị hệ thống, Giảng viên). */
+  isSystem: boolean;
+  /** Số hồ sơ đang bật mang vai trò này. */
+  activeProfileCount: number;
+}
+
+export interface SaveAdminRole {
+  name: string;
+  description: string | null;
+  dataScope: AdminRole['dataScope'];
+  canWrite: boolean;
+  profileCodeSuffix: string;
+}
+
+export interface RoleDeletionResult {
+  disabledProfileCount: number;
+  usersWithoutActiveProfile: number;
 }
 
 export interface AdminAuditLog {
@@ -801,18 +815,14 @@ export interface OptionCount {
 
 export interface QuestionRating {
   questionId: number;
-  /** Số thứ tự câu trong bộ đề (C1, C2...), đánh trên cả câu bẫy và câu tự nhập. */
+  /** Số thứ tự câu trong bộ đề (C1, C2...); câu bẫy không được đánh số. */
   questionOrder: number;
   questionText: string;
-  /** Chỉ có ý nghĩa với câu thuộc thang `Options`. */
   averageScore: number;
   totalAnswers: number;
-  /** Theo đúng các mức của thang câu đó, rỗng với câu thang `Text`. */
+  /** Theo đúng các mức của thang mà bộ câu hỏi đang dùng. */
   optionDistribution: OptionCount[];
-  scaleKind: AnswerScaleKind;
   answerScaleName: string;
-  /** Nội dung người học tự nhập, chỉ có với câu thang `Text`. */
-  textAnswers: string[] | null;
 }
 
 export interface LecturerSectionSummary {

@@ -247,9 +247,7 @@ export function toQuestionRatings(report: UnitSurveyReport): QuestionRating[] {
         count: item.count,
         percentage: question.answerCount === 0 ? 0 : (item.count / question.answerCount) * 100,
       })),
-      scaleKind: 'Options',
       answerScaleName: '',
-      textAnswers: null,
     }));
 }
 

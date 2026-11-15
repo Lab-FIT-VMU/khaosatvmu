@@ -111,8 +111,8 @@ def _section(section_id, code, name='Học phần', group='N01', lecturer_id=Non
             'DepartmentId': department, 'FacultyId': faculty}
 
 
-def _grade(section_id, student_id, x, y, z):
-    return {'CourseSectionId': section_id, 'StudentId': student_id, 'X': x, 'Y': y, 'Z': z}
+def _grade(section_id, student_number, x, y, z):
+    return {'CourseSectionId': section_id, 'StudentNumber': student_number, 'X': x, 'Y': y, 'Z': z}
 
 
 def _plain(row, column):

@@ -471,7 +471,10 @@ export const UnitSurveysPage: React.FC<UnitSurveysPageProps> = ({
       (item) => item.surveyTemplateId === designerTarget.surveyTemplateId,
     );
     if (!template) return undefined;
-    const scaleById = new Map(answerScales.map((scale) => [scale.answerScaleId, scale]));
+    // Cả bộ dùng một thang nên mọi câu có cùng các mức chọn.
+    const options = (
+      answerScales.find((scale) => scale.answerScaleId === template.answerScaleId)?.options ?? []
+    ).map((option) => ({ value: option.value, displayText: option.displayText }));
     return {
       surveyName: designerTarget.surveyName,
       templateName: template.templateName,
@@ -481,11 +484,7 @@ export const UnitSurveysPage: React.FC<UnitSurveysPageProps> = ({
           sectionName: section.sectionName,
           questions: template.questions
             .filter((question) => question.sectionId === section.sectionId)
-            .map((question) => ({
-              questionText: question.questionText,
-              options: (scaleById.get(question.answerScaleId)?.options ?? [])
-                .map((option) => ({ value: option.value, displayText: option.displayText })),
-            })),
+            .map((question) => ({ questionText: question.questionText, options })),
         }))
         .filter((section) => section.questions.length > 0),
       questionCount: template.questions.length,

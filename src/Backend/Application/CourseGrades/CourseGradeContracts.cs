@@ -41,13 +41,14 @@ public interface IGradeCipher
 /// </summary>
 public readonly record struct GradeCellContext(
     long RevisionId,
-    long StudentId,
+    /// <summary>Số thứ tự sinh viên trong lần nạp (StudentCourseGrades.StudentNumber).</summary>
+    long StudentNumber,
     string CourseCode,
     int SourceRowNumber,
     string Column)
 {
     public string ToAssociatedData() =>
-        $"StudentCourseGrades|{Column}|{RevisionId}|{StudentId}|{CourseCode}|{SourceRowNumber}";
+        $"StudentCourseGrades|{Column}|{RevisionId}|{StudentNumber}|{CourseCode}|{SourceRowNumber}";
 }
 
 /// <summary>Tên cột của các ô mã hóa, dùng trong AAD.</summary>
@@ -79,7 +80,6 @@ public sealed record CourseGradeImportPreviewDto(
     int UsableRowCount,
     int MatchedRowCount,
     int StudentCount,
-    int NewStudentCount,
     IReadOnlyList<CourseGradeRuleCountDto> ExcludedRows,
     int MissingSectionCount,
     int MissingSectionRowCount,
@@ -104,7 +104,6 @@ public sealed record CourseGradeImportResultDto(
     int SemesterId,
     int ImportedRowCount,
     int SkippedRowCount,
-    int CreatedStudentCount,
     long AnalysisRunId);
 
 /// <summary>Một kỳ đã nạp điểm.</summary>

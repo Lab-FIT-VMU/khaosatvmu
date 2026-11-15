@@ -4,7 +4,8 @@ Giữ nguyên hợp đồng của xu_ly.chi_so.tinh_ky(lop, diem, ts):
   lop  : {(mã HP, nhóm): thông tin lớp}   — như luat_b.doc_file
   diem : [{masv, mamh, loptc, X, Y, Z}]   — như luat_b.ghep (chỉ dòng ghép được lớp)
 Khác bản file ở ba chỗ, đều không đổi phép tính:
-  - masv là StudentId (khóa nội bộ), không phải mã sinh viên.
+  - masv là StudentNumber: số thứ tự sinh viên trong lần nạp, không phải mã sinh viên
+    (view GradeAnalysisInputs không đưa mã sinh viên cho worker).
   - giang_vien là LecturerId dạng chuỗi; lớp chưa xác định giảng viên hoặc "giảng viên" là
     đơn vị (Trung tâm…) để trống, nên tự rơi khỏi G1 và xu hướng giảng viên.
   - ma_bm / ma_khoa là DepartmentId / FacultyId của danh mục khaosatvmu.
@@ -71,7 +72,7 @@ def build_term_input(sections, grades, decrypt):
 
     Trả về (lop, diem, section_id_by_key).
     """
-    # Thứ tự chuẩn (mã HP, nhóm) và (mã HP, nhóm, StudentId): kết quả không được phụ thuộc
+    # Thứ tự chuẩn (mã HP, nhóm) và (mã HP, nhóm, StudentNumber): kết quả không được phụ thuộc
     # thứ tự dòng trong CSDL. Bộ tính có hai chỗ nhạy với thứ tự: p-value Monte Carlo của H4
     # dùng chung một dãy số ngẫu nhiên lần lượt qua các học phần, và statsmodels.MixedLM dừng
     # ở điểm hơi khác khi thứ tự dòng khác. Sắp cố định thì nạp lại cùng dữ liệu cho cùng số.
@@ -104,7 +105,7 @@ def build_term_input(sections, grades, decrypt):
             continue
         with_grades.add(key)
         diem.append({
-            'masv': str(g['StudentId']), 'mamh': key[0], 'loptc': key[1],
+            'masv': str(g['StudentNumber']), 'mamh': key[0], 'loptc': key[1],
             'X': decrypt(g, 'XEnc'), 'Y': decrypt(g, 'YEnc'), 'Z': decrypt(g, 'ZEnc'),
         })
     for key, info in lop.items():

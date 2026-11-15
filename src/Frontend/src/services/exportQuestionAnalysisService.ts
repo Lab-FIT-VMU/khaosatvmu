@@ -124,7 +124,7 @@ export async function generateQuestionChartImage(
     ...q,
     code: `C${q.questionOrder || idx + 1}`,
   }));
-  const chartData = coded.filter((q) => q.scaleKind !== 'Text');
+  const chartData = coded;
 
   const computedAverage =
     overallAverageScore !== undefined
@@ -459,8 +459,7 @@ export async function exportQuestionAnalysisToPdf(options: QuestionAnalysisExpor
     ...q,
     code: `C${q.questionOrder || idx + 1}`,
   }));
-  const chartData = coded.filter((q) => q.scaleKind !== 'Text');
-  const textQuestions = coded.filter((q) => q.scaleKind === 'Text');
+  const chartData = coded;
 
   const distributionGroups = chartData.reduce<Map<string, typeof coded>>((groups, question) => {
     const key = question.answerScaleName || 'Thang trả lời';
@@ -565,56 +564,6 @@ export async function exportQuestionAnalysisToPdf(options: QuestionAnalysisExpor
     });
 
     currentY = (doc as any).lastAutoTable.finalY + 8;
-  }
-
-  // 3. Câu hỏi tự nhập (nếu có)
-  if (textQuestions.length > 0) {
-    if (currentY > pageHeight - 30) {
-      doc.addPage();
-      currentY = margin;
-    }
-
-    doc.setFont(fontName, 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(15, 76, 129);
-    doc.text('Ý KIẾN ĐÓNG GÓP TỰ NHẬP CỦA NGƯỜI HỌC', margin, currentY);
-    currentY += 5;
-
-    textQuestions.forEach((tq) => {
-      if (currentY > pageHeight - 25) {
-        doc.addPage();
-        currentY = margin;
-      }
-
-      doc.setFont(fontName, 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(30, 41, 59);
-      doc.text(`${tq.code}. ${tq.questionText} (${tq.totalAnswers} lượt trả lời)`, margin, currentY);
-      currentY += 4.5;
-
-      const answers = tq.textAnswers || [];
-      if (answers.length === 0) {
-        doc.setFont(fontName, 'italic');
-        doc.setFontSize(8);
-        doc.setTextColor(120, 120, 120);
-        doc.text('(Không có ý kiến nào)', margin + 6, currentY);
-        currentY += 4.5;
-      } else {
-        doc.setFont(fontName, 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(51, 65, 85);
-        answers.forEach((ans) => {
-          if (currentY > pageHeight - 15) {
-            doc.addPage();
-            currentY = margin;
-          }
-          const wrapped = doc.splitTextToSize(`- ${ans}`, pageWidth - margin * 2 - 8);
-          doc.text(wrapped, margin + 4, currentY);
-          currentY += wrapped.length * 3.8;
-        });
-        currentY += 3;
-      }
-    });
   }
 
   const baseName = metadata?.fileName || options.title || 'bao-cao-cau-hoi-khao-sat';
@@ -820,8 +769,7 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
     ...q,
     code: `C${q.questionOrder || idx + 1}`,
   }));
-  const chartData = coded.filter((q) => q.scaleKind !== 'Text');
-  const textQuestions = coded.filter((q) => q.scaleKind === 'Text');
+  const chartData = coded;
 
   const distributionGroups = chartData.reduce<Map<string, typeof coded>>((groups, question) => {
     const key = question.answerScaleName || 'Thang trả lời';
@@ -971,66 +919,6 @@ export async function exportQuestionAnalysisToWord(options: QuestionAnalysisExpo
     docChildren.push(docTable);
   }
 
-  // 3. PHẦN III: Ý KIẾN ĐÓNG GÓP TỰ NHẬP
-  if (textQuestions.length > 0) {
-    docChildren.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        spacing: { before: 240, after: 100 },
-        children: [
-          new TextRun({
-            text: 'III. Ý KIẾN ĐÓNG GÓP TỰ NHẬP CỦA NGƯỜI HỌC',
-            bold: true,
-            size: 22,
-            color: '0F4C81',
-          }),
-        ],
-      }),
-    );
-
-    textQuestions.forEach((tq) => {
-      docChildren.push(
-        new Paragraph({
-          spacing: { before: 100, after: 40 },
-          children: [
-            new TextRun({
-              text: `${tq.code}. ${tq.questionText} `,
-              bold: true,
-              size: 19,
-              color: '1E293B',
-            }),
-            new TextRun({
-              text: `(${tq.totalAnswers} lượt trả lời)`,
-              italics: true,
-              size: 17,
-              color: '64748B',
-            }),
-          ],
-        }),
-      );
-
-      const answers = tq.textAnswers || [];
-      if (answers.length === 0) {
-        docChildren.push(
-          new Paragraph({
-            spacing: { after: 60 },
-            children: [new TextRun({ text: '(Chưa có ý kiến nào)', italics: true, size: 17, color: '888888' })],
-          }),
-        );
-      } else {
-        answers.forEach((ans) => {
-          docChildren.push(
-            new Paragraph({
-              bullet: { level: 0 },
-              spacing: { after: 30 },
-              children: [new TextRun({ text: ans, size: 18 })],
-            }),
-          );
-        });
-      }
-    });
-  }
-
   const doc = new Document({
     sections: [
       {
@@ -1084,8 +972,7 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
     ...q,
     code: `C${q.questionOrder || idx + 1}`,
   }));
-  const chartData = coded.filter((q) => q.scaleKind !== 'Text');
-  const textQuestions = coded.filter((q) => q.scaleKind === 'Text');
+  const chartData = coded;
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'VMU Survey System';
@@ -1318,60 +1205,6 @@ export async function exportQuestionAnalysisToExcel(options: QuestionAnalysisExp
 
     r++;
   });
-
-  // Sheet 2: Ý kiến tự nhập (nếu có)
-  if (textQuestions.length > 0) {
-    const wsText = workbook.addWorksheet('Y_Kien_Tu_Nhap', {
-      views: [{ showGridLines: true }],
-    });
-
-    wsText.columns = [
-      { key: 'code', width: 10 },
-      { key: 'question', width: 45 },
-      { key: 'stt', width: 8 },
-      { key: 'answer', width: 70 },
-    ];
-
-    const tHeadRow = wsText.getRow(1);
-    tHeadRow.values = ['Mã câu', 'Nội dung câu hỏi khảo sát', 'STT', 'Ý kiến đóng góp của người học'];
-    tHeadRow.height = 24;
-    tHeadRow.eachCell((cell) => {
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE3EDF5' },
-      };
-      cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: 'FF14415C' } };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        bottom: { style: 'medium', color: { argb: 'FF0F4C81' } },
-        right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-      };
-    });
-
-    let tr = 2;
-    textQuestions.forEach((tq) => {
-      const answers = tq.textAnswers || [];
-      if (answers.length === 0) {
-        const row = wsText.getRow(tr);
-        row.values = [tq.code, tq.questionText, 1, '(Chưa có ý kiến nào)'];
-        row.font = { name: 'Arial', size: 9 };
-        row.getCell(4).font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF888888' } };
-        tr++;
-      } else {
-        answers.forEach((ans, aIdx) => {
-          const row = wsText.getRow(tr);
-          row.values = [tq.code, tq.questionText, aIdx + 1, ans];
-          row.font = { name: 'Arial', size: 9 };
-          row.getCell(1).alignment = { horizontal: 'left' };
-          row.getCell(3).alignment = { horizontal: 'right' };
-          tr++;
-        });
-      }
-    });
-  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   const baseName = metadata?.fileName || options.title || 'bao-cao-cau-hoi-khao-sat';

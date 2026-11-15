@@ -86,10 +86,76 @@ public class NewRoleScopeTests
     [InlineData(RoleCodes.BoardOfDirectors, "Ban Giám hiệu", "GH")]
     [InlineData(RoleCodes.FacultyManager, "Quản lý khoa", "KV")]
     [InlineData(RoleCodes.DepartmentManager, "Quản lý bộ môn", "BM")]
-    public void ProfileNaming_CoversNewRoles(string roleCode, string name, string suffix)
+    public void DefaultRoles_CoverEveryBuiltInRole(string roleCode, string name, string suffix)
     {
-        // Thiếu dòng nào ở đây là cấp hồ sơ cho vai trò đó ném KeyNotFoundException.
-        ProfileNaming.ByRoleCode[roleCode].Should().Be((name, suffix));
-        ProfileNaming.RoleCodeFromLabel(name).Should().Be(roleCode);
+        // Tên và hậu tố mã hồ sơ của vai trò mặc định nay nằm trong bảng "Roles", tạo lúc cài.
+        var role = Infrastructure.Persistence.DatabaseSeeder.DefaultRoles.Single(x => x.Code == roleCode);
+        (role.Name, role.Suffix).Should().Be((name, suffix));
+    }
+
+    // ------------------------------------------------ Vai trò tùy biến: phạm vi × quyền ghi
+
+    private static UserScope Custom(string dataScope, bool canWrite, bool seesEverything = false) =>
+        new("ROLE_CUSTOM", 10, 20, 30, seesEverything, dataScope, canWrite);
+
+    [Fact]
+    public void CustomDepartmentReadOnly_SeesDepartmentButCannotWrite()
+    {
+        var scope = Custom(Domain.RoleDataScopes.Department, canWrite: false);
+
+        scope.SeesWholeFaculty.Should().BeFalse();
+        scope.SeesOnlyOwn.Should().BeFalse();
+        scope.IsReadOnly.Should().BeTrue();
+        scope.CanAddSurveyScope.Should().BeFalse("vai trò bộ môn chỉ xem không được thêm phạm vi khảo sát");
+        scope.CanResolveCourseSectionLecturer.Should().BeFalse();
+        scope.ManagesEverything.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CustomFacultyReadOnly_SeesWholeFacultyButCannotWrite()
+    {
+        var scope = Custom(Domain.RoleDataScopes.Faculty, canWrite: false);
+
+        scope.SeesWholeFaculty.Should().BeTrue();
+        scope.IsReadOnly.Should().BeTrue();
+        scope.CanAddSurveyScope.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CustomFacultyWritable_ManagesOwnFaculty()
+    {
+        var scope = Custom(Domain.RoleDataScopes.Faculty, canWrite: true);
+
+        scope.SeesWholeFaculty.Should().BeTrue();
+        scope.IsReadOnly.Should().BeFalse();
+        scope.CanAddSurveyScope.Should().BeTrue();
+        scope.ManagesEverything.Should().BeFalse("phạm vi khoa không phải quản trị toàn trường");
+    }
+
+    [Fact]
+    public void CustomWholeSchool_WriteFlagDecidesAdminActions()
+    {
+        UserScope.Unrestricted("ROLE_CUSTOM", canWrite: true).ManagesEverything.Should().BeTrue();
+        UserScope.Unrestricted("ROLE_CUSTOM", canWrite: false).ManagesEverything.Should().BeFalse();
+        UserScope.Unrestricted("ROLE_CUSTOM", canWrite: false).IsReadOnly.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CustomOwnScope_IsAlwaysReadOnly()
+    {
+        var scope = Custom(Domain.RoleDataScopes.Own, canWrite: true);
+
+        scope.SeesOnlyOwn.Should().BeTrue();
+        scope.IsReadOnly.Should().BeTrue("phạm vi lớp mình dạy không có thao tác ghi nào");
+    }
+
+    [Fact]
+    public void RoleCode_NoLongerDecidesScope_WhenAttributesAreGiven()
+    {
+        // Mã LECTURER nhưng vai trò được sửa thành phạm vi bộ môn, được ghi.
+        var scope = new UserScope(RoleCodes.Lecturer, 10, 20, 30, false, Domain.RoleDataScopes.Department, true);
+
+        scope.SeesOnlyOwn.Should().BeFalse();
+        scope.IsReadOnly.Should().BeFalse();
     }
 }

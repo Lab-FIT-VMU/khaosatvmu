@@ -293,7 +293,10 @@ public sealed class EfAuthService(AppDbContext db) : IAuthService
              role.Code,
              profile.OrganizationUnitCode,
              profile.OrganizationUnitName,
-             profile.IsDefault)).ToListAsync();
+             profile.IsDefault,
+             role.Name,
+             role.DataScope,
+             role.CanWrite)).ToListAsync();
 
     private Task<List<string>> GetPermissionCodesAsync(Guid roleId) =>
         (from rolePermission in db.RolePermissions

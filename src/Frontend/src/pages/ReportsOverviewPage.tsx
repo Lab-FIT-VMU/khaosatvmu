@@ -1858,7 +1858,7 @@ export const ReportsOverviewPage: React.FC = () => {
    * màn hình, chứ không tách thành hai cột số lượng và tỷ lệ.
    */
   const questionDetailExportColumns = (questions: QuestionRating[]): ExportColumn<any>[] => {
-    const levels = questions.find((question) => question.scaleKind !== 'Text')?.optionDistribution ?? [];
+    const levels = questions.find((question) => question.optionDistribution.length > 0)?.optionDistribution ?? [];
     return [
       {
         key: 'code',
@@ -1919,7 +1919,7 @@ export const ReportsOverviewPage: React.FC = () => {
         sheet với bảng số liệu, chỉ thiếu ảnh.
       */
       const charts = await Promise.all(analyses.map(async (analysis) => {
-        const questions = analysis?.questions.filter((question) => question.scaleKind !== 'Text') ?? [];
+        const questions = analysis?.questions ?? [];
         if (!analysis || questions.length === 0) return undefined;
         try {
           const { dataUrl, width, height } = await generateQuestionChartImage({
@@ -1940,7 +1940,7 @@ export const ReportsOverviewPage: React.FC = () => {
         const tables: ExportTable<any>[] = [];
 
         if (analysis) {
-          const questions = analysis.questions.filter((question) => question.scaleKind !== 'Text');
+          const questions = analysis.questions;
           if (questions.length > 0) {
             tables.push({
               title: '1. Bảng điểm chi tiết & tỷ lệ phân bố theo câu hỏi',

@@ -20,7 +20,8 @@
   --cga-border-strong: #9FAEC6;
   --cga-up: #2A8C8C;
   --cga-down: #7A6BB0;
-  --cga-ok: #2E7D5B;
+  /* Trạng thái ổn định: xanh mòng két đậm như bản audit (--s-ok), không dùng xanh lá (luật M1). */
+  --cga-ok: #0F5E5E;
   --cga-shadow: 0 1px 2px rgba(10, 36, 99, 0.06), 0 2px 8px rgba(10, 36, 99, 0.06);
 
   display: flex;
@@ -145,7 +146,7 @@
 .cga-chip--up::before { content: '▲'; color: var(--cga-up); }
 .cga-chip--down { border-color: var(--cga-down); background: #F1EEF8; }
 .cga-chip--down::before { content: '▼'; color: var(--cga-down); }
-.cga-chip--stable { border-color: var(--cga-ok); background: #EAF4EE; }
+.cga-chip--stable { border-color: var(--cga-ok); background: #E1F3F3; }
 .cga-chip--stable::before { content: '●'; color: var(--cga-ok); }
 .cga-chip--pending { border-style: dashed; color: var(--cga-text-3); }
 .cga-chip--pending::before { content: '○'; color: var(--cga-text-3); }
@@ -164,6 +165,9 @@
 .cga-table tbody tr:last-child td { border-bottom: 0; }
 .cga-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cga-table th.num { white-space: normal; min-width: 96px; }
+/* Tiêu đề cột luôn căn giữa (cả chiều ngang lẫn chiều dọc), kể cả cột số: căn trái / phải
+   theo nội dung làm hàng tiêu đề nhiều dòng trông lệch. Ô dữ liệu vẫn căn như cũ. */
+.cga-table th, .cga-table th.num { text-align: center; vertical-align: middle; }
 .cga-unit { display: block; color: var(--cga-text-3); font-size: 12px; font-weight: 500; }
 .cga-pct { color: var(--cga-text-3); font-weight: 400; }
 .cga-sticky { position: sticky; left: 0; z-index: 1; background: #fff; box-shadow: 1px 0 0 var(--cga-border); }
@@ -236,6 +240,14 @@
 .cga-empty p { margin: 0; }
 
 /* Giải thích thuật ngữ */
+/* Trang Design System: ô màu kèm tên và mã. */
+.cga-swatches { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.cga-swatch { display: grid; gap: 2px; padding: 10px; border: 1px solid var(--cga-border); border-radius: 10px; background: #fff; }
+.cga-swatch i { display: block; height: 44px; margin-bottom: 6px; border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 6px; }
+.cga-swatch b { font-size: 13.5px; }
+.cga-swatch span { color: var(--cga-text-3); font-family: var(--font-mono); font-size: 12px; }
+.cga-swatch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
 .cga-gloss { display: grid; margin: 0; }
 .cga-gloss > div { display: grid; grid-template-columns: minmax(200px, 320px) 1fr; gap: 16px; padding: 10px 0; border-bottom: 1px solid #E6ECF4; }
 .cga-gloss > div:last-child { border-bottom: 0; }

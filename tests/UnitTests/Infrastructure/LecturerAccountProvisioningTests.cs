@@ -13,8 +13,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 /// <summary>
-/// Kiểm chứng thêm giảng viên thì sinh luôn tài khoản và hồ sơ Giảng viên. Người có
-/// chức vụ Trưởng/Phó Trưởng bộ môn được sinh đúng hồ sơ quản lý tương ứng.
+/// Kiểm chứng thêm giảng viên thì sinh luôn tài khoản và hồ sơ Giảng viên. Hồ sơ quản lý
+/// không tự cấp theo chức vụ.
 ///
 /// Các test này chạy trên cơ sở dữ liệu thật vì phần cần kiểm nằm ở tầng EF và ở
 /// interceptor xoá mềm — dùng provider giả thì không kiểm được gì. Mỗi test bọc trong
@@ -105,29 +105,22 @@ public class LecturerAccountProvisioningTests
     }
 
     /// <summary>
-    /// Trưởng bộ môn và Phó bộ môn cùng nhận hồ sơ Quản lý bộ môn; Trưởng khoa và Phó
-    /// trưởng khoa cùng nhận hồ sơ Quản lý khoa. Luôn kèm hồ sơ Giảng viên làm mặc định.
+    /// Hồ sơ quản lý KHÔNG còn tự cấp theo chức vụ: vai trò do người quản trị tạo và gán
+    /// tay. Giảng viên giữ chức Trưởng bộ môn / Trưởng khoa chỉ nhận hồ sơ Giảng viên.
     /// </summary>
     [Theory]
-    [InlineData("Trưởng Bộ môn", RoleCodes.DepartmentManager, "BM")]
-    [InlineData("Phó Trưởng Bộ môn", RoleCodes.DepartmentManager, "BM")]
-    [InlineData("Trưởng khoa", RoleCodes.FacultyManager, "KV")]
-    [InlineData("Phó trưởng khoa", RoleCodes.FacultyManager, "KV")]
-    public async Task CreateLecturer_WithLeadershipPosition_ShouldCreateMatchingManagerProfile(
-        string positionName,
-        string expectedRoleCode,
-        string expectedProfileSuffix)
+    [InlineData("Trưởng Bộ môn")]
+    [InlineData("Phó trưởng khoa")]
+    public async Task CreateLecturer_WithLeadershipPosition_GetsOnlyLecturerProfile(string positionName)
     {
         await RunInRollbackAsync(async (db, service) =>
         {
-            // Tra chức vụ KHÔNG phân biệt hoa thường. Đây là danh mục do người dùng đặt tên,
-            // và chính production cũng nhận diện chức vụ bằng khoá bỏ dấu
-            // (EfCatalogService.IsDepartmentManagerPosition) chứ không so chuỗi thô.
-            // So khớp chặt như trước khiến test đỏ ở nơi danh mục ghi "Trưởng bộ môn".
             var positionId = await db.Positions
                 .Where(x => x.PositionName.ToLower() == positionName.ToLower())
-                .Select(x => x.PositionId)
-                .SingleAsync();
+                .Select(x => (int?)x.PositionId)
+                .FirstOrDefaultAsync();
+            if (positionId is null) return;
+
             var command = NewLecturer($"quanly-{Guid.NewGuid():N}@vimaru.edu.vn") with
             {
                 PositionId = positionId,
@@ -136,122 +129,44 @@ public class LecturerAccountProvisioningTests
             var result = await service.CreateLecturerAsync(command);
 
             result.Succeeded.Should().BeTrue();
-            var userId = await db.Users
-                .Where(x => x.LecturerId == result.Value!.LecturerId)
-                .Select(x => x.Id)
-                .SingleAsync();
-            var profiles = await (
-                from profile in db.UserProfiles
+            var codes = await (
+                from user in db.Users
+                join profile in db.UserProfiles on user.Id equals profile.UserId
                 join role in db.Roles on profile.RoleId equals role.Id
-                where profile.UserId == userId
-                select new { role.Code, profile.IsDefault, profile.ProfileCode })
+                where user.LecturerId == result.Value!.LecturerId
+                select role.Code)
                 .ToListAsync();
-
-            profiles.Select(x => x.Code).Should().BeEquivalentTo(
-                RoleCodes.Lecturer,
-                expectedRoleCode);
-            profiles.Single(x => x.Code == RoleCodes.Lecturer).IsDefault.Should().BeTrue();
-            profiles.Single(x => x.Code == expectedRoleCode).IsDefault.Should().BeFalse();
-            profiles.Single(x => x.Code == expectedRoleCode).ProfileCode.Should().EndWith(expectedProfileSuffix);
+            codes.Should().Equal(RoleCodes.Lecturer);
         });
     }
 
     [Fact]
-    public async Task ImportLecturers_ShouldCreateProfilesForEveryImportedLecturer()
+    public async Task ImportLecturers_ShouldCreateLecturerProfileForEveryImportedLecturer()
     {
         await RunInRollbackAsync(async (db, service) =>
         {
             var lecturerEmail = $"import-gv-{Guid.NewGuid():N}@vimaru.edu.vn";
             var managerEmail = $"import-bm-{Guid.NewGuid():N}@vimaru.edu.vn";
-            var facultyEmail = $"import-kv-{Guid.NewGuid():N}@vimaru.edu.vn";
             var rows = new[]
             {
                 new ImportLecturerRowCommand(2, "Giảng viên import", lecturerEmail, null, null, null, "Giảng viên"),
                 new ImportLecturerRowCommand(3, "Quản lý import", managerEmail, null, null, null, "Phó Trưởng Bộ môn"),
-                new ImportLecturerRowCommand(4, "Quản lý khoa import", facultyEmail, null, null, null, "Phó trưởng khoa"),
             };
 
             var result = await service.ImportLecturersAsync(rows);
 
             result.Succeeded.Should().BeTrue();
-            result.Value!.CreatedCount.Should().Be(3);
+            result.Value!.CreatedCount.Should().Be(2);
             var assignedRoles = await (
                 from user in db.Users
                 join profile in db.UserProfiles on user.Id equals profile.UserId
                 join role in db.Roles on profile.RoleId equals role.Id
-                where user.Email == lecturerEmail || user.Email == managerEmail || user.Email == facultyEmail
+                where user.Email == lecturerEmail || user.Email == managerEmail
                 select new { user.Email, role.Code, profile.IsDefault })
                 .ToListAsync();
 
-            assignedRoles.Where(x => x.Email == lecturerEmail)
-                .Select(x => x.Code)
-                .Should().Equal(RoleCodes.Lecturer);
-            assignedRoles.Where(x => x.Email == managerEmail)
-                .Select(x => x.Code)
-                .Should().BeEquivalentTo(RoleCodes.Lecturer, RoleCodes.DepartmentManager);
-            assignedRoles.Where(x => x.Email == facultyEmail)
-                .Select(x => x.Code)
-                .Should().BeEquivalentTo(RoleCodes.Lecturer, RoleCodes.FacultyManager);
-            assignedRoles.Single(x => x.Email == managerEmail && x.Code == RoleCodes.Lecturer)
-                .IsDefault.Should().BeTrue();
-        });
-    }
-
-    /// <summary>
-    /// Trưởng bộ môn và Phó bộ môn dùng chung một hồ sơ Quản lý bộ môn: đổi qua lại giữa
-    /// hai chức vụ thì vẫn đúng một hồ sơ đó, đang bật. Thôi giữ chức thì hồ sơ tắt đi.
-    /// </summary>
-    [Fact]
-    public async Task UpdateLecturer_BetweenDepartmentLeadershipPositions_KeepsOneManagerProfile()
-    {
-        await RunInRollbackAsync(async (db, service) =>
-        {
-            var managerPositionId = await db.Positions
-                .Where(x => x.PositionName.ToLower() == "trưởng bộ môn")
-                .Select(x => x.PositionId)
-                .SingleAsync();
-            var deputyPositionId = await db.Positions
-                .Where(x => x.PositionName.ToLower() == "phó trưởng bộ môn")
-                .Select(x => x.PositionId)
-                .SingleAsync();
-            var command = NewLecturer($"doichucvu-{Guid.NewGuid():N}@vimaru.edu.vn") with
-            {
-                PositionId = managerPositionId,
-            };
-            var created = await service.CreateLecturerAsync(command);
-
-            var toDeputy = await service.UpdateLecturerAsync(
-                created.Value!.LecturerId,
-                command with { PositionId = deputyPositionId });
-            toDeputy.Succeeded.Should().BeTrue();
-
-            var profiles = await (
-                from user in db.Users
-                join profile in db.UserProfiles on user.Id equals profile.UserId
-                join role in db.Roles on profile.RoleId equals role.Id
-                where user.LecturerId == created.Value.LecturerId
-                select new { role.Code, profile.IsActive, profile.ProfileName, profile.ProfileCode })
-                .ToListAsync();
-            profiles.Where(x => x.IsActive).Select(x => x.Code).Should().BeEquivalentTo(
-                RoleCodes.Lecturer,
-                RoleCodes.DepartmentManager);
-            var managerProfile = profiles.Single(x => x.Code == RoleCodes.DepartmentManager);
-            managerProfile.ProfileName.Should().Be("Quản lý bộ môn");
-            managerProfile.ProfileCode.Should().EndWith("BM");
-
-            var toLecturer = await service.UpdateLecturerAsync(
-                created.Value.LecturerId,
-                command with { PositionId = null });
-            toLecturer.Succeeded.Should().BeTrue();
-
-            var activeCodes = await (
-                from user in db.Users
-                join profile in db.UserProfiles on user.Id equals profile.UserId
-                join role in db.Roles on profile.RoleId equals role.Id
-                where user.LecturerId == created.Value.LecturerId && profile.IsActive
-                select role.Code)
-                .ToListAsync();
-            activeCodes.Should().Equal(RoleCodes.Lecturer);
+            assignedRoles.Select(x => (x.Email, x.Code, x.IsDefault)).Should().BeEquivalentTo(
+                [(lecturerEmail, RoleCodes.Lecturer, true), (managerEmail, RoleCodes.Lecturer, true)]);
         });
     }
 

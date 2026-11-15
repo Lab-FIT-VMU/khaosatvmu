@@ -6,11 +6,9 @@ public sealed record AnswerScaleOptionDto(
     int Value,
     string DisplayText);
 
-/// <summary><paramref name="ScaleKind"/> là 'Options' hoặc 'Text' (xem Domain.AnswerScaleKinds).</summary>
 public sealed record AnswerScaleDto(
     int AnswerScaleId,
     string AnswerScaleName,
-    string ScaleKind,
     IReadOnlyList<AnswerScaleOptionDto> Options);
 
 /// <summary>Một mục chia nhóm câu hỏi của bộ, vd "Nội dung đánh giá học phần".</summary>
@@ -27,12 +25,13 @@ public sealed record SurveyQuestionDto(
     /// <summary>Mục chứa câu này; mọi câu đều thuộc một mục, kể cả câu bẫy.</summary>
     int SectionId,
     string QuestionText,
-    int AnswerScaleId,
     int? AttentionCheckValue);
 
 public sealed record SurveyTemplateDto(
     int SurveyTemplateId,
     string TemplateName,
+    /// <summary>Thang trả lời dùng chung cho mọi câu của bộ.</summary>
+    int AnswerScaleId,
     DateTime CreatedAt,
     /// <summary>
     /// Xếp theo thứ tự hiển thị, tức theo vị trí câu đầu tiên của từng mục — mục
@@ -50,10 +49,8 @@ public sealed record SurveyTemplateDto(
 
 public sealed record SaveAnswerScaleOptionCommand(int Value, string DisplayText);
 
-/// <summary>Thang loại 'Text' không nhận mức nào; danh sách <paramref name="Options"/> phải rỗng.</summary>
 public sealed record SaveAnswerScaleCommand(
     string AnswerScaleName,
-    string ScaleKind,
     IReadOnlyList<SaveAnswerScaleOptionCommand> Options);
 
 /// <summary>
@@ -66,24 +63,23 @@ public sealed record SaveAnswerScaleCommand(
 public sealed record SaveSurveyQuestionSectionCommand(int? SectionId, string SectionName);
 
 /// <summary>
-/// Một câu hỏi kèm thang trả lời của riêng nó.
+/// Một câu hỏi. Câu không mang thang riêng — mọi câu dùng thang của bộ.
 /// <paramref name="AttentionCheckValue"/> khác null biến câu này thành câu bẫy độ
-/// tập trung: người trả lời phải chọn đúng mức đó thì phiếu mới hợp lệ. Chỉ đặt
-/// được trên câu thuộc thang 'Options' và phải là một mức có thật của thang đó.
+/// tập trung: người trả lời phải chọn đúng mức đó thì phiếu mới hợp lệ. Giá trị
+/// phải là một mức có thật của thang mà bộ đang dùng.
 /// <paramref name="SectionIndex"/> là chỉ số mục trong danh sách
 /// <see cref="SaveSurveyTemplateCommand.Sections"/> gửi kèm — dùng chỉ số chứ
 /// không dùng Id vì mục mới chưa có Id lúc gửi lên.
 /// </summary>
 public sealed record SaveSurveyQuestionCommand(
     string QuestionText,
-    int AnswerScaleId,
     int? AttentionCheckValue,
     int SectionIndex);
 
 /// <summary>
 /// Lưu cả bộ câu hỏi trong một lần: danh sách mục và danh sách câu hỏi đều được
-/// ghi đè theo đúng thứ tự gửi lên. Mỗi câu mang thang trả lời riêng nên một bộ
-/// trộn được nhiều loại thang.
+/// ghi đè theo đúng thứ tự gửi lên. <paramref name="AnswerScaleId"/> là thang dùng
+/// chung cho mọi câu của bộ.
 ///
 /// Các câu cùng một mục phải nằm liền nhau trong <paramref name="Questions"/>:
 /// tiêu đề mục hiện ra ngay trước câu đầu tiên của mục, nên mục bị cắt làm hai
@@ -91,6 +87,7 @@ public sealed record SaveSurveyQuestionCommand(
 /// </summary>
 public sealed record SaveSurveyTemplateCommand(
     string TemplateName,
+    int AnswerScaleId,
     IReadOnlyList<SaveSurveyQuestionSectionCommand> Sections,
     IReadOnlyList<SaveSurveyQuestionCommand> Questions);
 
@@ -199,7 +196,7 @@ public sealed record NormalizedSectionDto(
 public sealed record NormalizationQuestionSectionDto(
     int SectionId,
     string SectionName,
-    /// <summary>Số câu được chấm điểm của mục: không đếm câu bẫy và câu tự nhập.</summary>
+    /// <summary>Số câu được chấm điểm của mục: không đếm câu bẫy.</summary>
     int QuestionCount);
 
 /// <summary>Toàn bộ sheet chuẩn hoá điểm của một đợt khảo sát.</summary>
@@ -354,9 +351,7 @@ public sealed record ScopeAnalysisQuestionDto(
     decimal AverageScore,
     int TotalAnswers,
     IReadOnlyList<ScopeAnalysisOptionDto> OptionDistribution,
-    string ScaleKind,
-    string AnswerScaleName,
-    IReadOnlyList<string>? TextAnswers);
+    string AnswerScaleName);
 
 /// <summary>
 /// Kết quả chi tiết theo từng câu hỏi cho một khoa/viện, bộ môn hoặc học phần
@@ -673,8 +668,8 @@ public sealed record UnitReportSummaryDto(
 public sealed record UnitReportValueCountDto(int Value, string DisplayText, int Count);
 
 /// <summary>
-/// Một câu của bộ câu hỏi. Chỉ câu thang mức chọn và không phải câu bẫy mới có điểm
-/// (<see cref="IsScored"/>); câu tự nhập và câu bẫy vẫn liệt kê để giữ đúng số thứ tự.
+/// Một câu của bộ câu hỏi. Câu bẫy không có điểm (<see cref="IsScored"/>) nhưng vẫn
+/// liệt kê để giữ đúng số thứ tự.
 /// Điểm câu tính trên phiếu hợp lệ của các đơn vị được tính điểm, mỗi lượt trả lời nặng
 /// như nhau.
 /// </summary>
@@ -875,7 +870,6 @@ public sealed record SaveSurveyScheduleCommand(DateTime StartTime, DateTime EndT
 public sealed record PublicSurveyQuestionDto(
     int QuestionId,
     string QuestionText,
-    int AnswerScaleId,
     /// <summary>Mục chứa câu này, để phiếu hiện tiêu đề mục trước câu đầu tiên của mục.</summary>
     int SectionId);
 
@@ -884,8 +878,8 @@ public sealed record PublicSurveySectionDto(int SectionId, string SectionName);
 
 /// <summary>
 /// Dữ liệu phiếu khảo sát mà sinh viên thấy khi mở link hoặc quét QR.
-/// <paramref name="AnswerScales"/> là các thang mà bộ câu hỏi đang dùng; mỗi câu
-/// trong <paramref name="Questions"/> trỏ tới một thang qua "AnswerScaleId".
+/// <paramref name="AnswerScale"/> là thang của bộ câu hỏi, dùng chung cho mọi câu
+/// trong <paramref name="Questions"/>.
 /// </summary>
 public sealed record PublicSurveyDto(
     string LinkToken,
@@ -900,7 +894,8 @@ public sealed record PublicSurveyDto(
     DateTime StartTime,
     DateTime EndTime,
     bool IsOpen,
-    IReadOnlyList<AnswerScaleDto> AnswerScales,
+    /// <summary>Thang của bộ câu hỏi; null khi phiếu bị chặn (đã cắt hết câu hỏi).</summary>
+    AnswerScaleDto? AnswerScale,
     IReadOnlyList<PublicSurveySectionDto> Sections,
     IReadOnlyList<PublicSurveyQuestionDto> Questions,
     /// <summary>
@@ -961,8 +956,8 @@ public sealed record SurveyUnitDto(
     int OpenCommentCount);
 
 /// <summary>
-/// <paramref name="AnswerValue"/> là số mức đã chọn ("1".."5") với câu thang
-/// 'Options', hoặc nội dung tự nhập với câu thang 'Text'.
+/// <paramref name="AnswerValue"/> là số mức đã chọn ("1".."5") của thang mà bộ câu
+/// hỏi đang dùng.
 /// </summary>
 public sealed record SubmitSurveyAnswerCommand(int QuestionId, string AnswerValue);
 
@@ -977,7 +972,7 @@ public sealed record SubmitSurveyResponseCommand(
 
 public sealed record SubmitSurveyResponseDto(int ResponseId, decimal Score, DateTime SubmittedAt);
 
-/// <summary>Số câu đã chọn ở một mức trả lời trong cùng một phiếu (chỉ câu thang 'Options').</summary>
+/// <summary>Số câu đã chọn ở một mức trả lời trong cùng một phiếu.</summary>
 public sealed record SurveyResponseValueCountDto(int Value, string DisplayText, int Count);
 
 /// <summary>
@@ -997,15 +992,12 @@ public sealed record SurveyResponseSummaryDto(
     string? RejectionReasons);
 
 /// <summary>
-/// Một câu trong phiếu đã nộp. <paramref name="SelectedValue"/> chỉ có giá trị khi
-/// câu thuộc thang 'Options'; câu thang 'Text' để null và đọc ở
-/// <paramref name="AnswerValue"/>.
+/// Một câu trong phiếu đã nộp. <paramref name="SelectedValue"/> là mức đã chọn; null
+/// khi "AnswerValue" không đọc ra được số (câu chưa trả lời hoặc dữ liệu cũ).
 /// </summary>
 public sealed record SurveyResponseAnswerDto(
     int QuestionId,
     string QuestionText,
-    int AnswerScaleId,
-    string ScaleKind,
     string AnswerValue,
     int? SelectedValue,
     string SelectedText);
@@ -1022,7 +1014,8 @@ public sealed record SurveyResponseDetailDto(
     string CourseName,
     string SectionName,
     string LecturerName,
-    IReadOnlyList<AnswerScaleDto> AnswerScales,
+    /// <summary>Thang của bộ câu hỏi; null khi không còn đọc được bộ hay thang.</summary>
+    AnswerScaleDto? AnswerScale,
     IReadOnlyList<SurveyResponseAnswerDto> Answers);
 
 public sealed record SurveyOperationResult<T>(bool Succeeded, string? ErrorCode, T? Value);
@@ -1037,9 +1030,6 @@ public static class SurveyRules
 
     /// <summary>Số mức tối đa của một thang: "AnswerScaleOptions"."Value" CHECK 1..5.</summary>
     public const int MaximumAnswerScaleOptions = 5;
-
-    /// <summary>Độ dài tối đa của câu trả lời tự nhập ("SurveyResponseAnswers"."AnswerValue").</summary>
-    public const int MaximumTextAnswerLength = 2000;
 }
 
 public interface ISurveyService
@@ -1291,13 +1281,6 @@ public static class SurveyErrorCodes
     public const string AnswerScaleOptionsInvalid = "SURVEY_ANSWER_SCALE_OPTIONS_INVALID";
     public const string AnswerScaleOptionTextRequired = "SURVEY_ANSWER_SCALE_OPTION_TEXT_REQUIRED";
     public const string AnswerScaleInUse = "SURVEY_ANSWER_SCALE_IN_USE";
-    public const string AnswerScaleKindInvalid = "SURVEY_ANSWER_SCALE_KIND_INVALID";
-
-    /// <summary>Thang loại 'Text' không được có mức trả lời nào.</summary>
-    public const string AnswerScaleTextHasOptions = "SURVEY_ANSWER_SCALE_TEXT_HAS_OPTIONS";
-
-    /// <summary>Không cho đổi loại thang khi đã có câu hỏi dùng nó.</summary>
-    public const string AnswerScaleKindLocked = "SURVEY_ANSWER_SCALE_KIND_LOCKED";
 
     public const string TemplateNotFound = "SURVEY_TEMPLATE_NOT_FOUND";
     public const string TemplateNameRequired = "SURVEY_TEMPLATE_NAME_REQUIRED";
@@ -1329,11 +1312,8 @@ public static class SurveyErrorCodes
     /// <summary>Các câu cùng một mục không nằm liền nhau nên mục bị cắt làm nhiều khúc.</summary>
     public const string SectionQuestionsNotContiguous = "SURVEY_SECTION_QUESTIONS_NOT_CONTIGUOUS";
 
-    /// <summary>Câu hỏi trỏ tới một "AnswerScaleId" không tồn tại.</summary>
-    public const string QuestionScaleNotFound = "SURVEY_QUESTION_SCALE_NOT_FOUND";
-
-    /// <summary>Đặt câu bẫy trên câu dùng thang tự nhập chữ, không có mức nào để chọn.</summary>
-    public const string AttentionCheckOnTextScale = "SURVEY_ATTENTION_CHECK_ON_TEXT_SCALE";
+    /// <summary>Bộ câu hỏi chưa chọn thang, hoặc "AnswerScaleId" gửi lên không tồn tại.</summary>
+    public const string TemplateScaleNotFound = "SURVEY_TEMPLATE_SCALE_NOT_FOUND";
 
     /// <summary>Mức bắt buộc của câu bẫy không phải là một mức có thật của thang đó.</summary>
     public const string AttentionCheckValueInvalid = "SURVEY_ATTENTION_CHECK_VALUE_INVALID";
@@ -1433,9 +1413,6 @@ public static class SurveyErrorCodes
     public const string ClassFull = "SURVEY_CLASS_FULL";
     public const string AnswersIncomplete = "SURVEY_ANSWERS_INCOMPLETE";
     public const string AnswerValueInvalid = "SURVEY_ANSWER_VALUE_INVALID";
-
-    /// <summary>Câu trả lời tự nhập vượt <see cref="SurveyRules.MaximumTextAnswerLength"/> ký tự.</summary>
-    public const string AnswerTextTooLong = "SURVEY_ANSWER_TEXT_TOO_LONG";
 
     public const string ScopeTypeInvalid = "SURVEY_SCOPE_TYPE_INVALID";
     public const string ScopeNotFound = "SURVEY_SCOPE_NOT_FOUND";

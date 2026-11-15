@@ -75,17 +75,9 @@ namespace Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("ScaleKind")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.HasKey("AnswerScaleId");
 
-                    b.ToTable("AnswerScales", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_AnswerScales_ScaleKind", "\"ScaleKind\" IN ('Options', 'Text')");
-                        });
+                    b.ToTable("AnswerScales", (string)null);
                 });
 
             modelBuilder.Entity("Domain.AnswerScaleOption", b =>
@@ -1846,10 +1838,18 @@ namespace Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("CanWrite")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DataScope")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1869,12 +1869,30 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("ProfileCodeSuffix")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("Roles", (string)null);
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasFilter("NOT \"IsDeleted\"");
+
+                    b.HasIndex("ProfileCodeSuffix")
+                        .IsUnique()
+                        .HasFilter("NOT \"IsDeleted\"");
+
+                    b.ToTable("Roles", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Roles_DataScope", "\"DataScope\" IN ('ALL', 'FACULTY', 'DEPARTMENT', 'OWN')");
+
+                            t.HasCheckConstraint("CK_Roles_OwnScopeReadOnly", "\"DataScope\" <> 'OWN' OR NOT \"CanWrite\"");
+                        });
                 });
 
             modelBuilder.Entity("Domain.RolePermission", b =>
@@ -1993,68 +2011,6 @@ namespace Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Domain.Student", b =>
-                {
-                    b.Property<long>("StudentId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("StudentId"));
-
-                    b.Property<int?>("CohortMajorId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly?>("DateOfBirth")
-                        .HasColumnType("date");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)");
-
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("Gender")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)");
-
-                    b.Property<string>("StudentCode")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<string>("StudyStatus")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("StudentId");
-
-                    b.HasIndex("CohortMajorId");
-
-                    b.HasIndex("StudentCode")
-                        .IsUnique();
-
-                    b.ToTable("Students", (string)null);
-                });
-
             modelBuilder.Entity("Domain.StudentCourseGrade", b =>
                 {
                     b.Property<long>("StudentCourseGradeId")
@@ -2126,7 +2082,16 @@ namespace Infrastructure.Persistence.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
-                    b.Property<long>("StudentId")
+                    b.Property<string>("StudentCode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("StudentName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("StudentNumber")
                         .HasColumnType("bigint");
 
                     b.Property<string>("TermText")
@@ -2146,13 +2111,14 @@ namespace Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CourseSectionId");
 
-                    b.HasIndex("StudentId");
-
                     b.HasIndex("SemesterId", "CourseSectionId");
 
-                    b.HasIndex("SemesterId", "StudentId");
+                    b.HasIndex("RevisionId", "CourseSectionId", "StudentCode")
+                        .IsUnique()
+                        .HasDatabaseName("UX_StudentCourseGrades_Revision_Section_Student_Usable")
+                        .HasFilter("\"ExclusionRule\" IS NULL AND \"CourseSectionId\" IS NOT NULL");
 
-                    b.HasIndex("RevisionId", "StudentId", "CourseCode")
+                    b.HasIndex("RevisionId", "StudentNumber", "CourseCode")
                         .IsUnique()
                         .HasDatabaseName("UX_StudentCourseGrades_Revision_Student_Course_Usable")
                         .HasFilter("\"ExclusionRule\" IS NULL");
@@ -2167,9 +2133,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("QuestionId"));
-
-                    b.Property<int>("AnswerScaleId")
-                        .HasColumnType("integer");
 
                     b.Property<int?>("AttentionCheckValue")
                         .HasColumnType("integer");
@@ -2188,8 +2151,6 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("QuestionId");
-
-                    b.HasIndex("AnswerScaleId");
 
                     b.HasIndex("SectionId");
 
@@ -2391,6 +2352,9 @@ namespace Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("SurveyTemplateId"));
 
+                    b.Property<int>("AnswerScaleId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2405,6 +2369,8 @@ namespace Infrastructure.Persistence.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("SurveyTemplateId");
+
+                    b.HasIndex("AnswerScaleId");
 
                     b.ToTable("SurveyTemplates", (string)null);
                 });
@@ -2974,14 +2940,6 @@ namespace Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Domain.Student", b =>
-                {
-                    b.HasOne("Domain.CohortMajor", null)
-                        .WithMany()
-                        .HasForeignKey("CohortMajorId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
             modelBuilder.Entity("Domain.StudentCourseGrade", b =>
                 {
                     b.HasOne("Domain.CourseSection", null)
@@ -3000,22 +2958,10 @@ namespace Infrastructure.Persistence.Migrations
                         .HasForeignKey("SemesterId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("Domain.Student", null)
-                        .WithMany()
-                        .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.SurveyQuestion", b =>
                 {
-                    b.HasOne("Domain.AnswerScale", null)
-                        .WithMany()
-                        .HasForeignKey("AnswerScaleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("Domain.SurveyQuestionSection", null)
                         .WithMany()
                         .HasForeignKey("SectionId")
@@ -3056,6 +3002,15 @@ namespace Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("SurveyResponse");
+                });
+
+            modelBuilder.Entity("Domain.SurveyTemplate", b =>
+                {
+                    b.HasOne("Domain.AnswerScale", null)
+                        .WithMany()
+                        .HasForeignKey("AnswerScaleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.User", b =>

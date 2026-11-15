@@ -1,5 +1,4 @@
 using Application.Surveys;
-using Domain;
 using FluentAssertions;
 using Xunit;
 
@@ -8,13 +7,10 @@ namespace UnitTests.ApplicationTests;
 public class ResponseFilterTests
 {
     private static FilterQuestion Scored(int id) =>
-        new(id, AnswerScaleKinds.Options, null);
-
-    private static FilterQuestion Text(int id) =>
-        new(id, AnswerScaleKinds.Text, null);
+        new(id, null);
 
     private static FilterQuestion Trap(int id, int required) =>
-        new(id, AnswerScaleKinds.Options, required);
+        new(id, required);
 
     /// <summary>Đủ lâu để không dính TOO_FAST với số câu cho trước.</summary>
     private static double SlowEnough(int questionCount) =>
@@ -77,14 +73,14 @@ public class ResponseFilterTests
     }
 
     [Fact]
-    public void CauTuNhapVaCauBay_VanTinhVaoNguongThoiGian()
+    public void CauBay_VanTinhVaoNguongThoiGian()
     {
-        // 1 câu chấm điểm + 1 câu tự nhập + 1 câu bẫy = 3 câu, ngưỡng 4.5 giây.
-        var questions = new[] { Scored(1), Text(2), Trap(3, 3) };
+        // 2 câu chấm điểm + 1 câu bẫy = 3 câu, ngưỡng 4.5 giây.
+        var questions = new[] { Scored(1), Scored(2), Trap(3, 3) };
         var answers = new[]
         {
             new FilterAnswer(1, "5"),
-            new FilterAnswer(2, "góp ý gì đó"),
+            new FilterAnswer(2, "4"),
             new FilterAnswer(3, "3"),
         };
 
@@ -114,29 +110,12 @@ public class ResponseFilterTests
     [Fact]
     public void ChiMotCauChamDiem_ThiKhongXetSingleAnswer()
     {
-        var questions = new[] { Scored(1), Text(2) };
-        var answers = new[] { new FilterAnswer(1, "5"), new FilterAnswer(2, "abc") };
+        var questions = new[] { Scored(1), Trap(2, 3) };
+        var answers = new[] { new FilterAnswer(1, "5"), new FilterAnswer(2, "3") };
 
         var result = ResponseFilter.Evaluate(questions, answers, SlowEnough(2));
 
         result.IsValid.Should().BeTrue();
-    }
-
-    [Fact]
-    public void CauTuNhap_KhongLamHongPhepKiemSingleAnswer()
-    {
-        // Nội dung chữ khác hẳn "5" nhưng không được coi là một giá trị khác mức.
-        var questions = new[] { Scored(1), Scored(2), Text(3) };
-        var answers = new[]
-        {
-            new FilterAnswer(1, "5"),
-            new FilterAnswer(2, "5"),
-            new FilterAnswer(3, "giảng viên dạy tốt"),
-        };
-
-        var result = ResponseFilter.Evaluate(questions, answers, SlowEnough(3));
-
-        result.RejectionReasons.Should().Be(RejectionReasonCodes.SingleAnswer);
     }
 
     [Fact]

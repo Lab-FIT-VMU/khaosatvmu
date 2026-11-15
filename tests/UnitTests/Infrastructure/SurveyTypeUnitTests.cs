@@ -139,9 +139,15 @@ public class SurveyTypeUnitTests
         };
         db.CohortMajors.AddRange(cohortMajorA, cohortMajorB);
 
-        var scale = new AnswerScale { AnswerScaleName = $"Thang {suffix}", ScaleKind = AnswerScaleKinds.Options };
+        var scale = new AnswerScale { AnswerScaleName = $"Thang {suffix}" };
         db.AnswerScales.Add(scale);
-        var template = new SurveyTemplate { TemplateName = $"Bộ {suffix}", CreatedAt = DateTime.UtcNow };
+        await db.SaveChangesAsync();
+        var template = new SurveyTemplate
+        {
+            TemplateName = $"Bộ {suffix}",
+            AnswerScaleId = scale.AnswerScaleId,
+            CreatedAt = DateTime.UtcNow,
+        };
         db.SurveyTemplates.Add(template);
         await db.SaveChangesAsync();
 
@@ -159,7 +165,6 @@ public class SurveyTypeUnitTests
         {
             SectionId = section.SectionId,
             QuestionText = "Câu 1",
-            AnswerScaleId = scale.AnswerScaleId,
         };
         db.SurveyQuestions.Add(question);
         await db.SaveChangesAsync();

@@ -597,11 +597,10 @@ public static class SurveyEndpoints
             SurveyErrorCodes.LecturerHasNoSections => StatusCodes.Status404NotFound,
             SurveyErrorCodes.ResponseNotFound => StatusCodes.Status404NotFound,
             SurveyErrorCodes.LinkNotFound => StatusCodes.Status404NotFound,
-            SurveyErrorCodes.QuestionScaleNotFound => StatusCodes.Status404NotFound,
+            SurveyErrorCodes.TemplateScaleNotFound => StatusCodes.Status404NotFound,
             SurveyErrorCodes.AnswerScaleNameExists => StatusCodes.Status409Conflict,
             SurveyErrorCodes.TemplateNameExists => StatusCodes.Status409Conflict,
             SurveyErrorCodes.AnswerScaleInUse => StatusCodes.Status409Conflict,
-            SurveyErrorCodes.AnswerScaleKindLocked => StatusCodes.Status409Conflict,
             SurveyErrorCodes.TemplateInUse => StatusCodes.Status409Conflict,
             SurveyErrorCodes.SemesterSurveyHasResponses => StatusCodes.Status409Conflict,
             SurveyErrorCodes.ScopeSectionsAlreadyAdded => StatusCodes.Status409Conflict,
@@ -631,13 +630,10 @@ public static class SurveyEndpoints
 
     public sealed record SaveAnswerScaleRequest(
         string AnswerScaleName,
-        string? ScaleKind,
         IReadOnlyList<SaveAnswerScaleOptionRequest>? Options)
     {
         public SaveAnswerScaleCommand ToCommand() => new(
             AnswerScaleName,
-            // Bỏ trống thì hiểu là thang có mức chọn, giữ tương thích với client cũ.
-            string.IsNullOrWhiteSpace(ScaleKind) ? AnswerScaleKinds.Options : ScaleKind,
             Options?
                 .Select(x => new SaveAnswerScaleOptionCommand(x.Value, x.DisplayText ?? string.Empty))
                 .ToList() ?? []);
@@ -658,17 +654,19 @@ public static class SurveyEndpoints
     /// </summary>
     public sealed record SaveSurveyQuestionRequest(
         string? QuestionText,
-        int AnswerScaleId,
         int? AttentionCheckValue,
         int SectionIndex);
 
+    /// <summary><paramref name="AnswerScaleId"/> là thang dùng chung cho mọi câu của bộ.</summary>
     public sealed record SaveSurveyTemplateRequest(
         string TemplateName,
+        int AnswerScaleId,
         IReadOnlyList<SaveSurveyQuestionSectionRequest>? Sections,
         IReadOnlyList<SaveSurveyQuestionRequest>? Questions)
     {
         public SaveSurveyTemplateCommand ToCommand() => new(
             TemplateName,
+            AnswerScaleId,
             Sections?
                 .Select(x => new SaveSurveyQuestionSectionCommand(
                     x.SectionId,
@@ -677,7 +675,6 @@ public static class SurveyEndpoints
             Questions?
                 .Select(x => new SaveSurveyQuestionCommand(
                     x.QuestionText ?? string.Empty,
-                    x.AnswerScaleId,
                     x.AttentionCheckValue,
                     x.SectionIndex))
                 .ToList() ?? []);

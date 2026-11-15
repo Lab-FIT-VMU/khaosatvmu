@@ -20,7 +20,7 @@ public class AesGcmGradeCipherTests
         }));
 
     private static GradeCellContext Context(string column = GradeCellColumns.Z, int row = 7) =>
-        new(RevisionId: 12, StudentId: 345, CourseCode: "17540", SourceRowNumber: row, Column: column);
+        new(RevisionId: 12, StudentNumber: 345, CourseCode: "17540", SourceRowNumber: row, Column: column);
 
     [Theory]
     [InlineData("6.3")]

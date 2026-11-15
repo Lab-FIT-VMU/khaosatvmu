@@ -1,13 +1,13 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { CircleAlert, Download, FileSpreadsheet, LoaderCircle, Upload } from 'lucide-react';
 import {
+  attentionCheckOf,
   downloadSurveyTemplateFailedRows,
   downloadSurveyTemplateImportTemplate,
   parseSurveyTemplateImportFile,
   SurveyTemplateImportFileError,
   type ImportSurveyQuestionRow,
   type InvalidAttentionCheckRow,
-  type InvalidScaleCodeRow,
   type InvalidSectionRow,
   type SurveyTemplateImportFileErrorCode,
 } from '../utils/surveyTemplateImportExcel';
@@ -32,7 +32,6 @@ const fileErrorMessages: Record<SurveyTemplateImportFileErrorCode, string> = {
   FILE_EMPTY: 'Tệp Excel không có dữ liệu.',
   SECTION_HEADER_MISSING: 'Không tìm thấy cột "Mục" trong hàng tiêu đề.',
   QUESTION_HEADER_MISSING: 'Không tìm thấy cột "Câu hỏi" trong hàng tiêu đề.',
-  SCALE_HEADER_MISSING: 'Không tìm thấy cột "Mã thang trả lời" trong hàng tiêu đề.',
   NO_DATA_ROWS: 'Tệp Excel chưa có câu hỏi nào.',
   TOO_MANY_SECTIONS: `Mỗi bộ câu hỏi chỉ được tối đa ${maximumSectionsPerTemplate} mục.`,
   READ_FAILED: 'Không thể đọc tệp Excel. Hãy kiểm tra tệp không bị hỏng hoặc đặt mật khẩu.',
@@ -47,16 +46,34 @@ export function SurveyTemplateImportDialog({
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [templateName, setTemplateName] = useState('');
+  /** Thang của cả bộ. Chuỗi rỗng là chưa chọn; hệ thống chỉ có một thang thì lấy luôn. */
+  const [chosenScaleId, setChosenScaleId] = useState('');
   const [fileName, setFileName] = useState('');
   const [sections, setSections] = useState<string[]>([]);
   const [rows, setRows] = useState<ImportSurveyQuestionRow[]>([]);
   const [invalidSectionRows, setInvalidSectionRows] = useState<InvalidSectionRow[]>([]);
-  const [invalidScaleRows, setInvalidScaleRows] = useState<InvalidScaleCodeRow[]>([]);
-  const [invalidTrapRows, setInvalidTrapRows] = useState<InvalidAttentionCheckRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const answerScaleId =
+    chosenScaleId || (answerScales.length === 1 ? String(answerScales[0].answerScaleId) : '');
+  const scale = answerScales.find((item) => String(item.answerScaleId) === answerScaleId);
+
+  // Đối chiếu lại mỗi khi đổi thang: cùng một tệp, đổi sang thang Có/Không là câu bẫy
+  // "chọn mức 3" thành sai ngay.
+  const invalidTrapRows = useMemo<InvalidAttentionCheckRow[]>(
+    () =>
+      rows
+        .filter((row) => attentionCheckOf(row, scale) === undefined)
+        .map((row) => ({
+          rowNumber: row.rowNumber,
+          questionText: row.questionText,
+          rawValue: row.rawAttention,
+        })),
+    [rows, scale]
+  );
 
   const resetFile = () => {
     if (inputRef.current) inputRef.current.value = '';
@@ -64,8 +81,6 @@ export function SurveyTemplateImportDialog({
     setSections([]);
     setRows([]);
     setInvalidSectionRows([]);
-    setInvalidScaleRows([]);
-    setInvalidTrapRows([]);
     setParseError(null);
     setFormError(null);
   };
@@ -74,6 +89,7 @@ export function SurveyTemplateImportDialog({
     if (parsing || saving) return;
     resetFile();
     setTemplateName('');
+    setChosenScaleId('');
     onClose();
   };
 
@@ -84,12 +100,10 @@ export function SurveyTemplateImportDialog({
     setFileName(file.name);
     setParsing(true);
     try {
-      const result = await parseSurveyTemplateImportFile(file, answerScales);
+      const result = await parseSurveyTemplateImportFile(file);
       setSections(result.sections);
       setRows(result.rows);
       setInvalidSectionRows(result.invalidSectionRows);
-      setInvalidScaleRows(result.invalidScaleRows);
-      setInvalidTrapRows(result.invalidAttentionCheckRows);
       // Chưa đặt tên bộ thì lấy tạm tên tệp cho đỡ phải gõ lại.
       if (!templateName.trim()) setTemplateName(file.name.replace(/\.xlsx$/i, ''));
     } catch (error) {
@@ -104,36 +118,27 @@ export function SurveyTemplateImportDialog({
   };
 
   /**
-   * Ba loại lỗi của một tệp bộ câu hỏi gộp chung vào một tệp xuất ra: người sửa
-   * chỉ cần mở đúng một tệp thay vì đối chiếu ba bảng trên màn hình.
+   * Hai loại lỗi của một tệp bộ câu hỏi gộp chung vào một tệp xuất ra: người sửa
+   * chỉ cần mở đúng một tệp thay vì đối chiếu hai bảng trên màn hình.
    */
   const exportFailedRows = () =>
     downloadSurveyTemplateFailedRows([
       ...invalidSectionRows.map((row) => ({
         rowNumber: row.rowNumber,
-        values: [row.sectionName, row.questionText, '', ''],
+        values: [row.sectionName, row.questionText, ''],
         reason:
           row.reason === 'MISSING'
             ? 'Chưa điền tên mục (nếu đang gộp ô cột Mục thì bỏ gộp và lặp lại tên mục ở từng dòng)'
             : 'Mục này đã kết thúc ở phía trên; gom các câu cùng mục lại liền nhau',
       })),
-      ...invalidScaleRows.map((row) => ({
-        rowNumber: row.rowNumber,
-        values: ['', row.questionText, row.rawCode, ''],
-        reason: 'Mã thang trả lời không có trong hệ thống',
-      })),
       ...invalidTrapRows.map((row) => ({
         rowNumber: row.rowNumber,
-        values: ['', row.questionText, '', row.rawValue],
-        reason:
-          row.reason === 'TEXT_SCALE'
-            ? 'Câu này dùng thang tự nhập chữ, không có mức nào để chọn'
-            : 'Mức này không có trong thang trả lời của câu',
+        values: ['', row.questionText, row.rawValue],
+        reason: `Mức này không có trong thang "${scale?.answerScaleName ?? ''}" của bộ`,
       })),
     ].sort((left, right) => left.rowNumber - right.rowNumber));
 
-  const failedRowCount =
-    invalidSectionRows.length + invalidScaleRows.length + invalidTrapRows.length;
+  const failedRowCount = invalidSectionRows.length + invalidTrapRows.length;
 
   const handleImport = async () => {
     if (rows.length === 0) return;
@@ -141,29 +146,31 @@ export function SurveyTemplateImportDialog({
       setFormError('Vui lòng nhập tên bộ câu hỏi.');
       return;
     }
+    if (!scale) {
+      setFormError('Vui lòng chọn thang trả lời cho bộ câu hỏi.');
+      return;
+    }
     // Bỏ qua một phần câu hỏi thì bộ sẽ thiếu, bắt sửa tệp rồi tải lại.
     if (invalidSectionRows.length > 0) {
       setFormError('Vui lòng sửa các dòng có vấn đề ở cột Mục rồi chọn lại tệp.');
       return;
     }
-    if (invalidScaleRows.length > 0) {
-      setFormError('Vui lòng sửa các dòng có mã thang trả lời sai rồi chọn lại tệp.');
-      return;
-    }
     if (invalidTrapRows.length > 0) {
-      setFormError('Vui lòng sửa các dòng có mức bắt buộc của câu bẫy không hợp lệ rồi chọn lại tệp.');
+      setFormError(
+        'Mức bắt buộc của một số câu bẫy không có trong thang đã chọn: đổi thang, hoặc sửa tệp rồi chọn lại.'
+      );
       return;
     }
 
     setSaving(true);
     const message = await onImport({
       templateName: templateName.trim(),
+      answerScaleId: scale.answerScaleId,
       // Bộ mới hoàn toàn nên mọi mục đều chưa có mã.
       sections: sections.map((sectionName) => ({ sectionId: null, sectionName })),
       questions: rows.map((row) => ({
         questionText: row.questionText,
-        answerScaleId: row.answerScaleId,
-        attentionCheckValue: row.attentionCheckValue,
+        attentionCheckValue: attentionCheckOf(row, scale) ?? null,
         sectionIndex: row.sectionIndex,
       })),
     });
@@ -182,9 +189,9 @@ export function SurveyTemplateImportDialog({
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
           <p>
-            Hàng đầu tiên cần có cột <strong>Mục</strong>, <strong>Câu hỏi</strong> và{' '}
-            <strong>Mã thang trả lời</strong>; thêm cột{' '}
-            <strong>Đáp án bắt buộc phải chọn</strong> nếu bộ có câu bẫy. Cột Mục phải điền ở{' '}
+            Hàng đầu tiên cần có cột <strong>Mục</strong> và <strong>Câu hỏi</strong>; thêm cột{' '}
+            <strong>Đáp án bắt buộc phải chọn</strong> nếu bộ có câu bẫy. Thang trả lời chọn một
+            lần cho cả bộ ở ô bên dưới, tệp không cần cột thang. Cột Mục phải điền ở{' '}
             <strong>mọi dòng, kể cả dòng câu bẫy</strong> — lặp lại tên mục chứ{' '}
             <strong>không gộp ô</strong>, vì ô gộp chỉ đọc ra được dòng trên cùng. Các câu cùng
             một mục phải nằm liền nhau. Tối đa {maximumSectionsPerTemplate} mục, số câu không
@@ -194,14 +201,14 @@ export function SurveyTemplateImportDialog({
 
         <div className="import-template-row">
           <span>
-            Tệp mẫu có sheet <strong>Danh sách thang trả lời</strong> liệt kê mã và các đáp án của
-            từng thang đang dùng.
+            Tệp mẫu có sheet <strong>Danh sách thang trả lời</strong> liệt kê các đáp án của từng
+            thang, để biết điền mức nào cho câu bẫy.
           </span>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
             disabled={answerScales.length === 0}
-            onClick={() => void downloadSurveyTemplateImportTemplate(answerScales)}
+            onClick={() => void downloadSurveyTemplateImportTemplate(answerScales, scale)}
           >
             <Download aria-hidden="true" />
             Tải file mẫu
@@ -215,39 +222,6 @@ export function SurveyTemplateImportDialog({
           </div>
         )}
 
-        {answerScales.length > 0 && (
-          <section className="admin-import-preview" aria-label="Mã thang trả lời của hệ thống">
-            <header>
-              <strong>Mã thang trả lời đang dùng</strong>
-              <span>Điền đúng mã này vào cột "Mã thang trả lời"</span>
-            </header>
-            <div className="admin-import-table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Mã</th>
-                    <th>Thang trả lời</th>
-                    <th>Loại</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {answerScales.map((scale) => (
-                    <tr key={scale.answerScaleId}>
-                      <td style={{ textAlign: 'right' }}>{scale.answerScaleId}</td>
-                      <td>{scale.answerScaleName}</td>
-                      <td>
-                        {scale.scaleKind === 'Text'
-                          ? 'Tự nhập chữ'
-                          : `${scale.options.length} mức chọn`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
         <div className="survey-template-import-fields">
           <div className="form-group">
             <label htmlFor={`${inputId}-name`}>Tên bộ câu hỏi</label>
@@ -259,6 +233,35 @@ export function SurveyTemplateImportDialog({
               onChange={(event) => setTemplateName(event.target.value)}
               required
             />
+          </div>
+          <div className="form-group">
+            <label htmlFor={`${inputId}-scale`}>Thang trả lời</label>
+            <select
+              id={`${inputId}-scale`}
+              value={answerScaleId}
+              onChange={(event) => {
+                setChosenScaleId(event.target.value);
+                setFormError(null);
+              }}
+              disabled={answerScales.length === 0 || saving}
+              required
+            >
+              <option value="">Chọn thang trả lời</option>
+              {answerScales.map((item) => (
+                <option key={item.answerScaleId} value={String(item.answerScaleId)}>
+                  {item.answerScaleName}
+                </option>
+              ))}
+            </select>
+            {scale && (
+              <small className="survey-template-import-scale-levels">
+                {scale.options
+                  .slice()
+                  .sort((left, right) => left.value - right.value)
+                  .map((option) => `${option.value}. ${option.displayText}`)
+                  .join(' · ')}
+              </small>
+            )}
           </div>
         </div>
 
@@ -337,40 +340,15 @@ export function SurveyTemplateImportDialog({
           </section>
         )}
 
-        {invalidScaleRows.length > 0 && (
-          <section className="admin-import-preview" aria-label="Dòng có mã thang trả lời sai">
-            <header>
-              <strong>{invalidScaleRows.length} dòng có mã thang trả lời sai</strong>
-              <span>Sửa lại tệp rồi chọn lại</span>
-            </header>
-            <div className="admin-import-table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Dòng</th>
-                    <th>Nội dung câu hỏi</th>
-                    <th>Mã đã điền</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invalidScaleRows.map((row) => (
-                    <tr key={row.rowNumber}>
-                      <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
-                      <td>{row.questionText}</td>
-                      <td>{row.rawCode || '(trống)'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
-
         {invalidTrapRows.length > 0 && (
           <section className="admin-import-preview" aria-label="Dòng có câu bẫy không hợp lệ">
             <header>
               <strong>{invalidTrapRows.length} dòng có mức bắt buộc không hợp lệ</strong>
-              <span>Sửa lại tệp rồi chọn lại</span>
+              <span>
+                {scale
+                  ? `Mức không có trong thang "${scale.answerScaleName}" — đổi thang hoặc sửa tệp`
+                  : 'Chọn thang trả lời cho bộ để kiểm mức câu bẫy'}
+              </span>
             </header>
             <div className="admin-import-table-scroll">
               <table>
@@ -379,7 +357,6 @@ export function SurveyTemplateImportDialog({
                     <th>Dòng</th>
                     <th>Nội dung câu hỏi</th>
                     <th>Mức đã điền</th>
-                    <th>Lý do</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -388,11 +365,6 @@ export function SurveyTemplateImportDialog({
                       <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                       <td>{row.questionText}</td>
                       <td>{row.rawValue || '(trống)'}</td>
-                      <td>
-                        {row.reason === 'TEXT_SCALE'
-                          ? 'Câu này dùng thang tự nhập chữ, không có mức nào để chọn'
-                          : 'Mức này không có trong thang trả lời của câu'}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -416,7 +388,6 @@ export function SurveyTemplateImportDialog({
                     <th>Dòng</th>
                     <th>Mục</th>
                     <th>Nội dung câu hỏi</th>
-                    <th>Thang trả lời</th>
                     <th>Câu bẫy</th>
                   </tr>
                 </thead>
@@ -426,12 +397,7 @@ export function SurveyTemplateImportDialog({
                       <td style={{ textAlign: 'right' }}>{row.rowNumber}</td>
                       <td>{row.sectionName}</td>
                       <td>{row.questionText}</td>
-                      <td>{row.answerScaleName}</td>
-                      <td>
-                        {row.attentionCheckValue === null
-                          ? '—'
-                          : `Phải chọn mức ${row.attentionCheckValue}`}
-                      </td>
+                      <td>{row.rawAttention ? `Phải chọn mức ${row.rawAttention}` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -455,8 +421,8 @@ export function SurveyTemplateImportDialog({
             onClick={() => void handleImport()}
             disabled={
               rows.length === 0
+              || !scale
               || invalidSectionRows.length > 0
-              || invalidScaleRows.length > 0
               || invalidTrapRows.length > 0
               || parsing
               || saving

@@ -21,6 +21,7 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   'course-grade-report-department': 'COURSE_GRADE_ANALYSIS_ACCESS',
   'course-grade-report-trends': 'COURSE_GRADE_ANALYSIS_ACCESS',
   'course-grade-glossary': 'COURSE_GRADE_ANALYSIS_ACCESS',
+  'course-grade-design': 'COURSE_GRADE_ANALYSIS_ACCESS',
   // Giữ hash cũ để bookmark tự chuyển vào module thống nhất.
   'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
   'graduation-analytics-2': 'GRADUATION_ANALYTICS_ACCESS',
@@ -32,7 +33,6 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   lecturers: 'LECTURERS_ACCESS',
   majors: 'MAJORS_ACCESS',
   'cohort-majors': 'COHORT_MAJORS_ACCESS',
-  students: 'STUDENTS_ACCESS',
   courses: 'COURSES_ACCESS',
   classes: 'COURSE_SECTIONS_ACCESS',
   'course-question-sets': 'COURSE_QUESTION_SETS_ACCESS',

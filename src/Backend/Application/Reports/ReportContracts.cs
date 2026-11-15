@@ -38,16 +38,14 @@ public sealed record OptionCountDto(
     decimal Percentage);
 
 /// <summary>
-/// Thống kê một câu hỏi cụ thể theo mẫu khảo sát.
-/// Câu thuộc thang 'Options' có <paramref name="AverageScore"/> và
-/// <paramref name="OptionDistribution"/>; câu thuộc thang 'Text' để cả hai rỗng
-/// và đọc nội dung ở <paramref name="TextAnswers"/>.
+/// Thống kê một câu hỏi cụ thể theo mẫu khảo sát: điểm trung bình và phân bố các
+/// mức của thang mà bộ câu hỏi đang dùng.
 /// </summary>
 public sealed record QuestionRatingDto(
     int QuestionId,
     /// <summary>
     /// Số thứ tự câu trong bộ đề (C1, C2...). Đánh trên TOÀN BỘ câu của bộ, kể cả
-    /// câu bẫy và câu tự nhập, để mã câu ở mọi màn hình trùng nhau — đánh lại theo
+    /// câu bẫy, để mã câu ở mọi màn hình trùng nhau — đánh lại theo
     /// vị trí trong danh sách đã lọc thì C16 ở màn này là C15 ở màn kia.
     /// </summary>
     int QuestionOrder,
@@ -55,9 +53,7 @@ public sealed record QuestionRatingDto(
     decimal AverageScore,
     int TotalAnswers,
     IReadOnlyList<OptionCountDto> OptionDistribution,
-    string ScaleKind = "Options",
-    string AnswerScaleName = "",
-    IReadOnlyList<string>? TextAnswers = null);
+    string AnswerScaleName = "");
 
 /// <summary>Tóm tắt kết quả của một lớp học phần mà giảng viên đảm nhận.</summary>
 public sealed record LecturerSectionSummaryDto(

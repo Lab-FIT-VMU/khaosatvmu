@@ -26,8 +26,8 @@ export interface CourseGradeImportPreview {
   sourceRowCount: number;
   usableRowCount: number;
   matchedRowCount: number;
+  /** Số mã sinh viên khác nhau trong file. */
   studentCount: number;
-  newStudentCount: number;
   excludedRows: CourseGradeRuleCount[];
   missingSectionCount: number;
   missingSectionRowCount: number;
@@ -45,7 +45,6 @@ export interface CourseGradeImportResult {
   semesterId: number;
   importedRowCount: number;
   skippedRowCount: number;
-  createdStudentCount: number;
   analysisRunId: number;
 }
 

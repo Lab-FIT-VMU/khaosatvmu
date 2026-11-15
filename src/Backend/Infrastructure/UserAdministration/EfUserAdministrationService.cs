@@ -206,8 +206,7 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
             cancellationToken);
         var isDefault = command.IsDefault || !hasActiveProfile;
         var role = await db.Roles.SingleAsync(x => x.Id == command.RoleId, cancellationToken);
-        var naming = ProfileNaming.ByRoleCode[role.Code];
-        var profileCode = await GenerateNextProfileCodeAsync(naming.Suffix, cancellationToken);
+        var profileCode = await GenerateNextProfileCodeAsync(role.ProfileCodeSuffix, cancellationToken);
 
         await using var transaction = isDefault
             ? await db.Database.BeginTransactionAsync(cancellationToken)
@@ -222,7 +221,7 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
             Id = Guid.NewGuid(),
             UserId = userId,
             RoleId = command.RoleId,
-            ProfileName = naming.Name,
+            ProfileName = role.Name,
             ProfileCode = profileCode,
             OrganizationUnitCode = NormalizeCodeOptional(command.OrganizationUnitCode),
             OrganizationUnitName = NormalizeOptional(command.OrganizationUnitName),
@@ -280,7 +279,7 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
 
         var roleChanged = profile.RoleId != command.RoleId;
         var role = await db.Roles.SingleAsync(x => x.Id == command.RoleId, cancellationToken);
-        profile.ProfileName = ProfileNaming.ByRoleCode[role.Code].Name;
+        profile.ProfileName = role.Name;
         profile.RoleId = command.RoleId;
         profile.OrganizationUnitCode = NormalizeCodeOptional(command.OrganizationUnitCode);
         profile.OrganizationUnitName = NormalizeOptional(command.OrganizationUnitName);
@@ -358,7 +357,16 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         await db.Roles
             .AsNoTracking()
             .OrderBy(x => x.Name)
-            .Select(x => new AdminRoleDto(x.Id, x.Code, x.Name, x.Description))
+            .Select(x => new AdminRoleDto(
+                x.Id,
+                x.Code,
+                x.Name,
+                x.Description,
+                x.DataScope,
+                x.CanWrite,
+                x.ProfileCodeSuffix,
+                x.IsSystem,
+                db.UserProfiles.Count(profile => profile.RoleId == x.Id && profile.IsActive)))
             .ToListAsync(cancellationToken);
 
     public async Task<AdminPage<AdminAuditLogDto>> GetAuditLogsAsync(
@@ -481,7 +489,6 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         ["COHORT_MAJORS_ACCESS"] = 6,
         ["COURSES_ACCESS"] = 7,
         ["COURSE_SECTIONS_ACCESS"] = 8,
-        ["STUDENTS_ACCESS"] = 9,
         // Khảo sát học phần
         ["COURSE_QUESTION_SETS_ACCESS"] = 1,
         ["COURSE_CAMPAIGNS_ACCESS"] = 2,

@@ -135,7 +135,10 @@ public static class GraduationAnalytics2Endpoints
                     request.SeriesBy), ct));
             }
             catch (GraduationAnalyticsException exception) { return ToError(exception); }
-        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+        })
+        // POST chỉ vì bộ lọc dài; đây là truy vấn đọc nên hồ sơ chỉ xem vẫn dùng được.
+        .WithMetadata(API.Auth.AllowReadOnlyProfileAttribute.Instance)
+        .AddEndpointFilter<RequireAntiforgeryFilter>();
 
         return app;
     }

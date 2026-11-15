@@ -1,17 +1,5 @@
 namespace Domain;
 
-/// <summary>Các giá trị hợp lệ của "AnswerScales"."ScaleKind".</summary>
-public static class AnswerScaleKinds
-{
-    /// <summary>Thang có sẵn các mức chọn trong "AnswerScaleOptions" (Mức độ hài lòng, Có/Không, Phần trăm...).</summary>
-    public const string Options = "Options";
-
-    /// <summary>Thang để người trả lời tự nhập chữ, không có mức chọn nào.</summary>
-    public const string Text = "Text";
-
-    public static bool IsValid(string? value) => value is Options or Text;
-}
-
 /// <summary>
 /// Các giá trị hợp lệ của "SemesterSurveys"."SurveyType". Ba loại dùng chung bộ câu hỏi,
 /// hình thức phiếu và đường nộp phiếu; chỉ khác đơn vị được phát link (xem
@@ -37,20 +25,17 @@ public static class SurveyTypes
     public static bool IsValid(string? value) => value is Course or Program or Lecturer;
 }
 
-/// <summary>Bảng "AnswerScales". Thang trả lời dùng lại được cho nhiều bộ câu hỏi.</summary>
+/// <summary>
+/// Bảng "AnswerScales". Thang trả lời dùng lại được cho nhiều bộ câu hỏi. Thang nào
+/// cũng có sẵn các mức chọn trong "AnswerScaleOptions" — hệ thống không có thang
+/// tự nhập chữ; ý kiến tự do của người học đi vào "SurveyResponses"."AdditionalComments".
+/// </summary>
 public sealed class AnswerScale : ISoftDeletable
 {
     public int AnswerScaleId { get; set; }
 
     /// <summary>Vd 'Mức độ hài lòng', 'Mức độ đồng ý'.</summary>
     public string AnswerScaleName { get; set; } = string.Empty;
-
-    /// <summary>
-    /// <see cref="AnswerScaleKinds.Options"/> hoặc <see cref="AnswerScaleKinds.Text"/>.
-    /// Thang loại Text không có dòng nào trong "AnswerScaleOptions" và câu trả lời
-    /// của nó không được tính vào <see cref="SurveyResponse.Score"/>.
-    /// </summary>
-    public string ScaleKind { get; set; } = AnswerScaleKinds.Options;
 
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
@@ -80,6 +65,13 @@ public sealed class SurveyTemplate : ISoftDeletable
     public int SurveyTemplateId { get; set; }
 
     public string TemplateName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// NOT NULL, ON DELETE RESTRICT. Thang trả lời dùng chung cho MỌI câu của bộ: mỗi
+    /// bộ đúng một thang, câu hỏi không mang thang riêng. Bộ đã thu phiếu thì không
+    /// đổi được thang — số mức đã lưu sẽ bị đọc theo nhãn của thang khác.
+    /// </summary>
+    public int AnswerScaleId { get; set; }
 
     public DateTime CreatedAt { get; set; }
     public bool IsDeleted { get; set; }
@@ -136,16 +128,10 @@ public sealed class SurveyQuestion : ISoftDeletable
     public string QuestionText { get; set; } = string.Empty;
 
     /// <summary>
-    /// NOT NULL, ON DELETE RESTRICT. Thang trả lời của riêng câu này nên một bộ
-    /// câu hỏi trộn được nhiều loại thang khác nhau.
-    /// </summary>
-    public int AnswerScaleId { get; set; }
-
-    /// <summary>
     /// Câu bẫy kiểm tra độ tập trung. NULL là câu hỏi bình thường; có giá trị thì
     /// người trả lời phải chọn đúng mức đó, sai một câu là phiếu bị lọc.
-    /// Chỉ đặt được trên câu thuộc thang <see cref="AnswerScaleKinds.Options"/> và
-    /// giá trị phải là một mức có thật của chính thang đó.
+    /// Giá trị phải là một mức có thật của thang mà bộ câu hỏi đang dùng
+    /// (<see cref="SurveyTemplate.AnswerScaleId"/>).
     /// Câu bẫy không được tính vào <see cref="SurveyResponse.Score"/>.
     /// </summary>
     public int? AttentionCheckValue { get; set; }
@@ -324,9 +310,8 @@ public sealed class SurveyResponse : ISoftDeletable
     public string? AdditionalComments { get; set; }
 
     /// <summary>
-    /// numeric(4,2): điểm trung bình, backend tính khi nhận phiếu. Chỉ gộp các câu
-    /// thuộc thang <see cref="AnswerScaleKinds.Options"/> và không phải câu bẫy;
-    /// câu thang Text và câu bẫy không tính.
+    /// numeric(4,2): điểm trung bình, backend tính khi nhận phiếu. Gộp mọi câu
+    /// không phải câu bẫy; câu bẫy không tính.
     /// </summary>
     public decimal Score { get; set; }
 
@@ -370,10 +355,8 @@ public sealed class SurveyResponseAnswer
     public int QuestionId { get; set; }
 
     /// <summary>
-    /// Câu trả lời thô luôn lưu dạng chữ. Câu thuộc thang
-    /// <see cref="AnswerScaleKinds.Options"/> lưu số mức đã chọn ("1".."5"), câu
-    /// thuộc thang <see cref="AnswerScaleKinds.Text"/> lưu nguyên nội dung người
-    /// học gõ. Muốn đọc lại thì tra "ScaleKind" của thang gắn với câu hỏi.
+    /// Số mức đã chọn ("1".."5") của thang mà bộ câu hỏi đang dùng. Cột kiểu chữ là
+    /// do lịch sử: trước đây có thang tự nhập chữ và cột này giữ nguyên nội dung gõ.
     /// </summary>
     public string AnswerValue { get; set; } = string.Empty;
 

@@ -26,23 +26,26 @@ internal sealed class EfUserScopeResolver(
         }
 
         // Vai trò lấy theo profile đang hoạt động chứ không theo user, vì một người
-        // có thể có nhiều profile với phạm vi khác nhau.
-        var roleCode = await (
+        // có thể có nhiều profile với phạm vi khác nhau. Phạm vi và quyền ghi là thuộc
+        // tính của vai trò (bảng "Roles"), không suy từ mã vai trò.
+        var role = await (
             from profile in db.UserProfiles
-            join role in db.Roles on profile.RoleId equals role.Id
+            join item in db.Roles on profile.RoleId equals item.Id
             where profile.Id == profileId && profile.UserId == userId && profile.IsActive
-            select role.Code).SingleOrDefaultAsync(cancellationToken);
+            select new { item.Code, item.DataScope, item.CanWrite }).SingleOrDefaultAsync(cancellationToken);
 
-        if (string.IsNullOrEmpty(roleCode))
+        if (role is null)
         {
             return UserScope.None;
         }
 
-        // Ban Giám hiệu thấy toàn bộ dữ liệu như hai vai trò quản trị; phần "chỉ đọc"
-        // do UserScope.IsReadOnly quyết định chứ không phải do phạm vi.
-        if (roleCode is RoleCodes.Admin or RoleCodes.SurveyAdmin or RoleCodes.BoardOfDirectors)
+        var roleCode = role.Code;
+
+        // Phạm vi toàn trường: không lọc gì. Phần "chỉ xem" do UserScope.IsReadOnly quyết
+        // định theo CanWrite chứ không phải do phạm vi.
+        if (role.DataScope == Domain.RoleDataScopes.All)
         {
-            return UserScope.Unrestricted(roleCode);
+            return UserScope.Unrestricted(roleCode, role.CanWrite);
         }
 
         // Các vai trò còn lại quy phạm vi qua hồ sơ giảng viên gắn với tài khoản.
@@ -56,12 +59,14 @@ internal sealed class EfUserScopeResolver(
             .SingleOrDefaultAsync(cancellationToken);
 
         return lecturer is null
-            ? UserScope.None with { RoleCode = roleCode }
+            ? UserScope.None with { RoleCode = roleCode, DataScope = role.DataScope, CanWrite = role.CanWrite }
             : new UserScope(
                 roleCode,
                 lecturer.LecturerId,
                 lecturer.DepartmentId,
                 lecturer.FacultyId,
-                SeesEverything: false);
+                SeesEverything: false,
+                role.DataScope,
+                role.CanWrite);
     }
 }

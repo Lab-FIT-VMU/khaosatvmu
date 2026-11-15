@@ -58,7 +58,7 @@ public sealed partial class EfSurveyService
             .ToHashSet();
         var unitOfResponse = responses.ToDictionary(x => x.ResponseId, x => x.CourseSectionSurveyId);
 
-        // Câu có điểm: thang mức chọn và không phải câu bẫy — cùng luật với Score của phiếu.
+        // Câu có điểm: mọi câu không phải câu bẫy — cùng luật với Score của phiếu.
         var questions = await (
                 from question in db.SurveyQuestions.AsNoTracking()
                 join section in db.SurveyQuestionSections.AsNoTracking()
@@ -69,18 +69,14 @@ public sealed partial class EfSurveyService
                 {
                     question.QuestionId,
                     question.QuestionText,
-                    question.AnswerScaleId,
                     question.AttentionCheckValue,
                     section.SectionId,
                     section.SectionName,
                 })
             .ToListAsync(cancellationToken);
-        var scales = (await ScalesOfTemplateAsync(survey.SurveyTemplateId, cancellationToken))
-            .ToDictionary(x => x.AnswerScaleId);
+        var scale = await ScaleOfTemplateAsync(survey.SurveyTemplateId, cancellationToken);
         var scoredQuestionIds = questions
-            .Where(x => x.AttentionCheckValue == null
-                && scales.TryGetValue(x.AnswerScaleId, out var scale)
-                && scale.ScaleKind == AnswerScaleKinds.Options)
+            .Where(x => x.AttentionCheckValue == null)
             .Select(x => x.QuestionId)
             .ToList();
 
@@ -148,9 +144,7 @@ public sealed partial class EfSurveyService
             {
                 var isScored = scoredQuestionIds.Contains(question.QuestionId);
                 var values = scoredAnswersByQuestion[question.QuestionId].Select(x => x.Value).ToList();
-                var options = scales.TryGetValue(question.AnswerScaleId, out var scale)
-                    ? scale.Options
-                    : [];
+                var options = scale?.Options ?? [];
                 return new UnitReportQuestionDto(
                     question.QuestionId,
                     index + 1,

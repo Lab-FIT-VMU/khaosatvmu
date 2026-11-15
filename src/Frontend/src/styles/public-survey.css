@@ -1158,12 +1158,6 @@
   cursor: not-allowed;
 }
 
-.public-quiz-text {
-  margin-top: 16px;
-  padding-left: 40px;
-}
-
-.public-quiz-text textarea,
 .public-quiz-comments textarea {
   display: block;
   width: 100%;
@@ -1178,14 +1172,12 @@
   resize: vertical;
 }
 
-.public-quiz-text textarea:focus,
 .public-quiz-comments textarea:focus {
   border-color: var(--survey-primary-color);
   outline: none;
   box-shadow: 0 0 0 3px var(--survey-primary-glow);
 }
 
-.public-quiz-text .public-survey-counter,
 .public-quiz-comments .public-survey-counter {
   position: static;
   display: block;
@@ -1403,10 +1395,6 @@
     flex: 1 1 auto;
     justify-content: flex-start;
     text-align: left;
-  }
-
-  .public-quiz-text {
-    padding-left: 0;
   }
 
   .public-quiz-question-head p {

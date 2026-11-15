@@ -1864,7 +1864,7 @@ const QuestionSectionPicker: React.FC<{
 }> = ({ sections, selectedId, onSelect }) => {
   if (sections.length === 0) return null;
 
-  // Số câu trong ngoặc là số câu được chấm điểm: không đếm câu bẫy và câu tự nhập.
+  // Số câu trong ngoặc là số câu được chấm điểm: không đếm câu bẫy.
   const totalQuestionCount = sections.reduce((sum, section) => sum + section.questionCount, 0);
   const options: { id: number | null; label: string }[] = [
     { id: null, label: `Toàn bộ bài khảo sát (${totalQuestionCount} câu)` },

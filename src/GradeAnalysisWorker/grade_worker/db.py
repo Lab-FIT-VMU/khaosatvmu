@@ -1,6 +1,7 @@
 """Đọc / ghi CSDL khaosatvmu cho worker phân tích điểm.
 
-Worker chỉ đọc điểm qua view GradeAnalysisInputs (không có cột nào của bảng Students) và ghi
+Worker chỉ đọc điểm qua view GradeAnalysisInputs (không có mã hay họ tên sinh viên; mỗi người
+chỉ là một số thứ tự trong lần nạp) và ghi
 vào GradeAnalysisRuns cùng bốn bảng kết quả. Thông điệp lỗi ghi vào CSDL không chứa dữ liệu.
 """
 import json
@@ -76,7 +77,7 @@ def load_sections(conn, semester_id):
 
 def load_grades(conn, semester_id):
     return conn.execute(
-        """SELECT "RevisionId", "StudentId", "CourseSectionId", "CourseCode", "SourceRowNumber",
+        """SELECT "RevisionId", "StudentNumber", "CourseSectionId", "CourseCode", "SourceRowNumber",
                   "XEnc", "YEnc", "ZEnc", "KeyVersion"
            FROM "GradeAnalysisInputs" WHERE "SemesterId" = %s""", (semester_id,)).fetchall()
 

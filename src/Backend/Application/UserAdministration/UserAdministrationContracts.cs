@@ -39,7 +39,37 @@ public sealed record AdminUserDto(
     string? DepartmentName = null,
     string? FacultyName = null);
 
-public sealed record AdminRoleDto(Guid Id, string Code, string Name, string? Description);
+/// <summary>
+/// Một vai trò kèm phạm vi dữ liệu, quyền ghi và số hồ sơ đang bật dùng nó.
+/// <paramref name="IsSystem"/>: không xóa được (ADMIN, Giảng viên).
+/// </summary>
+public sealed record AdminRoleDto(
+    Guid Id,
+    string Code,
+    string Name,
+    string? Description,
+    string DataScope = "DEPARTMENT",
+    bool CanWrite = false,
+    string ProfileCodeSuffix = "",
+    bool IsSystem = false,
+    int ActiveProfileCount = 0);
+
+/// <summary>Thêm hoặc sửa vai trò. <paramref name="DataScope"/> là một trong Domain.RoleDataScopes.</summary>
+public sealed record SaveRoleCommand(
+    string Name,
+    string? Description,
+    string DataScope,
+    bool CanWrite,
+    string ProfileCodeSuffix);
+
+/// <summary>Kết quả xóa vai trò: số hồ sơ bị vô hiệu hóa và số tài khoản không còn hồ sơ nào.</summary>
+public sealed record RoleDeletionDto(int DisabledProfileCount, int UsersWithoutActiveProfile);
+
+public static class RoleRules
+{
+    /// <summary>Số vai trò tối đa đang dùng cùng lúc (không tính vai trò đã xóa).</summary>
+    public const int MaximumRoles = 8;
+}
 
 /// <summary>Thông tin một permission trong hệ thống.</summary>
 public sealed record PermissionDto(
@@ -113,46 +143,15 @@ public sealed record ImportAdminUserRowCommand(int RowNumber, string Email, stri
 /// Quy ước đặt tên và mã hồ sơ. Nằm ở backend vì cả ba đường tạo hồ sơ — thủ công,
 /// tạo hàng loạt và import Excel — đều phải cho ra cùng một kết quả.
 /// <para>
-/// Sáu chữ số đầu là số thứ tự tự tăng trên toàn hệ thống, hai ký tự cuối biểu thị
-/// vai trò. Ví dụ hồ sơ thứ 36 của quản lý bộ môn có mã <c>000036BM</c>.
+/// Tên hồ sơ là tên vai trò. Mã hồ sơ: sáu chữ số đầu là số thứ tự tự tăng trên toàn hệ
+/// thống, phần cuối là hậu tố của vai trò ("Roles"."ProfileCodeSuffix"). Ví dụ hồ sơ thứ
+/// 36 của quản lý bộ môn có mã <c>000036BM</c>.
 /// </para>
 /// </summary>
 public static class ProfileNaming
 {
-    public static readonly IReadOnlyDictionary<string, (string Name, string Suffix)> ByRoleCode =
-        new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["ADMIN"] = ("Quản trị hệ thống", "AD"),
-            ["BOARD_OF_DIRECTORS"] = ("Ban Giám hiệu", "GH"),
-            ["DEPARTMENT_MANAGER"] = ("Quản lý bộ môn", "BM"),
-            ["FACULTY_MANAGER"] = ("Quản lý khoa", "KV"),
-            ["LECTURER"] = ("Giảng viên", "GV"),
-            ["SURVEY_ADMIN"] = ("Quản trị khảo sát", "QT"),
-        };
-
     public static string CodeFor(long sequenceNumber, string suffix) =>
         $"{sequenceNumber:D6}{suffix}";
-
-    /// <summary>
-    /// Tra vai trò từ tên tiếng Việt trong tệp Excel, hoặc từ chính mã vai trò. Nhận
-    /// cả hai để người điền tệp không phải nhớ mã hệ thống.
-    /// </summary>
-    public static string? RoleCodeFromLabel(string? value)
-    {
-        var text = (value ?? string.Empty).Trim();
-        if (text.Length == 0) return null;
-
-        foreach (var (roleCode, naming) in ByRoleCode)
-        {
-            if (string.Equals(text, roleCode, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(text, naming.Name, StringComparison.OrdinalIgnoreCase))
-            {
-                return roleCode;
-            }
-        }
-
-        return null;
-    }
 }
 
 /// <summary>Một dòng của tệp Excel cấp hồ sơ hàng loạt.</summary>
@@ -266,6 +265,25 @@ public interface IUserAdministrationService
 
     Task<IReadOnlyList<AdminRoleDto>> GetRolesAsync(CancellationToken cancellationToken = default);
 
+    Task<AdminOperationResult<AdminRoleDto>> CreateRoleAsync(
+        SaveRoleCommand command,
+        CancellationToken cancellationToken = default);
+
+    Task<AdminOperationResult<AdminRoleDto>> UpdateRoleAsync(
+        Guid roleId,
+        SaveRoleCommand command,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Xóa mềm vai trò; mọi hồ sơ đang mang vai trò đó bị vô hiệu hóa (tắt, đăng xuất các
+    /// phiên đang dùng, chọn lại hồ sơ mặc định cho tài khoản).
+    /// </summary>
+    Task<AdminOperationResult<RoleDeletionDto>> DeleteRoleAsync(
+        Guid roleId,
+        Guid actorUserId,
+        Guid actorProfileId,
+        CancellationToken cancellationToken = default);
+
     Task<AdminPage<AdminAuditLogDto>> GetAuditLogsAsync(
         Guid? userId,
         int page,
@@ -323,4 +341,26 @@ public static class UserAdministrationErrorCodes
     public const string NoProfilesToCreate = "ADMIN_NO_PROFILES_TO_CREATE";
     public const string CannotModifyActiveProfile = "ADMIN_CANNOT_MODIFY_ACTIVE_PROFILE";
     public const string CannotRevokeRequiredPermission = "ADMIN_CANNOT_REVOKE_REQUIRED_PERMISSION";
+
+    /// <summary>Đã đủ <see cref="RoleRules.MaximumRoles"/> vai trò.</summary>
+    public const string RoleLimitReached = "ADMIN_ROLE_LIMIT_REACHED";
+    public const string RoleNameRequired = "ADMIN_ROLE_NAME_REQUIRED";
+    public const string RoleNameExists = "ADMIN_ROLE_NAME_EXISTS";
+
+    /// <summary>Hậu tố mã hồ sơ phải là 2–4 chữ in hoa hoặc chữ số.</summary>
+    public const string RoleSuffixInvalid = "ADMIN_ROLE_SUFFIX_INVALID";
+    public const string RoleSuffixExists = "ADMIN_ROLE_SUFFIX_EXISTS";
+    public const string RoleScopeInvalid = "ADMIN_ROLE_SCOPE_INVALID";
+
+    /// <summary>Phạm vi "chỉ lớp mình dạy" không bật được quyền ghi.</summary>
+    public const string RoleOwnScopeCannotWrite = "ADMIN_ROLE_OWN_SCOPE_CANNOT_WRITE";
+
+    /// <summary>Vai trò hệ thống (ADMIN, Giảng viên) không xóa được.</summary>
+    public const string RoleSystemLocked = "ADMIN_ROLE_SYSTEM_LOCKED";
+
+    /// <summary>ADMIN phải luôn thấy và ghi toàn trường.</summary>
+    public const string AdminRoleScopeLocked = "ADMIN_ROLE_ADMIN_SCOPE_LOCKED";
+
+    /// <summary>Không xóa được vai trò của chính hồ sơ đang đăng nhập.</summary>
+    public const string CannotDeleteOwnRole = "ADMIN_CANNOT_DELETE_OWN_ROLE";
 }

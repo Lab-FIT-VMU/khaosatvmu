@@ -16,7 +16,7 @@ public sealed partial class EfUserAdministrationService
         CancellationToken cancellationToken = default)
     {
         var role = await db.Roles
-            .SingleOrDefaultAsync(x => x.Code == "LECTURER", cancellationToken);
+            .SingleOrDefaultAsync(x => x.Code == Application.Auth.RoleCodes.Lecturer, cancellationToken);
         if (role is null)
         {
             return Failure<AdminProfileImportDto>(UserAdministrationErrorCodes.RoleNotFound);
@@ -39,17 +39,15 @@ public sealed partial class EfUserAdministrationService
             return Success(new AdminProfileImportDto(0, 0, 0, []));
         }
 
-        var naming = ProfileNaming.ByRoleCode["LECTURER"];
-
         var items = new List<AdminProfileImportItemDto>(candidates.Count);
         var created = 0;
         var now = DateTime.UtcNow;
 
         foreach (var user in candidates)
         {
-            var code = await GenerateNextProfileCodeAsync(naming.Suffix, cancellationToken);
+            var code = await GenerateNextProfileCodeAsync(role.ProfileCodeSuffix, cancellationToken);
 
-            AddProfile(user, role.Id, naming.Name, code, isDefault: true, now, actorUserId);
+            AddProfile(user, role.Id, role.Name, code, isDefault: true, now, actorUserId);
             items.Add(new AdminProfileImportItemDto(0, user.Email, true, null));
             created++;
         }
@@ -76,11 +74,18 @@ public sealed partial class EfUserAdministrationService
             return Failure<AdminProfileImportDto>(UserAdministrationErrorCodes.InvalidRequest);
         }
 
-        var roles = await db.Roles.ToDictionaryAsync(
-            x => x.Code,
-            x => x,
-            StringComparer.OrdinalIgnoreCase,
-            cancellationToken);
+        // Tệp ghi vai trò bằng tên tiếng Việt hoặc mã; vai trò người quản trị tự thêm cũng
+        // tra được vì đọc thẳng từ bảng.
+        var roleList = await db.Roles.ToListAsync(cancellationToken);
+        Role? RoleFromLabel(string? label)
+        {
+            var text = (label ?? string.Empty).Trim();
+            return text.Length == 0
+                ? null
+                : roleList.FirstOrDefault(x =>
+                    string.Equals(x.Name, text, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(x.Code, text, StringComparison.OrdinalIgnoreCase));
+        }
 
         var emails = commands
             .Select(x => (x.Email ?? string.Empty).Trim().ToLowerInvariant())
@@ -121,8 +126,8 @@ public sealed partial class EfUserAdministrationService
                 continue;
             }
 
-            var roleCode = ProfileNaming.RoleCodeFromLabel(command.RoleLabel);
-            if (roleCode is null || !roles.TryGetValue(roleCode, out var role))
+            var role = RoleFromLabel(command.RoleLabel);
+            if (role is null)
             {
                 items.Add(Reject(command, email, UserAdministrationErrorCodes.ImportRoleInvalid));
                 continue;
@@ -134,15 +139,14 @@ public sealed partial class EfUserAdministrationService
                 continue;
             }
 
-            var naming = ProfileNaming.ByRoleCode[roleCode];
-            var code = await GenerateNextProfileCodeAsync(naming.Suffix, cancellationToken);
+            var code = await GenerateNextProfileCodeAsync(role.ProfileCodeSuffix, cancellationToken);
 
             // Hồ sơ đầu tiên của tài khoản mặc nhiên là hồ sơ mặc định, giống hệt
             // đường tạo thủ công — không có hồ sơ mặc định thì không đăng nhập được.
             var isFirst = !db.UserProfiles.Local.Any(x => x.UserId == user.Id)
                           && !await db.UserProfiles.AnyAsync(x => x.UserId == user.Id, cancellationToken);
 
-            AddProfile(user, role.Id, naming.Name, code, isFirst, now, actorUserId);
+            AddProfile(user, role.Id, role.Name, code, isFirst, now, actorUserId);
             items.Add(new AdminProfileImportItemDto(command.RowNumber, email, true, null));
             created++;
         }

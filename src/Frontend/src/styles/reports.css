@@ -766,50 +766,6 @@
   padding: 10px 14px;
 }
 
-/* Câu hỏi tự nhập: liệt kê nội dung thay cho bảng phân bố mức. */
-.analysis-text-answers {
-  display: grid;
-  gap: 14px;
-}
-
-.analysis-text-question-title {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--reports-text-strong, #0f172a);
-}
-
-.analysis-text-question-title small {
-  font-size: 13px;
-  font-weight: 500;
-  color: #000000;
-}
-
-.analysis-text-question ul {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding-left: 18px;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.analysis-text-question li {
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--reports-text-strong, #0f172a);
-}
-
-.analysis-text-empty {
-  margin: 0;
-  font-size: 13px;
-  color: #000000;
-}
-
 .distribution-table-title {
   margin: 0 0 2px 0;
   font-size: 14px;

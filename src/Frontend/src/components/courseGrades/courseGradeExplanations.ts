@@ -94,7 +94,7 @@ export const EXPLAIN = {
   },
   trendsExam: {
     use: 'Theo dõi độ ổn định của bộ đề thi, làm căn cứ hiệu chỉnh ngân hàng câu hỏi khi cần.',
-    read: 'Số trong ngoặc là mức thay đổi điểm thi trung bình so với lần mở học phần liền trước (có thể cách 6 tháng, 12 tháng hoặc hơn). Điểm lưu ý H6 được gắn vào **học kỳ sau** khi mức thay đổi từ {ng} điểm trở lên và có ý nghĩa thống kê. Một lần thay đổi chưa cho thấy bộ đề không ổn định kéo dài.',
+    read: 'Số trong ngoặc là mức thay đổi điểm thi trung bình so với lần mở học phần liền trước (có thể cách 6 tháng, 12 tháng hoặc hơn). Điểm lưu ý “Điểm thi thay đổi so với lần mở gần nhất” được gắn vào **học kỳ sau** khi mức thay đổi từ {ng} điểm trở lên và có ý nghĩa thống kê. Một lần thay đổi chưa cho thấy bộ đề không ổn định kéo dài.',
   },
 } satisfies Record<string, Explanation>;
 

@@ -23,14 +23,13 @@ import {
   type SaveSurveyTemplatePayload,
 } from '../services/surveyApi';
 import { maximumAnswerScaleOptions, maximumSectionsPerTemplate } from '../types';
-import type { AnswerScale, AnswerScaleKind, SurveyTemplate } from '../types';
+import type { AnswerScale, SurveyTemplate } from '../types';
 import '../styles/survey-operations.css';
 import { foldVietnamese } from '../utils/vietnamese';
 
-/** Một dòng câu hỏi trong trình soạn: nội dung kèm thang trả lời của riêng nó. */
+/** Một dòng câu hỏi trong trình soạn. Câu không có thang riêng — dùng thang của bộ. */
 interface QuestionForm {
   questionText: string;
-  answerScaleId: string;
   /** Mức bắt buộc của câu bẫy độ tập trung. Chuỗi rỗng nghĩa là câu bình thường. */
   attentionCheckValue: string;
 }
@@ -52,6 +51,8 @@ interface SectionForm {
 interface TemplateForm {
   surveyTemplateId: number | null;
   templateName: string;
+  /** Thang trả lời dùng chung cho mọi câu của bộ. Chuỗi rỗng là chưa chọn. */
+  answerScaleId: string;
   sections: SectionForm[];
   /** Bộ đã thu phiếu: chỉ cho sửa chữ, ẩn mọi nút làm dịch chỗ câu hỏi. */
   locked: boolean;
@@ -66,13 +67,13 @@ interface ScaleOptionForm {
 interface ScaleForm {
   answerScaleId: number | null;
   answerScaleName: string;
-  scaleKind: AnswerScaleKind;
   options: ScaleOptionForm[];
 }
 
 const emptyTemplateForm: TemplateForm = {
   surveyTemplateId: null,
   templateName: '',
+  answerScaleId: '',
   sections: [],
   locked: false,
 };
@@ -80,7 +81,6 @@ const emptyTemplateForm: TemplateForm = {
 const emptyScaleForm: ScaleForm = {
   answerScaleId: null,
   answerScaleName: '',
-  scaleKind: 'Options',
   options: [1, 2, 3, 4, 5].map((value) => ({ value: String(value), displayText: '' })),
 };
 
@@ -136,11 +136,10 @@ export const SurveyTemplatesPage: React.FC = () => {
   const scaleNameOf = (answerScaleId: number) =>
     answerScales.find((scale) => scale.answerScaleId === answerScaleId)?.answerScaleName ?? '—';
 
-  /** Tên các thang mà một bộ đang dùng, không lặp, theo thứ tự câu hỏi. */
-  const scaleNamesOf = (template: SurveyTemplate) =>
-    [...new Set(template.questions.map((question) => question.answerScaleId))]
-      .map(scaleNameOf)
-      .join(' · ');
+  /** Thang đang chọn trong trình soạn; các mức của nó là lựa chọn cho câu bẫy. */
+  const formScale = answerScales.find(
+    (scale) => String(scale.answerScaleId) === form.answerScaleId
+  );
 
   const normalized = foldVietnamese(search);
   const filtered = templates.filter(
@@ -164,9 +163,6 @@ export const SurveyTemplatesPage: React.FC = () => {
   }, [viewing]);
 
   // ------------------------------------------------------------- Bộ câu hỏi
-
-  // Chỉ có đúng một thang thì chọn sẵn cho đỡ phải bấm.
-  const defaultScaleId = answerScales.length === 1 ? String(answerScales[0].answerScaleId) : '';
 
   const questionCount = form.sections.reduce(
     (total, section) => total + section.questions.length,
@@ -200,6 +196,7 @@ export const SurveyTemplatesPage: React.FC = () => {
     setForm({
       surveyTemplateId: template.surveyTemplateId,
       templateName: template.templateName,
+      answerScaleId: String(template.answerScaleId),
       locked: template.hasResponses,
       // API đã trả mục theo đúng thứ tự hiển thị và câu theo đúng thứ tự trong bộ,
       // nên chỉ cần gom câu về mục của nó là ra đúng bố cục phiếu.
@@ -211,7 +208,6 @@ export const SurveyTemplatesPage: React.FC = () => {
           .filter((question) => question.sectionId === section.sectionId)
           .map((question) => ({
             questionText: question.questionText,
-            answerScaleId: String(question.answerScaleId),
             attentionCheckValue:
               question.attentionCheckValue === null ? '' : String(question.attentionCheckValue),
           })),
@@ -263,7 +259,7 @@ export const SurveyTemplatesPage: React.FC = () => {
           sectionId: null,
           sectionName: '',
           collapsed: false,
-          questions: [{ questionText: '', answerScaleId: defaultScaleId, attentionCheckValue: '' }],
+          questions: [{ questionText: '', attentionCheckValue: '' }],
         },
       ],
     }));
@@ -285,15 +281,7 @@ export const SurveyTemplatesPage: React.FC = () => {
           ? section
           : {
               ...section,
-              // Câu mới thường cùng thang với câu ngay trên nó.
-              questions: [
-                ...section.questions,
-                {
-                  questionText: '',
-                  answerScaleId: section.questions.at(-1)?.answerScaleId ?? defaultScaleId,
-                  attentionCheckValue: '',
-                },
-              ],
+              questions: [...section.questions, { questionText: '', attentionCheckValue: '' }],
             }
       ),
     }));
@@ -313,12 +301,39 @@ export const SurveyTemplatesPage: React.FC = () => {
     }));
   };
 
+  /**
+   * Đổi thang của bộ. Mức bắt buộc của câu bẫy nào không có trong thang mới thì bỏ
+   * đi (câu trở lại thành câu thường) — để lại là gửi lên một mức không tồn tại.
+   */
+  const changeTemplateScale = (answerScaleId: string) => {
+    const scale = answerScales.find((item) => String(item.answerScaleId) === answerScaleId);
+    const values = new Set((scale?.options ?? []).map((option) => String(option.value)));
+
+    setValidationError(null);
+    setForm((prev) => ({
+      ...prev,
+      answerScaleId,
+      sections: prev.sections.map((section) => ({
+        ...section,
+        questions: section.questions.map((question) =>
+          question.attentionCheckValue && !values.has(question.attentionCheckValue)
+            ? { ...question, attentionCheckValue: '' }
+            : question
+        ),
+      })),
+    }));
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     const templateName = form.templateName.trim();
     if (!templateName) {
       setValidationError('Vui lòng nhập tên bộ câu hỏi.');
+      return;
+    }
+    if (!form.answerScaleId) {
+      setValidationError('Vui lòng chọn thang trả lời cho bộ câu hỏi.');
       return;
     }
 
@@ -347,17 +362,10 @@ export const SurveyTemplatesPage: React.FC = () => {
       setValidationError('Hai mục trong cùng một bộ không được trùng tên.');
       return;
     }
-    if (
-      filledSections.some((section) =>
-        section.questions.some((question) => !question.answerScaleId)
-      )
-    ) {
-      setValidationError('Vui lòng chọn thang trả lời cho từng câu hỏi.');
-      return;
-    }
 
     const payload: SaveSurveyTemplatePayload = {
       templateName,
+      answerScaleId: Number(form.answerScaleId),
       sections: filledSections.map((section) => ({
         sectionId: section.sectionId,
         sectionName: section.sectionName,
@@ -366,7 +374,6 @@ export const SurveyTemplatesPage: React.FC = () => {
       questions: filledSections.flatMap((section, sectionIndex) =>
         section.questions.map((question) => ({
           questionText: question.questionText,
-          answerScaleId: Number(question.answerScaleId),
           // Để trống là câu bình thường; backend còn kiểm mức có thật của thang.
           attentionCheckValue: question.attentionCheckValue
             ? Number(question.attentionCheckValue)
@@ -439,7 +446,6 @@ export const SurveyTemplatesPage: React.FC = () => {
     setScaleForm({
       answerScaleId: scale.answerScaleId,
       answerScaleName: scale.answerScaleName,
-      scaleKind: scale.scaleKind,
       options: scale.options
         .slice()
         .sort((left, right) => left.value - right.value)
@@ -453,12 +459,6 @@ export const SurveyTemplatesPage: React.FC = () => {
     const answerScaleName = scaleForm.answerScaleName.trim();
     if (!answerScaleName) {
       setScaleError('Vui lòng nhập tên thang trả lời.');
-      return;
-    }
-
-    // Thang tự nhập chữ không có mức nào để nhập.
-    if (scaleForm.scaleKind === 'Text') {
-      await saveScale({ answerScaleName, scaleKind: 'Text', options: [] });
       return;
     }
 
@@ -479,7 +479,6 @@ export const SurveyTemplatesPage: React.FC = () => {
 
     await saveScale({
       answerScaleName,
-      scaleKind: 'Options',
       options: scaleForm.options.map((option) => ({
         value: Number(option.value),
         displayText: option.displayText.trim(),
@@ -489,7 +488,6 @@ export const SurveyTemplatesPage: React.FC = () => {
 
   const saveScale = async (payload: {
     answerScaleName: string;
-    scaleKind: AnswerScaleKind;
     options: { value: number; displayText: string }[];
   }) => {
     const answerScaleName = payload.answerScaleName;
@@ -560,13 +558,14 @@ export const SurveyTemplatesPage: React.FC = () => {
       render: (item) => <span className="catalog-cell-primary">{item.templateName}</span>,
     },
     {
-      key: 'answerScales',
+      key: 'answerScaleId',
       header: 'Thang trả lời',
       width: '28%',
-      filterValue: scaleNamesOf,
-      // Bộ chưa gán thang trả lời: màn hình in "—", tệp để trắng một ô vô nghĩa.
-      exportFormat: (item) => scaleNamesOf(item) || '—',
-      render: (item) => <span className="catalog-cell-primary">{scaleNamesOf(item) || '—'}</span>,
+      filterValue: (item) => scaleNameOf(item.answerScaleId),
+      exportFormat: (item) => scaleNameOf(item.answerScaleId),
+      render: (item) => (
+        <span className="catalog-cell-primary">{scaleNameOf(item.answerScaleId)}</span>
+      ),
     },
     {
       key: 'questions',
@@ -634,8 +633,8 @@ export const SurveyTemplatesPage: React.FC = () => {
           <h2>Bộ câu hỏi khảo sát</h2>
           <p>
             Bảng "SurveyTemplates", "SurveyQuestionSections" và "SurveyQuestions". Câu hỏi chia
-            theo mục, mỗi câu có thang trả lời riêng nên một bộ trộn được nhiều loại thang. Bộ
-            mới tạo từ nút Thêm bộ khảo sát mới; ở đây chỉ sửa lại bộ đã có.
+            theo mục, mỗi bộ dùng đúng một thang trả lời cho mọi câu. Bộ mới tạo từ nút Thêm bộ
+            khảo sát mới; ở đây chỉ sửa lại bộ đã có.
           </p>
         </div>
       </header>
@@ -703,18 +702,38 @@ export const SurveyTemplatesPage: React.FC = () => {
             <div className="catalog-validation-error" role="alert">{validationError}</div>
           )}
 
-          <div className="form-group">
-            <label htmlFor="survey-template-name">Tên bộ câu hỏi</label>
-            <input
-              id="survey-template-name"
-              type="text"
-              placeholder="VD: Khảo sát học phần học kỳ I"
-              value={form.templateName}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, templateName: event.target.value }))
-              }
-              required
-            />
+          <div className="survey-template-import-fields">
+            <div className="form-group">
+              <label htmlFor="survey-template-name">Tên bộ câu hỏi</label>
+              <input
+                id="survey-template-name"
+                type="text"
+                placeholder="VD: Khảo sát học phần học kỳ I"
+                value={form.templateName}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, templateName: event.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="survey-template-scale">Thang trả lời</label>
+              <select
+                id="survey-template-scale"
+                value={form.answerScaleId}
+                disabled={form.locked}
+                title={form.locked ? 'Bộ đã thu phiếu nên không đổi được thang trả lời' : undefined}
+                onChange={(event) => changeTemplateScale(event.target.value)}
+                required
+              >
+                <option value="">Chọn thang trả lời</option>
+                {answerScales.map((scale) => (
+                  <option key={scale.answerScaleId} value={String(scale.answerScaleId)}>
+                    {scale.answerScaleName}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <section className="survey-question-editor" aria-label="Danh sách câu hỏi">
@@ -807,71 +826,30 @@ export const SurveyTemplatesPage: React.FC = () => {
                                     })
                                   }
                                 />
-                                <select
-                                  aria-label={`Thang trả lời của câu hỏi ${questionIndex + 1} mục ${sectionIndex + 1}`}
-                                  value={question.answerScaleId}
-                                  disabled={form.locked}
-                                  title={
-                                    form.locked
-                                      ? 'Bộ đã thu phiếu nên không đổi được thang trả lời'
-                                      : undefined
-                                  }
-                                  onChange={(event) =>
-                                    updateQuestion(sectionIndex, questionIndex, {
-                                      answerScaleId: event.target.value,
-                                    })
-                                  }
-                                >
-                                  <option value="">Chọn thang trả lời</option>
-                                  {answerScales.map((scale) => (
-                                    <option
-                                      key={scale.answerScaleId}
-                                      value={String(scale.answerScaleId)}
-                                    >
-                                      {scale.answerScaleName}
-                                      {scale.scaleKind === 'Text' ? ' (tự nhập)' : ''}
-                                    </option>
-                                  ))}
-                                </select>
-                                {(() => {
-                                  // Câu bẫy chỉ đặt được trên thang có mức chọn sẵn:
-                                  // thang tự nhập chữ không có mức nào để bắt chọn.
-                                  const scale = answerScales.find(
-                                    (item) => String(item.answerScaleId) === question.answerScaleId
-                                  );
-                                  const canTrap = scale?.scaleKind === 'Options';
-
-                                  return (
-                                    <label className="survey-question-trap">
-                                      <span>Câu bẫy — mức bắt buộc</span>
-                                      <select
-                                        aria-label={`Mức bắt buộc của câu bẫy cho câu hỏi ${questionIndex + 1} mục ${sectionIndex + 1}`}
-                                        value={canTrap ? question.attentionCheckValue : ''}
-                                        disabled={!canTrap}
-                                        title={
-                                          canTrap
-                                            ? undefined
-                                            : 'Chỉ đặt được câu bẫy trên thang có mức chọn sẵn'
-                                        }
-                                        onChange={(event) =>
-                                          updateQuestion(sectionIndex, questionIndex, {
-                                            attentionCheckValue: event.target.value,
-                                          })
-                                        }
+                                <label className="survey-question-trap">
+                                  <span>Câu bẫy — mức bắt buộc</span>
+                                  <select
+                                    aria-label={`Mức bắt buộc của câu bẫy cho câu hỏi ${questionIndex + 1} mục ${sectionIndex + 1}`}
+                                    value={question.attentionCheckValue}
+                                    disabled={!formScale}
+                                    title={formScale ? undefined : 'Chọn thang trả lời của bộ trước'}
+                                    onChange={(event) =>
+                                      updateQuestion(sectionIndex, questionIndex, {
+                                        attentionCheckValue: event.target.value,
+                                      })
+                                    }
+                                  >
+                                    <option value="">Không phải câu bẫy</option>
+                                    {(formScale?.options ?? []).map((option) => (
+                                      <option
+                                        key={option.answerScaleOptionId}
+                                        value={String(option.value)}
                                       >
-                                        <option value="">Không phải câu bẫy</option>
-                                        {(scale?.options ?? []).map((option) => (
-                                          <option
-                                            key={option.answerScaleOptionId}
-                                            value={String(option.value)}
-                                          >
-                                            Mức {option.value} — {option.displayText}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </label>
-                                  );
-                                })()}
+                                        Mức {option.value} — {option.displayText}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
                               </div>
                               {!form.locked && (
                                 <button
@@ -964,13 +942,11 @@ export const SurveyTemplatesPage: React.FC = () => {
                       có bốn mức. Mã chỉ dùng nội bộ, người tạo phiếu không cần biết. */}
                   <strong>{scale.answerScaleName}</strong>
                   <span>
-                    {scale.scaleKind === 'Text'
-                      ? 'Người trả lời tự nhập chữ'
-                      : scale.options
-                          .slice()
-                          .sort((left, right) => left.value - right.value)
-                          .map((option) => `${option.value}. ${option.displayText}`)
-                          .join(' · ')}
+                    {scale.options
+                      .slice()
+                      .sort((left, right) => left.value - right.value)
+                      .map((option) => `${option.value}. ${option.displayText}`)
+                      .join(' · ')}
                   </span>
                 </div>
                 {deletingScaleId === scale.answerScaleId ? (
@@ -1018,176 +994,151 @@ export const SurveyTemplatesPage: React.FC = () => {
           </section>
 
           <form className="catalog-form" onSubmit={(event) => void handleSaveScale(event)}>
-            <div className="catalog-form-grid catalog-form-grid--2">
-              <div className="form-group">
-                <label htmlFor="answer-scale-name">
-                  {scaleForm.answerScaleId === null ? 'Tên thang mới' : 'Tên thang'}
-                </label>
-                <input
-                  id="answer-scale-name"
-                  type="text"
-                  placeholder="VD: Mức độ hài lòng"
-                  value={scaleForm.answerScaleName}
-                  onChange={(event) =>
-                    setScaleForm((prev) => ({ ...prev, answerScaleName: event.target.value }))
-                  }
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="answer-scale-kind">Loại thang</label>
-                <select
-                  id="answer-scale-kind"
-                  value={scaleForm.scaleKind}
-                  onChange={(event) =>
-                    setScaleForm((prev) => ({
-                      ...prev,
-                      scaleKind: event.target.value as AnswerScaleKind,
-                    }))
-                  }
-                >
-                  <option value="Options">Chọn đáp án có sẵn</option>
-                  <option value="Text">Nhập chữ</option>
-                </select>
-              </div>
+            <div className="form-group">
+              <label htmlFor="answer-scale-name">
+                {scaleForm.answerScaleId === null ? 'Tên thang mới' : 'Tên thang'}
+              </label>
+              <input
+                id="answer-scale-name"
+                type="text"
+                placeholder="VD: Mức độ hài lòng"
+                value={scaleForm.answerScaleName}
+                onChange={(event) =>
+                  setScaleForm((prev) => ({ ...prev, answerScaleName: event.target.value }))
+                }
+                required
+              />
             </div>
 
-            {scaleForm.scaleKind === 'Text' ? (
-              <p className="answer-scale-empty">
-                Thang tự nhập không có mức nào. Câu hỏi dùng thang này không tính vào điểm
-                trung bình của phiếu.
-              </p>
-            ) : (
-              <>
-                <div className="answer-scale-options">
-                  <div className="answer-scale-options-head" aria-hidden="true">
-                    <span className="answer-scale-options-head-value">Mức điểm</span>
-                    <span>Nội dung đáp án</span>
-                  </div>
-                  {scaleForm.options.map((option, index) => (
-                    // Số mức chỉ thay đổi ở cuối danh sách nên dùng vị trí làm key.
-                    <div className="answer-scale-option-row" key={index}>
-                      <select
-                        className="answer-scale-option-value"
-                        aria-label={`Mức điểm của đáp án thứ ${index + 1}`}
-                        value={option.value}
-                        disabled={scaleIsFull}
-                        title={
-                          scaleIsFull
-                            ? `Thang đủ ${maximumAnswerScaleOptions} đáp án nên điểm cố định 1 → ${maximumAnswerScaleOptions}.`
-                            : undefined
-                        }
-                        onChange={(event) =>
-                          setScaleForm((prev) => ({
-                            ...prev,
-                            options: prev.options.map((current, position) =>
-                              position === index
-                                ? { ...current, value: event.target.value }
-                                : current
-                            ),
-                          }))
-                        }
-                      >
-                        {scaleValueChoices(Number(option.value)).map((value) => (
-                          <option key={value} value={String(value)}>
-                            {value}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        placeholder={`Nội dung đáp án thứ ${index + 1}`}
-                        aria-label={`Nội dung đáp án thứ ${index + 1}`}
-                        value={option.displayText}
-                        onChange={(event) =>
-                          setScaleForm((prev) => ({
-                            ...prev,
-                            options: prev.options.map((current, position) =>
-                              position === index
-                                ? { ...current, displayText: event.target.value }
-                                : current
-                            ),
-                          }))
-                        }
-                      />
-                    </div>
-                  ))}
+            <>
+              <div className="answer-scale-options">
+                <div className="answer-scale-options-head" aria-hidden="true">
+                  <span className="answer-scale-options-head-value">Mức điểm</span>
+                  <span>Nội dung đáp án</span>
                 </div>
-
-                <p className="answer-scale-hint">
-                  {scaleIsFull ? (
-                    <>
-                      Thang đã đủ {maximumAnswerScaleOptions} đáp án — mức cao nhất — nên điểm
-                      cố định 1 → {maximumAnswerScaleOptions} theo thứ tự trên. Bấm "Bớt đáp
-                      án" nếu muốn đổi lại điểm.
-                    </>
-                  ) : (
-                    <>
-                      Mức điểm là điểm mà đáp án đó được tính. Hai đáp án không được cùng điểm,
-                      nên ô chọn chỉ hiện những mức còn trống — muốn đổi một đáp án sang điểm
-                      đang có đáp án khác giữ thì phải đổi đáp án kia trước. Thang ít đáp án như
-                      "Có/Không" nên dùng 1 và {maximumAnswerScaleOptions} để cùng dải điểm với
-                      thang mức độ hài lòng.
-                    </>
-                  )}
-                </p>
-
-                <div className="answer-scale-option-actions">
-                  {/* Đủ mức thì bỏ hẳn nút, không để nút xám nằm đó cho người dùng
-                      bấm thử rồi tự hỏi vì sao không ăn. */}
-                  {!scaleIsFull && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={() =>
-                        setScaleForm((prev) => {
-                          // Gợi ý giá trị chưa dùng nhỏ nhất để đỡ phải sửa tay.
-                          const used = new Set(prev.options.map((option) => Number(option.value)));
-                          const next =
-                            Array.from(
-                              { length: maximumAnswerScaleOptions },
-                              (_, offset) => offset + 1
-                            ).find((value) => !used.has(value)) ?? 1;
-                          const options = [
-                            ...prev.options,
-                            { value: String(next), displayText: '' },
-                          ];
-
-                          // Đủ mức thì cả 1..5 đều đã có chủ, nên xếp lại theo điểm
-                          // tăng dần: thứ tự dòng khớp thứ tự điểm, không còn cảnh
-                          // dòng 1 điểm nằm dưới dòng 5 điểm.
-                          return {
-                            ...prev,
-                            options:
-                              options.length === maximumAnswerScaleOptions
-                                ? options
-                                    .slice()
-                                    .sort((left, right) => Number(left.value) - Number(right.value))
-                                : options,
-                          };
-                        })
+                {scaleForm.options.map((option, index) => (
+                  // Số mức chỉ thay đổi ở cuối danh sách nên dùng vị trí làm key.
+                  <div className="answer-scale-option-row" key={index}>
+                    <select
+                      className="answer-scale-option-value"
+                      aria-label={`Mức điểm của đáp án thứ ${index + 1}`}
+                      value={option.value}
+                      disabled={scaleIsFull}
+                      title={
+                        scaleIsFull
+                          ? `Thang đủ ${maximumAnswerScaleOptions} đáp án nên điểm cố định 1 → ${maximumAnswerScaleOptions}.`
+                          : undefined
+                      }
+                      onChange={(event) =>
+                        setScaleForm((prev) => ({
+                          ...prev,
+                          options: prev.options.map((current, position) =>
+                            position === index
+                              ? { ...current, value: event.target.value }
+                              : current
+                          ),
+                        }))
                       }
                     >
-                      <Plus aria-hidden="true" size={16} />
-                      Thêm đáp án
-                    </button>
-                  )}
+                      {scaleValueChoices(Number(option.value)).map((value) => (
+                        <option key={value} value={String(value)}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      placeholder={`Nội dung đáp án thứ ${index + 1}`}
+                      aria-label={`Nội dung đáp án thứ ${index + 1}`}
+                      value={option.displayText}
+                      onChange={(event) =>
+                        setScaleForm((prev) => ({
+                          ...prev,
+                          options: prev.options.map((current, position) =>
+                            position === index
+                              ? { ...current, displayText: event.target.value }
+                              : current
+                          ),
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <p className="answer-scale-hint">
+                {scaleIsFull ? (
+                  <>
+                    Thang đã đủ {maximumAnswerScaleOptions} đáp án — mức cao nhất — nên điểm
+                    cố định 1 → {maximumAnswerScaleOptions} theo thứ tự trên. Bấm "Bớt đáp
+                    án" nếu muốn đổi lại điểm.
+                  </>
+                ) : (
+                  <>
+                    Mức điểm là điểm mà đáp án đó được tính. Hai đáp án không được cùng điểm,
+                    nên ô chọn chỉ hiện những mức còn trống — muốn đổi một đáp án sang điểm
+                    đang có đáp án khác giữ thì phải đổi đáp án kia trước. Thang ít đáp án như
+                    "Có/Không" nên dùng 1 và {maximumAnswerScaleOptions} để cùng dải điểm với
+                    thang mức độ hài lòng.
+                  </>
+                )}
+              </p>
+
+              <div className="answer-scale-option-actions">
+                {/* Đủ mức thì bỏ hẳn nút, không để nút xám nằm đó cho người dùng
+                    bấm thử rồi tự hỏi vì sao không ăn. */}
+                {!scaleIsFull && (
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
                     onClick={() =>
-                      setScaleForm((prev) => ({
-                        ...prev,
-                        options: prev.options.slice(0, -1),
-                      }))
+                      setScaleForm((prev) => {
+                        // Gợi ý giá trị chưa dùng nhỏ nhất để đỡ phải sửa tay.
+                        const used = new Set(prev.options.map((option) => Number(option.value)));
+                        const next =
+                          Array.from(
+                            { length: maximumAnswerScaleOptions },
+                            (_, offset) => offset + 1
+                          ).find((value) => !used.has(value)) ?? 1;
+                        const options = [
+                          ...prev.options,
+                          { value: String(next), displayText: '' },
+                        ];
+
+                        // Đủ mức thì cả 1..5 đều đã có chủ, nên xếp lại theo điểm
+                        // tăng dần: thứ tự dòng khớp thứ tự điểm, không còn cảnh
+                        // dòng 1 điểm nằm dưới dòng 5 điểm.
+                        return {
+                          ...prev,
+                          options:
+                            options.length === maximumAnswerScaleOptions
+                              ? options
+                                  .slice()
+                                  .sort((left, right) => Number(left.value) - Number(right.value))
+                              : options,
+                        };
+                      })
                     }
-                    disabled={scaleForm.options.length <= 2}
                   >
-                    Bớt đáp án
+                    <Plus aria-hidden="true" size={16} />
+                    Thêm đáp án
                   </button>
-                </div>
-              </>
-            )}
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() =>
+                    setScaleForm((prev) => ({
+                      ...prev,
+                      options: prev.options.slice(0, -1),
+                    }))
+                  }
+                  disabled={scaleForm.options.length <= 2}
+                >
+                  Bớt đáp án
+                </button>
+              </div>
+            </>
 
             <div className="modal-footer catalog-form-actions">
               {scaleForm.answerScaleId !== null && (
@@ -1225,7 +1176,7 @@ export const SurveyTemplatesPage: React.FC = () => {
         <div className="survey-question-preview">
           {viewing && (
             <p className="survey-question-preview-scale">
-              Thang trả lời đang dùng: <strong>{scaleNamesOf(viewing) || '—'}</strong>
+              Thang trả lời đang dùng: <strong>{scaleNameOf(viewing.answerScaleId)}</strong>
             </p>
           )}
           {viewing?.sections.map((section) => (
@@ -1243,9 +1194,6 @@ export const SurveyTemplatesPage: React.FC = () => {
                           : 'Bẫy'}
                       </span>
                       {question.questionText}
-                      <span className="survey-question-preview-badge">
-                        {scaleNameOf(question.answerScaleId)}
-                      </span>
                     </li>
                   ))}
               </ul>

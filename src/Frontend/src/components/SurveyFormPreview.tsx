@@ -436,23 +436,17 @@ export const SurveyFormPreview: React.FC<{
                         </span>
                         <p>{question.questionText}</p>
                       </div>
-                      {question.options.length === 0 ? (
-                        <div className="public-quiz-text">
-                          <textarea rows={3} readOnly placeholder="Nhập câu trả lời của bạn..." />
-                        </div>
-                      ) : (
-                        <div className="public-quiz-options">
-                          {question.options.map((option) => (
-                            <label className="public-quiz-option" key={option.value}>
-                              <input type="radio" name={`preview-${questionOrder}`} readOnly />
-                              <span className="public-quiz-option-text">
-                                <span className="public-quiz-option-value">{option.value}.</span>
-                                <span className="public-quiz-option-label">{option.displayText}</span>
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
+                      <div className="public-quiz-options">
+                        {question.options.map((option) => (
+                          <label className="public-quiz-option" key={option.value}>
+                            <input type="radio" name={`preview-${questionOrder}`} readOnly />
+                            <span className="public-quiz-option-text">
+                              <span className="public-quiz-option-value">{option.value}.</span>
+                              <span className="public-quiz-option-label">{option.displayText}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
                     </li>
                   );
                 })}

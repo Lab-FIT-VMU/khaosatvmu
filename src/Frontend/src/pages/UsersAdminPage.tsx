@@ -59,21 +59,6 @@ type StatusConfirmation =
   | { type: 'profile'; item: AdminProfile }
   | null;
 
-/**
- * Tên hồ sơ và hai ký tự cuối của mã hồ sơ suy thẳng từ vai trò được cấp, không để
- * quản trị tự gõ: gõ tay thì mỗi người một kiểu và mã hồ sơ mất luôn tính tra cứu.
- *
- * Mã hồ sơ do backend cấp số tự tăng khi tạo và không xuất hiện trong biểu mẫu.
- */
-const profileNamingByRole: Record<string, { name: string; suffix: string }> = {
-  ADMIN: { name: 'Quản trị hệ thống', suffix: 'AD' },
-  BOARD_OF_DIRECTORS: { name: 'Ban Giám hiệu', suffix: 'GH' },
-  DEPARTMENT_MANAGER: { name: 'Quản lý bộ môn', suffix: 'BM' },
-  FACULTY_MANAGER: { name: 'Quản lý khoa', suffix: 'KV' },
-  LECTURER: { name: 'Giảng viên', suffix: 'GV' },
-  SURVEY_ADMIN: { name: 'Quản trị khảo sát', suffix: 'QT' },
-};
-
 const emptyProfile: SaveAdminProfile = {
   name: '',
   roleId: '',
@@ -466,19 +451,11 @@ export function UsersAdminPage() {
       key: 'roles',
       value: roleLabelOf,
       values: rolesOf,
-      // Các vai trò cố định của hệ thống, cộng mục cho tài khoản chưa được cấp hồ sơ.
-      options: [
-        'Quản trị hệ thống',
-        'Quản trị khảo sát',
-        'Ban Giám hiệu',
-        'Quản lý khoa',
-        'Quản lý bộ môn',
-        'Giảng viên',
-        'Chưa có hồ sơ',
-      ],
+      // Các vai trò đang có, cộng mục cho tài khoản chưa được cấp hồ sơ.
+      options: [...roles.map((role) => role.name), 'Chưa có hồ sơ'],
     },
     { key: 'lastLogin', value: (user) => formatDate(user.lastLoginAt) },
-  ], []);
+  ], [roles]);
 
   const userFilters = useColumnFilters(userRows, userColumns);
 
@@ -508,9 +485,9 @@ export function UsersAdminPage() {
 
   // Vai trò đang chọn quyết định cả tên lẫn hậu tố mã, nên tính tại chỗ thay vì
   // giữ thêm state — state riêng thì đổi vai trò xong hai ô kia còn giá trị cũ.
-  const selectedRoleCode = roles.find((role) => role.id === profileForm.roleId)?.code ?? '';
-  const naming = profileNamingByRole[selectedRoleCode];
-  const derivedProfileName = naming?.name ?? '';
+  // Tên hồ sơ là tên vai trò, không để quản trị tự gõ: gõ tay thì mỗi người một kiểu.
+  // Mã hồ sơ do backend cấp (số tự tăng + hậu tố của vai trò) và không có trong biểu mẫu.
+  const derivedProfileName = roles.find((role) => role.id === profileForm.roleId)?.name ?? '';
 
   const handleSaveProfile = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -947,7 +924,7 @@ export function UsersAdminPage() {
           {roles.length === 0 ? (
             <p className="perm-empty">Chưa có vai trò nào trong hệ thống.</p>
           ) : (
-            <RolePermissionEditor roles={roles} />
+            <RolePermissionEditor roles={roles} onRolesChanged={loadRoles} />
           )}
         </section>
       ) : (
@@ -1020,6 +997,7 @@ export function UsersAdminPage() {
       <ProfileImportDialog
         isOpen={isImportProfilesOpen}
         onClose={() => setIsImportProfilesOpen(false)}
+        roleOptions={roles.map((role) => ({ roleCode: role.code, label: role.name }))}
         onImport={handleImportProfiles}
       />
 

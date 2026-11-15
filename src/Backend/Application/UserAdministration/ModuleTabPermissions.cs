@@ -54,14 +54,11 @@ public static class ModuleTabPermissions
     /// có quyền tab: Phân tích chuyên sâu trước đây tự lọc tab theo vai trò, các module
     /// khác hiện đủ mọi tab. Sau lần đầu, người quản trị bật tắt thế nào thì giữ thế đó.
     /// </summary>
-    public static bool IsGrantedByDefault(string roleCode, string tabCode)
+    /// <param name="dataScope">Phạm vi dữ liệu của vai trò (Domain.RoleDataScopes).</param>
+    public static bool IsGrantedByDefault(string dataScope, string tabCode) => tabCode switch
     {
-        var seesAllData = roleCode is RoleCodes.Admin or RoleCodes.SurveyAdmin or RoleCodes.BoardOfDirectors;
-        return tabCode switch
-        {
-            "SURVEY_ANALYSIS_TAB_FACULTIES" => seesAllData,
-            "SURVEY_ANALYSIS_TAB_DEPARTMENTS" or "SURVEY_ANALYSIS_TAB_COURSES" => roleCode != RoleCodes.Lecturer,
-            _ => true,
-        };
-    }
+        "SURVEY_ANALYSIS_TAB_FACULTIES" => dataScope == Domain.RoleDataScopes.All,
+        "SURVEY_ANALYSIS_TAB_DEPARTMENTS" or "SURVEY_ANALYSIS_TAB_COURSES" => dataScope != Domain.RoleDataScopes.Own,
+        _ => true,
+    };
 }

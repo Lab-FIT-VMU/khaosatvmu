@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { AuthApiError, authApi } from '../services/authApi';
 import type { AuthConfiguration, AuthMeResponse } from '../types';
 import { AuthContext } from './authContext';
+import { registerRoleCapabilities } from './roles';
 import type { AuthContextValue, AuthStatus } from './authContext';
 
 const anonymousState: Pick<AuthContextValue, 'user' | 'activeProfile' | 'availableProfiles' | 'access'> = {
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const access = await authApi.access();
+    registerRoleCapabilities(response.availableProfiles);
     setSession({
       user: response.user,
       activeProfile: response.activeProfile,

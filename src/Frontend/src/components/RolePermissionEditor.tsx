@@ -1,23 +1,50 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, RefreshCw, Save, Search, ShieldAlert } from 'lucide-react';
+import { AlertCircle, Pencil, Plus, RefreshCw, Save, Search, ShieldAlert, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { roleDisplayName } from '../auth/roles';
+import { ROLE_DATA_SCOPE_LABELS, roleDisplayName } from '../auth/roles';
 import { Modal } from './Modal';
+import { RoleFormDialog } from './RoleFormDialog';
 import { adminApi } from '../services/adminApi';
 import { ApiError } from '../services/apiClient';
-import type { AdminRole, RolePermissionMatrix } from '../types';
+import type { AdminRole, RolePermissionMatrix, SaveAdminRole } from '../types';
 import '../styles/auth-admin.css';
+
+/** Phải trùng RoleRules.MaximumRoles bên backend. */
+const MAXIMUM_ROLES = 8;
 
 interface RolePermissionEditorProps {
   roles: AdminRole[];
+  /** Tải lại danh sách vai trò sau khi thêm, sửa, xóa. */
+  onRolesChanged: () => Promise<void>;
 }
 
+const ROLE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
+  ADMIN_CANNOT_REVOKE_REQUIRED_PERMISSION:
+    'Quyền Người dùng & phân quyền và tab Phân quyền Module là bắt buộc đối với Quản trị hệ thống, không thể tắt.',
+  ADMIN_ROLE_LIMIT_REACHED: `Đã đủ ${MAXIMUM_ROLES} vai trò. Xóa bớt một vai trò rồi mới thêm được.`,
+  ADMIN_ROLE_NAME_REQUIRED: 'Vui lòng nhập tên vai trò.',
+  ADMIN_ROLE_NAME_EXISTS: 'Đã có vai trò trùng tên.',
+  ADMIN_ROLE_SUFFIX_INVALID: 'Hậu tố mã hồ sơ phải gồm 2–4 chữ cái hoặc chữ số.',
+  ADMIN_ROLE_SUFFIX_EXISTS: 'Hậu tố mã hồ sơ đã được vai trò khác dùng.',
+  ADMIN_ROLE_SCOPE_INVALID: 'Phạm vi dữ liệu không hợp lệ.',
+  ADMIN_ROLE_OWN_SCOPE_CANNOT_WRITE: 'Phạm vi "Chỉ lớp mình dạy" luôn chỉ xem.',
+  ADMIN_ROLE_SYSTEM_LOCKED: 'Vai trò Quản trị hệ thống và Giảng viên không xóa được.',
+  ADMIN_ROLE_ADMIN_SCOPE_LOCKED: 'Quản trị hệ thống luôn thấy và ghi toàn trường.',
+  ADMIN_CANNOT_DELETE_OWN_ROLE: 'Không xóa được vai trò của hồ sơ bạn đang đăng nhập.',
+  ADMIN_ROLE_NOT_FOUND: 'Vai trò không còn tồn tại. Hãy tải lại trang.',
+  PROFILE_READ_ONLY: 'Hồ sơ của bạn chỉ có quyền xem.',
+};
+
 function messageFromError(error: unknown): string {
-  if (error instanceof ApiError && error.errorCode === 'ADMIN_CANNOT_REVOKE_REQUIRED_PERMISSION') {
-    return 'Quyền Người dùng & phân quyền và tab Phân quyền Module là bắt buộc đối với Quản trị hệ thống, không thể tắt.';
+  if (error instanceof ApiError && ROLE_ERROR_MESSAGES[error.errorCode]) {
+    return ROLE_ERROR_MESSAGES[error.errorCode];
   }
   return error instanceof Error ? error.message : 'Không thể tải danh sách quyền';
 }
+
+/** Một dòng mô tả ngắn phạm vi và quyền ghi của vai trò. */
+const roleSummary = (role: AdminRole) =>
+  `${ROLE_DATA_SCOPE_LABELS[role.dataScope]} · ${role.canWrite ? 'Được ghi' : 'Chỉ xem'}`;
 
 /** Tắt đi thì Quản trị hệ thống mất màn hình duy nhất cấp lại quyền. */
 const ADMIN_REQUIRED_PERMISSIONS = new Set(['USER_ADMIN_ACCESS', 'USER_ADMIN_TAB_PERMISSIONS']);
@@ -46,8 +73,13 @@ function ancestorsOf(permissions: PermissionItem[], item: PermissionItem): Permi
   return result;
 }
 
-export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
+export function RolePermissionEditor({ roles, onRolesChanged }: RolePermissionEditorProps) {
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(roles[0]?.id ?? null);
+  const [roleForm, setRoleForm] = useState<{ open: boolean; role: AdminRole | null }>({ open: false, role: null });
+  const [roleFormSaving, setRoleFormSaving] = useState(false);
+  const [roleFormError, setRoleFormError] = useState<string | null>(null);
+  const [deletingRole, setDeletingRole] = useState<AdminRole | null>(null);
+  const [deletingBusy, setDeletingBusy] = useState(false);
   const [roleDataById, setRoleDataById] = useState<Record<string, RolePermissionMatrix>>({});
   const [loadingRole, setLoadingRole] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -228,6 +260,53 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
     return groups;
   }, [roleData, searchQuery]);
 
+  const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? null;
+  const roleLimitReached = roles.length >= MAXIMUM_ROLES;
+
+  const openRoleForm = (role: AdminRole | null) => {
+    setRoleFormError(null);
+    setRoleForm({ open: true, role });
+  };
+
+  const handleSaveRole = async (value: SaveAdminRole) => {
+    setRoleFormSaving(true);
+    setRoleFormError(null);
+    try {
+      const saved = roleForm.role
+        ? await adminApi.updateRole(roleForm.role.id, value)
+        : await adminApi.createRole(value);
+      await onRolesChanged();
+      await fetchRolePermissions();
+      setSelectedRoleId(saved.id);
+      setRoleForm({ open: false, role: null });
+      toast.success(roleForm.role ? 'Đã lưu vai trò' : 'Đã thêm vai trò', { description: saved.name });
+    } catch (error) {
+      setRoleFormError(messageFromError(error));
+    } finally {
+      setRoleFormSaving(false);
+    }
+  };
+
+  const handleDeleteRole = async () => {
+    if (!deletingRole) return;
+    setDeletingBusy(true);
+    try {
+      const result = await adminApi.deleteRole(deletingRole.id);
+      await onRolesChanged();
+      await fetchRolePermissions();
+      toast.success('Đã xóa vai trò', {
+        description: result.disabledProfileCount > 0
+          ? `${result.disabledProfileCount} hồ sơ đã bị vô hiệu hóa.`
+          : deletingRole.name,
+      });
+      setDeletingRole(null);
+    } catch (error) {
+      toast.error('Không xóa được vai trò', { description: messageFromError(error) });
+    } finally {
+      setDeletingBusy(false);
+    }
+  };
+
   return (
     <div className="perm-editor">
       <div className="perm-sidebar">
@@ -257,13 +336,53 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
                 aria-selected={role.id === selectedRoleId}
               >
                 <div className="perm-role-item__name">{roleDisplayName(role.code, role.name)}</div>
+                <div className="perm-role-item__meta">{roleSummary(role)}</div>
               </button>
             </li>
           ))}
         </ul>
+        <button
+          type="button"
+          className="btn btn-secondary perm-role-add"
+          onClick={() => openRoleForm(null)}
+          disabled={roleLimitReached}
+          title={roleLimitReached ? `Tối đa ${MAXIMUM_ROLES} vai trò` : undefined}
+        >
+          <Plus size={16} aria-hidden="true" />
+          Thêm vai trò ({roles.length}/{MAXIMUM_ROLES})
+        </button>
       </div>
 
       <div className="perm-content">
+        {selectedRole && (
+          <div className="perm-role-card">
+            <div className="perm-role-card__body">
+              <strong>{selectedRole.name}</strong>
+              <span>
+                {roleSummary(selectedRole)} · Mã hồ sơ …{selectedRole.profileCodeSuffix}
+                {' · '}{selectedRole.activeProfileCount} hồ sơ đang dùng
+              </span>
+              {selectedRole.description && <small>{selectedRole.description}</small>}
+            </div>
+            <div className="perm-role-card__actions">
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => openRoleForm(selectedRole)}>
+                <Pencil size={14} aria-hidden="true" />
+                Sửa
+              </button>
+              {!selectedRole.isSystem && (
+                <button
+                  type="button"
+                  className="btn catalog-danger-button btn-sm"
+                  onClick={() => setDeletingRole(selectedRole)}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                  Xóa
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="perm-content__toolbar">
           <div className="perm-search">
             <Search aria-hidden="true" size={16} />
@@ -375,6 +494,45 @@ export function RolePermissionEditor({ roles }: RolePermissionEditorProps) {
           </div>
         ))}
       </div>
+
+      <RoleFormDialog
+        isOpen={roleForm.open}
+        role={roleForm.role}
+        saving={roleFormSaving}
+        error={roleFormError}
+        onClose={() => setRoleForm({ open: false, role: null })}
+        onSubmit={(value) => void handleSaveRole(value)}
+      />
+
+      <Modal
+        isOpen={deletingRole !== null}
+        onClose={() => !deletingBusy && setDeletingRole(null)}
+        title="Xóa vai trò"
+      >
+        <div className="catalog-confirm">
+          <ShieldAlert aria-hidden="true" size={20} />
+          <p>
+            Xóa vai trò <strong>{deletingRole?.name}</strong>?
+            {deletingRole && deletingRole.activeProfileCount > 0
+              ? ` ${deletingRole.activeProfileCount} hồ sơ đang mang vai trò này sẽ bị vô hiệu hóa và đăng xuất;`
+                + ' tài khoản nào còn hồ sơ khác sẽ chuyển sang dùng hồ sơ đó.'
+              : ' Hiện không có hồ sơ nào dùng vai trò này.'}
+          </p>
+        </div>
+        <div className="modal-footer catalog-form-actions">
+          <button type="button" className="btn btn-secondary" onClick={() => setDeletingRole(null)} disabled={deletingBusy}>
+            Hủy
+          </button>
+          <button
+            type="button"
+            className="btn catalog-danger-button"
+            disabled={deletingBusy}
+            onClick={() => void handleDeleteRole()}
+          >
+            {deletingBusy ? 'Đang xóa...' : 'Xóa vai trò'}
+          </button>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={pendingRoleId !== null}

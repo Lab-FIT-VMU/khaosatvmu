@@ -2948,3 +2948,108 @@
     transition: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Quản lý vai trò trong tab Phân quyền Module: thêm, sửa, xóa vai trò.
+   --------------------------------------------------------------------------- */
+
+.perm-role-item__meta {
+  margin-top: 2px;
+  color: #68737d;
+  font-size: 12px;
+}
+
+.perm-role-add {
+  width: 100%;
+  margin-top: 10px;
+  justify-content: center;
+}
+
+.perm-role-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid #dfe4e8;
+  border-radius: 8px;
+  background: #f7f9fa;
+}
+
+.perm-role-card__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.perm-role-card__body span,
+.perm-role-card__body small {
+  color: #4a5466;
+  font-size: 13px;
+}
+
+.perm-role-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.role-form {
+  display: grid;
+  gap: 12px;
+}
+
+.role-form__row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr);
+}
+
+.role-form small {
+  color: #68737d;
+  font-size: 12px;
+}
+
+.role-form__scope {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #dfe4e8;
+  border-radius: 8px;
+}
+
+.role-form__scope legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+.role-form__scope:disabled {
+  opacity: 0.6;
+}
+
+.role-form__option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.role-form__option span {
+  display: grid;
+  gap: 1px;
+}
+
+.role-form__note {
+  margin: 0;
+  color: #4a5466;
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .role-form__row {
+    grid-template-columns: 1fr;
+  }
+}

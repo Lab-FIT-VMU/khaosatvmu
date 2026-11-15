@@ -290,11 +290,6 @@ public class ReportScopeTests
             analysis.ResponseCount.Should().BeGreaterThan(0);
             analysis.Questions.Should().NotBeEmpty();
             analysis.Questions
-                .Where(question => question.ScaleKind == AnswerScaleKinds.Text)
-                .All(question => question.TextAnswers != null && question.TextAnswers.Count <= 200)
-                .Should().BeTrue();
-            analysis.Questions
-                .Where(question => question.ScaleKind == AnswerScaleKinds.Options)
                 .All(question =>
                     question.OptionDistribution.Sum(option => option.Count) <= question.TotalAnswers)
                 .Should().BeTrue();

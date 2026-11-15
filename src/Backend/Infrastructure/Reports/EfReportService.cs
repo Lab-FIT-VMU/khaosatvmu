@@ -32,9 +32,6 @@ public sealed class EfReportService(
     /// <summary>Trần số tiêu chí trả về khi người dùng tự chọn số lượng, chặn truy vấn quá rộng.</summary>
     private const int MaxQuestionRankingCount = 50;
 
-    /// <summary>Trần số câu trả lời tự nhập trả kèm mỗi câu hỏi, tránh payload quá lớn.</summary>
-    private const int MaxTextAnswersPerQuestion = 200;
-
     /// <summary>
     /// Bảng lớp đã lọc theo trạng thái phát hành và phạm vi người xem. MỌI truy vấn số
     /// liệu của service này phải đi qua đây chứ không đọc thẳng <c>db.CourseSectionSurveys</c>:
@@ -203,9 +200,6 @@ public sealed class EfReportService(
         QuestionRatingDto rating,
         IReadOnlyDictionary<int, QuestionScoreSnapshot> snapshots)
     {
-        // Câu tự nhập không có điểm nên không nằm trong bảng điểm từng câu.
-        if (rating.ScaleKind == AnswerScaleKinds.Text) return rating;
-
         return snapshots.TryGetValue(rating.QuestionId, out var snapshot)
             ? rating with { AverageScore = snapshot.AverageScore, TotalAnswers = snapshot.AnswerCount }
             : rating with { AverageScore = 0, TotalAnswers = 0, OptionDistribution = [] };
@@ -712,13 +706,7 @@ public sealed class EfReportService(
         var scaleByQuestion = await LoadScalesByQuestionAsync(questions, cancellationToken);
         var questionOrders = await QuestionOrdersAsync(questionIds, cancellationToken);
 
-        var textQuestionIds = questions
-            .Where(q => scaleByQuestion.TryGetValue(q.QuestionId, out var s) && s?.IsText == true)
-            .Select(q => q.QuestionId)
-            .ToList();
-
         var numericQuestionIds = questions
-            .Where(q => !textQuestionIds.Contains(q.QuestionId))
             .Select(q => q.QuestionId)
             .ToList();
 
@@ -733,29 +721,6 @@ public sealed class EfReportService(
             .GroupBy(x => x.QuestionId)
             .ToDictionary(g => g.Key, g => g.Select(x => (x.AnswerValue, x.Count)).ToList());
 
-        var textCounts = textQuestionIds.Count == 0 ? [] : await validAnswersQuery
-            .Where(x => textQuestionIds.Contains(x.QuestionId) && x.AnswerValue != null && x.AnswerValue != "")
-            .GroupBy(x => x.QuestionId)
-            .Select(g => new { QuestionId = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-
-        var textCountLookup = textCounts.ToDictionary(x => x.QuestionId, x => x.Count);
-
-        var textSamples = textQuestionIds.Count == 0
-            ? []
-            : await db.SurveyQuestions.AsNoTracking()
-                .Where(q => textQuestionIds.Contains(q.QuestionId))
-                .SelectMany(q => validAnswersQuery
-                    .Where(x => x.QuestionId == q.QuestionId && x.AnswerValue != null && x.AnswerValue != "")
-                    .OrderByDescending(x => x.ResponseId)
-                    .Take(MaxTextAnswersPerQuestion)
-                    .Select(x => new { q.QuestionId, x.AnswerValue }))
-                .ToListAsync(cancellationToken);
-
-        var textSamplesByQuestion = textSamples
-            .GroupBy(x => x.QuestionId)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.AnswerValue!).ToList());
-
         var questionRatings = questions
             .Select(q => WithSnapshotScore(
                 BuildQuestionRatingFromAggregate(
@@ -763,9 +728,7 @@ public sealed class EfReportService(
                     questionOrders.GetValueOrDefault(q.QuestionId),
                     q.QuestionText,
                     numericLookup.GetValueOrDefault(q.QuestionId) ?? [],
-                    scaleByQuestion.GetValueOrDefault(q.QuestionId),
-                    textSamplesByQuestion.GetValueOrDefault(q.QuestionId),
-                    textCountLookup.GetValueOrDefault(q.QuestionId)),
+                    scaleByQuestion.GetValueOrDefault(q.QuestionId)),
                 questionSnapshots))
             .ToList();
 
@@ -973,13 +936,7 @@ public sealed class EfReportService(
         var validAnswersQuery = db.SurveyResponseAnswers.AsNoTracking()
             .Where(x => validResponseIds.Contains(x.ResponseId));
 
-        var textQuestionIds = questions
-            .Where(q => scaleByQuestion.TryGetValue(q.QuestionId, out var s) && s?.IsText == true)
-            .Select(q => q.QuestionId)
-            .ToList();
-
         var numericQuestionIds = questions
-            .Where(q => !textQuestionIds.Contains(q.QuestionId))
             .Select(q => q.QuestionId)
             .ToList();
 
@@ -994,38 +951,13 @@ public sealed class EfReportService(
             .GroupBy(x => x.QuestionId)
             .ToDictionary(g => g.Key, g => g.Select(x => (x.AnswerValue, x.Count)).ToList());
 
-        var textCounts = textQuestionIds.Count == 0 ? [] : await validAnswersQuery
-            .Where(x => textQuestionIds.Contains(x.QuestionId) && x.AnswerValue != null && x.AnswerValue != "")
-            .GroupBy(x => x.QuestionId)
-            .Select(g => new { QuestionId = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-
-        var textCountLookup = textCounts.ToDictionary(x => x.QuestionId, x => x.Count);
-
-        var textSamples = textQuestionIds.Count == 0
-            ? []
-            : await db.SurveyQuestions.AsNoTracking()
-                .Where(q => textQuestionIds.Contains(q.QuestionId))
-                .SelectMany(q => validAnswersQuery
-                    .Where(x => x.QuestionId == q.QuestionId && x.AnswerValue != null && x.AnswerValue != "")
-                    .OrderByDescending(x => x.ResponseId)
-                    .Take(MaxTextAnswersPerQuestion)
-                    .Select(x => new { q.QuestionId, x.AnswerValue }))
-                .ToListAsync(cancellationToken);
-
-        var textSamplesByQuestion = textSamples
-            .GroupBy(x => x.QuestionId)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.AnswerValue!).ToList());
-
         var questionRatings = questions
             .Select(q => BuildQuestionRatingFromAggregate(
                 q.QuestionId,
                 questionOrders.GetValueOrDefault(q.QuestionId),
                 q.QuestionText,
                 numericLookup.GetValueOrDefault(q.QuestionId) ?? [],
-                scaleByQuestion.GetValueOrDefault(q.QuestionId),
-                textSamplesByQuestion.GetValueOrDefault(q.QuestionId),
-                textCountLookup.GetValueOrDefault(q.QuestionId)))
+                scaleByQuestion.GetValueOrDefault(q.QuestionId)))
             .ToList();
 
         return new SurveyQuestionSummaryReportDto(
@@ -1828,9 +1760,8 @@ public sealed class EfReportService(
         {
             int qId = group.Key;
 
-            // Câu tự nhập không có điểm nên không xếp hạng "yếu nhất" được.
             var scale = scaleByQuestion.GetValueOrDefault(qId);
-            if (scale is null || scale.IsText) continue;
+            if (scale is null) continue;
 
             int total = group.Sum(x => x.Count);
             if (total < WeakQuestionMinAnswers) continue;
@@ -1861,7 +1792,6 @@ public sealed class EfReportService(
                 Math.Round(sum / scored, 3),
                 total,
                 options,
-                AnswerScaleKinds.Options,
                 scale.AnswerScaleName));
         }
 
@@ -1879,7 +1809,7 @@ public sealed class EfReportService(
             .ToDictionary(x => x.Id, x => x.Index);
 
         return ratings
-            // Câu bẫy và câu tự nhập bị loại ở vòng lặp trên nên có thể thiếu; giữ nguyên
+            // Câu bẫy và câu ít lượt trả lời bị loại ở vòng lặp trên nên có thể thiếu; giữ nguyên
             // thứ tự tương đối của những câu còn lại.
             .Where(x => candidateOrder.ContainsKey(x.QuestionId))
             .OrderBy(x => candidateOrder[x.QuestionId])
@@ -2076,21 +2006,32 @@ public sealed class EfReportService(
     private sealed record ScaleInfo(
         int AnswerScaleId,
         string AnswerScaleName,
-        string ScaleKind,
-        IReadOnlyList<AnswerScaleOption> Options)
-    {
-        public bool IsText => ScaleKind == AnswerScaleKinds.Text;
-    }
+        IReadOnlyList<AnswerScaleOption> Options);
 
-    /// <summary>Nạp thang trả lời của một tập câu hỏi, tra theo "QuestionId".</summary>
+    /// <summary>
+    /// Nạp thang trả lời của một tập câu hỏi, tra theo "QuestionId". Câu không mang thang
+    /// riêng: thang là của bộ chứa câu (qua mục). Đọc cả bộ và thang đã xoá mềm vì báo
+    /// cáo của đợt cũ vẫn phải hiện được nhãn các mức.
+    /// </summary>
     private async Task<Dictionary<int, ScaleInfo>> LoadScalesByQuestionAsync(
         IReadOnlyList<SurveyQuestion> questions,
         CancellationToken cancellationToken)
     {
         if (questions.Count == 0) return [];
 
-        var scaleIds = questions.Select(x => x.AnswerScaleId).Distinct().ToList();
-        var scales = await db.AnswerScales.AsNoTracking()
+        var questionIds = questions.Select(x => x.QuestionId).ToList();
+        var scaleIdByQuestion = await (
+            from question in db.SurveyQuestions.IgnoreQueryFilters().AsNoTracking()
+            join section in db.SurveyQuestionSections.IgnoreQueryFilters().AsNoTracking()
+                on question.SectionId equals section.SectionId
+            join template in db.SurveyTemplates.IgnoreQueryFilters().AsNoTracking()
+                on section.SurveyTemplateId equals template.SurveyTemplateId
+            where questionIds.Contains(question.QuestionId)
+            select new { question.QuestionId, template.AnswerScaleId })
+            .ToDictionaryAsync(x => x.QuestionId, x => x.AnswerScaleId, cancellationToken);
+
+        var scaleIds = scaleIdByQuestion.Values.Distinct().ToList();
+        var scales = await db.AnswerScales.IgnoreQueryFilters().AsNoTracking()
             .Where(x => scaleIds.Contains(x.AnswerScaleId))
             .ToListAsync(cancellationToken);
         var options = await db.AnswerScaleOptions.AsNoTracking()
@@ -2104,18 +2045,13 @@ public sealed class EfReportService(
             scale => new ScaleInfo(
                 scale.AnswerScaleId,
                 scale.AnswerScaleName,
-                scale.ScaleKind,
                 optionsByScaleId[scale.AnswerScaleId].ToList()));
 
-        return questions
-            .Where(question => infoById.ContainsKey(question.AnswerScaleId))
-            .ToDictionary(question => question.QuestionId, question => infoById[question.AnswerScaleId]);
+        return scaleIdByQuestion
+            .Where(pair => infoById.ContainsKey(pair.Value))
+            .ToDictionary(pair => pair.Key, pair => infoById[pair.Value]);
     }
 
-    /// <summary>
-    /// Thống kê một câu hỏi. Câu thang 'Options' ra điểm trung bình và phân bố các
-    /// mức của chính thang đó; câu thang 'Text' ra danh sách nội dung người học gõ.
-    /// </summary>
     /// <summary>
     /// Các câu của một bộ đề. "SurveyQuestions" không còn khoá ngoại thẳng tới
     /// "SurveyTemplates" — bộ của một câu suy ra từ mục chứa nó.
@@ -2129,7 +2065,7 @@ public sealed class EfReportService(
 
     /// <summary>
     /// Số thứ tự hiển thị (C1, C2...) của các câu trong một bộ đề. Câu bẫy KHÔNG
-    /// được đánh số nên số chạy liền mạch; câu tự nhập vẫn giữ số như câu thường.
+    /// được đánh số nên số chạy liền mạch.
     /// Phải trùng khít cách đánh số của trang bảng dữ liệu khảo sát, lệch nhau thì
     /// C16 ở màn này là C15 ở màn kia.
     /// </summary>
@@ -2201,26 +2137,6 @@ public sealed class EfReportService(
             return new QuestionRatingDto(questionId, questionOrder, questionText, 0, total, []);
         }
 
-        if (scale.IsText)
-        {
-            var texts = answers
-                .Select(x => x.AnswerValue)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Take(MaxTextAnswersPerQuestion)
-                .ToList();
-
-            return new QuestionRatingDto(
-                questionId,
-                questionOrder,
-                questionText,
-                0,
-                total,
-                [],
-                AnswerScaleKinds.Text,
-                scale.AnswerScaleName,
-                texts);
-        }
-
         // Chỉ "AnswerValue" đọc được ra số mới vào điểm; dòng hỏng thì bỏ qua.
         var values = answers
             .Select(x => int.TryParse(x.AnswerValue, out var value) ? value : (int?)null)
@@ -2248,7 +2164,6 @@ public sealed class EfReportService(
             average,
             total,
             distribution,
-            AnswerScaleKinds.Options,
             scale.AnswerScaleName);
     }
 
@@ -2257,9 +2172,7 @@ public sealed class EfReportService(
         int questionOrder,
         string questionText,
         IEnumerable<(string Value, int Count)> valueCounts,
-        ScaleInfo? scale,
-        IReadOnlyList<string>? textSamples = null,
-        int? textTotalCount = null)
+        ScaleInfo? scale)
     {
         var countList = valueCounts.ToList();
         int total = countList.Sum(x => x.Count);
@@ -2267,27 +2180,6 @@ public sealed class EfReportService(
         if (scale is null)
         {
             return new QuestionRatingDto(questionId, questionOrder, questionText, 0, total, []);
-        }
-
-        if (scale.IsText)
-        {
-            var texts = (textSamples ?? [])
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Take(MaxTextAnswersPerQuestion)
-                .ToList();
-
-            int textTotal = textTotalCount ?? (total > 0 ? total : texts.Count);
-
-            return new QuestionRatingDto(
-                questionId,
-                questionOrder,
-                questionText,
-                0,
-                textTotal,
-                [],
-                AnswerScaleKinds.Text,
-                scale.AnswerScaleName,
-                texts);
         }
 
         long sumScores = 0;
@@ -2323,7 +2215,6 @@ public sealed class EfReportService(
             average,
             total,
             distribution,
-            AnswerScaleKinds.Options,
             scale.AnswerScaleName);
     }
 

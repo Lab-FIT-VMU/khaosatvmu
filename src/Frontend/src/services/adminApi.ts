@@ -10,6 +10,8 @@ import type {
   RolePermissionGrantDto,
   RolePermissionMatrix,
   SaveAdminProfile,
+  SaveAdminRole,
+  RoleDeletionResult,
   AdminProfileImportResult,
 } from '../types';
 import { apiRequest, csrfRequest } from './apiClient';
@@ -41,6 +43,12 @@ export const adminApi = {
   setUserStatus: (userId: string, isActive: boolean) =>
     csrfRequest<AdminUser>(`/api/admin/users/${userId}/status`, 'PATCH', { isActive }),
   roles: () => apiRequest<AdminRole[]>('/api/admin/roles'),
+  createRole: (role: SaveAdminRole) => csrfRequest<AdminRole>('/api/admin/roles', 'POST', role),
+  updateRole: (roleId: string, role: SaveAdminRole) =>
+    csrfRequest<AdminRole>(`/api/admin/roles/${roleId}`, 'PUT', role),
+  /** Xóa vai trò; mọi hồ sơ đang mang vai trò đó bị vô hiệu hóa. */
+  deleteRole: (roleId: string) =>
+    csrfRequest<RoleDeletionResult>(`/api/admin/roles/${roleId}`, 'DELETE'),
   createProfile: (userId: string, profile: SaveAdminProfile) =>
     csrfRequest<AdminProfile>(`/api/admin/users/${userId}/profiles`, 'POST', profile),
   updateProfile: (userId: string, profileId: string, profile: SaveAdminProfile) =>

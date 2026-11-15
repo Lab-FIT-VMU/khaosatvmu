@@ -153,8 +153,7 @@ export function CourseGradeUploadPage() {
         replaceReason: preview.activeRevisionId ? replaceReason : null,
       });
       toast.success(
-        `Đã nạp ${formatNumber(result.importedRowCount)} dòng điểm cho ${preview.semesterLabel}`
-        + (result.createdStudentCount > 0 ? `, thêm ${formatNumber(result.createdStudentCount)} sinh viên mới.` : '.'),
+        `Đã nạp ${formatNumber(result.importedRowCount)} dòng điểm cho ${preview.semesterLabel}.`,
       );
       chooseFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -285,7 +284,7 @@ export function CourseGradeUploadPage() {
             <div><dt>Dòng trong file</dt><dd>{formatNumber(preview.sourceRowCount)}</dd></div>
             <div><dt>Dòng dùng được (bộ luật A)</dt><dd>{formatNumber(preview.usableRowCount)}</dd></div>
             <div><dt>Ghép được với lớp học phần</dt><dd>{formatNumber(preview.matchedRowCount)}</dd></div>
-            <div><dt>Sinh viên</dt><dd>{formatNumber(preview.studentCount)}<small>{formatNumber(preview.newStudentCount)} mới</small></dd></div>
+            <div><dt>Sinh viên</dt><dd>{formatNumber(preview.studentCount)}</dd></div>
           </dl>
 
           {preview.warnings.length > 0 && (

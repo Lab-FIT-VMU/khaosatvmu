@@ -64,7 +64,6 @@ const SurveyStatisticsPage = lazy(() => import('./pages/SurveyStatisticsPage').t
 const SurveyAnalysisPage = lazy(() => import('./pages/SurveyAnalysisPage').then(m => ({ default: m.SurveyAnalysisPage })));
 const SurveyDashboardPage = lazy(() => import('./pages/SurveyDashboardPage').then(m => ({ default: m.SurveyDashboardPage })));
 const GraduationAnalytics2Page = lazy(() => import('./pages/GraduationAnalytics2Page').then(m => ({ default: m.GraduationAnalytics2Page })));
-const StudentsPage = lazy(() => import('./pages/StudentsPage').then(m => ({ default: m.StudentsPage })));
 const CourseGradeUploadPage = lazy(() => import('./pages/CourseGradeUploadPage').then(m => ({ default: m.CourseGradeUploadPage })));
 const CourseGradeReportsPage = lazy(() => import('./pages/CourseGradeReportsPage').then(m => ({ default: m.CourseGradeReportsPage })));
 /** Mục sidebar của báo cáo phân tích điểm → cấp báo cáo (CourseGradeReportsPage). */
@@ -74,6 +73,7 @@ const COURSE_GRADE_REPORT_VIEWS: Record<string, CourseGradeReportView> = {
   'course-grade-report-department': 'department',
   'course-grade-report-trends': 'trends',
   'course-grade-glossary': 'glossary',
+  'course-grade-design': 'design',
 };
 const courseGradeReportTab = (view: CourseGradeReportView) =>
   Object.keys(COURSE_GRADE_REPORT_VIEWS).find((tab) => COURSE_GRADE_REPORT_VIEWS[tab] === view) ?? 'course-grade-report-school';
@@ -703,7 +703,6 @@ function DashboardApp() {
             )}
             {currentTab === 'course-grade-thresholds' && <CourseGradeThresholdsPage />}
 
-            {currentTab === 'students' && <StudentsPage />}
 
             {currentTab === 'academic-years' && <AcademicYearsPage />}
 

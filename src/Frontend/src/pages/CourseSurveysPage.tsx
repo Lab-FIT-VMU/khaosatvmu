@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../auth/authContext';
-import { isUnitManagerRole, isUnrestrictedRole, ROLE_CODES } from '../auth/roles';
+import { isUnitScopedRole, isUnrestrictedRole, seesOnlyOwnSections } from '../auth/roles';
 import { writeSemesterSurveysCache } from '../hooks/useSemesterSurveys';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { CreateSurveyDialog } from '../components/CreateSurveyDialog';
@@ -235,8 +235,8 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
   // Thêm phạm vi chỉ còn dành cho quản trị. Trưởng bộ môn trước đây tự thêm được
   // bộ môn mình vào đợt, giờ tắt theo yêu cầu.
   const canAddScope = canManageCampaign;
-  const canViewReports = canManageCampaign || isUnitManagerRole(roleCode);
-  const hideCampaignCounts = isUnitManagerRole(roleCode) || roleCode === ROLE_CODES.lecturer;
+  const canViewReports = canManageCampaign || isUnitScopedRole(roleCode);
+  const hideCampaignCounts = isUnitScopedRole(roleCode) || seesOnlyOwnSections(roleCode);
 
   const [templates, setTemplates] = useState<SurveyTemplate[]>([]);
   /** Thang trả lời của mọi bộ, để màn soạn phiếu dựng đúng các mức của từng câu. */
@@ -274,15 +274,13 @@ export const CourseSurveysPage: React.FC<CourseSurveysPageProps> = ({
     );
     if (!template) return undefined;
 
-    const scaleById = new Map(answerScales.map((scale) => [scale.answerScaleId, scale]));
+    // Cả bộ dùng một thang nên mọi câu có cùng các mức chọn.
+    const options = (
+      answerScales.find((scale) => scale.answerScaleId === template.answerScaleId)?.options ?? []
+    ).map((option) => ({ value: option.value, displayText: option.displayText }));
     const questionsOfSection = (sectionId: number) => template.questions
       .filter((question) => question.sectionId === sectionId)
-      .map((question) => ({
-        questionText: question.questionText,
-        // Thang loại Text không có mức nào; xem trước dựng thành ô nhập chữ.
-        options: (scaleById.get(question.answerScaleId)?.options ?? [])
-          .map((option) => ({ value: option.value, displayText: option.displayText })),
-      }));
+      .map((question) => ({ questionText: question.questionText, options }));
 
     return {
       surveyName: designerTarget.surveyName,

@@ -13,7 +13,11 @@ export class ApiError extends Error {
   public readonly body: Record<string, unknown>;
 
   constructor(status: number, errorCode: string, body: Record<string, unknown> = {}) {
-    super(errorCode);
+    // Bộ chặn ghi tập trung ở backend trả cùng một mã cho mọi trang; cho nó câu chữ sẵn để
+    // trang nào hiện error.message cũng đọc được.
+    super(errorCode === 'PROFILE_READ_ONLY'
+      ? 'Hồ sơ đang dùng chỉ có quyền xem, không thực hiện được thao tác này.'
+      : errorCode);
     this.status = status;
     this.errorCode = errorCode;
     this.body = body;

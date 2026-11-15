@@ -60,7 +60,7 @@ không kèm dữ liệu điểm), 2 = cấu hình sai.
 ## Khác với bản gốc (có chủ ý)
 
 1. **Thứ tự cố định.** Bộ tính nhạy với thứ tự dòng (p-value Monte Carlo của H4, điểm dừng của
-   `statsmodels.MixedLM`). Worker sắp lớp theo (mã HP, nhóm) và dòng theo (mã HP, nhóm, StudentId), nên
+   `statsmodels.MixedLM`). Worker sắp lớp theo (mã HP, nhóm) và dòng theo (mã HP, nhóm, StudentNumber), nên
    cùng dữ liệu luôn cho cùng số, kể cả sau khi nạp lại.
 2. **Kiểm định F khi X trùng hệt Y.** Bản gốc chỉ bỏ qua khi phần dư bằng đúng 0; phần dư ~1e-29 do nhiễu
    số học cho p = 0 hay p = 1 tùy nền tảng, và đã bật cờ H1 sai cho học phần 22729 (HK1 2024–2025) và

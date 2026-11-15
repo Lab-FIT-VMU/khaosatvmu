@@ -1,5 +1,3 @@
-using Domain;
-
 namespace Application.Surveys;
 
 /// <summary>Mã lý do một phiếu bị lọc, lưu vào "SurveyResponses"."RejectionReasons".</summary>
@@ -17,9 +15,8 @@ public static class RejectionReasonCodes
 
 /// <summary>Một câu hỏi rút gọn, đủ để bộ lọc làm việc mà không cần chạm cơ sở dữ liệu.</summary>
 /// <param name="QuestionId">Khóa của câu hỏi.</param>
-/// <param name="ScaleKind"><see cref="AnswerScaleKinds.Options"/> hoặc <see cref="AnswerScaleKinds.Text"/>.</param>
 /// <param name="AttentionCheckValue">Mức bắt buộc của câu bẫy; null là câu bình thường.</param>
-public sealed record FilterQuestion(int QuestionId, string ScaleKind, int? AttentionCheckValue);
+public sealed record FilterQuestion(int QuestionId, int? AttentionCheckValue);
 
 /// <summary>Một câu trả lời thô, giá trị luôn ở dạng chữ giống lúc lưu xuống.</summary>
 public sealed record FilterAnswer(int QuestionId, string AnswerValue);
@@ -49,7 +46,7 @@ public static class ResponseFilter
 
     /// <summary>
     /// Ngưỡng thời gian tối thiểu của cả bài: tính trên TỔNG số câu, kể cả câu
-    /// tự nhập chữ và câu bẫy (quyết định A-d).
+    /// bẫy (quyết định A-d).
     /// </summary>
     public static double MinimumSeconds(int questionCount) => questionCount * SecondsPerQuestion;
 
@@ -84,7 +81,6 @@ public static class ResponseFilter
 
         foreach (var question in questions)
         {
-            if (question.ScaleKind != AnswerScaleKinds.Options) continue;
             if (!answerByQuestion.TryGetValue(question.QuestionId, out var value)) continue;
 
             if (question.AttentionCheckValue is { } required)

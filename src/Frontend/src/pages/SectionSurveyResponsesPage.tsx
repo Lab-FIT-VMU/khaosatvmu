@@ -572,34 +572,24 @@ export const SectionSurveyResponsesPage: React.FC<SectionSurveyResponsesPageProp
                   </tr>
                 </thead>
                 <tbody>
-                  {detail.answers.map((answer, index) => {
-                    const scale = detail.answerScales.find(
-                      (item) => item.answerScaleId === answer.answerScaleId
-                    );
-
-                    return (
-                      <tr key={answer.questionId}>
-                        <td className="response-detail-question" style={{ textAlign: 'left' }}>
-                          {index + 1}. {answer.questionText}
-                        </td>
-                        <td style={{ textAlign: 'left' }}>{scale?.answerScaleName ?? '—'}</td>
-                        <td style={{ textAlign: 'left' }}>
-                          {answer.scaleKind === 'Text' ? (
-                            <span className="response-comment">
-                              {answer.answerValue || 'Không trả lời.'}
-                            </span>
-                          ) : (
-                            <span>
-                              {answer.selectedText || '—'}
-                              {answer.selectedValue !== null && (
-                                <small> ({answer.selectedValue})</small>
-                              )}
-                            </span>
+                  {detail.answers.map((answer, index) => (
+                    <tr key={answer.questionId}>
+                      <td className="response-detail-question" style={{ textAlign: 'left' }}>
+                        {index + 1}. {answer.questionText}
+                      </td>
+                      <td style={{ textAlign: 'left' }}>
+                        {detail.answerScale?.answerScaleName ?? '—'}
+                      </td>
+                      <td style={{ textAlign: 'left' }}>
+                        <span>
+                          {answer.selectedText || answer.answerValue || '—'}
+                          {answer.selectedValue !== null && answer.selectedText && (
+                            <small> ({answer.selectedValue})</small>
                           )}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

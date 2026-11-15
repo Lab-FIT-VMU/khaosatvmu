@@ -15,7 +15,6 @@ import {
 import { Modal } from '../components/Modal';
 import { ApiError } from '../services/apiClient';
 import { publicSurveyApi, surveyErrorMessage } from '../services/surveyApi';
-import { maximumTextAnswerLength } from '../types';
 import type { AnswerScale, PublicSurvey, SurveyFormConfig } from '../types';
 import {
   coverStyleOf,
@@ -193,15 +192,15 @@ function toRoman(value: number): string {
 /**
  * Gom câu theo mục: mỗi mục là một thẻ, bên trong là các câu của mục.
  *
- * Mỗi câu vẫn đứng riêng một dòng chứ không gộp thành bảng ma trận — bộ đề trộn
- * nhiều loại thang thì bảng vỡ thành mấy khối rời rạc mỗi khối một bộ cột.
+ * Mỗi câu đứng riêng một dòng chứ không gộp thành bảng ma trận. Cả bộ dùng một thang
+ * (`survey.answerScale`) nên mọi câu có cùng các mức chọn.
  *
  * Số thứ tự chạy suốt cả phiếu và đánh trên MỌI câu, kể cả câu bẫy: số ở đây phải
  * khớp thanh tiến độ và lưới điều hướng cuối phiếu. Bỏ số của câu bẫy là chỉ thẳng
  * vào nó cho sinh viên thấy. Các màn quản trị thì ngược lại — bên đó bẫy không số.
  */
 function buildSectionGroups(survey: PublicSurvey): SectionGroup[] {
-  const scaleById = new Map(survey.answerScales.map((scale) => [scale.answerScaleId, scale]));
+  const scale = survey.answerScale;
   const groups: SectionGroup[] = [];
   const groupBySectionId = new Map<number, SectionGroup>();
 
@@ -217,7 +216,6 @@ function buildSectionGroups(survey: PublicSurvey): SectionGroup[] {
   });
 
   survey.questions.forEach((question, index) => {
-    const scale = scaleById.get(question.answerScaleId);
     const group = groupBySectionId.get(question.sectionId);
     if (!scale || !group) return;
 
@@ -225,7 +223,7 @@ function buildSectionGroups(survey: PublicSurvey): SectionGroup[] {
   });
 
   // Mục rỗng không hiện: backend không cho lưu mục không có câu nào, nhưng dữ
-  // liệu cũ hoặc câu bị bỏ thang có thể để lại mục trống.
+  // liệu cũ có thể để lại mục trống.
   return groups.filter((group) => group.rows.length > 0);
 }
 
@@ -250,8 +248,7 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
   const [blockedCode, setBlockedCode] = useState<string | null>(null);
   const [blockedForm, setBlockedForm] = useState<SurveyFormConfig | null>(null);
 
-  // Giá trị thô theo "SurveyResponseAnswers"."AnswerValue": số mức đã chọn dạng
-  // chuỗi với câu chọn mức, nội dung đã gõ với câu tự nhập.
+  // Giá trị thô theo "SurveyResponseAnswers"."AnswerValue": số mức đã chọn dạng chuỗi.
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [comments, setComments] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -809,10 +806,8 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
         <form onSubmit={handleSubmitRequest}>
           {/*
             Cả một mục nằm chung một thẻ, tiêu đề mục là dải trên cùng của thẻ đó.
-            Bên trong, mỗi câu vẫn là một dòng riêng chứ không gộp thành bảng ma
-            trận: bảng ma trận chỉ gọn khi cả bộ đề dùng đúng một thang, bộ trộn
-            thang chọn mức với Có/Không và câu tự nhập thì nó vỡ thành mấy bảng rời
-            rạc, mỗi bảng một bộ cột khác nhau.
+            Bên trong, mỗi câu là một dòng riêng chứ không gộp thành bảng ma trận:
+            đọc trên điện thoại dễ hơn, và mọi câu dùng chung thang của bộ.
           */}
           {sectionGroups.map((group) => (
             <section className="public-quiz-section" key={group.sectionId}>
@@ -837,31 +832,6 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
                     <p>{question.questionText}</p>
                   </div>
 
-                  {scale.scaleKind === 'Text' ? (
-                    <div className="public-quiz-text">
-                      <textarea
-                        id={`question-${question.questionId}`}
-                        rows={3}
-                        maxLength={maximumTextAnswerLength}
-                        placeholder="Nhập câu trả lời của bạn..."
-                        aria-label={question.questionText}
-                        aria-invalid={invalidQuestionId === question.questionId}
-                        value={value}
-                        disabled={!survey.isOpen || submitting}
-                        onChange={(event) => {
-                          setAnswers((prev) => ({
-                            ...prev,
-                            [question.questionId]: event.target.value,
-                          }));
-                          setSubmitError(null);
-                          setInvalidQuestionId(null);
-                        }}
-                      />
-                      <span className="public-survey-counter">
-                        {value.length}/{maximumTextAnswerLength}
-                      </span>
-                    </div>
-                  ) : (
                     <div
                       className="public-quiz-options"
                       role="radiogroup"
@@ -898,7 +868,6 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
                         );
                       })}
                     </div>
-                  )}
                     </li>
                   );
                 })}

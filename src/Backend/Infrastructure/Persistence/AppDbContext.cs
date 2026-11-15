@@ -47,7 +47,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<GraduationRoundRevisionAggregate> GraduationRoundRevisionAggregates => Set<GraduationRoundRevisionAggregate>();
     public DbSet<CohortMajorGraduation> CohortMajorGraduations => Set<CohortMajorGraduation>();
     public DbSet<ChangeAuditLog> ChangeAuditLogs => Set<ChangeAuditLog>();
-    public DbSet<Student> Students => Set<Student>();
     public DbSet<GradeImportRevision> GradeImportRevisions => Set<GradeImportRevision>();
     public DbSet<StudentCourseGrade> StudentCourseGrades => Set<StudentCourseGrade>();
     public DbSet<GradeAnalysisThreshold> GradeAnalysisThresholds => Set<GradeAnalysisThreshold>();
@@ -61,7 +60,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasSequence<long>("UserProfileCodeSequence");
-        modelBuilder.Entity<Student>().HasQueryFilter(e => !e.IsDeleted);
 
         // Global soft-delete filters — excluded from queries unless .IgnoreQueryFilters() is used
         modelBuilder.Entity<Role>().HasQueryFilter(e => !e.IsDeleted);
@@ -141,12 +139,28 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         modelBuilder.Entity<Role>(entity =>
         {
-            entity.ToTable("Roles");
+            entity.ToTable("Roles", table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_Roles_DataScope",
+                    "\"DataScope\" IN ('ALL', 'FACULTY', 'DEPARTMENT', 'OWN')");
+                // Phạm vi "lớp mình dạy" không có thao tác ghi nào: bật ghi thì code sẽ quy
+                // về bộ môn của giảng viên và mở quyền ghi cả bộ môn.
+                table.HasCheckConstraint(
+                    "CK_Roles_OwnScopeReadOnly",
+                    "\"DataScope\" <> 'OWN' OR NOT \"CanWrite\"");
+            });
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Code).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.DataScope).HasMaxLength(20).IsRequired();
+            entity.Property(x => x.ProfileCodeSuffix).HasMaxLength(4).IsRequired();
             entity.HasIndex(x => x.Code).IsUnique();
+            // Tên và hậu tố chỉ cần duy nhất giữa các vai trò còn dùng: xóa rồi tạo lại đúng
+            // tên cũ là thao tác tự nhiên.
+            entity.HasIndex(x => x.Name).IsUnique().HasFilter("NOT \"IsDeleted\"");
+            entity.HasIndex(x => x.ProfileCodeSuffix).IsUnique().HasFilter("NOT \"IsDeleted\"");
         });
 
         modelBuilder.Entity<Permission>(entity =>
@@ -572,13 +586,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         // service (dtb.md cho phép bỏ trigger và validate trong backend).
         modelBuilder.Entity<AnswerScale>(entity =>
         {
-            entity.ToTable("AnswerScales", table =>
-                table.HasCheckConstraint(
-                    "CK_AnswerScales_ScaleKind",
-                    "\"ScaleKind\" IN ('Options', 'Text')"));
+            entity.ToTable("AnswerScales");
             entity.HasKey(x => x.AnswerScaleId);
             entity.Property(x => x.AnswerScaleName).IsRequired();
-            entity.Property(x => x.ScaleKind).HasMaxLength(20).IsRequired();
         });
 
         modelBuilder.Entity<AnswerScaleOption>(entity =>
@@ -599,6 +609,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.ToTable("SurveyTemplates");
             entity.HasKey(x => x.SurveyTemplateId);
             entity.Property(x => x.TemplateName).IsRequired();
+            // Mỗi bộ đúng một thang, dùng chung cho mọi câu của bộ.
+            entity.HasIndex(x => x.AnswerScaleId);
+            entity.HasOne<AnswerScale>()
+                .WithMany()
+                .HasForeignKey(x => x.AnswerScaleId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Mục chia nhóm câu hỏi, thuộc sở hữu của đúng một bộ câu hỏi.
@@ -618,26 +634,21 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Thang trả lời gắn ở từng câu hỏi nên một bộ trộn được nhiều loại thang.
         // Bộ câu hỏi của một câu suy ra từ mục, không có khoá ngoại thẳng tới bộ.
+        // Thang trả lời cũng không nằm ở câu: mọi câu dùng thang của bộ.
         modelBuilder.Entity<SurveyQuestion>(entity =>
         {
             entity.ToTable("SurveyQuestions");
             entity.HasKey(x => x.QuestionId);
             entity.Property(x => x.QuestionText).IsRequired();
-            // Ràng buộc "chỉ đặt bẫy trên thang Options và mức phải có thật" cần
-            // tra sang bảng khác nên kiểm ở tầng service, không đặt CHECK ở đây.
+            // Ràng buộc "mức bắt buộc của câu bẫy phải có thật trong thang của bộ"
+            // cần tra sang bảng khác nên kiểm ở tầng service, không đặt CHECK ở đây.
             entity.HasIndex(x => x.SectionId);
-            entity.HasIndex(x => x.AnswerScaleId);
             // RESTRICT chứ không CASCADE: mục bị bỏ đi là xoá mềm, câu trong mục
             // cũng xoá mềm theo, nên không bao giờ có DELETE thật để mà đổ dây.
             entity.HasOne<SurveyQuestionSection>()
                 .WithMany()
                 .HasForeignKey(x => x.SectionId)
-                .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne<AnswerScale>()
-                .WithMany()
-                .HasForeignKey(x => x.AnswerScaleId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -762,8 +773,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // "AnswerValue" lưu dạng chữ cho cả hai loại thang: câu thang Options lưu
-        // số mức ("1".."5"), câu thang Text lưu nội dung người học gõ.
+        // "AnswerValue" lưu số mức ("1".."5") dưới dạng chữ — cột chữ là do trước đây
+        // có thang tự nhập chữ.
         modelBuilder.Entity<SurveyResponseAnswer>(entity =>
         {
             entity.ToTable("SurveyResponseAnswers");

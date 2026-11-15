@@ -8,7 +8,6 @@ using Application.CourseGrades;
 using DocumentFormat.OpenXml.Packaging;
 using Domain;
 using Infrastructure.Persistence;
-using Infrastructure.Students;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -21,6 +20,9 @@ namespace Infrastructure.CourseGrades;
 /// Hai bước theo mẫu module tốt nghiệp: xem trước (chỉ đọc, trả số đếm) rồi xác nhận (gửi lại
 /// đúng file đó, so mã băm). Không giữ file hay bản đọc tạm ở đâu cả. Điểm được mã hóa từng ô
 /// trước khi ghi; mã lỗi và thông điệp không bao giờ chứa giá trị của dòng điểm nào.
+///
+/// Mã và họ tên sinh viên lưu ngay trên dòng điểm, không có bảng sinh viên riêng; lớp hành
+/// chính không đọc. Bộ tính gom dòng theo số thứ tự (<see cref="StudentNumbers"/>).
 /// </summary>
 public sealed partial class EfCourseGradeImportService(
     AppDbContext db,
@@ -44,7 +46,6 @@ public sealed partial class EfCourseGradeImportService(
         GradeRuleAResult Rules,
         IReadOnlyList<GradeRuleARow> StorableRows,
         IReadOnlyDictionary<int, int> SectionIdByRow,
-        IReadOnlyDictionary<string, long> ExistingStudentIds,
         IReadOnlyList<CourseGradeMissingSectionDto> MissingSections,
         IReadOnlyList<string> SectionsWithoutGrades,
         IReadOnlyList<string> Warnings,
@@ -173,13 +174,6 @@ public sealed partial class EfCourseGradeImportService(
                 : $"{s.CourseName} – {s.SectionName}")
             .ToList();
 
-        var codes = storable.Select(r => r.StudentCode).Distinct(StringComparer.Ordinal).ToList();
-        var existing = await db.Students.IgnoreQueryFilters().AsNoTracking()
-            .Where(s => codes.Contains(s.StudentCode))
-            .Select(s => new { s.StudentCode, s.StudentId, s.FullName })
-            .ToListAsync(cancellationToken);
-        var existingIds = existing.ToDictionary(x => x.StudentCode, x => x.StudentId, StringComparer.Ordinal);
-
         var warnings = new List<string>();
         var unreadable = rules.UnreadableRowNumbers.Count + oversized;
         if (unreadable > 0)
@@ -187,44 +181,10 @@ public sealed partial class EfCourseGradeImportService(
             warnings.Add($"{unreadable} dòng không đọc được (thiếu mã sinh viên, mã học phần hoặc ô điểm không phải số) và sẽ không được lưu.");
         }
 
-        var nameByCode = storable
-            .Where(r => r.StudentName is not null)
-            .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.First().StudentName!, StringComparer.Ordinal);
-        // Lớp hành chính chưa có trong danh mục Khoá ngành đào tạo: sinh viên vẫn được nạp điểm nhưng chưa
-        // gắn lớp. Báo danh sách để người dùng thêm khóa ngành rồi nạp lại.
-        var cohortMajors = await CohortMajorLookup.LoadAsync(db, cancellationToken);
-        var classMatches = storable
-            .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
-            .Select(g => cohortMajors.Match(g.First().AdministrativeClassCode))
-            .OfType<CohortMajorMatch>()
-            .ToList();
-        static string List(IEnumerable<IGrouping<string, CohortMajorMatch>> groups) =>
-            string.Join(", ", groups.OrderByDescending(g => g.Count()).Take(40).Select(g => $"{g.Key} ({g.Count()})"));
-        var toCreate = classMatches.Where(m => m.NeedsCreate).GroupBy(m => m.Code, StringComparer.Ordinal).ToList();
-        if (toCreate.Count > 0)
-        {
-            warnings.Add($"{toCreate.Count} lớp chưa có trong Khoá ngành đào tạo sẽ được tự thêm khi nạp (sĩ số đầu vào để 0): {List(toCreate)}"
-                + (toCreate.Count > 40 ? ", …" : string.Empty) + ".");
-        }
-        var unresolved = classMatches.Where(m => m.Problem is not null).GroupBy(m => m.Code, StringComparer.Ordinal).ToList();
-        if (unresolved.Count > 0)
-        {
-            warnings.Add($"{unresolved.Count} lớp không suy được khóa ngành (ngành hoặc khóa chưa có trong danh mục), sinh viên các lớp này chưa được gắn lớp: "
-                + List(unresolved) + (unresolved.Count > 40 ? ", …" : string.Empty) + ". Hãy thêm ngành / khóa rồi nạp lại.");
-        }
-
         var expectedTerm = SemesterOrdering.ExpectedTermCode(semester.AcademicYearName, semester.SemesterName);
         if (expectedTerm is not null && rules.MostCommonTermCode is { } fileTerm && fileTerm != expectedTerm)
         {
             warnings.Add($"Mã học kỳ trong file điểm là {fileTerm}, khác với mã {expectedTerm} của {semesterLabel}. Hãy kiểm tra lại đã chọn đúng học kỳ chưa.");
-        }
-
-        var renamed = existing.Count(x => nameByCode.TryGetValue(x.StudentCode, out var name)
-            && !string.Equals(name, x.FullName, StringComparison.Ordinal));
-        if (renamed > 0)
-        {
-            warnings.Add($"{renamed} sinh viên đã có trong hệ thống nhưng họ tên trong file khác. Họ tên đang lưu được giữ nguyên.");
         }
 
         return new ImportAnalysis(
@@ -236,7 +196,6 @@ public sealed partial class EfCourseGradeImportService(
             rules,
             storable,
             sectionIdByRow,
-            existingIds,
             missingSections,
             sectionsWithoutGrades,
             warnings,
@@ -256,8 +215,6 @@ public sealed partial class EfCourseGradeImportService(
             usable.Count,
             usable.Count(r => analysis.SectionIdByRow.ContainsKey(r.RowNumber)),
             analysis.StorableRows.Select(r => r.StudentCode).Distinct(StringComparer.Ordinal).Count(),
-            analysis.StorableRows.Select(r => r.StudentCode).Distinct(StringComparer.Ordinal)
-                .Count(code => !analysis.ExistingStudentIds.ContainsKey(code)),
             ExcludedSummary(analysis),
             analysis.MissingSections.Count,
             analysis.MissingSections.Sum(x => x.RowCount),
@@ -316,7 +273,7 @@ public sealed partial class EfCourseGradeImportService(
                 "Kỳ này đã có điểm. Phải nhập lý do khi nạp lại.");
         }
 
-        var studentIds = await UpsertStudentsAsync(analysis, now, cancellationToken);
+        var studentNumbers = StudentNumbers(analysis);
 
         var revisionNumber = 1 + await db.GradeImportRevisions
             .Where(x => x.SemesterId == command.SemesterId)
@@ -354,7 +311,7 @@ public sealed partial class EfCourseGradeImportService(
         db.GradeImportRevisions.Add(revision);
         await db.SaveChangesAsync(cancellationToken);
 
-        await CopyGradesAsync(analysis, revision.RevisionId, studentIds, cancellationToken);
+        await CopyGradesAsync(analysis, revision.RevisionId, studentNumbers, cancellationToken);
 
         // Đổi lần nạp đang dùng: tắt lần cũ trước, vì chỉ mục duy nhất kiểm tra ngay từng lệnh.
         if (active is not null)
@@ -378,78 +335,32 @@ public sealed partial class EfCourseGradeImportService(
             revision.SemesterId,
             revision.ImportedRowCount,
             revision.SkippedRowCount,
-            analysis.StorableRows.Select(r => r.StudentCode).Distinct(StringComparer.Ordinal)
-                .Count(code => !analysis.ExistingStudentIds.ContainsKey(code)),
             run.RunId);
     }
 
-    private async Task<Dictionary<string, long>> UpsertStudentsAsync(
-        ImportAnalysis analysis, DateTime now, CancellationToken cancellationToken)
+    /// <summary>Đánh số thứ tự 1, 2, 3… cho từng sinh viên theo thứ tự xuất hiện trong file.</summary>
+    private static Dictionary<string, long> StudentNumbers(ImportAnalysis analysis)
     {
-        var cohortMajors = await CohortMajorLookup.LoadAsync(db, cancellationToken);
-        var firstRowByCode = analysis.StorableRows
-            .GroupBy(r => r.StudentCode, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
-        // Lớp chưa có khóa ngành mà suy được khóa, ngành: tự thêm khóa ngành (như nạp danh sách sinh viên).
-        var matches = firstRowByCode.Values
-            .Select(r => cohortMajors.Match(r.AdministrativeClassCode))
-            .OfType<CohortMajorMatch>()
-            .ToList();
-        var newIds = await CohortMajorLookup.CreateMissingAsync(db, matches, cancellationToken);
-        int? CohortMajorOf(string? classCode) => cohortMajors.Match(classCode) switch
+        var numbers = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var row in analysis.StorableRows.OrderBy(r => r.RowNumber))
         {
-            { CohortMajorId: { } id } => id,
-            { NeedsCreate: true } m => newIds[m.Code],
-            _ => null,
-        };
-
-        var codes = firstRowByCode.Keys.ToList();
-        var tracked = await db.Students.IgnoreQueryFilters()
-            .Where(s => codes.Contains(s.StudentCode))
-            .ToDictionaryAsync(s => s.StudentCode, StringComparer.Ordinal, cancellationToken);
-
-        foreach (var (code, row) in firstRowByCode)
-        {
-            // Lớp hành chính = khóa ngành đào tạo; lớp chưa có trong danh mục thì giữ liên kết đang có.
-            var cohortMajorId = CohortMajorOf(row.AdministrativeClassCode);
-            if (!tracked.TryGetValue(code, out var student))
-            {
-                student = new Student
-                {
-                    StudentCode = code,
-                    FullName = Truncate(row.StudentName, 200) ?? string.Empty,
-                    CohortMajorId = cohortMajorId,
-                    CreatedAtUtc = now,
-                    UpdatedAtUtc = now,
-                };
-                db.Students.Add(student);
-                tracked[code] = student;
-                continue;
-            }
-
-            // Họ tên đã lưu không bị ghi đè; khóa ngành theo file mới nhất.
-            if (cohortMajorId is not null && cohortMajorId != student.CohortMajorId)
-            {
-                student.CohortMajorId = cohortMajorId;
-                student.UpdatedAtUtc = now;
-            }
+            numbers.TryAdd(row.StudentCode, numbers.Count + 1);
         }
-
-        await db.SaveChangesAsync(cancellationToken);
-        return tracked.ToDictionary(x => x.Key, x => x.Value.StudentId, StringComparer.Ordinal);
+        return numbers;
     }
 
     private async Task CopyGradesAsync(
         ImportAnalysis analysis,
         long revisionId,
-        IReadOnlyDictionary<string, long> studentIds,
+        IReadOnlyDictionary<string, long> studentNumbers,
         CancellationToken cancellationToken)
     {
         var connection = (NpgsqlConnection)db.Database.GetDbConnection();
         await using var importer = await connection.BeginBinaryImportAsync(
             """
             COPY "StudentCourseGrades" (
-                "RevisionId", "SemesterId", "StudentId", "CourseSectionId", "SourceRowNumber",
+                "RevisionId", "SemesterId", "StudentNumber", "StudentCode", "StudentName",
+                "CourseSectionId", "SourceRowNumber",
                 "SourceTermCode", "CourseCode", "CourseName", "SectionName",
                 "AcademicYearText", "TermText", "ExamRound", "NoteCode",
                 "Component1Enc", "Component2Enc", "Component3Enc", "ExamScoreEnc", "OfficialTotalEnc",
@@ -461,14 +372,16 @@ public sealed partial class EfCourseGradeImportService(
         var keyVersion = cipher.ActiveKeyVersion;
         foreach (var row in analysis.StorableRows)
         {
-            var studentId = studentIds[row.StudentCode];
-            GradeCellContext Cell(string column) => new(revisionId, studentId, row.CourseCode, row.RowNumber, column);
+            var studentNumber = studentNumbers[row.StudentCode];
+            GradeCellContext Cell(string column) => new(revisionId, studentNumber, row.CourseCode, row.RowNumber, column);
             byte[]? Encrypt(decimal? value, string column) => value is { } v ? cipher.Encrypt(v, Cell(column)) : null;
 
             await importer.StartRowAsync(cancellationToken);
             await importer.WriteAsync(revisionId, NpgsqlDbType.Bigint, cancellationToken);
             await importer.WriteAsync(analysis.SemesterId, NpgsqlDbType.Integer, cancellationToken);
-            await importer.WriteAsync(studentId, NpgsqlDbType.Bigint, cancellationToken);
+            await importer.WriteAsync(studentNumber, NpgsqlDbType.Bigint, cancellationToken);
+            await importer.WriteAsync(row.StudentCode, NpgsqlDbType.Varchar, cancellationToken);
+            await WriteNullableAsync(importer, Truncate(row.StudentName, 200), NpgsqlDbType.Varchar, cancellationToken);
             if (analysis.SectionIdByRow.TryGetValue(row.RowNumber, out var sectionId))
             {
                 await importer.WriteAsync(sectionId, NpgsqlDbType.Integer, cancellationToken);

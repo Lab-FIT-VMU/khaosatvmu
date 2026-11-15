@@ -51,7 +51,6 @@ public sealed partial class EfSurveyService(
         var scale = new AnswerScale
         {
             AnswerScaleName = validation.Name,
-            ScaleKind = validation.ScaleKind,
         };
         db.AnswerScales.Add(scale);
         await db.SaveChangesAsync(cancellationToken);
@@ -88,16 +87,7 @@ public sealed partial class EfSurveyService(
             return Failed<AnswerScaleDto>(validation.ErrorCode);
         }
 
-        // Đổi loại thang khi đã có câu hỏi dùng nó sẽ làm các phiếu đã thu không đọc
-        // lại được (số đang lưu bỗng bị hiểu thành chữ và ngược lại).
-        if (scale.ScaleKind != validation.ScaleKind
-            && await db.SurveyQuestions.AnyAsync(x => x.AnswerScaleId == answerScaleId, cancellationToken))
-        {
-            return Failed<AnswerScaleDto>(SurveyErrorCodes.AnswerScaleKindLocked);
-        }
-
         scale.AnswerScaleName = validation.Name;
-        scale.ScaleKind = validation.ScaleKind;
 
         // Ghi đè các mức: giữ lại dòng cùng Value để không phá "SurveyResponseAnswers".
         var existing = await db.AnswerScaleOptions
@@ -146,8 +136,8 @@ public sealed partial class EfSurveyService(
             return Failed<bool>(SurveyErrorCodes.AnswerScaleNotFound);
         }
 
-        // "SurveyQuestions"."AnswerScaleId" là ON DELETE RESTRICT.
-        if (await db.SurveyQuestions.AnyAsync(x => x.AnswerScaleId == answerScaleId, cancellationToken))
+        // "SurveyTemplates"."AnswerScaleId" là ON DELETE RESTRICT.
+        if (await db.SurveyTemplates.AnyAsync(x => x.AnswerScaleId == answerScaleId, cancellationToken))
         {
             return Failed<bool>(SurveyErrorCodes.AnswerScaleInUse);
         }
@@ -214,6 +204,7 @@ public sealed partial class EfSurveyService(
         var template = new SurveyTemplate
         {
             TemplateName = validation.Name,
+            AnswerScaleId = validation.AnswerScaleId,
             CreatedAt = DateTime.UtcNow,
         };
         db.SurveyTemplates.Add(template);
@@ -237,7 +228,6 @@ public sealed partial class EfSurveyService(
             {
                 SectionId = sections[question.SectionIndex].SectionId,
                 QuestionText = question.QuestionText,
-                AnswerScaleId = question.AnswerScaleId,
                 AttentionCheckValue = question.AttentionCheckValue,
             })
             .ToList();
@@ -294,7 +284,9 @@ public sealed partial class EfSurveyService(
         // ẩn nút ngoài giao diện: gọi thẳng API thì vẫn hỏng như thường.
         if (answeredIds.Count > 0)
         {
-            if (validation.Questions.Count != existing.Count)
+            // Đổi thang làm các mức đã lưu bị đọc theo nhãn của thang khác.
+            if (validation.Questions.Count != existing.Count
+                || validation.AnswerScaleId != template.AnswerScaleId)
             {
                 return Failed<SurveyTemplateDto>(SurveyErrorCodes.TemplateInUse);
             }
@@ -304,11 +296,9 @@ public sealed partial class EfSurveyService(
                 var current = existing[index];
                 if (!answeredIds.Contains(current.QuestionId)) continue;
 
-                // Đổi thang làm "AnswerValue" đã lưu bị hiểu sai (số thành chữ hoặc
-                // ngược lại); đổi mục làm điểm theo mục của các đợt cũ đổi nghĩa.
+                // Đổi mục làm điểm theo mục của các đợt cũ đổi nghĩa.
                 var sent = validation.Questions[index];
-                if (current.AnswerScaleId != sent.AnswerScaleId
-                    || validation.Sections[sent.SectionIndex].SectionId != current.SectionId)
+                if (validation.Sections[sent.SectionIndex].SectionId != current.SectionId)
                 {
                     return Failed<SurveyTemplateDto>(SurveyErrorCodes.TemplateInUse);
                 }
@@ -324,6 +314,7 @@ public sealed partial class EfSurveyService(
         await using var transactionScope = ownTransaction;
 
         template.TemplateName = validation.Name;
+        template.AnswerScaleId = validation.AnswerScaleId;
 
         // Mục nhận diện bằng Id gửi lên chứ không đoán theo vị trí: đảo chỗ hai mục
         // mà ghép theo vị trí thì hai mục đổi tên cho nhau, báo cáo cũ đọc ra nhãn
@@ -361,7 +352,6 @@ public sealed partial class EfSurveyService(
             {
                 var current = existing[index];
                 current.QuestionText = question.QuestionText;
-                current.AnswerScaleId = question.AnswerScaleId;
                 current.AttentionCheckValue = question.AttentionCheckValue;
                 current.SectionId = sectionId;
             }
@@ -371,7 +361,6 @@ public sealed partial class EfSurveyService(
                 {
                     SectionId = sectionId,
                     QuestionText = question.QuestionText,
-                    AnswerScaleId = question.AnswerScaleId,
                     AttentionCheckValue = question.AttentionCheckValue,
                 });
             }
@@ -1408,9 +1397,7 @@ public sealed partial class EfSurveyService(
             .OrderByDescending(x => x.ResponseId)
             .ToListAsync(cancellationToken);
 
-        var scales = await ScalesOfSectionSurveyAsync(sectionSurvey, cancellationToken);
-        var mergedValues = MergedOptionValues(scales);
-        var scaleOfQuestion = await ScaleByQuestionAsync(sectionSurvey, scales, cancellationToken);
+        var scale = await ScaleOfSectionSurveyAsync(sectionSurvey, cancellationToken);
 
         var responseIds = responses.Select(x => x.ResponseId).ToList();
         var answers = responseIds.Count == 0
@@ -1424,9 +1411,7 @@ public sealed partial class EfSurveyService(
             {
                 var responseAnswers = answers.Where(x => x.ResponseId == response.ResponseId).ToList();
                 var selectedValues = responseAnswers
-                    .Select(answer => SelectedValueOf(
-                        scaleOfQuestion.GetValueOrDefault(answer.QuestionId),
-                        answer.AnswerValue))
+                    .Select(answer => SelectedValueOf(answer.AnswerValue))
                     .Where(value => value.HasValue)
                     .Select(value => value!.Value)
                     .ToList();
@@ -1439,7 +1424,7 @@ public sealed partial class EfSurveyService(
                     response.AdditionalComments,
                     responseAnswers.Count,
                     // Giữ đủ các mức của thang, mức không ai chọn hiển thị 0.
-                    mergedValues
+                    (scale?.Options ?? [])
                         .Select(option => new SurveyResponseValueCountDto(
                             option.Value,
                             option.DisplayText,
@@ -1483,8 +1468,9 @@ public sealed partial class EfSurveyService(
             : await db.SurveyTemplates
                 .FirstOrDefaultAsync(x => x.SurveyTemplateId == semesterSurvey.SurveyTemplateId, cancellationToken);
 
-        var scales = await ScalesOfSectionSurveyAsync(sectionSurvey, cancellationToken);
-        var scaleById = scales.ToDictionary(x => x.AnswerScaleId);
+        var scale = template is null
+            ? null
+            : await ScaleOfTemplateAsync(template.SurveyTemplateId, cancellationToken);
         var questions = template is null
             ? []
             : await QuestionsOfTemplate(template.SurveyTemplateId)
@@ -1514,19 +1500,16 @@ public sealed partial class EfSurveyService(
             course?.CourseName ?? string.Empty,
             section?.SectionName ?? string.Empty,
             lecturer?.FullName ?? string.Empty,
-            scales,
+            scale,
             questions
                 .Select(question =>
                 {
                     var answer = answers.FirstOrDefault(x => x.QuestionId == question.QuestionId);
-                    var scale = scaleById.GetValueOrDefault(question.AnswerScaleId);
-                    var selectedValue = SelectedValueOf(scale, answer?.AnswerValue);
+                    var selectedValue = SelectedValueOf(answer?.AnswerValue);
 
                     return new SurveyResponseAnswerDto(
                         question.QuestionId,
                         question.QuestionText,
-                        question.AnswerScaleId,
-                        scale?.ScaleKind ?? AnswerScaleKinds.Options,
                         answer?.AnswerValue ?? string.Empty,
                         selectedValue,
                         scale?.Options.FirstOrDefault(option => option.Value == selectedValue)?.DisplayText
@@ -1590,7 +1573,6 @@ public sealed partial class EfSurveyService(
                 .Select(x => new PublicSurveyQuestionDto(
                     x.QuestionId,
                     x.QuestionText,
-                    x.AnswerScaleId,
                     x.SectionId))
                 .ToListAsync(cancellationToken);
 
@@ -1608,8 +1590,8 @@ public sealed partial class EfSurveyService(
                 .OrderBy(x => sectionOrder[x.SectionId])
                 .ToList();
 
-            // Trả về mọi thang mà bộ đang dùng; mỗi câu tự trỏ tới thang của nó.
-            var scales = await ScalesOfTemplateAsync(template.SurveyTemplateId, cancellationToken);
+            // Một thang cho cả bộ, mọi câu dùng chung.
+            var scale = await ScaleOfTemplateAsync(template.SurveyTemplateId, cancellationToken);
 
             var section = await db.CourseSections
                 .AsNoTracking()
@@ -1681,7 +1663,7 @@ public sealed partial class EfSurveyService(
                 sectionSurvey.StartTime,
                 sectionSurvey.EndTime,
                 true,
-                scales,
+                scale,
                 sections,
                 questions,
                 semesterSurvey.SurveyName,
@@ -1761,7 +1743,7 @@ public sealed partial class EfSurveyService(
         new(false, errorCode, cached with
         {
             IsOpen = false,
-            AnswerScales = [],
+            AnswerScale = null,
             Sections = [],
             Questions = [],
         });
@@ -1791,11 +1773,12 @@ public sealed partial class EfSurveyService(
             return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.LinkNotFound);
         }
 
-        // Mỗi câu có thang riêng nên tra được thang nào cho câu nào trước khi kiểm.
-        var scaleById = publicSurvey.AnswerScales.ToDictionary(x => x.AnswerScaleId);
-        var scaleOfQuestion = publicSurvey.Questions
-            .Where(x => scaleById.ContainsKey(x.AnswerScaleId))
-            .ToDictionary(x => x.QuestionId, x => scaleById[x.AnswerScaleId]);
+        // Cả bộ dùng một thang; không đọc được thang thì không kiểm được câu nào.
+        if (publicSurvey.AnswerScale is not { } scale)
+        {
+            return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.AnswerValueInvalid);
+        }
+
         var questionIds = publicSurvey.Questions.Select(x => x.QuestionId).ToHashSet();
 
         // Mức bắt buộc của câu bẫy không nằm trong DTO công khai — để lộ ra thì
@@ -1819,25 +1802,10 @@ public sealed partial class EfSurveyService(
             return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.AnswersIncomplete);
         }
 
-        // Câu thang 'Options' phải gửi lên một mức có thật; câu thang 'Text' nhận
-        // nguyên nội dung, chỉ giới hạn độ dài.
+        // Mỗi câu phải gửi lên một mức có thật của thang.
         var scoredValues = new List<int>();
         foreach (var answer in answers)
         {
-            if (!scaleOfQuestion.TryGetValue(answer.QuestionId, out var scale))
-            {
-                return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.AnswerValueInvalid);
-            }
-
-            if (scale.ScaleKind == AnswerScaleKinds.Text)
-            {
-                if (answer.AnswerValue.Length > SurveyRules.MaximumTextAnswerLength)
-                {
-                    return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.AnswerTextTooLong);
-                }
-                continue;
-            }
-
             if (!int.TryParse(answer.AnswerValue, out var selectedValue)
                 || scale.Options.All(option => option.Value != selectedValue))
             {
@@ -1861,9 +1829,6 @@ public sealed partial class EfSurveyService(
         var filterQuestions = publicSurvey.Questions
             .Select(question => new FilterQuestion(
                 question.QuestionId,
-                scaleOfQuestion.TryGetValue(question.QuestionId, out var scale)
-                    ? scale.ScaleKind
-                    : AnswerScaleKinds.Options,
                 attentionCheckByQuestion.TryGetValue(question.QuestionId, out var required)
                     ? required
                     : null))
@@ -1899,8 +1864,8 @@ public sealed partial class EfSurveyService(
 
     // ------------------------------------------------------------------ Helpers
 
-    /// <summary>Các thang mà bộ câu hỏi của bài khảo sát đang dùng.</summary>
-    private async Task<IReadOnlyList<AnswerScaleDto>> ScalesOfSectionSurveyAsync(
+    /// <summary>Thang của bộ câu hỏi mà bài khảo sát đang dùng.</summary>
+    private async Task<AnswerScaleDto?> ScaleOfSectionSurveyAsync(
         CourseSectionSurvey sectionSurvey,
         CancellationToken cancellationToken)
     {
@@ -1910,62 +1875,13 @@ public sealed partial class EfSurveyService(
             .FirstOrDefaultAsync(cancellationToken);
 
         return surveyTemplateId == 0
-            ? []
-            : await ScalesOfTemplateAsync(surveyTemplateId, cancellationToken);
+            ? null
+            : await ScaleOfTemplateAsync(surveyTemplateId, cancellationToken);
     }
 
-    /// <summary>
-    /// Gộp các mức của mọi thang 'Options' theo giá trị số. Cùng một mức mà các
-    /// thang đặt nhãn khác nhau thì hiển thị chung là "Mức n".
-    /// </summary>
-    private static IReadOnlyList<(int Value, string DisplayText)> MergedOptionValues(
-        IReadOnlyList<AnswerScaleDto> scales)
-    {
-        return scales
-            .Where(scale => scale.ScaleKind == AnswerScaleKinds.Options)
-            .SelectMany(scale => scale.Options)
-            .GroupBy(option => option.Value)
-            .OrderBy(group => group.Key)
-            .Select(group =>
-            {
-                var labels = group.Select(x => x.DisplayText).Distinct().ToList();
-                return (group.Key, labels.Count == 1 ? labels[0] : $"Mức {group.Key}");
-            })
-            .ToList();
-    }
-
-    /// <summary>Đọc "AnswerValue" ra số mức; null nếu câu không thuộc thang 'Options'.</summary>
-    private static int? SelectedValueOf(AnswerScaleDto? scale, string? answerValue)
-    {
-        if (scale is null || scale.ScaleKind != AnswerScaleKinds.Options) return null;
-        return int.TryParse(answerValue, out var value) ? value : null;
-    }
-
-    /// <summary>Bảng tra thang trả lời theo từng câu hỏi của bài khảo sát một lớp.</summary>
-    private async Task<Dictionary<int, AnswerScaleDto>> ScaleByQuestionAsync(
-        CourseSectionSurvey sectionSurvey,
-        IReadOnlyList<AnswerScaleDto> scales,
-        CancellationToken cancellationToken)
-    {
-        if (scales.Count == 0) return [];
-
-        var surveyTemplateId = await db.SemesterSurveys
-            .AsNoTracking()
-            .Where(x => x.SemesterSurveyId == sectionSurvey.SemesterSurveyId)
-            .Select(x => x.SurveyTemplateId)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (surveyTemplateId == 0) return [];
-
-        var scaleById = scales.ToDictionary(x => x.AnswerScaleId);
-        var pairs = await QuestionsOfTemplate(surveyTemplateId)
-            .AsNoTracking()
-            .Select(x => new { x.QuestionId, x.AnswerScaleId })
-            .ToListAsync(cancellationToken);
-
-        return pairs
-            .Where(x => scaleById.ContainsKey(x.AnswerScaleId))
-            .ToDictionary(x => x.QuestionId, x => scaleById[x.AnswerScaleId]);
-    }
+    /// <summary>Đọc "AnswerValue" ra số mức; null nếu không phải số.</summary>
+    private static int? SelectedValueOf(string? answerValue) =>
+        int.TryParse(answerValue, out var value) ? value : null;
 
     /// <summary>
     /// Tổng lượt nộp và số phiếu qua được bộ lọc, gộp trong một lượt truy vấn.
@@ -2155,7 +2071,7 @@ public sealed partial class EfSurveyService(
             """, cancellationToken);
 
         // Gộp điểm từng câu ngay trong Postgres. Cùng bộ điều kiện với điểm phiếu:
-        // chỉ phiếu hợp lệ, bỏ câu bẫy và câu tự nhập chữ. Câu chưa ai trả lời thì
+        // chỉ phiếu hợp lệ, bỏ câu bẫy. Câu chưa ai trả lời thì
         // không sinh dòng — bảng hiển thị sẽ đọc ra "chưa có số".
         //
         // Điều kiện đủ phiếu đọc lại từ "AverageScore" mà câu UPDATE ở trên vừa ghi,
@@ -2173,7 +2089,6 @@ public sealed partial class EfSurveyService(
             JOIN "SurveyResponseAnswers" AS a ON a."ResponseId" = r."ResponseId"
             JOIN "CourseSectionSurveys" AS c ON c."CourseSectionSurveyId" = r."CourseSectionSurveyId"
             JOIN "SurveyQuestions" AS q ON q."QuestionId" = a."QuestionId"
-            JOIN "AnswerScales" AS s ON s."AnswerScaleId" = q."AnswerScaleId"
             WHERE c."SemesterSurveyId" = {semesterSurveyId}
               AND NOT c."IsDeleted"
               AND NOT r."IsDeleted"
@@ -2187,7 +2102,6 @@ public sealed partial class EfSurveyService(
                         OR position('ATTENTION_CHECK_FAILED' in r."RejectionReasons") = 0)))
               AND NOT q."IsDeleted"
               AND q."AttentionCheckValue" IS NULL
-              AND s."ScaleKind" = {AnswerScaleKinds.Options}
             GROUP BY r."CourseSectionSurveyId", a."QuestionId"
             """, cancellationToken);
 
@@ -2241,19 +2155,16 @@ public sealed partial class EfSurveyService(
                 .FirstOrDefaultAsync(x => x.AcademicYearId == semester.AcademicYearId, cancellationToken);
 
         // Bỏ câu bẫy ra TRƯỚC rồi mới đánh số, nên bộ 26 câu có hai bẫy cho ra
-        // C1..C24 liền mạch. Câu tự nhập vẫn giữ số của nó, chỉ không thành cột
-        // điểm. Cách đánh này phải giống hệt QuestionOrderMapAsync.
-        var allQuestions = await (
-            from q in QuestionsOfTemplate(semesterSurvey.SurveyTemplateId).AsNoTracking()
-            join s in db.AnswerScales.AsNoTracking() on q.AnswerScaleId equals s.AnswerScaleId
-            orderby q.QuestionId
-            select new { q.QuestionId, q.QuestionText, q.AttentionCheckValue, s.ScaleKind })
+        // C1..C24 liền mạch. Cách đánh này phải giống hệt QuestionOrderMapAsync.
+        var allQuestions = await QuestionsOfTemplate(semesterSurvey.SurveyTemplateId)
+            .AsNoTracking()
+            .OrderBy(q => q.QuestionId)
+            .Select(q => new { q.QuestionId, q.QuestionText, q.AttentionCheckValue })
             .ToListAsync(cancellationToken);
 
         var questionColumns = allQuestions
             .Where(x => x.AttentionCheckValue == null)
             .Select((q, index) => new { Question = q, Order = index + 1 })
-            .Where(x => x.Question.ScaleKind == AnswerScaleKinds.Options)
             .Select(x => new StatisticsQuestionColumnDto(
                 x.Question.QuestionId,
                 x.Order,
@@ -2315,8 +2226,7 @@ public sealed partial class EfSurveyService(
                 ? new { Total = counts.Total, Valid = counts.Valid }
                 : new { Total = 0, Valid = 0 });
 
-        // Số phiếu có điền ô "Ý kiến khác" — chỉ đếm ô cuối bài, không đếm câu
-        // thuộc thang tự nhập chữ.
+        // Số phiếu có điền ô "Ý kiến khác" ở cuối bài.
         var commentCounts = cssIds.Count == 0
             ? []
             : await db.SurveyResponses.AsNoTracking()
@@ -2934,7 +2844,7 @@ public sealed partial class EfSurveyService(
 
     /// <summary>
     /// Các mục của một bộ câu hỏi, theo thứ tự trên phiếu (vị trí câu đầu tiên của mục),
-    /// kèm số câu được chấm điểm của từng mục: không đếm câu bẫy và câu tự nhập, đúng
+    /// kèm số câu được chấm điểm của từng mục: không đếm câu bẫy, đúng
     /// tập câu dùng để tính điểm mục. Mục chưa có câu nào xếp cuối.
     /// </summary>
     private async Task<List<NormalizationQuestionSectionDto>> QuestionSectionsOfTemplateAsync(
@@ -2946,16 +2856,13 @@ public sealed partial class EfSurveyService(
             .Select(x => new { x.SectionId, x.SectionName })
             .ToListAsync(cancellationToken);
         var sectionIds = sectionRows.Select(x => x.SectionId).ToList();
-        var questionRows = await (
-            from question in db.SurveyQuestions.AsNoTracking()
-            join scale in db.AnswerScales.IgnoreQueryFilters().AsNoTracking()
-                on question.AnswerScaleId equals scale.AnswerScaleId
-            where sectionIds.Contains(question.SectionId)
-            select new
+        var questionRows = await db.SurveyQuestions.AsNoTracking()
+            .Where(question => sectionIds.Contains(question.SectionId))
+            .Select(question => new
             {
                 question.SectionId,
                 question.QuestionId,
-                IsScored = question.AttentionCheckValue == null && scale.ScaleKind == AnswerScaleKinds.Options,
+                IsScored = question.AttentionCheckValue == null,
             })
             .ToListAsync(cancellationToken);
         var firstQuestionOfSection = questionRows
@@ -2979,7 +2886,7 @@ public sealed partial class EfSurveyService(
     /// <summary>
     /// Thay điểm của từng lớp bằng điểm CHỈ gộp các câu thuộc một mục, lấy từ ảnh chụp
     /// điểm từng câu của lần Cập nhật điểm gần nhất — cùng lần chốt với điểm toàn bài
-    /// nên cùng một tập lớp, cùng bộ lọc phiếu hợp lệ, không có câu bẫy và câu tự nhập.
+    /// nên cùng một tập lớp, cùng bộ lọc phiếu hợp lệ, không có câu bẫy.
     ///
     /// Điểm mục = tổng (điểm câu × số lượt trả lời) ÷ tổng số lượt trả lời, để câu nhiều
     /// người trả lời nặng hơn. Lớp không có lượt trả lời nào cho mục thì bỏ khỏi mặt
@@ -3639,23 +3546,15 @@ public sealed partial class EfSurveyService(
 
         var cssIds = sections.Select(x => x.CourseSectionSurveyId).ToList();
 
-        var questions = await (
-            from q in QuestionsOfTemplate(header.SurveyTemplateId).AsNoTracking()
-            join s in db.AnswerScales.AsNoTracking() on q.AnswerScaleId equals s.AnswerScaleId
-            orderby q.QuestionId
-            select new
-            {
-                q.QuestionId,
-                q.QuestionText,
-                q.AttentionCheckValue,
-                q.AnswerScaleId,
-                s.ScaleKind,
-                s.AnswerScaleName
-            })
+        var questions = await QuestionsOfTemplate(header.SurveyTemplateId)
+            .AsNoTracking()
+            .OrderBy(q => q.QuestionId)
+            .Select(q => new { q.QuestionId, q.QuestionText, q.AttentionCheckValue })
             .ToListAsync(cancellationToken);
+        var templateScale = await ScaleOfTemplateAsync(header.SurveyTemplateId, cancellationToken);
 
         var scoredQuestionIds = questions
-            .Where(x => x.AttentionCheckValue == null && x.ScaleKind == AnswerScaleKinds.Options)
+            .Where(x => x.AttentionCheckValue == null)
             .Select(x => x.QuestionId)
             .ToList();
 
@@ -3706,12 +3605,6 @@ public sealed partial class EfSurveyService(
                     .Where(x => int.TryParse(x.AnswerValue, out _))
                     .ToDictionary(x => int.Parse(x.AnswerValue!), x => x.Count));
 
-        var scaleIds = questions.Select(x => x.AnswerScaleId).Distinct().ToList();
-        var optionsByScaleId = (await db.AnswerScaleOptions.AsNoTracking()
-                .Where(x => scaleIds.Contains(x.AnswerScaleId))
-                .ToListAsync(cancellationToken))
-            .ToLookup(x => x.AnswerScaleId);
-
         // Bỏ câu bẫy TRƯỚC rồi mới đánh số, giống QuestionOrderMapAsync, trang Bảng dữ
         // liệu khảo sát và trang kết quả của một lớp: câu bẫy không được đánh số nên
         // C1..C24 chạy liền mạch. Đánh số trước khi bỏ thì nhảy cóc qua đúng vị trí câu
@@ -3727,9 +3620,7 @@ public sealed partial class EfSurveyService(
                 var counts = countsByQuestion.GetValueOrDefault(q.QuestionId) ?? [];
                 int answeredTotal = counts.Values.Sum();
 
-                IReadOnlyList<ScopeAnalysisOptionDto> distribution = q.ScaleKind != AnswerScaleKinds.Options
-                    ? []
-                    : optionsByScaleId[q.AnswerScaleId]
+                IReadOnlyList<ScopeAnalysisOptionDto> distribution = (templateScale?.Options ?? [])
                         .OrderBy(option => option.Value)
                         .Select(option =>
                         {
@@ -3753,9 +3644,7 @@ public sealed partial class EfSurveyService(
                         : 0m,
                     stat?.TotalAnswers ?? 0,
                     distribution,
-                    q.ScaleKind,
-                    q.AnswerScaleName,
-                    null);
+                    templateScale?.AnswerScaleName ?? string.Empty);
             })
             .ToList();
 
@@ -4129,8 +4018,7 @@ public sealed partial class EfSurveyService(
     /// Các câu chấm điểm của một bộ, kèm số thứ tự dùng cho các cột C1, C2…
     ///
     /// Câu bẫy KHÔNG được đánh số: bỏ nó ra rồi mới đánh, nên bộ 26 câu có hai bẫy
-    /// cho ra C1..C24 liền mạch. Câu tự nhập thì vẫn chiếm số như câu thường — nó
-    /// là câu thật sinh viên phải trả lời, chỉ không có điểm để mà chấm.
+    /// cho ra C1..C24 liền mạch.
     ///
     /// Mọi màn quản trị phải đánh số cùng một kiểu này, lệch nhau thì C16 ở màn
     /// này là C15 ở màn kia.
@@ -4139,17 +4027,15 @@ public sealed partial class EfSurveyService(
         int surveyTemplateId,
         CancellationToken cancellationToken)
     {
-        var all = await (
-            from q in QuestionsOfTemplate(surveyTemplateId).AsNoTracking()
-            join s in db.AnswerScales.AsNoTracking() on q.AnswerScaleId equals s.AnswerScaleId
-            orderby q.QuestionId
-            select new { q.QuestionId, q.QuestionText, q.AttentionCheckValue, s.ScaleKind })
+        var all = await QuestionsOfTemplate(surveyTemplateId)
+            .AsNoTracking()
+            .OrderBy(q => q.QuestionId)
+            .Select(q => new { q.QuestionId, q.QuestionText, q.AttentionCheckValue })
             .ToListAsync(cancellationToken);
 
         return all
             .Where(x => x.AttentionCheckValue == null)
             .Select((q, index) => new { Question = q, Order = index + 1 })
-            .Where(x => x.Question.ScaleKind == AnswerScaleKinds.Options)
             .ToDictionary(
                 x => x.Question.QuestionId,
                 x => (x.Order, x.Question.QuestionText));
@@ -4166,7 +4052,6 @@ public sealed partial class EfSurveyService(
     private sealed record AnswerScaleValidation(
         string? ErrorCode,
         string Name,
-        string ScaleKind,
         IReadOnlyList<SaveAnswerScaleOptionCommand> Options);
 
     private async Task<AnswerScaleValidation> ValidateAnswerScaleAsync(
@@ -4175,15 +4060,10 @@ public sealed partial class EfSurveyService(
         CancellationToken cancellationToken)
     {
         var name = command.AnswerScaleName?.Trim() ?? string.Empty;
-        var kind = command.ScaleKind?.Trim() ?? string.Empty;
 
         if (name.Length == 0)
         {
-            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleNameRequired, name, kind, []);
-        }
-        if (!AnswerScaleKinds.IsValid(kind))
-        {
-            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleKindInvalid, name, kind, []);
+            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleNameRequired, name, []);
         }
 
         var names = await db.AnswerScales
@@ -4192,7 +4072,7 @@ public sealed partial class EfSurveyService(
             .ToListAsync(cancellationToken);
         if (names.Any(x => NormalizeKey(x) == NormalizeKey(name)))
         {
-            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleNameExists, name, kind, []);
+            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleNameExists, name, []);
         }
 
         var options = (command.Options ?? [])
@@ -4201,36 +4081,29 @@ public sealed partial class EfSurveyService(
                 option.DisplayText?.Trim() ?? string.Empty))
             .ToList();
 
-        // Thang tự nhập chữ không có mức nào để chọn.
-        if (kind == AnswerScaleKinds.Text)
-        {
-            return options.Count > 0
-                ? new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleTextHasOptions, name, kind, [])
-                : new AnswerScaleValidation(null, name, kind, []);
-        }
-
         if (options.Count < 2 || options.Count > MaximumScaleOptions)
         {
-            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleOptionsInvalid, name, kind, []);
+            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleOptionsInvalid, name, []);
         }
         // Value không cần liên tiếp: thang 'Có/Không' dùng 1 và 5 để cùng dải điểm
         // với thang mức độ hài lòng.
         if (options.Any(x => x.Value is < 1 or > MaximumScaleOptions)
             || options.Select(x => x.Value).Distinct().Count() != options.Count)
         {
-            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleOptionsInvalid, name, kind, []);
+            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleOptionsInvalid, name, []);
         }
         if (options.Any(x => x.DisplayText.Length == 0))
         {
-            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleOptionTextRequired, name, kind, []);
+            return new AnswerScaleValidation(SurveyErrorCodes.AnswerScaleOptionTextRequired, name, []);
         }
 
-        return new AnswerScaleValidation(null, name, kind, options.OrderBy(x => x.Value).ToList());
+        return new AnswerScaleValidation(null, name, options.OrderBy(x => x.Value).ToList());
     }
 
     private sealed record TemplateValidation(
         string? ErrorCode,
         string Name,
+        int AnswerScaleId,
         IReadOnlyList<SaveSurveyQuestionSectionCommand> Sections,
         IReadOnlyList<SaveSurveyQuestionCommand> Questions);
 
@@ -4308,7 +4181,6 @@ public sealed partial class EfSurveyService(
         var questions = (command.Questions ?? [])
             .Select(question => new SaveSurveyQuestionCommand(
                 question.QuestionText?.Trim() ?? string.Empty,
-                question.AnswerScaleId,
                 question.AttentionCheckValue,
                 question.SectionIndex))
             .Where(question => question.QuestionText.Length > 0)
@@ -4340,57 +4212,40 @@ public sealed partial class EfSurveyService(
             previousSection = question.SectionIndex;
         }
 
-        // Mỗi câu mang thang riêng nên phải kiểm tất cả mã thang được dùng.
-        var scaleIds = questions.Select(x => x.AnswerScaleId).Distinct().ToList();
-        var scales = await db.AnswerScales
-            .Where(x => scaleIds.Contains(x.AnswerScaleId))
-            .Select(x => new { x.AnswerScaleId, x.ScaleKind })
-            .ToListAsync(cancellationToken);
-        if (scales.Count != scaleIds.Count)
+        // Cả bộ dùng đúng một thang, và thang đó phải còn trong danh mục.
+        var answerScaleId = command.AnswerScaleId;
+        if (answerScaleId <= 0
+            || !await db.AnswerScales.AnyAsync(x => x.AnswerScaleId == answerScaleId, cancellationToken))
         {
-            return Invalid(SurveyErrorCodes.QuestionScaleNotFound, name);
+            return Invalid(SurveyErrorCodes.TemplateScaleNotFound, name);
         }
 
-        // Câu bẫy phải đặt được: thang có mức chọn sẵn, và mức bắt buộc phải là
-        // một mức có thật của chính thang đó. Không thể bắt "chọn mức 3" trên
-        // thang Có/Không vì thang đó chỉ có mức 1 và 5.
+        // Mức bắt buộc của câu bẫy phải là một mức có thật của thang đó: không thể
+        // bắt "chọn mức 3" trên thang Có/Không vì thang đó chỉ có mức 1 và 5.
         if (questions.Any(x => x.AttentionCheckValue is not null))
         {
-            var kindByScale = scales.ToDictionary(x => x.AnswerScaleId, x => x.ScaleKind);
-            var optionValuesByScale = (await db.AnswerScaleOptions
-                    .Where(x => scaleIds.Contains(x.AnswerScaleId))
-                    .Select(x => new { x.AnswerScaleId, x.Value })
+            var optionValues = (await db.AnswerScaleOptions
+                    .Where(x => x.AnswerScaleId == answerScaleId)
+                    .Select(x => x.Value)
                     .ToListAsync(cancellationToken))
-                .GroupBy(x => x.AnswerScaleId)
-                .ToDictionary(group => group.Key, group => group.Select(x => x.Value).ToHashSet());
+                .ToHashSet();
 
-            foreach (var question in questions)
+            if (questions.Any(x => x.AttentionCheckValue is { } required && !optionValues.Contains(required)))
             {
-                if (question.AttentionCheckValue is not { } required) continue;
-
-                if (kindByScale[question.AnswerScaleId] != AnswerScaleKinds.Options)
-                {
-                    return Invalid(SurveyErrorCodes.AttentionCheckOnTextScale, name);
-                }
-                if (!optionValuesByScale.TryGetValue(question.AnswerScaleId, out var values)
-                    || !values.Contains(required))
-                {
-                    return Invalid(SurveyErrorCodes.AttentionCheckValueInvalid, name);
-                }
+                return Invalid(SurveyErrorCodes.AttentionCheckValueInvalid, name);
             }
         }
 
-        return new TemplateValidation(null, name, sections, questions);
+        return new TemplateValidation(null, name, answerScaleId, sections, questions);
 
         static TemplateValidation Invalid(string errorCode, string name) =>
-            new(errorCode, name, [], []);
+            new(errorCode, name, 0, [], []);
     }
 
     private static AnswerScaleDto ToDto(AnswerScale scale, IReadOnlyList<AnswerScaleOption> options) =>
         new(
             scale.AnswerScaleId,
             scale.AnswerScaleName,
-            scale.ScaleKind,
             options
                 .OrderBy(x => x.Value)
                 .Select(x => new AnswerScaleOptionDto(
@@ -4432,6 +4287,7 @@ public sealed partial class EfSurveyService(
         return new SurveyTemplateDto(
             template.SurveyTemplateId,
             template.TemplateName,
+            template.AnswerScaleId,
             template.CreatedAt,
             sections
                 .OrderBy(x => firstQuestionOfSection.TryGetValue(x.SectionId, out var index)
@@ -4446,46 +4302,40 @@ public sealed partial class EfSurveyService(
                     template.SurveyTemplateId,
                     x.SectionId,
                     x.QuestionText,
-                    x.AnswerScaleId,
                     x.AttentionCheckValue))
                 .ToList(),
             hasResponses);
     }
 
-    /// <summary>Các thang (kèm mức) mà một bộ câu hỏi đang dùng.</summary>
-    private async Task<IReadOnlyList<AnswerScaleDto>> ScalesOfTemplateAsync(
+    /// <summary>
+    /// Thang (kèm mức) của một bộ câu hỏi; null khi không đọc được bộ hay thang. Đọc cả
+    /// dòng đã xoá mềm: phiếu và báo cáo của đợt cũ vẫn phải hiện được nhãn các mức.
+    /// </summary>
+    private async Task<AnswerScaleDto?> ScaleOfTemplateAsync(
         int surveyTemplateId,
         CancellationToken cancellationToken)
     {
-        var scaleIds = await QuestionsOfTemplate(surveyTemplateId)
-            .AsNoTracking()
-            .Select(x => x.AnswerScaleId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-        if (scaleIds.Count == 0) return [];
+        var scale = await (
+            from template in db.SurveyTemplates.IgnoreQueryFilters().AsNoTracking()
+            join answerScale in db.AnswerScales.IgnoreQueryFilters().AsNoTracking()
+                on template.AnswerScaleId equals answerScale.AnswerScaleId
+            where template.SurveyTemplateId == surveyTemplateId
+            select answerScale)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (scale is null) return null;
 
-        var scales = await db.AnswerScales
-            .AsNoTracking()
-            .Where(x => scaleIds.Contains(x.AnswerScaleId))
-            .ToListAsync(cancellationToken);
         var options = await db.AnswerScaleOptions
             .AsNoTracking()
-            .Where(x => scaleIds.Contains(x.AnswerScaleId))
+            .Where(x => x.AnswerScaleId == scale.AnswerScaleId)
             .OrderBy(x => x.Value)
             .ToListAsync(cancellationToken);
 
-        return scales
-            .OrderBy(x => x.AnswerScaleId)
-            .Select(scale => ToDto(
-                scale,
-                options.Where(option => option.AnswerScaleId == scale.AnswerScaleId).ToList()))
-            .ToList();
+        return ToDto(scale, options);
     }
 
     /// <summary>
-    /// Điểm của một phiếu: trung bình các câu thuộc thang 'Options' và không phải
-    /// câu bẫy. Câu thang 'Text' không có giá trị số nên không tham gia; câu bẫy
-    /// ép chọn một mức cố định nên điểm của nó vô nghĩa, tính vào sẽ kéo lệch.
+    /// Điểm của một phiếu: trung bình các câu không phải câu bẫy. Câu bẫy ép chọn
+    /// một mức cố định nên điểm của nó vô nghĩa, tính vào sẽ kéo lệch.
     /// </summary>
     private static decimal ComputeScore(IReadOnlyList<int> scoredValues) =>
         scoredValues.Count == 0
@@ -4522,6 +4372,17 @@ public sealed partial class EfSurveyService(
         if (template is null) return Failed<bool>(SurveyErrorCodes.TemplateNotFound);
         template.IsDeleted = false;
         template.DeletedAt = null;
+
+        // Bộ câu hỏi không sống được thiếu thang: thang của nó đã bị xoá (được phép
+        // xoá vì lúc đó không còn bộ nào đang dùng) thì khôi phục kèm.
+        var scale = await db.AnswerScales.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.AnswerScaleId == template.AnswerScaleId && x.IsDeleted, cancellationToken);
+        if (scale is not null)
+        {
+            scale.IsDeleted = false;
+            scale.DeletedAt = null;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         return Succeeded(true);
     }

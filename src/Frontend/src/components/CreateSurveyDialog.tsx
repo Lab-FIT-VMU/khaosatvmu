@@ -208,7 +208,9 @@ export const CreateSurveyDialog: React.FC<CreateSurveyDialogProps> = ({
   const designerData = useMemo((): SurveyPreviewData | undefined => {
     const template = templates.find((item) => item.surveyTemplateId === Number(templateId));
     if (!template) return undefined;
-    const scaleById = new Map(answerScales.map((scale) => [scale.answerScaleId, scale]));
+    const options = (
+      answerScales.find((scale) => scale.answerScaleId === template.answerScaleId)?.options ?? []
+    ).map((option) => ({ value: option.value, displayText: option.displayText }));
     return {
       surveyName,
       templateName: template.templateName,
@@ -220,8 +222,7 @@ export const CreateSurveyDialog: React.FC<CreateSurveyDialogProps> = ({
             .filter((question) => question.sectionId === section.sectionId)
             .map((question) => ({
               questionText: question.questionText,
-              options: (scaleById.get(question.answerScaleId)?.options ?? [])
-                .map((option) => ({ value: option.value, displayText: option.displayText })),
+              options,
             })),
         }))
         .filter((section) => section.questions.length > 0),

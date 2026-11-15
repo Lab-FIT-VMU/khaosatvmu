@@ -24,7 +24,6 @@ internal sealed class AuditInterceptor(ICurrentUserAccessor currentUser) : SaveC
         // mã sinh viên sang nhật ký chung là nhân bản dữ liệu cá nhân. Vết của lần nạp nằm ở
         // GradeImportRevisions (người nạp, lúc nào, file nào). Lượt tính do worker cập nhật
         // liên tục nên cũng không ghi. Ngưỡng phân tích VẪN được ghi nhật ký.
-        typeof(Student),
         typeof(GradeAnalysisRun),
     ];
 

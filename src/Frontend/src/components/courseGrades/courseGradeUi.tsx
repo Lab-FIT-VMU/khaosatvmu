@@ -12,10 +12,11 @@ import { fillText, type Explanation } from './courseGradeExplanations';
 /** Chiều lệch của đặc điểm lớp (▲ cao hơn, ▼ thấp hơn kỳ vọng), như lớp CSS up/down của bản audit. */
 const MARKER_DIRECTION: Record<string, 'up' | 'down'> = { D1: 'up', D2: 'down', D6: 'up', D7: 'down' };
 
-function Chip({ code, label, kind, compact = false }: { code: string; label?: CodeLabel; kind: 'flag' | 'marker' | 'stable' | 'pending'; compact?: boolean }) {
+function Chip({ code, label, kind }: { code: string; label?: CodeLabel; kind: 'flag' | 'marker' | 'stable' | 'pending' }) {
   const tooltip = label ? [label.name, label.description].filter(Boolean).join(' — ') : code;
-  // Rộng chỗ thì ghi tên (như bản audit), chật thì chỉ ghi mã, tên khi rê chuột.
-  const text = !compact && label?.name && kind !== 'pending' ? label.name : code;
+  // Luôn ghi tên đầy đủ, kể cả trong bảng hẹp: chỉ ghi mã (H1, D3…) thì người xem phải nhớ
+  // mã nào là luật gì. Mô tả chi tiết vẫn hiện khi rê chuột.
+  const text = label?.name ?? code;
   return (
     <span className={`cga-chip cga-chip--${kind}${kind === 'marker' && MARKER_DIRECTION[code] ? ` cga-chip--${MARKER_DIRECTION[code]}` : ''}`} title={tooltip}>
       {text}
@@ -23,30 +24,29 @@ function Chip({ code, label, kind, compact = false }: { code: string; label?: Co
   );
 }
 
-/** compact: chỉ hiện mã (tên đầy đủ khi rê chuột), dùng trong bảng nhiều cột. */
-export function FlagChips({ codes, empty = 'Không có điểm lưu ý', compact = false }: { codes?: string[] | null; empty?: string; compact?: boolean }) {
+export function FlagChips({ codes, empty = 'Không có điểm lưu ý' }: { codes?: string[] | null; empty?: string }) {
   if (!codes || codes.length === 0) return <span className="cga-muted">{empty}</span>;
-  return <span className="cga-chips">{codes.map((c) => <Chip key={c} code={c} label={FLAG_LABELS[c]} kind="flag" compact={compact} />)}</span>;
+  return <span className="cga-chips">{codes.map((c) => <Chip key={c} code={c} label={FLAG_LABELS[c]} kind="flag" />)}</span>;
 }
 
-export function MarkerChips({ codes, compact = false }: { codes?: string[] | null; compact?: boolean }) {
+export function MarkerChips({ codes }: { codes?: string[] | null }) {
   if (!codes || codes.length === 0) return <span className="cga-muted">—</span>;
   return (
     <span className="cga-chips">
-      {codes.map((c) => <Chip key={c} code={c} label={MARKER_LABELS[c]} kind="marker" compact={compact} />)}
+      {codes.map((c) => <Chip key={c} code={c} label={MARKER_LABELS[c]} kind="marker" />)}
     </span>
   );
 }
 
-export function StableChips({ codes, pending, compact = false }: { codes?: string[] | null; pending?: string[] | null; compact?: boolean }) {
+export function StableChips({ codes, pending }: { codes?: string[] | null; pending?: string[] | null }) {
   const stable = codes ?? [];
   const notYet = pending ?? [];
   if (stable.length === 0 && notYet.length === 0) return <span className="cga-muted">Chưa xác định</span>;
   return (
     <span className="cga-chips">
-      {stable.map((c) => <Chip key={c} code={c} label={STABLE_LABELS[c]} kind="stable" compact={compact} />)}
+      {stable.map((c) => <Chip key={c} code={c} label={STABLE_LABELS[c]} kind="stable" />)}
       {notYet.map((c) => (
-        <Chip key={`p-${c}`} code={`${c}: chưa đủ căn cứ`} label={{ name: `${STABLE_LABELS[c]?.name ?? c}: chưa đủ căn cứ để kết luận` }} kind="pending" />
+        <Chip key={`p-${c}`} code={c} label={{ name: `${STABLE_LABELS[c]?.name ?? c}: chưa đủ căn cứ để kết luận` }} kind="pending" />
       ))}
     </span>
   );

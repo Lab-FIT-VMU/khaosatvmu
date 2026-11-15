@@ -2,6 +2,10 @@ using System.Security.Claims;
 
 namespace Application.Auth;
 
+/// <summary>
+/// Một hồ sơ của người đăng nhập. <paramref name="DataScope"/> và <paramref name="CanWrite"/>
+/// lấy từ vai trò, để giao diện chọn màn hình và ẩn nút ghi mà không phải đoán theo mã vai trò.
+/// </summary>
 public sealed record AuthProfileDto(
     Guid Id,
     string Name,
@@ -9,7 +13,10 @@ public sealed record AuthProfileDto(
     string RoleCode,
     string? OrganizationUnitCode,
     string? OrganizationUnitName,
-    bool IsDefault);
+    bool IsDefault,
+    string RoleName = "",
+    string DataScope = "DEPARTMENT",
+    bool CanWrite = false);
 
 public sealed record AuthUserDto(
     Guid Id,

@@ -32,7 +32,7 @@ def process_run(conn, run, cipher, log):
 
         def decrypt(row, column):
             return cipher.decrypt(row[column], row['KeyVersion'], column, row['RevisionId'],
-                                  row['StudentId'], row['CourseCode'], row['SourceRowNumber'])
+                                  row['StudentNumber'], row['CourseCode'], row['SourceRowNumber'])
 
         lop, diem, section_ids = pipeline.build_term_input(
             db.load_sections(conn, semester_id), db.load_grades(conn, semester_id), decrypt)
