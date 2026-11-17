@@ -1,0 +1,6 @@
+# Cùng phiên bản với worker phân tích điểm (src/GradeAnalysisWorker), đã kiểm trên 4 kỳ dữ liệu thật:
+# bộ tính audit chạy bằng các bản này cho kết quả trùng worker (trừ chỗ khác có chủ ý, xem README).
+numpy==2.5.4
+scipy==1.18.1
+statsmodels==0.15.0
+openpyxl==3.1.5

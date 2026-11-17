@@ -1,4 +1,5 @@
 ﻿using API.Auth;
+using API.AuditGrades;
 using API.Catalog;
 using API.Cohorts;
 using API.CourseGrades;
@@ -182,6 +183,8 @@ builder.Services.Configure<GradeAnalysisWorkerOptions>(
     builder.Configuration.GetSection(GradeAnalysisWorkerOptions.SectionName));
 builder.Services.AddSingleton<GradeAnalysisWorkerLauncher>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<GradeAnalysisWorkerLauncher>());
+// Module phân tích điểm bản audit: container riêng, API chỉ chuyển tiếp (chỉ ADMIN).
+builder.Services.AddAuditGradeModule(builder.Configuration);
 builder.Services.AddScoped<ApplicationCookieEvents>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
@@ -226,6 +229,7 @@ app.MapReportEndpoints();
 app.MapGraduationAnalytics2Endpoints();
 app.MapCourseGradeEndpoints();
 app.MapCourseGradeAnalysisEndpoints();
+app.MapAuditGradeModuleEndpoints();
 
 app.MapHealthChecks("/healthz");
 app.MapHealthChecks("/api/health");

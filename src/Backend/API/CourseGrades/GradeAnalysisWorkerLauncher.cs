@@ -34,6 +34,26 @@ public sealed class GradeAnalysisWorkerOptions
 
     /// <summary>Quét dự phòng (giây), phòng khi lượt tính được xếp mà không qua API này.</summary>
     public int PollSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Lệnh chuẩn bị chạy trước worker, cùng <see cref="Command"/> (ví dụ <c>compose … build
+    /// grade-analysis-worker</c> để image luôn theo mã mới). Lỗi hay quá
+    /// <see cref="PrepareTimeoutSeconds"/> thì dừng nó và vẫn chạy worker bằng image đang có,
+    /// để một lần build treo không chặn việc tính.
+    /// </summary>
+    public List<string> PrepareArguments { get; set; } = [];
+
+    public int PrepareTimeoutSeconds { get; set; } = 180;
+
+    /// <summary>Worker chạy quá số phút này thì bị dừng và lượt tính bị đánh lỗi, không treo mãi.</summary>
+    public int TimeoutMinutes { get; set; } = 30;
+
+    /// <summary>
+    /// Lệnh dọn sau khi phải dừng worker vì quá giờ, cùng <see cref="Command"/> (ví dụ
+    /// <c>rm -f khaosatvmu_grade_analysis_worker</c>): tắt tiến trình docker không tắt container,
+    /// mà container còn sót giữ tên thì lần chạy sau không tạo được.
+    /// </summary>
+    public List<string> CleanupArguments { get; set; } = [];
 }
 
 /// <summary>
@@ -77,6 +97,8 @@ public sealed class GradeAnalysisWorkerLauncher(
         var command = usePython ? ResolvePython(workingDirectory) : settings.Command!;
         IReadOnlyList<string> arguments = usePython ? ["-m", "grade_worker"] : settings.Arguments;
         var pollInterval = TimeSpan.FromSeconds(Math.Max(5, settings.PollSeconds));
+        var prepareTimeout = TimeSpan.FromSeconds(Math.Max(10, settings.PrepareTimeoutSeconds));
+        var workerTimeout = TimeSpan.FromMinutes(Math.Max(1, settings.TimeoutMinutes));
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -85,14 +107,42 @@ public sealed class GradeAnalysisWorkerLauncher(
                 var queuedRunId = await QueuedRunIdAsync(stoppingToken);
                 if (queuedRunId is not null)
                 {
-                    var exitCode = await RunWorkerAsync(command, arguments, workingDirectory, stoppingToken);
-                    // Worker chạy xong mà lượt vẫn "chờ" nghĩa là worker không chạy nổi (thiếu thư viện,
-                    // sai cấu hình): đánh lỗi để trang báo "Tính lỗi" thay vì treo, và không chạy lại
-                    // liên tục. Lượt bị thay bằng lượt mới hơn thì đã bị xóa, không đụng tới.
-                    await MarkStillQueuedRunFailedAsync(
-                        queuedRunId.Value,
-                        $"Không chạy được worker phân tích điểm (mã thoát {exitCode}). Xem log của API rồi bấm Tính lại.",
-                        stoppingToken);
+                    if (settings.PrepareArguments.Count > 0)
+                    {
+                        var prepareExit = await RunProcessAsync(
+                            "chuẩn bị worker", command, settings.PrepareArguments, workingDirectory, prepareTimeout, stoppingToken);
+                        if (prepareExit != 0)
+                        {
+                            logger.LogWarning(
+                                "Bước chuẩn bị worker không xong ({Result}); vẫn tính bằng bản worker đang có.",
+                                prepareExit is null ? $"quá {prepareTimeout.TotalSeconds:0} giây" : $"mã thoát {prepareExit}");
+                        }
+                    }
+
+                    var exitCode = await RunProcessAsync(
+                        "worker phân tích điểm", command, arguments, workingDirectory, workerTimeout, stoppingToken);
+                    if (exitCode is null)
+                    {
+                        if (settings.CleanupArguments.Count > 0)
+                        {
+                            await RunProcessAsync(
+                                "dọn worker", command, settings.CleanupArguments, workingDirectory, prepareTimeout, stoppingToken);
+                        }
+                        await MarkUnfinishedRunsFailedAsync(
+                            queuedRunId.Value,
+                            $"Worker phân tích điểm chạy quá {workerTimeout.TotalMinutes:0} phút nên bị dừng. Xem log của API rồi bấm Tính lại.",
+                            stoppingToken);
+                    }
+                    else
+                    {
+                        // Worker chạy xong mà lượt vẫn "chờ" nghĩa là worker không chạy nổi (thiếu thư viện,
+                        // sai cấu hình): đánh lỗi để trang báo "Tính lỗi" thay vì treo, và không chạy lại
+                        // liên tục. Lượt bị thay bằng lượt mới hơn thì đã bị xóa, không đụng tới.
+                        await MarkStillQueuedRunFailedAsync(
+                            queuedRunId.Value,
+                            $"Không chạy được worker phân tích điểm (mã thoát {exitCode}). Xem log của API rồi bấm Tính lại.",
+                            stoppingToken);
+                    }
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -139,8 +189,28 @@ public sealed class GradeAnalysisWorkerLauncher(
                 .SetProperty(x => x.ErrorMessage, message), cancellationToken);
     }
 
-    private async Task<int> RunWorkerAsync(
-        string command, IReadOnlyList<string> arguments, string workingDirectory, CancellationToken cancellationToken)
+    /// <summary>
+    /// Sau khi phải dừng worker vì quá giờ: đánh lỗi lượt đang chạy dở và lượt đã đánh thức
+    /// worker nếu nó vẫn chờ, để trang không hiện "đang tính" mãi.
+    /// </summary>
+    private async Task MarkUnfinishedRunsFailedAsync(long queuedRunId, string message, CancellationToken cancellationToken)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var now = DateTime.UtcNow;
+        await db.GradeAnalysisRuns
+            .Where(x => x.Status == GradeAnalysisRunStatus.Running
+                || (x.RunId == queuedRunId && x.Status == GradeAnalysisRunStatus.Queued))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.Status, GradeAnalysisRunStatus.Failed)
+                .SetProperty(x => x.FinishedAtUtc, now)
+                .SetProperty(x => x.ErrorMessage, message), cancellationToken);
+    }
+
+    /// <summary>Chạy một lệnh và chờ nó thoát; trả mã thoát, hoặc null khi quá <paramref name="timeout"/> (đã dừng cả cây tiến trình).</summary>
+    private async Task<int?> RunProcessAsync(
+        string label, string command, IReadOnlyList<string> arguments, string workingDirectory,
+        TimeSpan timeout, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo(command)
         {
@@ -180,7 +250,7 @@ public sealed class GradeAnalysisWorkerLauncher(
         process.OutputDataReceived += (_, e) => { if (e.Data is { Length: > 0 }) logger.LogInformation("grade_worker: {Line}", e.Data); };
         process.ErrorDataReceived += (_, e) => { if (e.Data is { Length: > 0 }) logger.LogWarning("grade_worker: {Line}", e.Data); };
 
-        logger.LogInformation("Chạy worker phân tích điểm: {Command} {Arguments}", command, string.Join(' ', arguments));
+        logger.LogInformation("Chạy {Label}: {Command} {Arguments}", label, command, string.Join(' ', arguments));
         var started = Stopwatch.StartNew();
         try
         {
@@ -194,18 +264,26 @@ public sealed class GradeAnalysisWorkerLauncher(
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutSource.CancelAfter(timeout);
         try
         {
-            await process.WaitForExitAsync(cancellationToken);
+            await process.WaitForExitAsync(timeoutSource.Token);
         }
         catch (OperationCanceledException)
         {
-            // API dừng giữa lượt: dừng worker; lượt "đang chạy" sẽ được worker lần sau đánh lỗi.
+            // API dừng giữa lượt, hoặc lệnh treo quá giờ: dừng cả cây tiến trình. Lượt "đang chạy"
+            // do API dừng sẽ được worker lần sau đánh lỗi.
             try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-            throw;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            logger.LogError("{Label} chạy quá {Seconds:0} giây nên bị dừng.", label, timeout.TotalSeconds);
+            return null;
         }
 
-        logger.LogInformation("Worker phân tích điểm thoát với mã {ExitCode} sau {Seconds:0} giây.", process.ExitCode, started.Elapsed.TotalSeconds);
+        logger.LogInformation("{Label} thoát với mã {ExitCode} sau {Seconds:0} giây.", label, process.ExitCode, started.Elapsed.TotalSeconds);
         return process.ExitCode;
     }
 

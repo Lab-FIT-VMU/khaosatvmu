@@ -7,6 +7,7 @@ import {
   CalendarRange,
   ChartColumn,
   ChartNoAxesCombined,
+  ChartScatter,
   CircleHelp,
   ClipboardCheck,
   ClipboardList,
@@ -62,6 +63,11 @@ export interface SidebarMenuItem {
    * chỉ hiện tiêu đề một lần, ở mục đầu.
    */
   section?: string;
+  /**
+   * Chỉ hồ sơ vai trò ADMIN thấy, kể cả vai trò tự tạo có phạm vi toàn trường. Mục loại này
+   * không có quyền module; backend cũng tự chặn vai trò khác.
+   */
+  adminOnly?: boolean;
 }
 
 export interface SidebarMenuGroup {
@@ -144,6 +150,9 @@ export const menuStructure: SidebarMenuEntry[] = [
       { id: 'course-grade-design', label: 'Design System', icon: Palette, section: 'Trợ giúp' },
     ],
   },
+  // Module audit chạy nguyên bản, độc lập với nhóm trên (src/AuditGradeModule): một mục mở
+  // giao diện riêng của nó (các cấp báo cáo, nạp kỳ, tham số…). Chỉ ADMIN.
+  { id: 'audit-grade-module', label: 'Phân tích điểm (bản audit)', icon: ChartScatter, adminOnly: true },
   {
     id: 'graduation',
     label: 'Thống kê tốt nghiệp',

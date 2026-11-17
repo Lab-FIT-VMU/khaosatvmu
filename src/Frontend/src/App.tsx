@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { useAuth } from './auth/authContext';
 import { canAccessModule } from './auth/modulePermissions';
 import { readSemesterSurveysCache, writeSemesterSurveysCache } from './hooks/useSemesterSurveys';
-import { canAccessDashboard, isUnrestrictedRole, seesAllData, seesOnlyOwnSections } from './auth/roles';
+import { canAccessDashboard, isUnrestrictedRole, ROLE_CODES, seesAllData, seesOnlyOwnSections } from './auth/roles';
 import { AuthLoading } from './components/AuthLoading';
 import { getHashRoot } from './pages/reportRoute';
 
@@ -65,6 +65,7 @@ const SurveyAnalysisPage = lazy(() => import('./pages/SurveyAnalysisPage').then(
 const SurveyDashboardPage = lazy(() => import('./pages/SurveyDashboardPage').then(m => ({ default: m.SurveyDashboardPage })));
 const GraduationAnalytics2Page = lazy(() => import('./pages/GraduationAnalytics2Page').then(m => ({ default: m.GraduationAnalytics2Page })));
 const CourseGradeUploadPage = lazy(() => import('./pages/CourseGradeUploadPage').then(m => ({ default: m.CourseGradeUploadPage })));
+const AuditGradeModulePage = lazy(() => import('./pages/AuditGradeModulePage').then(m => ({ default: m.AuditGradeModulePage })));
 const CourseGradeReportsPage = lazy(() => import('./pages/CourseGradeReportsPage').then(m => ({ default: m.CourseGradeReportsPage })));
 /** Mục sidebar của báo cáo phân tích điểm → cấp báo cáo (CourseGradeReportsPage). */
 const COURSE_GRADE_REPORT_VIEWS: Record<string, CourseGradeReportView> = {
@@ -231,6 +232,7 @@ function DashboardApp() {
       !canAccessModule(permissions, currentTab)
       || (currentTab === 'overview' && !dashboardAllowed)
       || (unitStatisticsTab !== null && !isUnrestrictedRole(auth.activeProfile?.roleCode))
+      || (currentTab === 'audit-grade-module' && auth.activeProfile?.roleCode !== ROLE_CODES.admin)
       // Trang Thống kê theo mục đã bỏ khỏi menu; địa chỉ cũ còn lưu thì đưa về trang đầu.
       || currentTab === 'survey-section-scores';
     if (blocked) {
@@ -702,6 +704,9 @@ function DashboardApp() {
               />
             )}
             {currentTab === 'course-grade-thresholds' && <CourseGradeThresholdsPage />}
+            {currentTab === 'audit-grade-module' && auth.activeProfile?.roleCode === ROLE_CODES.admin && (
+              <AuditGradeModulePage />
+            )}
 
 
             {currentTab === 'academic-years' && <AcademicYearsPage />}

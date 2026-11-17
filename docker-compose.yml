@@ -175,6 +175,24 @@ services:
       db:
         condition: service_healthy
 
+  # Module phân tích điểm học phần bản audit (src/AuditGradeModule): chạy nguyên bản module audit
+  # (python chay.py: bộ tính + giao diện riêng), ĐỘC LẬP với module phân tích điểm ở trên — không
+  # dùng CSDL, dữ liệu dạng file trong volume audit_grade_data. Người dùng vào qua API
+  # (/api/audit-grades/, chỉ ADMIN); cổng 8770 chỉ mở trên 127.0.0.1 cho `dotnet run` trên máy.
+  # Lần đầu hoặc sau khi đổi mã: docker compose up -d --build audit-grade
+  # Nạp một kỳ khoảng 25 giây, ~600 MB RAM lúc tính.
+  audit-grade:
+    build:
+      context: ./src/AuditGradeModule
+    container_name: khaosatvmu_audit_grade
+    restart: unless-stopped
+    cpus: ${AUDIT_GRADE_CPU_LIMIT:-1.0}
+    mem_limit: ${AUDIT_GRADE_MEM_LIMIT:-1g}
+    ports:
+      - "127.0.0.1:${AUDIT_GRADE_PORT:-8770}:8770"
+    volumes:
+      - audit_grade_data:/data
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: khaosatvmu_pgadmin
@@ -195,3 +213,4 @@ volumes:
   postgres_data:
   pgadmin_data:
   survey_form_assets:
+  audit_grade_data:

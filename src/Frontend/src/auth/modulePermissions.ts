@@ -22,6 +22,9 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   'course-grade-report-trends': 'COURSE_GRADE_ANALYSIS_ACCESS',
   'course-grade-glossary': 'COURSE_GRADE_ANALYSIS_ACCESS',
   'course-grade-design': 'COURSE_GRADE_ANALYSIS_ACCESS',
+  // Module audit (bản nguyên, độc lập): không có quyền module, chỉ vai trò ADMIN — App và
+  // Sidebar kiểm theo vai trò, backend (/api/audit-grades) cũng vậy.
+  'audit-grade-module': null,
   // Giữ hash cũ để bookmark tự chuyển vào module thống nhất.
   'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
   'graduation-analytics-2': 'GRADUATION_ANALYTICS_ACCESS',

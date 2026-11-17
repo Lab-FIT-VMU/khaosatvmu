@@ -1,0 +1,422 @@
+{
+  "_ghi_chu": "Tập câu mẫu của giao diện báo cáo (tiêu đề, mô tả, khung “Biểu đồ/Bảng này cho biết gì?”, chú thích, câu nhận xét). Trang web chỉ đọc câu từ file này, không tự sinh câu. Chỗ trống {ten} do trang điền số liệu; **chữ** là chữ đậm; !!số!! là số nổi bật cỡ lớn. Khi một câu có nhiều phương án (ví dụ khi có / không có kỳ trước), mỗi phương án là một khóa riêng. Sửa xong chạy: python -X utf8 -m xu_ly.kho xuat. Câu nhận xét Hồ sơ một lớp nằm ở mau_nhan_xet.json (bộ luật E).",
+  "phien_ban": 1,
+
+  "tu_dien": {
+    "chi_so": {
+      "I1": ["Tỷ lệ mất tư cách dự thi", "Phần trăm sinh viên có điểm quá trình bằng 0 nên không đủ điều kiện dự thi kết thúc học phần."],
+      "I2": ["Tỷ lệ trượt do điểm thi", "Phần trăm sinh viên đủ tư cách dự thi nhưng có điểm học phần dưới 4 (điểm F) do điểm thi dưới 4."],
+      "I3": ["Điểm quá trình trung bình", "Trung bình điểm quá trình do giảng viên chấm, tính trên sinh viên đủ tư cách dự thi."],
+      "I4": ["Điểm thi trung bình", "Trung bình điểm thi kết thúc học phần. Các lớp thi tập trung theo bộ đề chung nên điểm thi so sánh được giữa các lớp."],
+      "I5": ["Chênh lệch giữa điểm quá trình và điểm thi", "Trung bình của (điểm quá trình − điểm thi). Giá trị dương nghĩa là điểm quá trình đang cao hơn điểm thi."],
+      "I6": ["Mức độ khớp giữa điểm quá trình và điểm thi", "Hệ số tương quan giữa điểm quá trình và điểm thi, thường nằm trong khoảng 0 đến 1. Giá trị càng gần 1, sinh viên có điểm quá trình cao càng có xu hướng đạt điểm thi cao."],
+      "I7": ["Điểm quá trình so với mức kỳ vọng", "Ở cùng mức điểm thi, sinh viên của lớp có điểm quá trình cao hơn (+) hay thấp hơn (−) bao nhiêu điểm so với sinh viên các lớp khác cùng học phần."],
+      "I8": ["Điểm thi so với mức kỳ vọng", "Điểm thi của lớp cao hơn (+) hay thấp hơn (−) bao nhiêu điểm so với mức dự đoán từ năng lực chung của sinh viên trong lớp."],
+      "I9": ["Mức chênh lệch chấm điểm quá trình giữa các lớp", "Độ tản (đơn vị điểm) của điểm quá trình giữa các lớp trong cùng một học phần. Giá trị lớn cho thấy các lớp có thể đang được chấm theo những chuẩn khác nhau. Mỗi học phần trong mỗi kỳ có một giá trị; khi gộp lên bộ môn, khoa hay toàn trường, hệ thống lấy trung vị trên các học phần đủ điều kiện so sánh, luôn kèm tỷ lệ học phần có điểm lưu ý."],
+      "I10": ["Độ khác biệt phân phối điểm", "Phân phối điểm của một lớp khác bao nhiêu so với gộp các lớp còn lại của cùng học phần (đơn vị điểm)."]
+    },
+    "diem_luu_y": {
+      "H1": ["Điểm quá trình chênh lệch giữa các lớp", "Điểm quá trình của các lớp trong cùng học phần khác nhau rõ rệt sau khi đã tính đến điểm thi."],
+      "H2": ["Điểm thi chênh lệch giữa các lớp", "Điểm thi của các lớp khác nhau rõ rệt sau khi đã tính đến năng lực chung của sinh viên."],
+      "H3": ["Điểm quá trình ít phản ánh điểm thi", "Trên toàn học phần, điểm quá trình và điểm thi có mức tương quan thấp, kể cả khi đã tính sai số. Điều này có thể do điểm quá trình đánh giá những năng lực mà đề thi không đo, nên chưa đủ để kết luận điểm quá trình có vấn đề."],
+      "H4": ["Tỷ lệ mất tư cách không đồng đều giữa các lớp", "Tỷ lệ sinh viên mất tư cách dự thi chênh nhau nhiều giữa các lớp của cùng học phần."],
+      "H5": ["Tỷ lệ trượt do điểm thi cao", "Tỷ lệ sinh viên trượt do điểm thi của học phần đạt mức lưu ý (tính cả sai số) hoặc cao hơn rõ so với các kỳ trước của chính học phần."],
+      "H6": ["Điểm thi thay đổi so với lần mở gần nhất", "Điểm thi trung bình thay đổi rõ so với học kỳ gần nhất có mở học phần này (có thể cách 6 tháng, 12 tháng hoặc hơn)."]
+    },
+    "nhan_ngan_lien_quan": { "H1": "Chênh điểm quá trình", "H2": "Chênh điểm thi", "H3": "Khớp X–Y thấp", "H4": "Mất tư cách không đồng đều", "H5": "Tỷ lệ F cao" },
+    "dac_diem": {
+      "D1": ["Điểm quá trình cao hơn mức kỳ vọng", "Ở cùng mức điểm thi, sinh viên của lớp có điểm quá trình cao hơn sinh viên các lớp khác."],
+      "D2": ["Điểm quá trình thấp hơn mức kỳ vọng", "Ở cùng mức điểm thi, sinh viên của lớp có điểm quá trình thấp hơn sinh viên các lớp khác."],
+      "D3": ["Điểm quá trình ít phản ánh điểm thi", "Trong lớp, điểm quá trình và điểm thi có tương quan rất thấp và thấp hơn rõ so với toàn học phần, kể cả khi đã tính sai số do số sinh viên có hạn."],
+      "D4": ["Phân bố điểm quá trình khác các lớp còn lại", "Hình dạng phân bố điểm quá trình của lớp khác hẳn các lớp còn lại của học phần. Đặc điểm này chưa xét đến điểm thi, nên cần đọc cùng mức điểm quá trình so với kỳ vọng."],
+      "D5": ["Tỷ lệ mất tư cách cao hơn hẳn các lớp khác", "Lớp có tỷ lệ mất tư cách dự thi cao hơn hẳn các lớp còn lại."],
+      "D6": ["Điểm thi cao hơn mức kỳ vọng", "Sinh viên của lớp đạt điểm thi cao hơn mức dự đoán từ năng lực chung. Cách tổ chức dạy học của lớp có thể là kinh nghiệm để chia sẻ."],
+      "D7": ["Điểm thi thấp hơn mức kỳ vọng", "Sinh viên của lớp đạt điểm thi thấp hơn mức dự đoán từ năng lực chung."]
+    },
+    "lap_lai": ["Đặc điểm lặp lại qua nhiều học kỳ", "Trong 4 học kỳ gần nhất tính đến kỳ đang xem, một giảng viên có cùng một đặc điểm ở cùng một học phần trong từ 2 học kỳ trở lên, và các kỳ đó chiếm từ một nửa số kỳ giảng viên dạy học phần trong khoảng này. “Đang tiếp diễn” là đặc điểm có xuất hiện ở kỳ đang xem; “đã ghi nhận trước đây” là đặc điểm chỉ xuất hiện ở các kỳ trước. Sự lặp lại cũng có thể xảy ra do ngẫu nhiên, nên đây là căn cứ để bộ môn và khoa trao đổi, tìm hiểu nguyên nhân, không phải kết luận."],
+    "tuong_duong_gv": ["Điểm quá trình gần mức kỳ vọng ở các kỳ đã dạy", "Mức điểm quá trình so với kỳ vọng của giảng viên nằm trong vùng gần 0 (±{vung} điểm) ở mọi học kỳ đã dạy học phần. Đây là mô tả số liệu; khi học phần có ít lớp, điều này chưa khẳng định các lớp tương đương nhau."],
+    "khoa": {"11": "Khoa Hàng hải", "12": "Khoa Máy tàu biển", "13": "Khoa Điện – Điện tử", "15": "Khoa Kinh tế", "16": "Khoa Công trình", "17": "Khoa Công nghệ thông tin", "18": "Khoa Cơ sở – Cơ bản", "19": "Khoa Lý luận chính trị", "22": "Viện Cơ khí", "23": "Khoa Đóng tàu", "25": "Khoa Ngoại ngữ", "26": "Viện Môi trường", "28": "Khoa Quản trị – Tài chính", "29": "Viện Đào tạo quốc tế (IMET)"},
+    "tham_so": {
+      "so_sv_toi_thieu_lop": ["Số sinh viên tối thiểu để một lớp được đưa vào thống kê", "Chỉ đếm sinh viên đủ tư cách dự thi. Lớp ít hơn được ghi là “không đưa vào thống kê”."],
+      "so_sv_tin_cay_thap": ["Ngưỡng gắn nhãn “ít sinh viên – đọc thận trọng”", "Lớp có số sinh viên dưới ngưỡng này vẫn được thống kê nhưng kèm nhãn để người đọc thận trọng."],
+      "so_lop_toi_thieu_hp": ["Số lớp tối thiểu để so sánh trong một học phần", "Học phần có ít lớp hơn sẽ không so sánh giữa các lớp."],
+      "so_lop_hp_nang_luc_nen": ["Số học phần tối thiểu sinh viên học trong kỳ", "Dùng để ước lượng năng lực chung của sinh viên (tính cả học phần đang xét)."],
+      "nang_luc_nen_thang": ["Thang điểm dùng tính năng lực nền", "Chỉ nhận 10 hoặc 4."],
+      "muc_tin_cay": ["Mức tin cậy của khoảng tin cậy", "Ví dụ 0,95 là 95%."],
+      "fdr_q": ["Ngưỡng ý nghĩa sau hiệu chỉnh nhiều phép thử", "Ví dụ 0,05. Giá trị càng nhỏ thì càng ít đặc điểm và điểm lưu ý được ghi nhận."],
+      "d1_d2_lech_x": ["Đặc điểm “điểm quá trình cao/thấp hơn kỳ vọng”: mức chênh tối thiểu", "Đơn vị điểm."],
+      "d3_r_lop": ["Đặc điểm “điểm quá trình ít phản ánh điểm thi”: tương quan của lớp dưới mức", "Từ 0 đến 1."],
+      "d3_r_hp": ["Đặc điểm “điểm quá trình ít phản ánh điểm thi”: khi tương quan của học phần từ mức", "Từ 0 đến 1. Cũng là ngưỡng của “Điểm quá trình khớp tốt với điểm thi”, kèm cận dưới khoảng tin cậy không thấp hơn ngưỡng “ít phản ánh điểm thi”."],
+      "d4_wasserstein": ["Đặc điểm “phân bố điểm quá trình khác các lớp còn lại”: khoảng cách tối thiểu", "Đơn vị điểm."],
+      "d5_chenh_mat_tu_cach": ["Đặc điểm “mất tư cách cao hơn hẳn các lớp khác”: chênh tối thiểu so với các lớp khác", "Tỷ lệ, ví dụ 0,15 là 15 điểm phần trăm."],
+      "d6_d7_lech_y": ["Đặc điểm “điểm thi cao/thấp hơn kỳ vọng”: mức chênh tối thiểu", "Đơn vị điểm."],
+      "h1_icc_x": ["“Điểm quá trình chênh lệch giữa các lớp”: tỷ lệ phương sai tối thiểu", "Từ 0 đến 1; càng lớn thì càng ít học phần có điểm lưu ý. “Đồng đều” cần cận trên của tỷ lệ này dưới mức đó."],
+      "h1_khoang_tan_x": ["“Điểm quá trình chênh lệch giữa các lớp”: mức chênh tối thiểu", "Chênh lệch (điểm) giữa lớp cao nhất và lớp thấp nhất."],
+      "h2_icc_y": ["“Điểm thi chênh lệch giữa các lớp”: tỷ lệ phương sai tối thiểu", "Từ 0 đến 1. “Đồng đều” cần cận trên của tỷ lệ này dưới mức đó."],
+      "h2_khoang_tan_y": ["“Điểm thi chênh lệch giữa các lớp”: mức chênh tối thiểu", "Đơn vị điểm."],
+      "h3_r_hp": ["“Điểm quá trình ít phản ánh điểm thi”: cận trên của tương quan dưới mức", "Từ 0 đến 1."],
+      "h4_chenh_mat_tu_cach": ["“Tỷ lệ mất tư cách không đồng đều”: chênh tối thiểu giữa lớp cao nhất và thấp nhất", "Tỷ lệ, ví dụ 0,15 là 15 điểm phần trăm."],
+      "h5_ty_le_f": ["“Tỷ lệ trượt do điểm thi cao”: mức lưu ý", "Ví dụ 0,30: cận dưới khoảng tin cậy của tỷ lệ trượt từ 30% trở lên."],
+      "h5_chenh_lich_su": ["“Tỷ lệ trượt do điểm thi cao”: mức tăng so với các kỳ trước của học phần", "Ví dụ 0,10 là 10 điểm phần trăm, kèm kiểm định có ý nghĩa thống kê."],
+      "h6_lech_y_giua_ky": ["“Điểm thi thay đổi so với lần mở gần nhất”: mức chênh điểm thi trung bình", "Chênh lệch (điểm) so với học kỳ gần nhất có mở học phần."],
+      "g1_so_ky_lap": ["Số học kỳ tối thiểu có cùng một đặc điểm", "Cùng giảng viên, cùng học phần."],
+      "g1_cua_so_ky": ["Số học kỳ gần nhất được xét khi tìm đặc điểm lặp lại", "Tính theo lịch, đến kỳ đang xem. Ví dụ 4 là 2 năm; đặc điểm cũ hơn không còn được tính là lặp lại."],
+      "g1_ty_le_ky": ["Tỷ lệ tối thiểu của số kỳ có đặc điểm", "Trong số kỳ giảng viên dạy học phần. Ví dụ 0,5 là từ một nửa số kỳ."],
+      "vung_gan_0": ["Hồ sơ lớp: vùng “gần 0” của mức chênh so với kỳ vọng", "Đơn vị điểm. Học kỳ có mức chênh trong khoảng ± giá trị này không tính là dương hay âm khi tóm tắt xu hướng của giảng viên."],
+      "so_ky_cung_chieu": ["Hồ sơ lớp: số học kỳ tối thiểu để nói về xu hướng", "Kèm điều kiện khoảng tin cậy của trung bình các kỳ không chứa 0."],
+      "he_so_ty_le_f": ["Hồ sơ lớp: hệ số tỷ lệ trượt do điểm thi", "Gợi ý khi tỷ lệ F do điểm thi của lớp cao hơn hệ số này nhân tỷ lệ của cả học phần."],
+      "ty_le_f_toi_thieu": ["Hồ sơ lớp: tỷ lệ trượt do điểm thi tối thiểu", "Và tỷ lệ F do điểm thi của lớp phải trên mức này (0,05 là 5%)."],
+      "ty_le_nguong_d5": ["Hồ sơ lớp: tỷ lệ của ngưỡng mất tư cách", "Gợi ý khi tỷ lệ mất tư cách của lớp cao hơn các lớp khác ít nhất giá trị này nhân ngưỡng đặc điểm “mất tư cách cao hơn hẳn các lớp khác”."]
+    },
+    "nhom_tham_so": {"pham_vi": "Phạm vi học phần", "co_mau": "Cỡ mẫu tối thiểu", "nang_luc_nen": "Năng lực nền của sinh viên", "kiem_dinh": "Kiểm định thống kê", "dau_hieu_lop": "Ngưỡng đặc điểm cấp lớp", "co_hoc_phan": "Ngưỡng điểm lưu ý của học phần", "co_giang_vien": "Lặp lại qua nhiều học kỳ", "goi_y_ho_so": "Gợi ý đọc hồ sơ lớp (bộ luật E)"},
+    "thang_do": {"icc": "Tỷ lệ phương sai giữa các lớp (0 đến 1)", "tau": "Chênh lệch tính bằng điểm (thang 10)"},
+    "loai_diem": {"x": "điểm quá trình", "y": "điểm thi"}
+  },
+
+  "chung": {
+    "giai_thich_bieu_do": "Biểu đồ này cho biết gì?",
+    "giai_thich_bang": "Bảng này cho biết gì?",
+    "y_nghia": "Ý nghĩa", "dung_de": "Dùng để", "cach_doc": "Cách đọc",
+    "khong_co_diem_luu_y": "Không có điểm lưu ý",
+    "chua_xac_dinh_on_dinh": "Chưa xác định (thiếu điều kiện so sánh)",
+    "g1_dang": "Đang tiếp diễn",
+    "g1_truoc": "Đã ghi nhận trước đây",
+    "du_lieu_gia": "Dữ liệu giả lập – không phải số liệu thật",
+    "chua_co_ky_tieu_de": "Chưa có học kỳ nào được nạp",
+    "chua_co_ky_tren_may": "Hãy nạp học kỳ đầu tiên để xem báo cáo. Phần so sánh qua các học kỳ chỉ có từ học kỳ thứ hai.",
+    "chua_co_ky_github": "Bản xem trên GitHub chưa có dữ liệu. Hãy nạp học kỳ trên máy rồi đưa thư mục web/data lên GitHub.",
+    "chua_du_dk_so_sanh": "Chưa có học phần đủ điều kiện so sánh.",
+    "tang": "Tăng", "giam": "Giảm", "tang_thuong": "tăng", "giam_thuong": "giảm",
+    "ngoai_kho_ky_dau": "Đây là học kỳ đầu tiên trong kho",
+    "thay_doi_so_voi": "{chieu} {so} {don_vi} so với {ky}",
+    "kho_co_ky": "Kho có {n} học kỳ: {ds}."
+  },
+
+  "hai_chieu": {
+    "tieu_de": "Cần lưu ý và ổn định, đồng đều",
+    "mo_ta": "{pham_vi}: {n} học phần. Mỗi dòng đặt một điểm lưu ý cạnh trạng thái ngược với nó, cùng ngưỡng. Tỷ lệ tính trên các học phần so sánh được của dòng đó.",
+    "pham_vi_truong": "Toàn trường, {ky}",
+    "pham_vi_khoa": "{khoa}, {ky}",
+    "giai_thich": {
+      "y_nghia": "Bên trái là số học phần có từng loại điểm lưu ý; bên phải là số học phần đạt trạng thái ngược lại – ổn định, đồng đều. Trạng thái ổn định, đồng đều chỉ được ghi khi khoảng tin cậy nằm về phía ổn định của ngưỡng. Hệ thống chỉ mô tả số liệu, không khen và không chê.",
+      "dung_de": "Nhìn cân bằng cả hai chiều: bên cạnh những học phần cần xem lại là những học phần đang ổn định, đồng đều, có thể làm căn cứ để chia sẻ cách làm.",
+      "cach_doc": "“Chưa đủ căn cứ” là học phần so sánh được, chưa có điểm lưu ý, nhưng khoảng tin cậy chưa đủ hẹp để ghi trạng thái ổn định hoặc chỉ số nằm giữa hai ngưỡng (ví dụ mức khớp giữa {r_thap} và {r_cao}). Đây không phải là kết quả tốt hay chưa tốt. “Không thể so sánh” là học phần mà câu hỏi của dòng không áp dụng được, ví dụ có dưới 2 lớp đủ điều kiện hoặc không có kỳ trước, và không được tính vào tỷ lệ. Khi nhóm chưa đủ căn cứ còn lớn, không nên suy ra tỷ lệ chung của toàn trường từ bảng này. Di chuột vào từng tên để xem điều kiện."
+    },
+    "cot": ["Cần lưu ý", "Số học phần", "Ổn định, đồng đều", "Số học phần", "Chưa đủ căn cứ", "Không thể so sánh"]
+  },
+
+  "ban_do": {
+    "truc_x": "Các lớp chênh lệch về điểm quá trình →", "truc_x_ngan": "Chênh lệch điểm QT →",
+    "truc_y": "Các lớp chênh lệch về điểm thi →", "truc_y_ngan": "Chênh lệch điểm thi →",
+    "moc_nguong": "Ngưỡng", "moc_trung_vi": "Trung vị",
+    "vung": [["dưới ngưỡng ở cả hai loại điểm", "dưới ngưỡng"], ["chỉ vượt ngưỡng ở điểm quá trình", "vượt ngưỡng điểm QT"], ["chỉ vượt ngưỡng ở điểm thi", "vượt ngưỡng điểm thi"], ["vượt ngưỡng ở cả hai loại điểm", "vượt cả hai"]],
+    "ghi_chu_nguong": "Hai đường đứt màu đỏ là **ngưỡng lưu ý** lấy từ tham số (điểm quá trình: {x}; điểm thi: {y}).",
+    "ghi_chu_trung_vi": "Hai đường đứt màu đỏ là **trung vị** của các học phần, không tính nhóm có độ tản bằng 0.",
+    "ghi_chu_cham_rong": "Chấm rỗng là học phần mà mô hình **không phát hiện chênh lệch** giữa các lớp ở ít nhất một loại điểm (độ tản ước lượng bằng 0): {nx} học phần ở điểm quá trình (nằm trên trục dọc), {ny} học phần ở điểm thi (nằm trên trục ngang).",
+    "cach_doc_nguong": "Hai đường đứt màu đỏ là ngưỡng lưu ý về tỷ lệ phương sai, lấy từ tham số; số học phần ở mỗi vùng ghi ở góc tương ứng. Vượt ngưỡng chưa đồng nghĩa với có điểm lưu ý: điểm lưu ý chỉ được ghi nhận khi khác biệt giữa các lớp đồng thời có ý nghĩa thống kê. Chấm rỗng là học phần không phát hiện chênh lệch giữa các lớp.",
+    "cach_doc_trung_vi": "Hai đường đứt màu đỏ là trung vị của các học phần (không tính nhóm có độ tản bằng 0), chia biểu đồ thành 4 vùng; số học phần của mỗi vùng ghi ở góc tương ứng. Chấm rỗng là học phần không phát hiện chênh lệch giữa các lớp.",
+    "chu_giai_khong_phat_hien": "Không phát hiện chênh lệch giữa các lớp"
+  },
+
+  "bgh": {
+    "duong_dan": "Báo cáo · Cấp Ban giám hiệu",
+    "tieu_de": "Tổng quan toàn trường",
+    "mo_ta": "{ky}. Báo cáo cấp trường **không hiển thị tên giảng viên và mã lớp**. Các tỷ lệ chung chỉ để mô tả tình hình, **không dùng để xếp hạng** khoa hay bộ môn.",
+    "nut_in": "In / lưu PDF",
+    "the": {
+      "so_hp": "Số học phần được thống kê", "so_hp_phu": "Thuộc {khoa} khoa/viện và {bm} bộ môn",
+      "so_lop": "Số lớp học phần", "don_vi_lop": "lớp",
+      "luot_sv": "Số lượt sinh viên học", "don_vi_luot": "lượt",
+      "khong_tk": "Số lớp không đưa vào thống kê", "khong_tk_phu": "Lớp dưới {n} sinh viên đủ tư cách dự thi (không phải lớp bị hủy)", "khong_tk_mat_tc": ". Trong đó {n} lớp có đủ số sinh viên có điểm, vẫn được xét tỷ lệ mất tư cách"
+    },
+    "xu_huong": {
+      "tieu_de": "Xu hướng của bốn chỉ số chính qua các học kỳ",
+      "mo_ta": "Tính chung cho toàn trường, từ học kỳ đầu tiên trong kho đến {ky}. Di chuột vào từng điểm để xem giá trị và mức thay đổi so với kỳ trước.",
+      "giai_thich": {
+        "y_nghia": "Bốn biểu đồ thể hiện diễn biến các chỉ số chính của toàn trường qua các học kỳ đã nạp. Riêng mức độ khớp được tính bằng trung vị của các lớp.",
+        "dung_de": "Theo dõi diễn biến sau khi ban hành quy chế hoặc chủ trương, ví dụ quy định mới về đánh giá quá trình hoặc chương trình hỗ trợ học tập.",
+        "cach_doc": "Hướng đi lên hoặc đi xuống của đường cho biết xu hướng. Số ghi trên mỗi điểm là giá trị của học kỳ đó."
+      },
+      "mot_ky": "Tính đến học kỳ đang xem mới có 1 học kỳ nên chưa xác định được xu hướng; biểu đồ chỉ hiển thị giá trị của học kỳ này."
+    },
+    "ban_do": {
+      "tieu_de": "Bản đồ học phần theo mức chênh lệch giữa các lớp",
+      "mo_ta": "Mỗi chấm là một học phần có từ {n_lop} lớp được thống kê trở lên ({n} học phần; {n_le} học phần khác chỉ có 1 lớp được thống kê nên không so sánh được). Báo cáo cấp trường không ghi mã hay tên học phần trên biểu đồ.",
+      "giai_thich": {
+        "y_nghia": "Mỗi học phần được đặt theo hai trục: trục ngang cho biết các lớp của học phần được chấm **điểm quá trình** chênh nhau bao nhiêu; trục dọc cho biết **điểm thi** của các lớp chênh nhau bao nhiêu (đã tính đến năng lực chung của sinh viên).",
+        "dung_de": "Định hướng biện pháp. Nếu nhiều học phần nằm lệch sang phải, cần xem xét thống nhất cách chấm điểm quá trình (ví dụ dùng rubric chung); nếu nhiều học phần nằm lệch lên trên, cần chú trọng phương pháp giảng dạy."
+      },
+      "loc_thang_do": "Thang đo của hai trục", "loc_khoa": "Làm nổi bật một khoa/viện", "loc_khoa_tat_ca": "Không – hiển thị tất cả như nhau",
+      "chu_giai_hp": "Học phần", "chu_giai_hp_khoa": "Học phần của {khoa}", "chu_giai_khac": "Học phần của các khoa/viện khác",
+      "ghi_chu_khoa": "Số học phần ở 4 góc đang tính riêng cho **{khoa}**; hai đường đứt giữ nguyên làm mốc so sánh."
+    },
+    "ty_le_co": {
+      "tieu_de": "Tỷ lệ học phần có điểm lưu ý, theo khoa/viện",
+      "mo_ta_tat_ca": "Điểm lưu ý mang nghĩa “cần xem xét”, không phải kết luận về chất lượng. Toàn trường: {n} trên {tong} học phần ({pct}%) – trong đó học phần đủ điều kiện so sánh {ndk}/{dk}, học phần chưa đủ điều kiện {ncd}/{cd}.",
+      "mo_ta_du_dk": "Điểm lưu ý mang nghĩa “cần xem xét”, không phải kết luận về chất lượng. Toàn trường (chỉ học phần đủ điều kiện so sánh): {n} trên {tong} học phần ({pct}%).",
+      "giai_thich": {
+        "y_nghia": "Phần trăm học phần của mỗi khoa/viện đang có điểm lưu ý trong học kỳ.",
+        "dung_de": "Xác định nơi cần ưu tiên nguồn lực đảm bảo chất lượng, tập huấn hoặc kiểm tra chuyên đề.",
+        "cach_doc": "Chữ bên phải thanh tách hai nhóm: **đủ ĐK** là học phần có từ 2 lớp được thống kê (so sánh được giữa các lớp); **chưa đủ** là học phần chỉ có 0–1 lớp được thống kê. Nhóm chưa đủ điều kiện **không thể** có điểm lưu ý về chênh lệch giữa các lớp (điểm quá trình, điểm thi, mất tư cách), nên khoa/viện có nhiều học phần nhỏ thường có tỷ lệ thấp hơn. Để so sánh các khoa/viện công bằng hơn, chọn phạm vi “Chỉ học phần đủ điều kiện so sánh”. Khoa/viện có ít học phần (dưới khoảng 10) thì tỷ lệ dễ dao động."
+      },
+      "loc_loai": "Loại điểm lưu ý", "loc_loai_tat_ca": "Bất kỳ loại điểm lưu ý nào",
+      "loc_pham_vi": "Phạm vi học phần", "pham_vi_tat_ca": "Tất cả học phần", "pham_vi_du_dk": "Chỉ học phần đủ điều kiện so sánh (từ 2 lớp)",
+      "nhac_chon_du_dk": "Loại điểm lưu ý đang chọn chỉ có ở học phần đủ điều kiện so sánh. Nên chọn phạm vi “Chỉ học phần đủ điều kiện so sánh” để tỷ lệ không bị kéo thấp bởi các học phần chỉ có 1 lớp.",
+      "nhan_thanh_du_dk": "{ndk}/{dk} học phần đủ điều kiện",
+      "nhan_thanh_tat_ca": "đủ ĐK {ndk}/{dk} · chưa đủ {ncd}/{cd}",
+      "goi_y": "{khoa}\n{n} trên {tong} học phần có điểm lưu ý ({pct}%)\n• Đủ điều kiện so sánh (từ 2 lớp): {ndk}/{dk}{pct_dk}\n• Chưa đủ điều kiện (0–1 lớp được thống kê): {ncd}/{cd}{pct_cd}",
+      "goi_y_dang_du_dk": "\n(Đang chỉ tính học phần đủ điều kiện so sánh)"
+    },
+    "i9": {
+      "tieu_de": "Các lớp trong cùng học phần chênh nhau bao nhiêu? – theo khoa/viện và qua các học kỳ",
+      "mo_ta": "Mức không hội tụ giữa các lớp (I9) gộp theo quy tắc R4: trung vị trên các học phần đủ điều kiện so sánh, luôn kèm tỷ lệ học phần có điểm lưu ý.",
+      "giai_thich": {
+        "y_nghia_x": "Ở mỗi học phần, hệ thống ước lượng các lớp chênh nhau bao nhiêu về điểm quá trình sau khi đã tính đến điểm thi. Khi gộp lên khoa/viện hay toàn trường, hệ thống lấy **trung vị** vì nhiều học phần có độ tản bằng 0 và một số ít học phần rất tản; trung vị cho mức của một học phần điển hình, còn **tỷ lệ học phần có điểm lưu ý** cho biết có bao nhiêu học phần tản mát nhiều. **Ví dụ:** tỷ lệ phương sai 0,10 nghĩa là khoảng 10% mức dao động của điểm quá trình đến từ khác biệt giữa các lớp.",
+        "y_nghia_y": "Ở mỗi học phần, hệ thống ước lượng các lớp chênh nhau bao nhiêu về điểm thi sau khi đã tính đến năng lực chung của sinh viên. Khi gộp lên khoa/viện hay toàn trường, hệ thống lấy **trung vị** vì nhiều học phần có độ tản bằng 0 và một số ít học phần rất tản; trung vị cho mức của một học phần điển hình, còn **tỷ lệ học phần có điểm lưu ý** cho biết có bao nhiêu học phần tản mát nhiều. **Ví dụ:** tỷ lệ phương sai 0,10 nghĩa là khoảng 10% mức dao động của điểm thi đến từ khác biệt giữa các lớp.",
+        "dung_de": "Theo dõi mức độ thống nhất chuẩn đánh giá giữa các lớp, làm căn cứ khi xem xét chủ trương dùng rubric chấm chung và hoạt động hiệu chuẩn. Đồng đều không đồng nghĩa với chất lượng cao, vì các lớp có thể cùng chấm rộng hoặc cùng chấm chặt.",
+        "cach_doc": "Thanh càng ngắn, các lớp càng đồng đều. Chữ bên phải thanh ghi trung vị và tỷ lệ học phần có điểm lưu ý; di chuột vào thanh để xem số học phần và mức thay đổi so với học kỳ trước."
+      },
+      "loc_loai_diem": "Loại điểm", "loai_x": "Điểm quá trình", "loai_y": "Điểm thi", "loc_thang_do": "Thang đo",
+      "toan_truong": "Toàn trường ({n} học phần đủ điều kiện so sánh, {loai_diem}): trung vị tỷ lệ phương sai **{icc}**, trung vị mức chênh lệch **{tau} điểm**; **{tl}%** học phần có điểm lưu ý “{ten_co}”{ky_truoc}.",
+      "toan_truong_ky_truoc": " (kỳ trước: {gt}; {tl}%)",
+      "nhan_thanh": "{gt} · {tl}% học phần có điểm lưu ý",
+      "ten_icc": "tỷ lệ phương sai", "ten_tau": "mức chênh lệch", "ten_tau_diem": "mức chênh lệch (điểm)",
+      "goi_y": "{khoa} – {loai_diem}\nTrung vị {ten_a}: {gt_a} (trên {n} học phần đủ điều kiện so sánh)\nTrung vị {ten_b}: {gt_b}\nHọc phần có điểm lưu ý “{ten_co}”: {tl}%{ky_truoc}",
+      "goi_y_ky_truoc": "\nSo với {ky}: {chieu} {so}",
+      "bd_trung_vi": "Trung vị {ten} toàn trường qua các học kỳ",
+      "bd_trung_vi_mo_ta": "Mức của một học phần điển hình về {loai_diem}.",
+      "bd_ty_le": "Tỷ lệ học phần có điểm lưu ý “{ten_co}” qua các học kỳ",
+      "bd_ty_le_mo_ta": "Phần trăm trên các học phần đủ điều kiện so sánh."
+    },
+    "lap_lai": {
+      "mo_ta": "Cấp trường chỉ thống kê số lượng. Tên giảng viên và học phần cụ thể được xem ở báo cáo cấp khoa.",
+      "chua_du_tieu_de": "Chưa đủ dữ liệu để so sánh",
+      "chua_du": "Cần ít nhất {n} học kỳ đã nạp đến thời điểm đang xem mới nhận ra được đặc điểm lặp lại.",
+      "tom_tat": "Tính đến {ky}, trong {cua_so} học kỳ gần nhất, có !!{n}!! trường hợp một giảng viên cho thấy **cùng một đặc điểm**, ở **cùng một học phần**, trong từ {nlap} học kỳ trở lên{ky_truoc}.",
+      "tom_tat_trang_thai": "Các trường hợp này gồm {luot} lượt đặc điểm: {dang} lượt đang tiếp diễn ở kỳ này, {truoc} lượt đã ghi nhận trước đây.",
+      "tom_tat_ngau_nhien": " Nếu các đặc điểm chỉ xuất hiện ngẫu nhiên, ước lượng vẫn có khoảng {nn} lượt lặp lại như vậy. Đây là ước lượng thô, có thể thấp hơn thực tế, nên không đọc mọi lượt như một xu hướng thật.",
+      "nhan_thanh": "{n} trường hợp, {dang} đang tiếp diễn",
+      "tom_tat_ky_truoc": " (tính đến kỳ trước là {n} trường hợp)",
+      "giai_thich": {
+        "dung_de": "Đánh giá mức độ phổ biến và loại đặc điểm lặp lại trong toàn trường, làm căn cứ cho chủ trương bồi dưỡng hoặc chia sẻ kinh nghiệm chung.",
+        "cach_doc": "Mỗi thanh là một loại đặc điểm; con số là số trường hợp (cặp giảng viên – học phần) có đặc điểm đó lặp lại. Màu mòng két và tím chỉ chiều lệch lên hoặc xuống, không mang nghĩa tốt hay xấu."
+      },
+      "don_vi": "trường hợp",
+      "goi_y": "{ten}\n{mo_ta}\n{n} trường hợp lặp lại, {dang} đang tiếp diễn"
+    }
+  },
+
+  "khoa": {
+    "duong_dan": "Báo cáo · Cấp khoa / viện",
+    "mo_ta": "{ky} · {bm} bộ môn · {hp} học phần · {lop} lớp. Báo cáo cấp khoa hiển thị tên giảng viên và dùng để chọn học phần cần ưu tiên rà soát, không dùng để xếp hạng bộ môn.",
+    "trong_tieu_de": "Khoa/viện không có học phần trong học kỳ này",
+    "trong_noi_dung": "Hãy chọn học kỳ hoặc khoa/viện khác ở thanh phía trên.",
+    "bang_bm": {
+      "tieu_de": "Tổng hợp chỉ số theo bộ môn",
+      "mo_ta": "Bấm vào tiêu đề cột để sắp xếp. Di chuột vào tên điểm lưu ý để xem giải thích.",
+      "giai_thich": {
+        "y_nghia": "Các chỉ số chính của từng bộ môn trong khoa ở học kỳ đang xem. Tỷ lệ mất tư cách và tỷ lệ trượt tính gộp trên các lớp được đưa vào thống kê; mức độ khớp là trung vị của các lớp; mức chênh lệch giữa các lớp là trung vị trên các học phần đủ điều kiện so sánh, kèm tỷ lệ học phần có điểm lưu ý.",
+        "dung_de": "Xác định bộ môn cần tổ chức sinh hoạt chuyên môn và báo cáo lại biện pháp điều chỉnh."
+      },
+      "ghi_chu": "Các cột tỷ lệ phương sai và chênh lệch giữa các lớp là trung vị trên các học phần đủ điều kiện so sánh của bộ môn (quy tắc R4), luôn đi kèm tỷ lệ học phần có điểm lưu ý tương ứng. “—” là bộ môn chưa có học phần đủ điều kiện so sánh."
+    },
+    "ban_do": {
+      "tieu_de": "Bản đồ học phần của khoa",
+      "mo_ta": "Mỗi chấm là một học phần đủ điều kiện so sánh ({n} học phần), tô màu theo bộ môn. Ghi tên tối đa 6 học phần có điểm lưu ý nằm xa nhất; di chuột vào các chấm khác để xem tên.",
+      "giai_thich": {
+        "y_nghia": "Vị trí của từng học phần theo mức chênh lệch điểm quá trình (trục ngang) và điểm thi (trục dọc) giữa các lớp của học phần đó.",
+        "dung_de": "Chọn học phần cần ưu tiên dự giờ, rà soát đề cương và bộ đề thi.",
+        "cach_doc_mo_dau": "Học phần càng xa góc dưới bên trái thì các lớp càng chênh lệch nhau."
+      },
+      "loc_bm": "Bộ môn", "loc_bm_tat_ca": "Tất cả bộ môn",
+      "loc_hien": "Học phần hiển thị", "hien_tat_ca": "Tất cả học phần", "hien_co": "Chỉ học phần có điểm lưu ý",
+      "trong": "Khoa chưa có học phần đủ điều kiện so sánh trong học kỳ này.",
+      "goi_y_bm": "Bộ môn {bm}", "goi_y_co": "Điểm lưu ý: {ds}"
+    },
+    "ds_co": {
+      "tieu_de": "Danh sách học phần có điểm lưu ý",
+      "mo_ta": "{n} học phần. Bấm vào tên học phần để mở trang chi tiết ở cấp bộ môn.",
+      "giai_thich": {
+        "y_nghia": "Các học phần đang có điểm lưu ý trong học kỳ, kèm số học kỳ đã từng có điểm lưu ý.",
+        "dung_de": "Lập kế hoạch kiểm tra chuyên đề; ưu tiên học phần có điểm lưu ý lặp lại qua nhiều học kỳ."
+      },
+      "trong": "Không có học phần nào có điểm lưu ý."
+    },
+    "lap_lai": {
+      "tieu_de": "{ten} – có tên giảng viên",
+      "mo_ta": "{n} trường hợp trong {cua_so} học kỳ gần nhất tính đến {ky}, {dang} trường hợp đang tiếp diễn. Mang nghĩa “cần xem xét”, không phải kết luận về giảng viên.",
+      "giai_thich": {
+        "dung_de": "Phối hợp với bộ môn khi phân công giảng dạy học kỳ sau và khi lập kế hoạch bồi dưỡng giảng viên.",
+        "cach_doc": "Ký hiệu ▲/▼ chỉ chiều lệch lên hoặc xuống so với mức kỳ vọng, không mang nghĩa tốt hay xấu. “Đang tiếp diễn” là đặc điểm có xuất hiện ở kỳ đang xem. Một phần các trường hợp có thể do ngẫu nhiên, nhất là khi chỉ lặp lại ở 2 học kỳ."
+      },
+      "chua_du": "Cần ít nhất {n} học kỳ đã nạp.",
+      "trong": "Không có trường hợp nào.",
+      "xem_dien_bien": "Xem diễn biến"
+    }
+  },
+
+  "bomon": {
+    "duong_dan": "Báo cáo · Cấp bộ môn",
+    "tieu_de": "Bộ môn {bm}",
+    "mo_ta": "{ky} · {khoa}. Mỗi học phần có một trang riêng. Chỉ so sánh **giữa các lớp trong cùng một học phần, cùng một học kỳ**, vì các lớp này dùng chung đề thi.",
+    "trong_tieu_de": "Bộ môn không có học phần trong học kỳ này",
+    "trong_noi_dung": "Hãy chọn học kỳ hoặc bộ môn khác ở thanh phía trên.",
+    "chon_hp": "Chọn học phần (bộ môn có {n} học phần trong kỳ)",
+    "chon_hp_co": " – có điểm lưu ý",
+    "nhan_co": "Điểm lưu ý của học phần trong học kỳ này",
+    "nhan_od": "Ổn định, đồng đều",
+    "ghi_hai_he": "Học phần có cả lớp đại trà và lớp chất lượng cao. Số điểm thành phần của hai hệ có thể khác nhau, nên tỷ lệ mất tư cách và phân bố điểm quá trình cần đọc có tính đến điều này.",
+    "ghi_h6_ky": "Điểm thi được so sánh với {ky}, cách {thang} tháng.",
+    "ghi_h5_lich_su": "Tỷ lệ trượt do điểm thi kỳ này {i2}%, cao hơn rõ so với {i0}% của các kỳ trước của chính học phần.",
+    "lien_quan": {
+      "tieu_de": "Lớp nào liên quan đến điểm lưu ý của học phần?",
+      "mo_ta": "Với mỗi điểm lưu ý, hệ thống chỉ ra các lớp liên quan nhiều nhất để bộ môn biết bắt đầu xem xét từ đâu.",
+      "hoi": "Điểm lưu ý của học phần và đặc điểm của lớp khác nhau thế nào?",
+      "giai_thich": [
+        ["Điểm lưu ý của học phần", "Xét **tất cả các lớp gộp lại**. Ví dụ “điểm quá trình chênh lệch giữa các lớp” được ghi nhận khi cả học phần tản mát rõ, dù từng lớp chỉ chênh một chút."],
+        ["Đặc điểm lớp", "Xét **từng lớp riêng**, với ngưỡng riêng. Ví dụ lớp phải chênh so với kỳ vọng từ {d1} điểm trở lên và có ý nghĩa thống kê mới có đặc điểm “điểm quá trình cao/thấp hơn mức kỳ vọng”."],
+        ["Vì sao có điểm lưu ý mà không có đặc điểm?", "Có ba trường hợp thường gặp: (1) nhiều lớp cùng chênh một ít, cộng lại thành tản mát rõ; (2) cả học phần có mức khớp X–Y thấp nên không lớp nào khác hẳn nhóm (đặc điểm lớp chỉ được ghi nhận khi lớp khớp kém trong khi cả học phần khớp tốt); (3) tỷ lệ trượt do điểm thi Y cao – loại này không có đặc điểm cấp lớp tương ứng."],
+        ["Lưu ý", "“Liên quan” chỉ để định hướng xem xét, **không phải** đặc điểm chính thức và không dùng để đánh giá giảng viên."]
+      ],
+      "cot": ["Điểm lưu ý của học phần", "Lớp liên quan"],
+      "khong_du": "Không đủ dữ liệu để xác định lớp liên quan."
+    },
+    "lop": {
+      "tieu_de": "Các lớp của học phần “{hp}”",
+      "mo_ta": "{n} lớp, trong đó {n_ktk} lớp không đưa vào thống kê.{gop} Bấm vào tiêu đề cột để sắp xếp.",
+      "mo_ta_gop": " Gồm các mã {ds} (lớp chất lượng cao được gộp với học phần gốc).",
+      "giai_thich": {
+        "y_nghia": "Số liệu của từng lớp: sĩ số, tỷ lệ mất tư cách dự thi, tỷ lệ trượt do điểm thi, điểm trung bình và mức chênh điểm quá trình so với kỳ vọng.",
+        "dung_de": "Bộ môn trao đổi chuyên môn về cách đánh giá điểm quá trình giữa các giảng viên cùng dạy học phần.",
+        "cach_doc": "Lớp có nhãn “Không đưa vào thống kê” là lớp có dưới {n} sinh viên đủ tư cách dự thi – **không phải** lớp bị hủy."
+      },
+      "loc_hien": "Lớp hiển thị", "hien_tat_ca": "Tất cả các lớp", "hien_tk": "Chỉ các lớp được đưa vào thống kê",
+      "mo_ho_so": "Mở hồ sơ của lớp này",
+      "nhan_ktk": "Không đưa vào thống kê", "nhan_tct": "Ít sinh viên – đọc thận trọng", "nhan_chua_diem": "Chưa có điểm"
+    },
+    "ho_so": {
+      "tieu_de": "Hồ sơ một lớp: {lop}",
+      "mo_ta": "Đọc lần lượt 4 bước để hiểu lớp này so với các lớp khác cùng học phần. Chọn lớp khác ở ô dưới đây, hoặc bấm vào tên lớp trong bảng phía trên.",
+      "chon_lop": "Chọn lớp", "chon_lop_co": " – có điểm lưu ý/đặc điểm",
+      "trong": "Chưa có dữ liệu hồ sơ của lớp này. Hãy xuất lại dữ liệu (python -m xu_ly.kho xuat).",
+      "buoc": "Bước {n}. {ten}",
+      "so_cau_hoi": "({n} câu hỏi)",
+      "ghi_chu_b3": "Phần này tính đến học kỳ đang xem. Xem đủ mọi học kỳ ở trang {lien_ket}.",
+      "lien_ket_b3": "Diễn biến – Giảng viên qua các học kỳ",
+      "bd_b3": "Điểm quá trình so với kỳ vọng của giảng viên qua các kỳ",
+      "cot_b2": ["Chỉ số", "Lớp này", "Cả học phần", "Khoảng của các lớp", "Nhận xét"],
+      "don_vi_khoang": "thấp nhất – cao nhất"
+    },
+    "dumbbell": {
+      "tieu_de": "Điểm quá trình và điểm thi trung bình của từng lớp",
+      "mo_ta": "Mỗi dòng là một lớp được đưa vào thống kê. Di chuột vào hình tròn hoặc hình vuông để xem số liệu.",
+      "giai_thich": {
+        "y_nghia": "Mỗi dòng là một lớp. Hình tròn là điểm quá trình trung bình của lớp (do giảng viên chấm); hình vuông là điểm thi trung bình (đề chung, chấm tập trung). Đoạn nối giữa hai hình là khoảng chênh lệch giữa hai loại điểm.",
+        "dung_de": "Phát hiện lớp có điểm quá trình cao hoặc thấp hẳn trong khi điểm thi không khác các lớp khác, để bộ môn tìm hiểu thêm; nguyên nhân có thể là cách đánh giá, đặc thù lớp hoặc yếu tố chưa đo được.",
+        "cach_doc": "Đoạn nối càng dài thì điểm quá trình và điểm thi của lớp càng chênh nhau. So sánh độ dài đoạn nối giữa các lớp, không so với một con số cố định."
+      },
+      "loc_sap_xep": "Sắp xếp các lớp theo", "sx_chenh": "Chênh lệch giữa hai loại điểm (lớn nhất ở trên)", "sx_x": "Điểm quá trình trung bình (cao nhất ở trên)", "sx_ten": "Tên nhóm lớp",
+      "trong": "Học phần chưa có lớp nào được đưa vào thống kê."
+    },
+    "forest": {
+      "tieu_de": "{ten}, theo từng lớp",
+      "mo_ta_du": "Chỉ gồm các lớp được đưa vào thống kê.",
+      "mo_ta_khong_du": "Học phần chỉ có 1 lớp được thống kê nên không so sánh được giữa các lớp.",
+      "mo_ta_du_phong": " Mô hình chính không phát hiện được độ tản giữa các lớp hoặc chưa hội tụ, nên học phần này dùng ước lượng thay thế; khi độ tản bằng 0, mức chênh của mọi lớp ghi là 0.",
+      "giai_thich": {
+        "dung_de": "Chọn những khác biệt có ý nghĩa thống kê để đưa ra trao đổi, tránh kết luận từ dao động ngẫu nhiên.",
+        "cach_doc": "Hình thoi là mức chênh của lớp; thanh ngang là khoảng tin cậy 95%. Hình chỉ được tô màu khi khác biệt có ý nghĩa thống kê sau khi đã hiệu chỉnh cho nhiều phép thử cùng lúc."
+      },
+      "trong": "Không có dữ liệu để vẽ."
+    }
+  },
+
+  "dien_bien": {
+    "duong_dan": "Báo cáo · Diễn biến qua các học kỳ",
+    "tieu_de": "Diễn biến qua các học kỳ",
+    "mo_ta": "{khoa} · {n} học kỳ tính đến học kỳ đang chọn. Một điểm lưu ý xuất hiện ở một học kỳ có thể chỉ là dao động ngẫu nhiên; chỉ nên chú ý khi **cùng một đặc điểm lặp lại ở cùng một học phần qua từ 2 học kỳ trở lên**.",
+    "the": {"hp": "Điểm lưu ý của học phần qua các học kỳ", "gv": "Giảng viên qua các học kỳ", "de": "Điểm thi qua các học kỳ"},
+    "hp": {
+      "tieu_de": "Điểm lưu ý của học phần qua các học kỳ",
+      "mo_ta": "{n} học phần phù hợp với bộ lọc.",
+      "giai_thich": {
+        "y_nghia": "Mỗi dòng là một học phần, mỗi cột là một học kỳ; ô ghi các điểm lưu ý của học phần trong học kỳ đó.",
+        "dung_de": "Nhận diện học phần có điểm lưu ý kéo dài để ưu tiên rà soát, đồng thời kiểm tra hiệu quả của biện pháp đã thực hiện (điểm lưu ý còn xuất hiện ở học kỳ sau hay không).",
+        "cach_doc": "Cột “Số học kỳ có điểm lưu ý” đếm học kỳ có **bất kỳ** điểm lưu ý nào; cột cuối cho biết **từng loại** điểm lưu ý lặp bao nhiêu kỳ. Bộ lọc “Mức độ lặp lại” tính theo loại điểm lưu ý đang chọn. Lưu ý: “đặc điểm lặp lại” (G1) là khái niệm riêng cho đặc điểm cấp lớp của giảng viên, không áp dụng cho điểm lưu ý của học phần."
+      },
+      "loc_tim": "Tìm học phần", "loc_tim_goi_y": "Nhập tên hoặc mã học phần",
+      "loc_lap": "Mức độ lặp lại", "lap_2": "Chỉ học phần có điểm lưu ý từ 2 học kỳ trở lên", "lap_1": "Học phần có điểm lưu ý ít nhất 1 học kỳ",
+      "so_ky_loai": "{ten} · {n} kỳ",
+      "trong_tieu_de": "Không có học phần nào phù hợp",
+      "trong_noi_dung": "Hãy thử đổi bộ lọc “Mức độ lặp lại” hoặc “Loại điểm lưu ý”."
+    },
+    "gv": {
+      "tieu_de": "{ten}: theo giảng viên, học phần và học kỳ",
+      "mo_ta": "Bộ môn {bm} · {n} cặp giảng viên – học phần. Đổi bộ môn ở thanh phía trên.",
+      "giai_thich": {
+        "y_nghia": "Mức chênh điểm quá trình so với kỳ vọng của các lớp do mỗi giảng viên dạy ở mỗi học phần, qua từng học kỳ (trung bình nếu giảng viên dạy nhiều lớp).",
+        "dung_de": "Phân biệt đặc điểm chỉ xuất hiện ở một học kỳ (có thể do ngẫu nhiên) với đặc điểm lặp lại qua nhiều học kỳ.",
+        "cach_doc": "Màu chỉ chiều chênh (cao hơn hay thấp hơn kỳ vọng), không mang nghĩa tốt hay xấu; màu càng đậm thì chênh càng nhiều, ô xám là gần 0. Ký hiệu ◆ đánh dấu học kỳ có đặc điểm lớp. Cột “Xu hướng” là câu nhận xét do bộ luật E ghép sẵn. Ô trống là học kỳ giảng viên không dạy học phần đó."
+      },
+      "goi_y_o": "{gv} – {hp}\n{ky}: điểm quá trình {muc}",
+      "muc_gan_0": "gần bằng kỳ vọng",
+      "muc_cao": "cao hơn kỳ vọng {so} điểm",
+      "muc_thap": "thấp hơn kỳ vọng {so} điểm",
+      "goi_y_dac_diem": "\nĐặc điểm lớp trong kỳ: {ds}",
+      "chu_giai_cao": "Cao hơn kỳ vọng: nhạt → đậm, đậm nhất từ {e1} điểm",
+      "chu_giai_gan_0": "Gần 0 (trong khoảng ±{e0} điểm)",
+      "chu_giai_thap": "Thấp hơn kỳ vọng: nhạt → đậm",
+      "chu_giai_dac_diem": "◆ Kỳ có đặc điểm lớp (di chuột để xem)",
+      "chu_giai_ky_chon": "Học kỳ đang chọn",
+      "ghi_chu": "Ngưỡng “gần 0” và ngưỡng đậm nhất lấy từ tham số (vung_gan_0, d1_d2_lech_x), giống với câu nhận xét ở Hồ sơ một lớp. Câu “Xu hướng” và cột “Lặp lại” chỉ xét đến học kỳ đang chọn, giống Hồ sơ một lớp.",
+      "trong": "Bộ môn chưa có dữ liệu so sánh giữa các lớp."
+    },
+    "de": {
+      "tieu_de": "Điểm thi trung bình của học phần qua các học kỳ",
+      "mo_ta": "{n} học phần của {khoa} có từ 2 học kỳ trở lên. Ngưỡng lưu ý: điểm thi trung bình thay đổi từ **{ng} điểm** trở lên so với học kỳ gần nhất trước đó có mở học phần, đồng thời có ý nghĩa thống kê.",
+      "giai_thich": {
+        "dung_de": "Theo dõi độ ổn định của bộ đề thi, làm căn cứ hiệu chỉnh ngân hàng câu hỏi khi cần.",
+        "cach_doc": "Số ghi trên mỗi đoạn nối là mức thay đổi điểm thi trung bình giữa hai lần mở học phần liền nhau (có thể cách 6 tháng, 12 tháng hoặc hơn) (2 chữ số thập phân, chưa làm tròn như số trên điểm). Điểm lưu ý được gắn vào **học kỳ sau** của đoạn nối khi mức thay đổi từ {ng} điểm trở lên; điểm của học kỳ đó được tô đậm và ghi “◆ Điểm thi thay đổi”. Một lần thay đổi chưa cho thấy bộ đề không ổn định kéo dài."
+      },
+      "chon_hp_thay_doi": " – điểm thi thay đổi ở {ds}",
+      "mo_ta_bd": "Mã học phần {ma} · tính trên sinh viên đủ tư cách dự thi của các lớp được thống kê",
+      "dau_bd": "◆ Điểm thi thay đổi",
+      "goi_y": "{hp}\n{ky}: điểm thi trung bình {gt}",
+      "goi_y_so_sanh": "\nSo với {ky}, cách {thang} tháng: {chieu} {so} điểm",
+      "goi_y_h6": "\n◆ Có điểm lưu ý: điểm thi thay đổi so với lần mở gần nhất",
+      "goi_y_dat_chua_y_nghia": "\nĐạt ngưỡng nhưng chưa có ý nghĩa thống kê",
+      "goi_y_duoi": "\nDưới ngưỡng {ng} điểm",
+      "goi_y_ky_dau": "\nHọc kỳ đầu tiên có mở học phần",
+      "cot": ["Học kỳ", "Điểm thi trung bình", "Thay đổi so với lần mở gần nhất", "So với ngưỡng {ng}", "Điểm thi thay đổi", "Lần mở được so sánh"],
+      "dat_nguong": "**Đạt ngưỡng**", "duoi_nguong": "Dưới ngưỡng (còn thiếu {so})", "ky_dau": "Kỳ đầu, không có kỳ để so",
+      "chu_giai_h6": "Học kỳ có điểm lưu ý “điểm thi thay đổi so với lần mở gần nhất”",
+      "chu_giai_dam": "**Số đậm** trên đoạn nối: thay đổi đạt ngưỡng {ng} điểm",
+      "chu_giai_thuong": "Số thường: dưới ngưỡng",
+      "trong": "Cần ít nhất 2 học kỳ có mở cùng học phần."
+    }
+  },
+
+  "thuat_ngu": {
+    "duong_dan": "Trợ giúp",
+    "tieu_de": "Giải thích thuật ngữ",
+    "mo_ta": "Các khái niệm dùng trong báo cáo, diễn giải bằng ngôn ngữ thông thường. Mã trong ngoặc là mã kỹ thuật để đối chiếu với bộ quy tắc thống kê.",
+    "co_ban_tieu_de": "Khái niệm cơ bản",
+    "co_ban": [
+      ["Điểm quá trình", "Điểm do giảng viên đánh giá trong quá trình học: chuyên cần, kiểm tra, bài tập."],
+      ["Điểm thi", "Điểm thi kết thúc học phần, thi tập trung theo bộ đề chung của bộ môn, nên là thước đo chung và khách quan giữa các lớp."],
+      ["Mất tư cách dự thi", "Sinh viên có điểm quá trình bằng 0 (có điểm thành phần dưới 4) nên không được dự thi kết thúc học phần."],
+      ["Trượt do điểm thi", "Sinh viên đủ tư cách dự thi nhưng có điểm học phần dưới 4 (điểm F)."],
+      ["Mức kỳ vọng", "Giá trị dự đoán từ dữ liệu của các lớp khác cùng học phần, hoặc từ năng lực chung của sinh viên (điểm trung bình các học phần khác trong kỳ)."],
+      ["Có ý nghĩa thống kê", "Khác biệt đủ lớn để khó giải thích bằng dao động ngẫu nhiên (mức tin cậy 95%, đã hiệu chỉnh cho nhiều phép thử cùng lúc)."],
+      ["Lớp không đưa vào thống kê", "Lớp có ít hơn {n} sinh viên đủ tư cách dự thi. Lớp vẫn học bình thường; số sinh viên quá ít nên chỉ số tính ra không đủ tin cậy."],
+      ["Học phần gộp", "Lớp chất lượng cao (mã có đuôi H hoặc E) được gộp với học phần cùng mã số vì dùng chung bộ đề thi."]
+    ],
+    "chi_so_tieu_de": "Chỉ số",
+    "diem_luu_y_tieu_de": "Điểm lưu ý của học phần",
+    "diem_luu_y_mo_ta": "Mang nghĩa “cần xem xét”, không phải kết luận.",
+    "on_dinh_tieu_de": "Ổn định, đồng đều",
+    "on_dinh_mo_ta": "Trạng thái ngược với từng điểm lưu ý, dùng đúng ngưỡng của điểm lưu ý đó.",
+    "nguoc_voi": "ngược với: {ten}",
+    "dac_diem_tieu_de": "Đặc điểm của lớp"
+  }
+}
