@@ -51,20 +51,27 @@ public sealed class OpenCommentAnalysisReportTests
 
         var report = await service.GetOpenCommentAnalysisAsync(
             null, null, null, null, null, null, null);
+        var comments = report.Comments.ToList();
+        for (var page = 2; (page - 1) * report.PageSize < report.TotalComments; page++)
+        {
+            var next = await service.GetOpenCommentAnalysisAsync(null, null, null, null, null, null, null,
+                options: new Application.Reports.OpenCommentQueryOptions(Page: page, PageSize: report.PageSize));
+            comments.AddRange(next.Comments);
+        }
 
-        report.TotalComments.Should().Be(report.Comments.Count);
-        report.Comments.Should().NotBeEmpty("cơ sở dữ liệu đang có ý kiến mở để kiểm tra");
+        report.TotalComments.Should().Be(comments.Count);
+        comments.Should().NotBeEmpty("cơ sở dữ liệu đang có ý kiến mở để kiểm tra");
 
         // Đã phân tích + chưa phân tích phải phủ đúng tổng số ý kiến, không thừa không thiếu.
         (report.AnalyzedCommentCount + report.PendingAnalysisCount)
             .Should().Be(report.TotalComments);
 
         report.UncertainCount.Should().Be(
-            report.Comments.Count(x => x.Sentiment == OpenCommentSentiments.Uncertain));
+            comments.Count(x => x.Sentiment == OpenCommentSentiments.Uncertain));
         report.ManuallyReviewedCount.Should().Be(
-            report.Comments.Count(x => x.IsManuallyReviewed));
+            comments.Count(x => x.IsManuallyReviewed));
 
-        foreach (var item in report.Comments)
+        foreach (var item in comments)
         {
             if (item.Sentiment is null)
             {

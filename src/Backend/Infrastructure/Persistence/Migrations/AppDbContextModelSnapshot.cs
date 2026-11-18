@@ -51,7 +51,8 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasKey("AcademicYearId");
 
                     b.HasIndex("AcademicYearName")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("AcademicYears", (string)null);
                 });
@@ -449,7 +450,8 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasKey("CourseId");
 
                     b.HasIndex("CourseCode")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.HasIndex("DepartmentId");
 
@@ -504,7 +506,8 @@ namespace Infrastructure.Persistence.Migrations
                         .HasFilter("\"UnidentifiedLecturerName\" IS NOT NULL");
 
                     b.HasIndex("CourseId", "SemesterId", "SectionName")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("CourseSections", (string)null);
                 });
@@ -669,7 +672,8 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasKey("FacultyId");
 
                     b.HasIndex("FacultyName")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Faculties", (string)null);
                 });
@@ -1401,7 +1405,8 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasKey("PositionId");
 
                     b.HasIndex("PositionName")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Positions", (string)null);
                 });
@@ -1495,7 +1500,8 @@ namespace Infrastructure.Persistence.Migrations
                     b.HasKey("SemesterId");
 
                     b.HasIndex("AcademicYearId", "SemesterName")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"IsDeleted\" = false");
 
                     b.ToTable("Semesters", (string)null);
                 });

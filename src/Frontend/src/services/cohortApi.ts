@@ -1,5 +1,5 @@
 import type { ImportCohortMajorRow } from '../utils/cohortMajorImportExcel';
-import { apiRequest, csrfRequest } from './apiClient';
+import { apiRequest, csrfRequest, commonApiErrorMessage } from './apiClient';
 
 export interface Cohort {
   cohortId: number;
@@ -126,5 +126,5 @@ export const cohortErrorMessages: Record<string, string> = {
 };
 
 export function cohortErrorMessage(errorCode: string | null | undefined): string {
-  return cohortErrorMessages[errorCode ?? ''] ?? 'Không thể kết nối tới máy chủ.';
+  return cohortErrorMessages[errorCode ?? ''] ?? commonApiErrorMessage(errorCode);
 }

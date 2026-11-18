@@ -32,7 +32,8 @@ import { RolePermissionEditor } from '../components/RolePermissionEditor';
 import { UserImportDialog } from '../components/UserImportDialog';
 import { adminApi } from '../services/adminApi';
 import { useSetBreadcrumbTrail } from '../context/breadcrumbTrail';
-import { ApiError } from '../services/apiClient';
+import { ApiError, apiErrorMessage } from '../services/apiClient';
+import { adminErrorMessage, adminErrorMessages as errorMessages } from '../services/adminErrorMessages';
 import type {
   AdminAuditLog,
   AdminPage,
@@ -194,17 +195,6 @@ function AuditLogDetails({ log }: { log: AdminAuditLog }) {
   );
 }
 
-const errorMessages: Record<string, string> = {
-  ADMIN_INVALID_REQUEST: 'Dữ liệu chưa hợp lệ. Vui lòng kiểm tra lại các trường.',
-  ADMIN_USER_EMAIL_EXISTS: 'Email này đã có trong hệ thống.',
-  ADMIN_CANNOT_DISABLE_SELF: 'Bạn không thể vô hiệu chính tài khoản đang sử dụng.',
-  ADMIN_PROFILE_CODE_EXISTS: 'Mã profile đã tồn tại.',
-  ADMIN_PROFILE_ASSIGNMENT_EXISTS: 'Người dùng đã có role trong cùng phạm vi đơn vị.',
-  ADMIN_NO_PROFILES_TO_CREATE: 'Tất cả tài khoản giảng viên phù hợp đã có hồ sơ.',
-  ADMIN_CANNOT_MODIFY_ACTIVE_PROFILE: 'Không thể đổi role hoặc vô hiệu profile đang sử dụng.',
-  AUTH_CSRF_INVALID: 'Phiên bảo mật đã thay đổi. Vui lòng thử lại.',
-};
-
 function formatDate(value: string | null): string {
   if (!value) return 'Chưa có';
   return new Intl.DateTimeFormat('vi-VN', {
@@ -214,10 +204,7 @@ function formatDate(value: string | null): string {
 }
 
 function messageFrom(error: unknown): string {
-  if (error instanceof ApiError) {
-    return errorMessages[error.errorCode] ?? 'Không thể hoàn tất thao tác quản trị.';
-  }
-  return 'Không thể kết nối tới máy chủ.';
+  return apiErrorMessage(error, adminErrorMessage);
 }
 
 export function UsersAdminPage() {

@@ -17,7 +17,7 @@ import { NoteModalButton } from '../components/NoteModalButton';
 import { ExportDropdown } from '../components/ExportDropdown';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
 import { useSemesterSurveys } from '../hooks/useSemesterSurveys';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import type {
   DashboardFacultyScore,
@@ -37,7 +37,7 @@ import {
 } from '../utils/surveySelection';
 
 function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 /*

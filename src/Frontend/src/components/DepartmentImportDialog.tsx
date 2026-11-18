@@ -16,7 +16,7 @@ import {
   type DepartmentImportFileErrorCode,
   type ImportDepartmentRow,
 } from '../utils/departmentImportExcel';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { catalogErrorMessage, type CatalogImportResponse } from '../services/catalogApi';
 import type { Faculty } from '../types';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
@@ -102,7 +102,7 @@ export function DepartmentImportDialog({
       setResult(await onImport(rows));
     } catch (error) {
       setRequestError(
-        error instanceof ApiError ? catalogErrorMessage(error.errorCode) : catalogErrorMessage(null)
+        apiErrorMessage(error, catalogErrorMessage)
       );
     } finally {
       setImporting(false);

@@ -16,7 +16,7 @@ import {
   type CourseImportFileErrorCode,
   type ImportCourseRow,
 } from '../utils/courseImportExcel';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { catalogErrorMessage, type CatalogImportResponse } from '../services/catalogApi';
 import { buildDepartmentLookupRows } from '../utils/importLookupRows';
 import type { Department, Faculty } from '../types';
@@ -104,7 +104,7 @@ export function CourseImportDialog({
       setResult(await onImport(rows));
     } catch (error) {
       setRequestError(
-        error instanceof ApiError ? catalogErrorMessage(error.errorCode) : catalogErrorMessage(null)
+        apiErrorMessage(error, catalogErrorMessage)
       );
     } finally {
       setImporting(false);

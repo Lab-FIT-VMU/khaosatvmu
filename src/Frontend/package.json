@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test:errors": "node --test tests/apiErrors.test.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

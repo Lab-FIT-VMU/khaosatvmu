@@ -2335,8 +2335,10 @@ public sealed class EfReportService(
         int? lecturerId,
         string? search,
         bool? validOnly,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        OpenCommentQueryOptions? options = null)
     {
+        options ??= new OpenCommentQueryOptions();
         var sectionSurveyQuery = (await VisibleSectionSurveysAsync(cancellationToken)).AsQueryable();
 
         if (semesterSurveyId is { } ssId)
@@ -2446,169 +2448,180 @@ public sealed class EfReportService(
             commentsQuery = commentsQuery.Where(thresholds.CountsTowardScore());
         }
 
-        var responsesWithComments = await commentsQuery
-            .OrderByDescending(x => x.SubmittedAt)
-            .Select(x => new
+        // Metadata is small (one entry per class). Filter it before fetching comments.
+        var term = ReportSearchText.Fold(search ?? string.Empty);
+        string MetadataValue(int id, string key)
+        {
+            var meta = matchedSections[id];
+            return key switch
             {
-                x.ResponseId,
-                x.CourseSectionSurveyId,
-                x.AdditionalComments,
-                x.SubmittedAt,
-                x.Score,
-                x.IsValid
-            })
+                "facultyName" => meta.FacultyName,
+                "departmentName" => meta.DepartmentName,
+                "courseCode" => meta.Course?.CourseCode ?? string.Empty,
+                "courseName" => meta.Course?.CourseName ?? string.Empty,
+                "sectionName" => meta.Section?.SectionName ?? string.Empty,
+                "lecturerName" => meta.LecturerName,
+                _ => string.Empty,
+            };
+        }
+        var metadataKeys = new[] { "facultyName", "departmentName", "courseCode", "courseName", "sectionName", "lecturerName" };
+        if (term.Length > 0)
+        {
+            var metadataMatches = matchedCssIds.Where(id =>
+                metadataKeys.Any(key => ReportSearchText.Fold(MetadataValue(id, key)).Contains(term))
+                || ReportSearchText.Fold($"{MetadataValue(id, "courseCode")} {MetadataValue(id, "courseName")}").Contains(term)).ToArray();
+            commentsQuery = commentsQuery.Where(x => metadataMatches.Contains(x.CourseSectionSurveyId)
+                || ReportSearchText.Translate(x.AdditionalComments!.ToLower(), ReportSearchText.From, ReportSearchText.To).Contains(term));
+        }
+
+        // All rows originate from the publication- and scope-filtered comments query.
+        var rows = from response in commentsQuery
+                   join analysis in db.OpenCommentAnalysisResults.AsNoTracking()
+                       on response.ResponseId equals analysis.SurveyResponseId into analyses
+                   from analysis in analyses.DefaultIfEmpty()
+                   select new OpenCommentQueryRow
+                   {
+                       ResponseId = response.ResponseId,
+                       CourseSectionSurveyId = response.CourseSectionSurveyId,
+                       Comments = response.AdditionalComments!,
+                       SubmittedAt = response.SubmittedAt,
+                       Score = response.Score,
+                       IsValid = response.IsValid,
+                       Sentiment = analysis == null ? null : analysis.ManualSentiment ?? analysis.Sentiment,
+                       Confidence = analysis == null ? null : analysis.Confidence,
+                       Reviewed = analysis != null && analysis.ManualSentiment != null,
+                   };
+
+        // Facets exclude their own filter, just like the existing table menus.
+        IQueryable<OpenCommentQueryRow> ApplyFilters(IQueryable<OpenCommentQueryRow> query, string? except = null)
+        {
+            foreach (var key in metadataKeys)
+            {
+                if (key == except || options.ColumnFilters is not { } filters || !filters.TryGetValue(key, out var values)) continue;
+                var ids = matchedCssIds.Where(id => values.Contains(MetadataValue(id, key))).ToArray();
+                query = query.Where(x => ids.Contains(x.CourseSectionSurveyId));
+            }
+            if (except != "sentiment" && options.ColumnFilters is { } columnFilters && columnFilters.TryGetValue("sentiment", out var labels))
+            {
+                var sentiments = OpenCommentSentiments.All.Where(s => labels.Contains(OpenCommentSentimentLabels.ToDisplay(s))).ToArray();
+                var pending = labels.Contains("Chưa phân tích");
+                query = query.Where(x => x.Sentiment == null ? pending : sentiments.Contains(x.Sentiment));
+            }
+            return query;
+        }
+        // One compact aggregate serves all facets and KPI, rather than scanning
+        // the response table again for every menu. No comment bodies are loaded.
+        var facetCounts = await rows.GroupBy(x => new { x.CourseSectionSurveyId, x.Sentiment, x.Reviewed })
+            .Select(g => new { g.Key.CourseSectionSurveyId, g.Key.Sentiment, g.Key.Reviewed, Count = g.Count() })
             .ToListAsync(cancellationToken);
-
-        var term = search?.Trim().ToLowerInvariant();
-        var matchedComments = new List<MatchedComment>(responsesWithComments.Count);
-
-        foreach (var resp in responsesWithComments)
+        bool PassesFacetFilters(int id, string? sentiment, string? except = null) =>
+            options.ColumnFilters is null || options.ColumnFilters.All(filter => filter.Key == except
+                || (!metadataKeys.Contains(filter.Key) && filter.Key != "sentiment")
+                || filter.Value.Contains(filter.Key == "sentiment"
+                    ? sentiment is null ? "Chưa phân tích" : OpenCommentSentimentLabels.ToDisplay(sentiment)
+                    : MetadataValue(id, filter.Key)));
+        var filterValues = new Dictionary<string, string[]>();
+        foreach (var key in metadataKeys)
         {
-            if (!matchedSections.TryGetValue(resp.CourseSectionSurveyId, out var meta))
-            {
-                continue;
-            }
-
-            var courseCode = meta.Course?.CourseCode ?? string.Empty;
-            var courseName = meta.Course?.CourseName ?? string.Empty;
-            var sectionName = meta.Section?.SectionName ?? string.Empty;
-            var comments = resp.AdditionalComments?.Trim() ?? string.Empty;
-
-            if (!string.IsNullOrEmpty(term))
-            {
-                if (!comments.ToLowerInvariant().Contains(term)
-                    && !courseCode.ToLowerInvariant().Contains(term)
-                    && !courseName.ToLowerInvariant().Contains(term)
-                    && !sectionName.ToLowerInvariant().Contains(term)
-                    && !meta.LecturerName.ToLowerInvariant().Contains(term)
-                    && !meta.DepartmentName.ToLowerInvariant().Contains(term)
-                    && !meta.FacultyName.ToLowerInvariant().Contains(term))
-                {
-                    continue;
-                }
-            }
-
-            matchedComments.Add(new MatchedComment(
-                resp.ResponseId,
-                resp.CourseSectionSurveyId,
-                comments,
-                resp.SubmittedAt,
-                resp.Score,
-                resp.IsValid,
-                courseCode,
-                courseName,
-                sectionName,
-                meta.LecturerName,
-                meta.DepartmentName,
-                meta.FacultyName,
-                meta.FacultyId,
-                meta.DepartmentId,
-                meta.Lecturer?.LecturerId));
+            var ids = facetCounts.Where(x => PassesFacetFilters(x.CourseSectionSurveyId, x.Sentiment, key))
+                .Select(x => x.CourseSectionSurveyId).Distinct();
+            filterValues[key] = ids.Select(id => MetadataValue(id, key)).Distinct().Order().ToArray();
         }
+        var sentimentValues = facetCounts.Where(x => PassesFacetFilters(x.CourseSectionSurveyId, x.Sentiment, "sentiment"))
+            .Select(x => x.Sentiment).Distinct();
+        filterValues["sentiment"] = sentimentValues.Select(s => s == null ? "Chưa phân tích" : OpenCommentSentimentLabels.ToDisplay(s)).ToArray();
+        rows = ApplyFilters(rows);
 
-        // Kết quả phân loại chỉ đọc theo đúng danh sách ý kiến vừa lọc, không quét cả bảng.
-        var matchedIds = matchedComments.Select(x => x.ResponseId).ToList();
-        var analysisByResponse = matchedIds.Count == 0
-            ? []
-            : await db.OpenCommentAnalysisResults.AsNoTracking()
-                .Where(x => matchedIds.Contains(x.SurveyResponseId))
-                .ToDictionaryAsync(x => x.SurveyResponseId, cancellationToken);
+        // Aggregate before paging: KPI and charts describe the entire filtered result.
+        var counts = facetCounts.Where(x => PassesFacetFilters(x.CourseSectionSurveyId, x.Sentiment)).ToList();
+        var totalComments = counts.Sum(x => x.Count);
+        var analyzed = counts.Where(x => x.Sentiment != null).Sum(x => x.Count);
+        var breakdown = OpenCommentSentiments.All.Select(sentiment => new
+            { Sentiment = sentiment, Count = counts.Where(x => x.Sentiment == sentiment).Sum(x => x.Count) })
+            .Where(x => x.Count > 0)
+            .Select(x => new OpenCommentSentimentBreakdownDto(x.Sentiment,
+                OpenCommentSentimentLabels.ToDisplay(x.Sentiment), x.Count,
+                Math.Round((decimal)x.Count / analyzed * 100, 1))).ToList();
 
-        var commentItems = new List<OpenCommentItemDto>(matchedComments.Count);
-        foreach (var row in matchedComments)
+        var descending = options.Descending;
+        var sortKey = options.SortKey ?? "submittedAt";
+        IOrderedQueryable<OpenCommentQueryRow> ordered;
+        if (metadataKeys.Contains(sortKey))
         {
-            analysisByResponse.TryGetValue(row.ResponseId, out var analysis);
-            commentItems.Add(new OpenCommentItemDto(
-                row.ResponseId,
-                row.CourseSectionSurveyId,
-                row.Comments,
-                row.SubmittedAt,
-                row.Score,
-                row.IsValid,
-                row.CourseCode,
-                row.CourseName,
-                row.SectionName,
-                row.LecturerName,
-                row.DepartmentName,
-                row.FacultyName,
-                row.FacultyId,
-                row.DepartmentId,
-                row.LecturerId,
-                analysis?.EffectiveSentiment,
-                analysis is null
-                    ? null
-                    : OpenCommentSentimentLabels.ToDisplay(analysis.EffectiveSentiment),
-                analysis?.Confidence,
-                analysis?.IsManuallyReviewed ?? false));
+            // Sort using catalog columns in SQL; never sort a page in isolation.
+            var sortable = from row in rows
+                           join link in db.CourseSectionSurveys on row.CourseSectionSurveyId equals link.CourseSectionSurveyId
+                           join section in db.CourseSections on link.CourseSectionId equals section.CourseSectionId
+                           join course in db.Courses on section.CourseId equals course.CourseId into courseRows
+                           from course in courseRows.DefaultIfEmpty()
+                           join lecturer in db.Lecturers on section.LecturerId equals lecturer.LecturerId into lecturerRows
+                           from lecturer in lecturerRows.DefaultIfEmpty()
+                           join department in db.Departments on (course.DepartmentId ?? lecturer.DepartmentId) equals department.DepartmentId into departmentRows
+                           from department in departmentRows.DefaultIfEmpty()
+                           join faculty in db.Faculties on (course.FacultyId ?? department.FacultyId ?? lecturer.FacultyId) equals faculty.FacultyId into facultyRows
+                           from faculty in facultyRows.DefaultIfEmpty()
+                           select new { Row = row, Value = sortKey == "facultyName" ? faculty.FacultyName ?? "Chưa thuộc khoa"
+                               : sortKey == "departmentName" ? department.DepartmentName ?? "Chưa thuộc bộ môn"
+                               : sortKey == "courseCode" ? course.CourseCode ?? ""
+                               : sortKey == "courseName" ? course.CourseName ?? ""
+                               : sortKey == "sectionName" ? section.SectionName
+                               : lecturer.FullName ?? section.UnidentifiedLecturerName ?? "Chưa phân công" };
+            var sorted = descending ? sortable.OrderByDescending(x => x.Value) : sortable.OrderBy(x => x.Value);
+            // Keep ordering inside the projected query, with a unique tie breaker.
+            var orderedRows = sorted.ThenByDescending(x => x.Row.ResponseId).Select(x => x.Row);
+            var size = Math.Clamp(options.PageSize, 1, 200);
+            var current = Math.Clamp(options.Page, 1, Math.Max(1, (int)Math.Ceiling((double)totalComments / size)));
+            var selected = await orderedRows.Skip((current - 1) * size).Take(size).ToListAsync(cancellationToken);
+            return BuildReport(selected, current, size);
         }
+        if (sortKey == "sentiment")
+            ordered = descending ? rows.OrderByDescending(x => x.Confidence ?? -1) : rows.OrderBy(x => x.Confidence ?? -1);
+        else
+            ordered = descending ? rows.OrderByDescending(x => x.SubmittedAt) : rows.OrderBy(x => x.SubmittedAt);
+        ordered = ordered.ThenByDescending(x => x.ResponseId);
+        var pageSize = Math.Clamp(options.PageSize, 1, 200);
+        var maxPage = Math.Max(1, (int)Math.Ceiling((double)totalComments / pageSize));
+        var page = Math.Clamp(options.Page, 1, maxPage);
+        var pageRows = await ordered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+        return BuildReport(pageRows, page, pageSize);
 
-        int totalComments = commentItems.Count;
-        decimal commentRate = totalResponses > 0
-            ? Math.Round((decimal)totalComments / totalResponses * 100, 3)
-            : 0m;
-        int sectionCountWithComments = commentItems.Select(x => x.CourseSectionSurveyId).Distinct().Count();
-        int lecturerCountWithComments = commentItems
-            .Select(x => x.LecturerName)
-            .Where(x => !string.IsNullOrEmpty(x) && x != "Chưa phân công")
-            .Distinct()
-            .Count();
-
-        // Tổng hợp cảm xúc tính trên chính danh sách vừa trả về, không phải trên cả học kỳ:
-        // người dùng đang lọc theo khoa/bộ môn/từ khoá thì bảng, KPI và file Excel phải khớp nhau.
-        var analyzedCommentCount = commentItems.Count(x => x.Sentiment is not null);
-        var sentimentBreakdown = new List<OpenCommentSentimentBreakdownDto>();
-        if (analyzedCommentCount > 0)
+        OpenCommentAnalysisReportDto BuildReport(List<OpenCommentQueryRow> selected, int currentPage, int size)
         {
-            foreach (var sentiment in OpenCommentSentiments.All)
+            var items = selected.Select(row =>
             {
-                var count = commentItems.Count(
-                    x => string.Equals(x.Sentiment, sentiment, StringComparison.Ordinal));
-                if (count == 0)
-                {
-                    continue;
-                }
-
-                sentimentBreakdown.Add(new OpenCommentSentimentBreakdownDto(
-                    sentiment,
-                    OpenCommentSentimentLabels.ToDisplay(sentiment),
-                    count,
-                    Math.Round((decimal)count / analyzedCommentCount * 100, 1)));
-            }
+                var meta = matchedSections[row.CourseSectionSurveyId];
+                return new OpenCommentItemDto(row.ResponseId, row.CourseSectionSurveyId, row.Comments.Trim(),
+                    row.SubmittedAt, row.Score, row.IsValid,
+                    meta.Course?.CourseCode ?? string.Empty, meta.Course?.CourseName ?? string.Empty,
+                    meta.Section?.SectionName ?? string.Empty, meta.LecturerName, meta.DepartmentName, meta.FacultyName,
+                    meta.FacultyId, meta.DepartmentId, meta.Lecturer?.LecturerId, row.Sentiment,
+                    row.Sentiment is null ? null : OpenCommentSentimentLabels.ToDisplay(row.Sentiment), row.Confidence, row.Reviewed);
+            }).ToList();
+            return new OpenCommentAnalysisReportDto(totalComments, totalResponses,
+                totalResponses > 0 ? Math.Round((decimal)totalComments / totalResponses * 100, 3) : 0m,
+                counts.Select(x => x.CourseSectionSurveyId).Distinct().Count(),
+                counts.Select(x => matchedSections[x.CourseSectionSurveyId].LecturerName)
+                    .Where(name => name.Length > 0 && name != "Chưa phân công").Distinct().Count(),
+                items, breakdown, analyzed, totalComments - analyzed,
+                counts.Where(x => x.Sentiment == OpenCommentSentiments.Uncertain).Sum(x => x.Count),
+                counts.Where(x => x.Reviewed).Sum(x => x.Count), currentPage, size, filterValues);
         }
-
-        return new OpenCommentAnalysisReportDto(
-            totalComments,
-            totalResponses,
-            commentRate,
-            sectionCountWithComments,
-            lecturerCountWithComments,
-            commentItems,
-            sentimentBreakdown,
-            analyzedCommentCount,
-            totalComments - analyzedCommentCount,
-            commentItems.Count(x => x.Sentiment == OpenCommentSentiments.Uncertain),
-            commentItems.Count(x => x.IsManuallyReviewed));
     }
 
     /// <summary>Báo cáo rỗng, dùng khi phạm vi lọc không có lớp nào.</summary>
     private static OpenCommentAnalysisReportDto EmptyOpenCommentReport() =>
         new(0, 0, 0m, 0, 0, [], [], 0, 0, 0, 0);
 
-    /// <summary>Một ý kiến đã qua bộ lọc tìm kiếm, chờ ghép với kết quả phân loại.</summary>
-    private sealed record MatchedComment(
-        int ResponseId,
-        int CourseSectionSurveyId,
-        string Comments,
-        DateTime SubmittedAt,
-        decimal Score,
-        bool IsValid,
-        string CourseCode,
-        string CourseName,
-        string SectionName,
-        string LecturerName,
-        string DepartmentName,
-        string FacultyName,
-        int? FacultyId,
-        int? DepartmentId,
-        int? LecturerId);
+    private sealed class OpenCommentQueryRow
+    {
+        public int ResponseId { get; set; }
+        public int CourseSectionSurveyId { get; set; }
+        public string Comments { get; set; } = string.Empty;
+        public DateTime SubmittedAt { get; set; }
+        public decimal Score { get; set; }
+        public bool IsValid { get; set; }
+        public string? Sentiment { get; set; }
+        public decimal? Confidence { get; set; }
+        public bool Reviewed { get; set; }
+    }
 }

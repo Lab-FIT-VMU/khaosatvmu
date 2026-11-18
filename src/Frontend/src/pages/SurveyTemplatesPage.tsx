@@ -16,7 +16,7 @@ import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { SurveyTemplateImportDialog } from '../components/SurveyTemplateImportDialog';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import {
   surveyApi,
   surveyErrorMessage,
@@ -88,7 +88,7 @@ const formatDate = (value: string) =>
   new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short' }).format(new Date(value));
 
 function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 export const SurveyTemplatesPage: React.FC = () => {
@@ -847,9 +847,11 @@ export const SurveyTemplatesPage: React.FC = () => {
                                       <select
                                         aria-label={`Mức bắt buộc của câu bẫy cho câu hỏi ${questionIndex + 1} mục ${sectionIndex + 1}`}
                                         value={canTrap ? question.attentionCheckValue : ''}
-                                        disabled={!canTrap}
+                                        disabled={form.locked || !canTrap}
                                         title={
-                                          canTrap
+                                          form.locked
+                                            ? 'Đã thu phiếu nên không thể thay đổi câu bẫy'
+                                            : canTrap
                                             ? undefined
                                             : 'Chỉ đặt được câu bẫy trên thang có mức chọn sẵn'
                                         }

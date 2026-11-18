@@ -29,7 +29,7 @@ import { QRCodeModal } from '../components/QRCodeModal';
 import { TablePagination } from '../components/TablePagination';
 import { useSemester } from '../context/semesterContext';
 import { useColumnFilters, type FilterableColumn } from '../hooks/useColumnFilters';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import {
   downloadCourseSurveyQrExcel,
   surveyApi,
@@ -148,7 +148,7 @@ const CampaignSectionsView: React.FC<CampaignSectionsViewProps> = ({
 };
 
 function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 /** Chuyển ISO 8601 sang giá trị của input datetime-local (giờ máy người dùng). */

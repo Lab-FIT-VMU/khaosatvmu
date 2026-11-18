@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole } from '../auth/roles';
 import { Modal } from './Modal';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import {
   publishScoringThresholds,
@@ -16,7 +16,7 @@ import type { ScoringThresholds } from '../utils/reportThresholds';
 import '../styles/catalogs.css';
 
 const messageFrom = (error: unknown): string =>
-  error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  apiErrorMessage(error, surveyErrorMessage);
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' })

@@ -59,6 +59,8 @@ export interface DataTableExportConfig<T> {
    */
   sheets?: ExportSheet<any>[] | (() => Promise<ExportSheet<any>[]>);
   scope?: 'filtered' | 'all';
+  /** Fetch the complete filtered dataset only when the user exports. */
+  loadData?: () => Promise<T[]>;
 }
 
 interface DataTableProps<T> {
@@ -94,6 +96,14 @@ interface DataTableProps<T> {
   onRowClick?: (item: T) => void;
   /** Dòng tổng kết ở cuối bảng, nhận toàn bộ dữ liệu sau tìm kiếm/lọc cột. */
   renderFooter?: (rows: T[]) => ReactNode;
+  remote?: {
+    page: number;
+    totalItems: number;
+    onPageChange: (page: number) => void;
+    columnFilters: Record<string, string[]>;
+    filterValues: Record<string, string[]>;
+    onColumnFiltersChange: (filters: Record<string, string[]>) => void;
+  };
 }
 
 export function DataTable<T>({
@@ -120,12 +130,14 @@ export function DataTable<T>({
   exportConfig,
   onRowClick,
   renderFooter,
+  remote,
 }: DataTableProps<T>) {
   const resolvedAddLabel = addNewLabel.replace(/^\+\s*/, '');
 
   const [page, setPage] = useState(1);
   /** Không có khóa nghĩa là cột đó chưa lọc. */
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
+  const activeColumnFilters = remote?.columnFilters ?? columnFilters;
   /**
    * Sắp xếp nội bộ, dùng khi trang không truyền onSortChange. Các trang danh mục
    * đều không truyền, nếu chỉ dựa vào prop thì nút sắp xếp trong menu lọc sẽ chết.
@@ -156,22 +168,22 @@ export function DataTable<T>({
   const passesFilters = (item: T, except?: string) =>
     filterableColumns.every((column) => {
       if (column.key === except) return true;
-      const allowed = columnFilters[column.key];
+      const allowed = activeColumnFilters[column.key];
       return !allowed || allowed.includes(column.filterValue!(item));
     });
 
   const filteredData = useMemo(
-    () => data.filter((item) => passesFilters(item)),
+    () => remote ? data : data.filter((item) => passesFilters(item)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, filterableColumns, columnFilters]
+    [data, filterableColumns, activeColumnFilters, remote]
   );
 
   const hasQuery = Boolean(
-    searchValue.trim() || currentFilter || Object.keys(columnFilters).length > 0
+    searchValue.trim() || currentFilter || Object.keys(activeColumnFilters).length > 0
   );
 
   const sortedData = useMemo(() => {
-    if (!activeSortKey) return filteredData;
+    if (remote || !activeSortKey) return filteredData;
     const column = columns.find(
       (item) => item.key === activeSortKey && (item.sortValue || item.filterValue)
     );
@@ -193,7 +205,7 @@ export function DataTable<T>({
         : String(left).localeCompare(String(right), 'vi', { numeric: true, sensitivity: 'base' });
       return result * direction;
     });
-  }, [columns, filteredData, activeSortDirection, activeSortKey]);
+  }, [columns, filteredData, activeSortDirection, activeSortKey, remote]);
 
   useEffect(() => {
     onVisibleDataChange?.(filteredData);
@@ -214,8 +226,8 @@ export function DataTable<T>({
     setPage(1);
   }, [currentFilter, searchValue]);
 
-  const firstIndex = (page - 1) * pageSize;
-  const visibleRows = sortedData.slice(firstIndex, firstIndex + pageSize);
+  const firstIndex = ((remote?.page ?? page) - 1) * pageSize;
+  const visibleRows = remote ? sortedData : sortedData.slice(firstIndex, firstIndex + pageSize);
 
   const exportColumns = useMemo<ExportColumn<T>[]>(() => {
     if (exportConfig?.columns) {
@@ -264,6 +276,12 @@ export function DataTable<T>({
       summaryNotes: exportConfig?.summaryNotes,
     };
 
+    if (exportConfig?.loadData) {
+      const loadData = exportConfig.loadData;
+      return async () => ({ fileName: resolvedFileName, metadata: exportMetadata,
+        columns: exportColumns, data: await loadData() });
+    }
+
     // Sheet phụ có thể cần gọi API nên chỉ dựng khi thật sự bấm xuất.
     if (typeof exportConfig?.sheets === 'function') {
       const buildSheets = exportConfig.sheets;
@@ -308,13 +326,20 @@ export function DataTable<T>({
 
   /** Giá trị cho menu của một cột, đã trừ các dòng bị cột khác lọc mất. */
   const valuesFor = (column: Column<T>) =>
-    [...new Set(
+    remote ? (remote.filterValues[column.key] ?? []) : [...new Set(
       data.filter((item) => passesFilters(item, column.key)).map((item) => column.filterValue!(item))
     )].sort((left, right) =>
       column.numeric ? Number(left) - Number(right) : left.localeCompare(right, 'vi')
     );
 
   const applyColumnFilter = (key: string, selected: string[] | null) => {
+    if (remote) {
+      const next = { ...remote.columnFilters };
+      if (selected === null) delete next[key];
+      else next[key] = selected;
+      remote.onColumnFiltersChange(next);
+      return;
+    }
     setPage(1);
     setColumnFilters((prev) => {
       const next = { ...prev };
@@ -341,7 +366,7 @@ export function DataTable<T>({
             </label>
           )}
           <span className="catalog-result-count" aria-live="polite">
-            {sortedData.length} kết quả
+            {remote?.totalItems ?? sortedData.length} kết quả
           </span>
         </div>
 
@@ -439,7 +464,7 @@ export function DataTable<T>({
                       <ColumnFilterMenu
                         label={column.header}
                         values={filterValues}
-                        selected={columnFilters[column.key] ?? null}
+                        selected={activeColumnFilters[column.key] ?? null}
                         quickFilters={column.quickFilters?.map((quick) => ({
                           label: quick.label,
                           values: filterValues.filter(quick.match),
@@ -508,10 +533,10 @@ export function DataTable<T>({
       </div>
 
       <TablePagination
-        page={page}
+        page={remote?.page ?? page}
         pageSize={pageSize}
-        totalItems={sortedData.length}
-        onPageChange={setPage}
+        totalItems={remote?.totalItems ?? sortedData.length}
+        onPageChange={remote?.onPageChange ?? setPage}
       />
     </section>
   );

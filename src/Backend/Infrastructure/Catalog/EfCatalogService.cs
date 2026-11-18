@@ -89,10 +89,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
 
         // Cascade soft-delete: khoa viện → ngành học (trước đây ON DELETE CASCADE).
         var majors = await db.Majors.Where(x => x.FacultyId == facultyId).ToListAsync(cancellationToken);
+        var deletedAt = DateTime.UtcNow;
         foreach (var major in majors)
-            db.Majors.Remove(major);
+            MarkDeleted(major, deletedAt);
 
-        db.Faculties.Remove(faculty);
+        MarkDeleted(faculty, deletedAt);
         await db.SaveChangesAsync(cancellationToken);
 
         return Succeeded(true);
@@ -637,7 +638,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         {
             return Failed<AcademicYearDto>(CatalogErrorCodes.AcademicYearNameInvalid);
         }
-        if (await db.Cohorts.AnyAsync(x => x.CohortCode == cohortCode, cancellationToken))
+        var existingCohort = await db.Cohorts
+            .FirstOrDefaultAsync(x => x.CohortCode == cohortCode, cancellationToken);
+        if (existingCohort is not null
+            && (await db.AcademicYears.AnyAsync(x => x.AcademicYearId == existingCohort.AcademicYearId, cancellationToken)
+                || await db.CohortMajors.AnyAsync(x => x.CohortId == existingCohort.CohortId, cancellationToken)))
         {
             return Failed<AcademicYearDto>(CatalogErrorCodes.AcademicYearCohortCodeExists);
         }
@@ -648,6 +653,14 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             ? await db.Database.BeginTransactionAsync(cancellationToken)
             : null;
         await using var transactionScope = ownTransaction;
+
+        // Older deletes left an empty cohort attached to a deleted year. Retire it
+        // in the same transaction as the replacement, preserving its historical ID.
+        if (existingCohort is not null)
+        {
+            existingCohort.IsDeleted = true;
+            existingCohort.DeletedAt = DateTime.UtcNow;
+        }
 
         var year = new AcademicYear
         {
@@ -738,18 +751,41 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<bool>(CatalogErrorCodes.AcademicYearNotFound);
         }
 
-        // Cascade soft-delete: năm học → học kỳ → lớp học phần.
+        // Never leave active surveys or cohort majors pointing at a deleted year.
+        var allSemesterIds = await db.Semesters.IgnoreQueryFilters()
+            .Where(x => x.AcademicYearId == academicYearId)
+            .Select(x => x.SemesterId).ToListAsync(cancellationToken);
+        var cohorts = await db.Cohorts.Where(x => x.AcademicYearId == academicYearId)
+            .ToListAsync(cancellationToken);
+        var cohortIds = cohorts.Select(x => x.CohortId).ToList();
+        if (await db.SemesterSurveys.AnyAsync(x => allSemesterIds.Contains(x.SemesterId), cancellationToken)
+            || await db.CohortMajors.AnyAsync(x => cohortIds.Contains(x.CohortId), cancellationToken)
+            || await db.GraduationRounds.AnyAsync(x => x.AcademicYearId == academicYearId, cancellationToken))
+        {
+            return Failed<bool>(CatalogErrorCodes.AcademicYearInUse);
+        }
+
+        // Use the same timestamp to identify children deleted by this operation.
+        // Setting flags avoids EF severing required relationships before interception.
+        var deletedAt = DateTime.UtcNow;
         var semesters = await db.Semesters
             .Where(x => x.AcademicYearId == academicYearId).ToListAsync(cancellationToken);
         var semesterIds = semesters.Select(x => x.SemesterId).ToList();
         var sections = await db.CourseSections
             .Where(x => semesterIds.Contains(x.SemesterId)).ToListAsync(cancellationToken);
+        var sectionIds = sections.Select(x => x.CourseSectionId).ToList();
+        if (await db.CourseSectionSurveys.AnyAsync(x => sectionIds.Contains(x.CourseSectionId ?? 0), cancellationToken))
+        {
+            return Failed<bool>(CatalogErrorCodes.AcademicYearInUse);
+        }
         foreach (var section in sections)
-            db.CourseSections.Remove(section);
+            MarkDeleted(section, deletedAt);
         foreach (var semester in semesters)
-            db.Semesters.Remove(semester);
+            MarkDeleted(semester, deletedAt);
+        foreach (var cohort in cohorts)
+            MarkDeleted(cohort, deletedAt);
 
-        db.AcademicYears.Remove(year);
+        MarkDeleted(year, deletedAt);
         await db.SaveChangesAsync(cancellationToken);
         return Succeeded(true);
     }
@@ -827,13 +863,23 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<bool>(CatalogErrorCodes.SemesterNotFound);
         }
 
-        // Cascade soft-delete: học kỳ → lớp học phần.
+        if (await db.SemesterSurveys.AnyAsync(x => x.SemesterId == semesterId, cancellationToken))
+        {
+            return Failed<bool>(CatalogErrorCodes.SemesterInUse);
+        }
+
         var sections = await db.CourseSections
             .Where(x => x.SemesterId == semesterId).ToListAsync(cancellationToken);
+        var sectionIds = sections.Select(x => x.CourseSectionId).ToList();
+        if (await db.CourseSectionSurveys.AnyAsync(x => sectionIds.Contains(x.CourseSectionId ?? 0), cancellationToken))
+        {
+            return Failed<bool>(CatalogErrorCodes.SemesterInUse);
+        }
+        var deletedAt = DateTime.UtcNow;
         foreach (var section in sections)
-            db.CourseSections.Remove(section);
+            MarkDeleted(section, deletedAt);
 
-        db.Semesters.Remove(semester);
+        MarkDeleted(semester, deletedAt);
         await db.SaveChangesAsync(cancellationToken);
         return Succeeded(true);
     }
@@ -1006,10 +1052,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         // Cascade soft-delete: lớp học phần → bài khảo sát lớp.
         var sectionSurveys = await db.CourseSectionSurveys
             .Where(x => x.CourseSectionId == courseSectionId).ToListAsync(cancellationToken);
+        var deletedAt = DateTime.UtcNow;
         foreach (var ss in sectionSurveys)
-            db.CourseSectionSurveys.Remove(ss);
+            MarkDeleted(ss, deletedAt);
 
-        db.CourseSections.Remove(section);
+        MarkDeleted(section, deletedAt);
         await db.SaveChangesAsync(cancellationToken);
         return Succeeded(true);
     }
@@ -1053,6 +1100,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var facultyIdByName = await LoadFacultyIdByNameAsync(cancellationToken);
 
         var lecturerIdByEmail = new Dictionary<string, int>();
+        var deletedLecturerEmails = await DeletedLecturerEmailsAsync(cancellationToken);
         foreach (var lecturer in await db.Lecturers.Select(x => new { x.LecturerId, x.Email }).ToListAsync(cancellationToken))
         {
             if (!string.IsNullOrWhiteSpace(lecturer.Email))
@@ -1102,6 +1150,12 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             if (sectionName.Length == 0)
             {
                 itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.CourseSectionNameRequired);
+                continue;
+            }
+
+            if (deletedLecturerEmails.Contains(NormalizeKey(row.LecturerEmail ?? string.Empty)))
+            {
+                itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.LecturerEmailDeleted);
                 continue;
             }
 
@@ -1583,6 +1637,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
 
         if (lecturer is null)
         {
+            if (await DeletedLecturerEmailExistsAsync(email, cancellationToken))
+            {
+                return Failed<ResolveUnidentifiedLecturerDto>(CatalogErrorCodes.LecturerEmailDeleted);
+            }
+
             var defaultPositionId = await db.Positions
                 .Where(x => x.PositionName == CatalogDefaults.PositionName)
                 .Select(x => (int?)x.PositionId)
@@ -1829,6 +1888,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .Where(x => x != null)
             .Select(x => NormalizeKey(x!))
             .ToHashSet();
+        var deletedEmails = await DeletedLecturerEmailsAsync(cancellationToken);
         var seenInFile = new HashSet<string>();
         var items = new List<CatalogImportItemDto>(rows.Count);
         var created = new List<Lecturer>();
@@ -1854,6 +1914,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             }
 
             var emailKey = NormalizeKey(email);
+            if (deletedEmails.Contains(emailKey))
+            {
+                items.Add(new CatalogImportItemDto(row.RowNumber, fullName, facultyName, false, CatalogErrorCodes.LecturerEmailDeleted));
+                continue;
+            }
             if (existingEmails.Contains(emailKey))
             {
                 items.Add(new CatalogImportItemDto(row.RowNumber, fullName, facultyName, false, CatalogErrorCodes.LecturerEmailExists));
@@ -2866,6 +2931,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         {
             return CatalogErrorCodes.LecturerEmailExists;
         }
+        if (await DeletedLecturerEmailExistsAsync(email, cancellationToken, lecturerId))
+        {
+            return CatalogErrorCodes.LecturerEmailDeleted;
+        }
 
         if (command.FacultyId is { } facultyId && !await FacultyExistsAsync(facultyId, cancellationToken))
         {
@@ -2983,7 +3052,62 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
 
     private static CatalogOperationResult<T> Failed<T>(string errorCode) => new(false, errorCode, default);
 
+    private static void MarkDeleted(ISoftDeletable entity, DateTime deletedAt)
+    {
+        entity.IsDeleted = true;
+        entity.DeletedAt = deletedAt;
+    }
+
+    private static void MarkRestored(ISoftDeletable entity)
+    {
+        entity.IsDeleted = false;
+        entity.DeletedAt = null;
+    }
+
+    private Task<bool> DeletedLecturerEmailExistsAsync(string email, CancellationToken cancellationToken, int? exceptLecturerId = null)
+    {
+        var key = NormalizeKey(email);
+        return db.Lecturers.IgnoreQueryFilters()
+            .AnyAsync(x => x.IsDeleted && (exceptLecturerId == null || x.LecturerId != exceptLecturerId)
+                && x.Email.Trim().ToLower() == key, cancellationToken);
+    }
+
+    private async Task<HashSet<string>> DeletedLecturerEmailsAsync(CancellationToken cancellationToken) =>
+        (await db.Lecturers.IgnoreQueryFilters().Where(x => x.IsDeleted)
+            .Select(x => x.Email).ToListAsync(cancellationToken))
+        .Select(NormalizeKey).ToHashSet();
+
     // --------------------------------------------------------------- Restore
+
+    private async Task<string?> ValidateRestoringChildrenAsync(
+        IReadOnlyList<Semester> semesters, IReadOnlyList<CourseSection> sections,
+        CancellationToken cancellationToken)
+    {
+        var yearIds = semesters.Select(x => x.AcademicYearId).Distinct().ToList();
+        var activeSemesters = await db.Semesters.Where(x => yearIds.Contains(x.AcademicYearId))
+            .Select(x => new { x.AcademicYearId, x.SemesterName }).ToListAsync(cancellationToken);
+        if (activeSemesters.Select(x => (x.AcademicYearId, Name: NormalizeKey(x.SemesterName)))
+            .Concat(semesters.Select(x => (x.AcademicYearId, Name: NormalizeKey(x.SemesterName))))
+            .GroupBy(x => x).Any(x => x.Count() > 1))
+            return CatalogErrorCodes.SemesterNameExists;
+
+        if (sections.Count == 0) return null;
+        var courseIds = sections.Select(x => x.CourseId).Distinct().ToList();
+        var lecturerIds = sections.Where(x => x.LecturerId != null)
+            .Select(x => x.LecturerId!.Value).Distinct().ToList();
+        if (await db.Courses.CountAsync(x => courseIds.Contains(x.CourseId), cancellationToken) != courseIds.Count)
+            return CatalogErrorCodes.CourseNotFound;
+        if (await db.Lecturers.CountAsync(x => lecturerIds.Contains(x.LecturerId), cancellationToken) != lecturerIds.Count)
+            return CatalogErrorCodes.LecturerNotFound;
+        var semesterIds = sections.Select(x => x.SemesterId).Distinct().ToList();
+        var activeSections = await db.CourseSections
+            .Where(x => courseIds.Contains(x.CourseId) && semesterIds.Contains(x.SemesterId))
+            .Select(x => new { x.CourseId, x.SemesterId, x.SectionName }).ToListAsync(cancellationToken);
+        return activeSections.Select(x => (x.CourseId, x.SemesterId, Name: NormalizeKey(x.SectionName)))
+            .Concat(sections.Select(x => (x.CourseId, x.SemesterId, Name: NormalizeKey(x.SectionName))))
+            .GroupBy(x => x).Any(x => x.Count() > 1)
+            ? CatalogErrorCodes.CourseSectionExists : null;
+    }
 
     public async Task<CatalogOperationResult<FacultyDto>> RestoreFacultyAsync(
         int facultyId,
@@ -2992,8 +3116,21 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var faculty = await db.Faculties.IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.FacultyId == facultyId && x.IsDeleted, cancellationToken);
         if (faculty is null) return Failed<FacultyDto>(CatalogErrorCodes.FacultyNotFound);
-        faculty.IsDeleted = false;
-        faculty.DeletedAt = null;
+        if (await FacultyNameTakenAsync(faculty.FacultyName, facultyId, cancellationToken))
+            return Failed<FacultyDto>(CatalogErrorCodes.FacultyNameExists);
+        var marker = faculty.DeletedAt;
+        var majors = await db.Majors.IgnoreQueryFilters()
+            .Where(x => x.FacultyId == facultyId && x.IsDeleted
+                && marker != null && x.DeletedAt == marker).ToListAsync(cancellationToken);
+        foreach (var major in majors)
+        {
+            if (await MajorCodeTakenAsync(major.MajorCode, major.MajorId, cancellationToken))
+                return Failed<FacultyDto>(CatalogErrorCodes.MajorCodeExists);
+            if (await MajorNameTakenAsync(major.MajorName, facultyId, major.MajorId, cancellationToken))
+                return Failed<FacultyDto>(CatalogErrorCodes.MajorExists);
+        }
+        MarkRestored(faculty);
+        foreach (var major in majors) MarkRestored(major);
         await db.SaveChangesAsync(cancellationToken);
         return Succeeded(new FacultyDto(faculty.FacultyId, faculty.FacultyName));
     }
@@ -3018,6 +3155,12 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var major = await db.Majors.IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.MajorId == majorId && x.IsDeleted, cancellationToken);
         if (major is null) return Failed<MajorDto>(CatalogErrorCodes.MajorNotFound);
+        if (!await FacultyExistsAsync(major.FacultyId, cancellationToken))
+            return Failed<MajorDto>(CatalogErrorCodes.FacultyNotFound);
+        if (await MajorCodeTakenAsync(major.MajorCode, majorId, cancellationToken))
+            return Failed<MajorDto>(CatalogErrorCodes.MajorCodeExists);
+        if (await MajorNameTakenAsync(major.MajorName, major.FacultyId, majorId, cancellationToken))
+            return Failed<MajorDto>(CatalogErrorCodes.MajorExists);
         major.IsDeleted = false;
         major.DeletedAt = null;
         await db.SaveChangesAsync(cancellationToken);
@@ -3038,17 +3181,39 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var year = await db.AcademicYears.IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.AcademicYearId == academicYearId && x.IsDeleted, cancellationToken);
         if (year is null) return Failed<AcademicYearDto>(CatalogErrorCodes.AcademicYearNotFound);
-        year.IsDeleted = false;
-        year.DeletedAt = null;
-        await db.SaveChangesAsync(cancellationToken);
+        var validation = await ValidateAcademicYearAsync(academicYearId,
+            new SaveAcademicYearCommand(year.AcademicYearName, year.StartDate), cancellationToken);
+        if (validation is not null) return Failed<AcademicYearDto>(validation);
+
+        var marker = year.DeletedAt;
         var semesters = await db.Semesters.IgnoreQueryFilters()
-            .Where(x => x.AcademicYearId == academicYearId)
-            .OrderBy(x => x.SemesterId)
+            .Where(x => x.AcademicYearId == academicYearId && x.IsDeleted
+                && marker != null && x.DeletedAt == marker)
             .ToListAsync(cancellationToken);
+        var semesterIds = semesters.Select(x => x.SemesterId).ToList();
+        var sections = await db.CourseSections.IgnoreQueryFilters()
+            .Where(x => semesterIds.Contains(x.SemesterId) && x.IsDeleted
+                && marker != null && x.DeletedAt == marker).ToListAsync(cancellationToken);
+        var cohorts = await db.Cohorts.IgnoreQueryFilters()
+            .Where(x => x.AcademicYearId == academicYearId && x.IsDeleted
+                && marker != null && x.DeletedAt == marker).ToListAsync(cancellationToken);
+        var cohortCodes = cohorts.Select(x => x.CohortCode).ToList();
+        if (await db.Cohorts.AnyAsync(x => cohortCodes.Contains(x.CohortCode), cancellationToken))
+            return Failed<AcademicYearDto>(CatalogErrorCodes.AcademicYearCohortCodeExists);
+        validation = await ValidateRestoringChildrenAsync(semesters, sections, cancellationToken);
+        if (validation is not null) return Failed<AcademicYearDto>(validation);
+
+        MarkRestored(year);
+        foreach (var semester in semesters) MarkRestored(semester);
+        foreach (var section in sections) MarkRestored(section);
+        foreach (var cohort in cohorts) MarkRestored(cohort);
+        await db.SaveChangesAsync(cancellationToken);
+        var visibleSemesters = await db.Semesters.Where(x => x.AcademicYearId == academicYearId)
+            .OrderBy(x => x.SemesterId).ToListAsync(cancellationToken);
         return Succeeded(new AcademicYearDto(
             year.AcademicYearId, year.AcademicYearName,
             year.StartDate, year.EndDate,
-            semesters.Select(ToDto).ToList()));
+            visibleSemesters.Select(ToDto).ToList()));
     }
 
     public async Task<CatalogOperationResult<SemesterDto>> RestoreSemesterAsync(
@@ -3064,8 +3229,17 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var semester = await db.Semesters.IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.SemesterId == semesterId && x.IsDeleted, cancellationToken);
         if (semester is null) return Failed<SemesterDto>(CatalogErrorCodes.SemesterNotFound);
-        semester.IsDeleted = false;
-        semester.DeletedAt = null;
+        var validation = await ValidateSemesterAsync(semesterId,
+            new SaveSemesterCommand(semester.SemesterName, semester.AcademicYearId), cancellationToken);
+        if (validation is not null) return Failed<SemesterDto>(validation);
+        var marker = semester.DeletedAt;
+        var sections = await db.CourseSections.IgnoreQueryFilters()
+            .Where(x => x.SemesterId == semesterId && x.IsDeleted
+                && marker != null && x.DeletedAt == marker).ToListAsync(cancellationToken);
+        validation = await ValidateRestoringChildrenAsync([semester], sections, cancellationToken);
+        if (validation is not null) return Failed<SemesterDto>(validation);
+        MarkRestored(semester);
+        foreach (var section in sections) MarkRestored(section);
         await db.SaveChangesAsync(cancellationToken);
         return Succeeded(ToDto(semester));
     }
@@ -3084,6 +3258,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             .FirstOrDefaultAsync(x => x.CourseSectionId == courseSectionId && x.IsDeleted, cancellationToken);
         if (section is null) return Failed<CourseSectionDto>(CatalogErrorCodes.CourseSectionNotFound);
 
+        var validation = await ValidateCourseSectionAsync(courseSectionId,
+            new SaveCourseSectionCommand(section.CourseId, section.SemesterId, section.LecturerId,
+                section.SectionName, section.ClassSize, section.UnidentifiedLecturerName), cancellationToken);
+        if (validation is not null) return Failed<CourseSectionDto>(validation);
+
         // Khôi phục đi cùng cặp với xoá và cũng chỉ dành cho quản trị.
         var departmentId = await DepartmentOfCourseAsync(section.CourseId, cancellationToken);
         if (await CheckDepartmentInScopeAsync(scope, departmentId, cancellationToken) is { } outOfScope)
@@ -3091,8 +3270,16 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<CourseSectionDto>(outOfScope);
         }
 
-        section.IsDeleted = false;
-        section.DeletedAt = null;
+        var marker = section.DeletedAt;
+        var links = await db.CourseSectionSurveys.IgnoreQueryFilters()
+            .Where(x => x.CourseSectionId == courseSectionId && x.IsDeleted
+                && marker != null && x.DeletedAt == marker).ToListAsync(cancellationToken);
+        var campaignIds = links.Select(x => x.SemesterSurveyId).Distinct().ToList();
+        if (await db.SemesterSurveys.CountAsync(x => campaignIds.Contains(x.SemesterSurveyId), cancellationToken)
+            != campaignIds.Count)
+            return Failed<CourseSectionDto>(CatalogErrorCodes.RestoreParentDeleted);
+        MarkRestored(section);
+        foreach (var link in links) MarkRestored(link);
         await db.SaveChangesAsync(cancellationToken);
         return Succeeded(ToDto(section));
     }
@@ -3111,6 +3298,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var lecturer = await db.Lecturers.IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.LecturerId == lecturerId && x.IsDeleted, cancellationToken);
         if (lecturer is null) return Failed<LecturerDto>(CatalogErrorCodes.LecturerNotFound);
+        var validation = await ValidateLecturerAsync(lecturerId,
+            new SaveLecturerCommand(lecturer.FullName, lecturer.DepartmentId, lecturer.FacultyId,
+                lecturer.Email, lecturer.PhoneNumber, lecturer.PositionId), cancellationToken);
+        if (validation is not null) return Failed<LecturerDto>(validation);
         lecturer.IsDeleted = false;
         lecturer.DeletedAt = null;
         // Khôi phục giảng viên thì mở lại tài khoản, và tạo bù nếu chưa từng có.
@@ -3118,6 +3309,21 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         await EnsureUserForLecturerAsync(lecturer, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         return Succeeded(ToDto(lecturer));
+    }
+
+    public async Task<CatalogOperationResult<LecturerDto>> RestoreLecturerByEmailAsync(
+        string email, CancellationToken cancellationToken = default)
+    {
+        var scope = await userScope.ResolveAsync(cancellationToken);
+        if (CheckAdminOnly(scope) is { } adminOnly) return Failed<LecturerDto>(adminOnly);
+        var key = NormalizeKey(email ?? string.Empty);
+        if (key.Length == 0) return Failed<LecturerDto>(CatalogErrorCodes.LecturerEmailRequired);
+        var lecturerId = await db.Lecturers.IgnoreQueryFilters()
+            .Where(x => x.IsDeleted && x.Email.Trim().ToLower() == key)
+            .Select(x => (int?)x.LecturerId).FirstOrDefaultAsync(cancellationToken);
+        return lecturerId is { } id
+            ? await RestoreLecturerAsync(id, cancellationToken)
+            : Failed<LecturerDto>(CatalogErrorCodes.LecturerNotFound);
     }
 
     public async Task<CatalogOperationResult<CourseDto>> RestoreCourseAsync(
@@ -3134,6 +3340,10 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var course = await db.Courses.IgnoreQueryFilters()
             .FirstOrDefaultAsync(x => x.CourseId == courseId && x.IsDeleted, cancellationToken);
         if (course is null) return Failed<CourseDto>(CatalogErrorCodes.CourseNotFound);
+        var validation = await ValidateCourseAsync(courseId,
+            new SaveCourseCommand(course.CourseCode, course.CourseName, course.Credits, course.CourseType,
+                course.DepartmentId, course.FacultyId, course.PrerequisiteCourseId), cancellationToken);
+        if (validation is not null) return Failed<CourseDto>(validation);
         course.IsDeleted = false;
         course.DeletedAt = null;
         await db.SaveChangesAsync(cancellationToken);

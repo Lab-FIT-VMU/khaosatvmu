@@ -1,0 +1,185 @@
+{
+  "phien_ban": 3,
+  "ts": {
+    "_ghi_chu": "Tham số mặc định cho Bộ luật D (BO_LUAT_D_CHI_SO_THONG_KE_VA_BAO_CAO.md). Giá trị khởi điểm, sửa được khi chạy. Chỉ đổi 'gia_tri'.",
+    "pham_vi": {
+      "tu_khoa_loai_hp": {
+        "gia_tri": [],
+        "mo_ta": "D-L2 (dự phòng): loại HP có tên chứa một trong các từ; đã chốt để rỗng = mọi HP thi bộ đề chung"
+      },
+      "ds_ma_hp_loai_tru": {
+        "gia_tri": [],
+        "mo_ta": "D-L2 (dự phòng): danh sách mã HP loại thêm"
+      },
+      "gop_ma_hp_hau_to": {
+        "gia_tri": true,
+        "mo_ta": "D-L3 (đã chốt): gộp mã đuôi H/E với mã cùng số không đuôi thành một học phần (ma_hp_goc)"
+      }
+    },
+    "co_mau": {
+      "so_sv_toi_thieu_lop": {
+        "gia_tri": 15,
+        "mo_ta": "D-Đ1: số SV đạt tư cách (X >= 4) tối thiểu để lớp đưa vào thống kê"
+      },
+      "so_sv_tin_cay_thap": {
+        "gia_tri": 20,
+        "mo_ta": "D-Đ2: dưới ngưỡng này gắn nhãn TIN_CAY_THAP"
+      },
+      "so_lop_toi_thieu_hp": {
+        "gia_tri": 2,
+        "mo_ta": "D-Đ3: số lớp đưa vào thống kê tối thiểu để so sánh trong học phần"
+      }
+    },
+    "nang_luc_nen": {
+      "so_lop_hp_nang_luc_nen": {
+        "gia_tri": 3,
+        "mo_ta": "D-N1: số lớp HP tối thiểu SV đăng ký trong kỳ, tính cả HP đang xét"
+      },
+      "nang_luc_nen_thang": {
+        "gia_tri": 10,
+        "mo_ta": "D-N2: thang điểm dùng tính năng lực nền (10 hoặc 4)"
+      }
+    },
+    "kiem_dinh": {
+      "muc_tin_cay": {
+        "gia_tri": 0.95,
+        "mo_ta": "Mức tin cậy của khoảng tin cậy"
+      },
+      "fdr_q": {
+        "gia_tri": 0.05,
+        "mo_ta": "Ngưỡng FDR Benjamini-Hochberg, theo từng loại dấu hiệu/cờ, từng kỳ"
+      }
+    },
+    "dau_hieu_lop": {
+      "d1_d2_lech_x": {
+        "gia_tri": 1.0,
+        "mo_ta": "D1/D2: |I7| tối thiểu (điểm)"
+      },
+      "d3_r_lop": {
+        "gia_tri": 0.2,
+        "mo_ta": "D3: r của lớp dưới ngưỡng này, đồng thời cận trên khoảng tin cậy của r lớp thấp hơn r học phần"
+      },
+      "d3_r_hp": {
+        "gia_tri": 0.4,
+        "mo_ta": "D3: khi r của học phần từ ngưỡng này trở lên"
+      },
+      "d4_wasserstein": {
+        "gia_tri": 1.0,
+        "mo_ta": "D4: khoảng cách Wasserstein X tối thiểu (điểm)"
+      },
+      "d5_chenh_mat_tu_cach": {
+        "gia_tri": 0.15,
+        "mo_ta": "D5: I1 lớp cao hơn các lớp khác cùng HP ít nhất (tỷ lệ, 0.15 = 15 điểm %)"
+      },
+      "d6_d7_lech_y": {
+        "gia_tri": 0.75,
+        "mo_ta": "D6/D7: |I8| tối thiểu (điểm)"
+      }
+    },
+    "co_hoc_phan": {
+      "h1_icc_x": {
+        "gia_tri": 0.2,
+        "mo_ta": "H1: ICC_X tối thiểu; O1 cần cận trên ICC_X dưới mức này"
+      },
+      "h1_khoang_tan_x": {
+        "gia_tri": 1.5,
+        "mo_ta": "H1: chênh u cao nhất - thấp nhất (điểm)"
+      },
+      "h2_icc_y": {
+        "gia_tri": 0.2,
+        "mo_ta": "H2: ICC_Y tối thiểu; O2 cần cận trên ICC_Y dưới mức này"
+      },
+      "h2_khoang_tan_y": {
+        "gia_tri": 1.5,
+        "mo_ta": "H2: chênh v cao nhất - thấp nhất (điểm)"
+      },
+      "h3_r_hp": {
+        "gia_tri": 0.3,
+        "mo_ta": "H3: cận trên khoảng tin cậy của r gộp học phần dưới ngưỡng này; O3 cần cận dưới từ mức này"
+      },
+      "h4_chenh_mat_tu_cach": {
+        "gia_tri": 0.15,
+        "mo_ta": "H4: chênh I1 lớp cao nhất - thấp nhất (tỷ lệ); O4 cần cận trên của chênh dưới mức này"
+      },
+      "h5_ty_le_f": {
+        "gia_tri": 0.3,
+        "mo_ta": "H5: cận dưới khoảng tin cậy của tỷ lệ F do thi từ mức này"
+      },
+      "h5_chenh_lich_su": {
+        "gia_tri": 0.1,
+        "mo_ta": "H5: tỷ lệ F do thi cao hơn các kỳ trước của chính học phần ít nhất (tỷ lệ, 0.10 = 10 điểm %), kèm Fisher có ý nghĩa sau FDR"
+      },
+      "h6_lech_y_giua_ky": {
+        "gia_tri": 1.5,
+        "mo_ta": "H6: |chênh Y trung bình| so với kỳ gần nhất trước đó (điểm)"
+      }
+    },
+    "co_giang_vien": {
+      "g1_so_ky_lap": {
+        "gia_tri": 2,
+        "mo_ta": "G1: số kỳ tối thiểu cùng một dấu hiệu lặp lại ở cùng GV x mã HP"
+      },
+      "g1_ty_le_ky": {
+        "gia_tri": 0.5,
+        "mo_ta": "G1: số kỳ có đặc điểm phải chiếm ít nhất tỷ lệ này trong số kỳ giảng viên dạy học phần"
+      }
+    },
+    "goi_y_ho_so": {
+      "vung_gan_0": {
+        "gia_tri": 0.05,
+        "mo_ta": "Bộ luật E: mức lệch so với kỳ vọng trong khoảng ± giá trị này (điểm) coi là gần 0"
+      },
+      "so_ky_cung_chieu": {
+        "gia_tri": 3,
+        "mo_ta": "Bộ luật E (X3, X4, Q8): số kỳ tối thiểu, kèm khoảng tin cậy của trung bình các kỳ không chứa 0"
+      },
+      "he_so_ty_le_f": {
+        "gia_tri": 1.3,
+        "mo_ta": "Bộ luật E (Q7): tỷ lệ F do thi của lớp cao hơn hệ số này nhân tỷ lệ của học phần"
+      },
+      "ty_le_f_toi_thieu": {
+        "gia_tri": 0.05,
+        "mo_ta": "Bộ luật E (Q7): và tỷ lệ F do thi của lớp trên mức này"
+      },
+      "ty_le_nguong_d5": {
+        "gia_tri": 0.5,
+        "mo_ta": "Bộ luật E (Q6): tỷ lệ của ngưỡng d5_chenh_mat_tu_cach dùng cho câu gợi ý"
+      }
+    },
+    "mau_sac": {
+      "do_lon": {
+        "gia_tri": [
+          "#DCE9F5",
+          "#9DC3E6",
+          "#4F8FC9",
+          "#1F5C99",
+          "#0B2F5B"
+        ],
+        "mo_ta": "M2: thang xanh dương nhạt -> đậm"
+      },
+      "chieu_tren": {
+        "gia_tri": "#2A8C8C",
+        "mo_ta": "M3: cao hơn kỳ vọng (cả D6)"
+      },
+      "chieu_duoi": {
+        "gia_tri": "#7A6BB0",
+        "mo_ta": "M3: thấp hơn kỳ vọng"
+      },
+      "chieu_giua": {
+        "gia_tri": "#E6E6E6",
+        "mo_ta": "M3: điểm giữa"
+      },
+      "phan_loai": {
+        "gia_tri": [
+          "#4C72B0",
+          "#2A8C8C",
+          "#7A6BB0",
+          "#8C8C8C",
+          "#937860",
+          "#1F3B73"
+        ],
+        "mo_ta": "M4: màu phân loại trung tính, không đỏ/cam/xanh lá"
+      }
+    }
+  }
+}

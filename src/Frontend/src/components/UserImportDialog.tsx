@@ -8,7 +8,8 @@ import {
   Upload,
 } from 'lucide-react';
 import { adminApi } from '../services/adminApi';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
+import { adminErrorMessage, adminErrorMessages as importErrorMessages } from '../services/adminErrorMessages';
 import type { AdminUserImportResult, ImportAdminUserRow } from '../types';
 import {
   parseUserImportFile,
@@ -32,21 +33,8 @@ const fileErrorMessages: Record<UserImportFileErrorCode, string> = {
   READ_FAILED: 'Không thể đọc tệp Excel. Hãy kiểm tra tệp không bị hỏng hoặc đặt mật khẩu.',
 };
 
-const importErrorMessages: Record<string, string> = {
-  ADMIN_INVALID_REQUEST: 'Danh sách import không hợp lệ.',
-  ADMIN_IMPORT_EMAIL_REQUIRED: 'Thiếu email',
-  ADMIN_IMPORT_EMAIL_INVALID: 'Email không hợp lệ',
-  ADMIN_IMPORT_DISPLAY_NAME_INVALID: 'Họ và tên vượt quá 200 ký tự',
-  ADMIN_IMPORT_DUPLICATE_EMAIL: 'Email bị lặp trong tệp',
-  ADMIN_USER_EMAIL_EXISTS: 'Email đã có trong hệ thống',
-  AUTH_CSRF_INVALID: 'Phiên bảo mật đã thay đổi. Vui lòng thử lại.',
-};
-
 function requestErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    return importErrorMessages[error.errorCode] ?? 'Không thể import danh sách người dùng.';
-  }
-  return 'Không thể kết nối tới máy chủ.';
+  return apiErrorMessage(error, adminErrorMessage);
 }
 
 export function UserImportDialog({ isOpen, onClose, onImported }: UserImportDialogProps) {

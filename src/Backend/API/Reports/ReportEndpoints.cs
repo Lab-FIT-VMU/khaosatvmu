@@ -148,9 +148,28 @@ public static class ReportEndpoints
             int? lecturerId,
             string? search,
             bool? validOnly,
+            int? page,
+            int? pageSize,
+            string? sortKey,
+            string? sortDirection,
+            string? columnFilters,
             IReportService reportService,
             CancellationToken cancellationToken) =>
         {
+            Dictionary<string, string[]>? filters = null;
+            if (columnFilters is not null)
+            {
+                try
+                {
+                    filters = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string[]>>(columnFilters);
+                    if (filters is null || filters.Count > 7 || filters.Values.Any(values => values is null || values.Length > 200))
+                        return Results.BadRequest();
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                    return Results.BadRequest();
+                }
+            }
             var analysis = await reportService.GetOpenCommentAnalysisAsync(
                 semesterId,
                 semesterSurveyId,
@@ -159,7 +178,9 @@ public static class ReportEndpoints
                 lecturerId,
                 search,
                 validOnly,
-                cancellationToken);
+                cancellationToken,
+                new OpenCommentQueryOptions(page ?? 1, pageSize ?? 20, sortKey,
+                    !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase), filters));
             return Results.Ok(analysis);
         });
 

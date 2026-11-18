@@ -399,6 +399,12 @@ public static class CatalogEndpoints
             .AddEndpointFilter<RequireAntiforgeryFilter>()
             .RequireAuthorization(AuthPolicies.LecturersAccess);
 
+        lecturers.MapPost("/restore-by-email", async (
+            RestoreLecturerByEmailRequest request, ICatalogService service, CancellationToken ct) =>
+            ToResult(await service.RestoreLecturerByEmailAsync(request.Email, ct)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>()
+            .RequireAuthorization(AuthPolicies.LecturersAccess);
+
         lecturers.MapPost("/import", async (
             ImportLecturersRequest request,
             ICatalogService service,
@@ -532,6 +538,7 @@ public static class CatalogEndpoints
         var statusCode = result.ErrorCode switch
         {
             CatalogErrorCodes.OutOfScope => StatusCodes.Status403Forbidden,
+            CatalogErrorCodes.RestoreParentDeleted => StatusCodes.Status409Conflict,
             CatalogErrorCodes.FacultyNotFound => StatusCodes.Status404NotFound,
             CatalogErrorCodes.DepartmentNotFound => StatusCodes.Status404NotFound,
             CatalogErrorCodes.MajorNotFound => StatusCodes.Status404NotFound,
@@ -553,6 +560,12 @@ public static class CatalogEndpoints
             CatalogErrorCodes.FacultyNameExists => StatusCodes.Status409Conflict,
             CatalogErrorCodes.CourseCodeExists => StatusCodes.Status409Conflict,
             CatalogErrorCodes.LecturerEmailExists => StatusCodes.Status409Conflict,
+            CatalogErrorCodes.LecturerEmailDeleted => StatusCodes.Status409Conflict,
+            CatalogErrorCodes.AcademicYearInUse => StatusCodes.Status409Conflict,
+            CatalogErrorCodes.SemesterInUse => StatusCodes.Status409Conflict,
+            CatalogErrorCodes.AcademicYearCohortCodeExists => StatusCodes.Status409Conflict,
+            CatalogErrorCodes.MajorCodeExists => StatusCodes.Status409Conflict,
+            CatalogErrorCodes.MajorExists => StatusCodes.Status409Conflict,
             CatalogErrorCodes.LecturerInUse => StatusCodes.Status409Conflict,
             CatalogErrorCodes.FacultyInUse => StatusCodes.Status409Conflict,
             CatalogErrorCodes.DepartmentInUse => StatusCodes.Status409Conflict,
@@ -563,6 +576,7 @@ public static class CatalogEndpoints
     }
 
     public sealed record SaveFacultyRequest(string FacultyName);
+    public sealed record RestoreLecturerByEmailRequest(string Email);
 
     public sealed record SaveDepartmentRequest(int DepartmentId, string DepartmentName, int? FacultyId);
 

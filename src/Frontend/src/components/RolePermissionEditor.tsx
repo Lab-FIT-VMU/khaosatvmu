@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import { roleDisplayName } from '../auth/roles';
 import { Modal } from './Modal';
 import { adminApi } from '../services/adminApi';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
+import { adminErrorMessage } from '../services/adminErrorMessages';
 import type { AdminRole, RolePermissionMatrix } from '../types';
 import '../styles/auth-admin.css';
 
@@ -13,10 +14,7 @@ interface RolePermissionEditorProps {
 }
 
 function messageFromError(error: unknown): string {
-  if (error instanceof ApiError && error.errorCode === 'ADMIN_CANNOT_REVOKE_REQUIRED_PERMISSION') {
-    return 'Quyền Người dùng & phân quyền và tab Phân quyền Module là bắt buộc đối với Quản trị hệ thống, không thể tắt.';
-  }
-  return error instanceof Error ? error.message : 'Không thể tải danh sách quyền';
+  return apiErrorMessage(error, adminErrorMessage);
 }
 
 /** Tắt đi thì Quản trị hệ thống mất màn hình duy nhất cấp lại quyền. */

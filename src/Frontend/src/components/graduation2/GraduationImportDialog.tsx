@@ -1,3 +1,4 @@
+import { graduationErrorMessage } from '../../services/graduationErrorMessages';
 import { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, FileSpreadsheet, LoaderCircle, Upload } from 'lucide-react';
 import { Modal } from '../Modal';
@@ -40,22 +41,7 @@ const rowErrorsOf = (error: unknown): { columns: string[]; rows: ImportRowError[
   return { columns, rows };
 };
 
-const errorMessage = (error: unknown) => {
-  if (!(error instanceof ApiError)) return 'Không thể xử lý file. Vui lòng thử lại.';
-
-  // Máy chủ đã nói rõ hỏng ở dòng nào, cột nào hoặc mã lớp nào. Ưu tiên hiện
-  // nguyên câu đó, chỉ khi thiếu mới rơi về câu chung chung.
-  const detail = typeof error.body?.message === 'string' ? error.body.message.trim() : '';
-  if (detail.length > 0) return detail;
-
-  const messages: Record<string, string> = {
-    GRADUATION_IMPORT_INVALID: 'File hoặc metadata import không hợp lệ.',
-    GRADUATION_IMPORT_TOO_LARGE: 'File có quá nhiều dòng dữ liệu.',
-    GRADUATION_V3_CONCURRENT_REPLACE: 'Đợt đã được người khác cập nhật. Hãy đóng cửa sổ và tải lại.',
-    GRADUATION_V3_REPLACE_REASON_REQUIRED: 'Phải nhập lý do khi import lại.',
-  };
-  return messages[error.errorCode] ?? 'Không thể xử lý file. Vui lòng kiểm tra lại dữ liệu.';
-};
+const errorMessage = graduationErrorMessage;
 
 const BASE_ACADEMIC_YEAR_START = 2018;
 const BASE_COHORT_NUMBER = 59;

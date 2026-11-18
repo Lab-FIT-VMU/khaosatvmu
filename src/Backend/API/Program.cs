@@ -43,6 +43,7 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddOpenApi();
 builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<PublicSurveyContentCache>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddPersistence(builder.Configuration);
 // Chỉ đọc/ghi bảng kết quả cảm xúc. Model ONNX và phần suy luận nằm ở tiến trình RIÊNG
@@ -62,6 +63,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(frontendBaseUrl, "http://localhost:5173", "http://127.0.0.1:5173")
             .AllowAnyHeader()
             .AllowAnyMethod()
+            .WithExposedHeaders("X-Trace-Id")
             .AllowCredentials();
     });
 });
@@ -168,6 +170,7 @@ builder.Services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHand
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseMiddleware<RequestTraceMiddleware>();
 app.UseForwardedHeaders();
 
 await using (var scope = app.Services.CreateAsyncScope())

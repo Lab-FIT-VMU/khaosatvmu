@@ -1,3 +1,4 @@
+import { graduationErrorMessage } from '../../services/graduationErrorMessages';
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Eye, FileSpreadsheet, LoaderCircle } from 'lucide-react';
 import { Modal } from '../Modal';
@@ -67,8 +68,8 @@ export function GraduationSavedPreviewDialog({
       .then((result) => {
         if (!cancelled) setPreview(result);
       })
-      .catch(() => {
-        if (!cancelled) setError('Không tải được dữ liệu xem trước. Vui lòng thử lại.');
+      .catch(error => {
+        if (!cancelled) setError(graduationErrorMessage(error));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

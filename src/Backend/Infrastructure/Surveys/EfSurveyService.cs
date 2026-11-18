@@ -14,10 +14,18 @@ public sealed partial class EfSurveyService(
     IUserScopeResolver userScope,
     IScoringThresholdProvider scoringThresholds,
     ISurveyPublicationService publication,
-    SchoolOverviewCacheVersion schoolOverviewCache) : ISurveyService
+    SchoolOverviewCacheVersion schoolOverviewCache,
+    PublicSurveyContentCache? publicContentCache = null) : ISurveyService
 {
     private const int MaximumScaleOptions = 5;
     private const int MaximumCommentLength = 1000;
+
+    private void RemovePublicContent(string token)
+    {
+        var key = $"survey:public:{token}";
+        publicContentCache?.Remove(key);
+        cache.Remove(key);
+    }
 
     // ------------------------------------------------------------ Answer scales
 
@@ -75,7 +83,12 @@ public sealed partial class EfSurveyService(
         SaveAnswerScaleCommand command,
         CancellationToken cancellationToken = default)
     {
-        var scale = await db.AnswerScales
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        var scale = await db.AnswerScales.FromSqlInterpolated($"""
+            SELECT * FROM "AnswerScales" WHERE "AnswerScaleId" = {answerScaleId} FOR UPDATE
+            """)
             .FirstOrDefaultAsync(x => x.AnswerScaleId == answerScaleId, cancellationToken);
         if (scale is null)
         {
@@ -94,6 +107,16 @@ public sealed partial class EfSurveyService(
             && await db.SurveyQuestions.AnyAsync(x => x.AnswerScaleId == answerScaleId, cancellationToken))
         {
             return Failed<AnswerScaleDto>(SurveyErrorCodes.AnswerScaleKindLocked);
+        }
+
+        // Include archived questions: their attention checks must still be valid
+        // when reading history or restoring a question/template.
+        var keptValues = validation.Options.Select(x => x.Value).ToHashSet();
+        if (await db.SurveyQuestions.IgnoreQueryFilters().AnyAsync(x =>
+                x.AnswerScaleId == answerScaleId && x.AttentionCheckValue != null
+                && !keptValues.Contains(x.AttentionCheckValue.Value), cancellationToken))
+        {
+            return Failed<AnswerScaleDto>(SurveyErrorCodes.AnswerScaleAttentionValueInUse);
         }
 
         scale.AnswerScaleName = validation.Name;
@@ -122,10 +145,10 @@ public sealed partial class EfSurveyService(
             }
         }
 
-        var keptValues = validation.Options.Select(x => x.Value).ToHashSet();
         db.AnswerScaleOptions.RemoveRange(existing.Where(x => !keptValues.Contains(x.Value)));
 
         await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
         var options = await db.AnswerScaleOptions
             .Where(x => x.AnswerScaleId == answerScaleId)
@@ -205,6 +228,10 @@ public sealed partial class EfSurveyService(
         SaveSurveyTemplateCommand command,
         CancellationToken cancellationToken = default)
     {
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        await LockTemplateScalesAsync(command, cancellationToken);
         var validation = await ValidateTemplateAsync(command, null, cancellationToken);
         if (validation.ErrorCode is not null)
         {
@@ -243,6 +270,7 @@ public sealed partial class EfSurveyService(
             .ToList();
         db.SurveyQuestions.AddRange(questions);
         await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
         return Succeeded(ToDto(template, sections, questions));
     }
@@ -252,13 +280,20 @@ public sealed partial class EfSurveyService(
         SaveSurveyTemplateCommand command,
         CancellationToken cancellationToken = default)
     {
-        var template = await db.SurveyTemplates
+        var ownTransaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        await using var transactionScope = ownTransaction;
+        var template = await db.SurveyTemplates.FromSqlInterpolated($"""
+            SELECT * FROM "SurveyTemplates" WHERE "SurveyTemplateId" = {surveyTemplateId} FOR UPDATE
+            """)
             .FirstOrDefaultAsync(x => x.SurveyTemplateId == surveyTemplateId, cancellationToken);
         if (template is null)
         {
             return Failed<SurveyTemplateDto>(SurveyErrorCodes.TemplateNotFound);
         }
 
+        await LockTemplateScalesAsync(command, cancellationToken);
         var validation = await ValidateTemplateAsync(command, surveyTemplateId, cancellationToken);
         if (validation.ErrorCode is not null)
         {
@@ -307,6 +342,10 @@ public sealed partial class EfSurveyService(
                 // Đổi thang làm "AnswerValue" đã lưu bị hiểu sai (số thành chữ hoặc
                 // ngược lại); đổi mục làm điểm theo mục của các đợt cũ đổi nghĩa.
                 var sent = validation.Questions[index];
+                if (current.AttentionCheckValue != sent.AttentionCheckValue)
+                {
+                    return Failed<SurveyTemplateDto>(SurveyErrorCodes.TemplateAttentionCheckLocked);
+                }
                 if (current.AnswerScaleId != sent.AnswerScaleId
                     || validation.Sections[sent.SectionIndex].SectionId != current.SectionId)
                 {
@@ -318,11 +357,6 @@ public sealed partial class EfSurveyService(
         // Hai lượt ghi (mục trước, câu sau) phải cùng sống hoặc cùng chết: lưu được
         // mục mà hỏng ở câu là bộ đề có mục rỗng, đúng thứ ValidateTemplateAsync
         // vừa từ chối ở đầu vào.
-        var ownTransaction = db.Database.CurrentTransaction is null
-            ? await db.Database.BeginTransactionAsync(cancellationToken)
-            : null;
-        await using var transactionScope = ownTransaction;
-
         template.TemplateName = validation.Name;
 
         // Mục nhận diện bằng Id gửi lên chứ không đoán theo vị trí: đảo chỗ hai mục
@@ -741,7 +775,7 @@ public sealed partial class EfSurveyService(
             .ToListAsync(cancellationToken);
         foreach (var link in links)
         {
-            cache.Remove($"survey:public:{link}");
+            RemovePublicContent(link);
         }
 
         var updated = (await GetSemesterSurveysAsync(survey.SemesterId, null, cancellationToken))
@@ -792,7 +826,7 @@ public sealed partial class EfSurveyService(
             .ToListAsync(cancellationToken);
         foreach (var link in links)
         {
-            cache.Remove($"survey:public:{link}");
+            RemovePublicContent(link);
         }
 
         return Succeeded<SurveyFormConfigDto?>(SurveyFormConfig.Parse(survey.FormConfigJson));
@@ -808,8 +842,10 @@ public sealed partial class EfSurveyService(
             return Failed<bool>(SurveyErrorCodes.OutOfScope);
         }
 
-        var survey = await db.SemesterSurveys
-            .FirstOrDefaultAsync(x => x.SemesterSurveyId == semesterSurveyId, cancellationToken);
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        var survey = await FindSemesterSurveyForUpdateAsync(semesterSurveyId, cancellationToken);
         if (survey is null)
         {
             return Failed<bool>(SurveyErrorCodes.SemesterSurveyNotFound);
@@ -827,11 +863,19 @@ public sealed partial class EfSurveyService(
         }
 
         // Cascade soft-delete: đợt khảo sát → bài khảo sát lớp học phần.
+        var deletedAt = DateTime.UtcNow;
         foreach (var sectionSurvey in sectionSurveys)
-            db.CourseSectionSurveys.Remove(sectionSurvey);
+        {
+            sectionSurvey.IsDeleted = true;
+            sectionSurvey.DeletedAt = deletedAt;
+        }
 
-        db.SemesterSurveys.Remove(survey);
+        survey.IsDeleted = true;
+        survey.DeletedAt = deletedAt;
         await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        foreach (var sectionSurvey in sectionSurveys)
+            RemovePublicContent(sectionSurvey.LinkToken);
 
         return Succeeded(true);
     }
@@ -1352,7 +1396,7 @@ public sealed partial class EfSurveyService(
         // Tổng quan toàn trường có cache 90 giây; không dọn thì bấm xong mở báo cáo
         // vẫn thấy điểm cũ hơn một phút, trông như hệ thống hỏng.
         schoolOverviewCache.Bump();
-        cache.Remove($"survey:public:{sectionSurvey.LinkToken}");
+        RemovePublicContent(sectionSurvey.LinkToken);
 
         var section = await db.CourseSections.AsNoTracking()
             .FirstOrDefaultAsync(x => x.CourseSectionId == sectionSurvey.CourseSectionId, cancellationToken);
@@ -1418,11 +1462,12 @@ public sealed partial class EfSurveyService(
             : await db.SurveyResponseAnswers
                 .Where(x => responseIds.Contains(x.ResponseId))
                 .ToListAsync(cancellationToken);
+        var answersByResponse = answers.ToLookup(x => x.ResponseId);
 
         var summaries = responses
             .Select(response =>
             {
-                var responseAnswers = answers.Where(x => x.ResponseId == response.ResponseId).ToList();
+                var responseAnswers = answersByResponse[response.ResponseId].ToList();
                 var selectedValues = responseAnswers
                     .Select(answer => SelectedValueOf(
                         scaleOfQuestion.GetValueOrDefault(answer.QuestionId),
@@ -1559,15 +1604,24 @@ public sealed partial class EfSurveyService(
         CancellationToken cancellationToken = default)
     {
         var token = linkToken?.Trim() ?? string.Empty;
-        if (string.IsNullOrEmpty(token))
+        // Link phát bởi hệ thống luôn là GUID dạng N. Không truy vấn/cache khóa tùy ý.
+        if (!Guid.TryParseExact(token, "N", out _))
         {
             return Failed<PublicSurveyDto>(SurveyErrorCodes.LinkNotFound);
         }
 
         var cacheKey = $"survey:public:{token}";
-        var cached = await cache.GetOrCreateAsync(cacheKey, async entry =>
+        PublicSurveyDto? cached;
+        var cacheHit = publicContentCache is not null
+            ? publicContentCache.TryGetValue(cacheKey, out cached)
+            : cache.TryGetValue(cacheKey, out cached);
+        if (!cacheHit)
         {
-            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15);
+            cached = await LoadContentAsync();
+        }
+
+        async Task<PublicSurveyDto?> LoadContentAsync()
+        {
 
             var sectionSurvey = await db.CourseSectionSurveys
                 .AsNoTracking()
@@ -1695,12 +1749,55 @@ public sealed partial class EfSurveyService(
                 cohortMajor?.CohortMajorCode ?? string.Empty,
                 major?.MajorName ?? string.Empty,
                 cohort?.CohortName ?? string.Empty);
-        });
+        }
 
         if (cached is null)
         {
             return Failed<PublicSurveyDto>(SurveyErrorCodes.LinkNotFound);
         }
+
+        // Cache chỉ giữ nội dung phiếu. Trạng thái, lịch và sĩ số luôn đọc sống,
+        // kể cả khi request được phục vụ bởi một instance khác với instance vừa sửa/xóa.
+        var live = await (
+            from link in db.CourseSectionSurveys.AsNoTracking()
+            join survey in db.SemesterSurveys.AsNoTracking()
+                on link.SemesterSurveyId equals survey.SemesterSurveyId
+            join semester in db.Semesters.AsNoTracking() on survey.SemesterId equals semester.SemesterId
+            join year in db.AcademicYears.AsNoTracking() on semester.AcademicYearId equals year.AcademicYearId
+            where link.LinkToken == token
+                && db.SurveyTemplates.Any(x => x.SurveyTemplateId == survey.SurveyTemplateId)
+                && (survey.SurveyType != SurveyTypes.Course || db.CourseSections.Any(section =>
+                    section.CourseSectionId == link.CourseSectionId && section.SemesterId == survey.SemesterId
+                    && db.Courses.Any(course => course.CourseId == section.CourseId)))
+            select new
+            {
+                link.StartTime,
+                link.EndTime,
+                CampaignStartTime = survey.StartTime,
+                CampaignEndTime = survey.EndTime,
+                ClassSize = link.TargetCount ?? db.CourseSections
+                    .Where(section => section.CourseSectionId == link.CourseSectionId)
+                    .Select(section => section.ClassSize).FirstOrDefault(),
+                Submitted = db.SurveyResponses.Count(response =>
+                    response.CourseSectionSurveyId == link.CourseSectionSurveyId),
+            }).FirstOrDefaultAsync(cancellationToken);
+        if (live is null)
+        {
+            RemovePublicContent(token);
+            return Failed<PublicSurveyDto>(SurveyErrorCodes.LinkNotFound);
+        }
+        // Chỉ giữ nội dung của link tồn tại và có đủ phụ thuộc đang hoạt động.
+        // Cache miss (kể cả token đúng định dạng nhưng không có thật) không tạo entry.
+        if (!cacheHit)
+        {
+            if (publicContentCache is not null) publicContentCache.Set(cacheKey, cached);
+            else cache.Set(cacheKey, cached, TimeSpan.FromMinutes(15));
+        }
+        cached = cached with
+        {
+            StartTime = live.StartTime > live.CampaignStartTime ? live.StartTime : live.CampaignStartTime,
+            EndTime = live.EndTime < live.CampaignEndTime ? live.EndTime : live.CampaignEndTime,
+        };
 
         // Ngoài khung giờ thì coi như không có link: chặn ngay ở đây nên phiếu
         // không mở ra được nữa, và bộ câu hỏi cũng không lọt ra ngoài.
@@ -1726,20 +1823,7 @@ public sealed partial class EfSurveyService(
         //
         // Sĩ số: lớp học phần đọc sĩ số lớp. CTĐT và khảo sát giảng viên không có sĩ số nên
         // ClassSize ra 0 và không bao giờ bị chặn.
-        var capacity = await db.CourseSectionSurveys.AsNoTracking()
-            .Where(x => x.LinkToken == token)
-            .Select(x => new
-            {
-                ClassSize = x.TargetCount ?? db.CourseSections
-                    .Where(section => section.CourseSectionId == x.CourseSectionId)
-                    .Select(section => section.ClassSize)
-                    .FirstOrDefault(),
-                Submitted = db.SurveyResponses
-                    .Count(response => response.CourseSectionSurveyId == x.CourseSectionSurveyId),
-            })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (capacity is not null && capacity.ClassSize > 0 && capacity.Submitted >= capacity.ClassSize)
+        if (live.ClassSize > 0 && live.Submitted >= live.ClassSize)
         {
             return Blocked(SurveyErrorCodes.ClassFull, cached);
         }
@@ -1772,6 +1856,36 @@ public sealed partial class EfSurveyService(
         CancellationToken cancellationToken = default)
     {
         var token = linkToken?.Trim() ?? string.Empty;
+        if (token.Length == 0) return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.LinkNotFound);
+
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken)
+            : null;
+        var campaignId = await db.CourseSectionSurveys.AsNoTracking()
+            .Where(x => x.LinkToken == token).Select(x => (int?)x.SemesterSurveyId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (campaignId is null) return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.LinkNotFound);
+
+        // Lock order matches campaign schedule updates: campaign first, then link.
+        // SHARE lets different links submit concurrently, while blocking campaign edits/deletes.
+        var campaign = await db.SemesterSurveys.FromSqlInterpolated($"""
+            SELECT * FROM "SemesterSurveys" WHERE "SemesterSurveyId" = {campaignId.Value} FOR SHARE
+            """).AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        if (campaign is null) return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.LinkNotFound);
+
+        // A waiting submission counts responses only AFTER the preceding submission commits.
+        var sectionSurvey = await db.CourseSectionSurveys.FromSqlInterpolated($"""
+            SELECT * FROM "CourseSectionSurveys" WHERE "LinkToken" = {token} FOR UPDATE
+            """).AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        if (sectionSurvey is null) return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.LinkNotFound);
+
+        // The template editor takes UPDATE on this row before checking for answers.
+        // Keep its definition stable through validation and committing this response.
+        var template = await db.SurveyTemplates.FromSqlInterpolated($"""
+            SELECT * FROM "SurveyTemplates" WHERE "SurveyTemplateId" = {campaign.SurveyTemplateId} FOR SHARE
+            """).AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        if (template is null) return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.LinkNotFound);
+
         var publicSurveyResult = await GetPublicSurveyAsync(token, cancellationToken);
         if (!publicSurveyResult.Succeeded || publicSurveyResult.Value is not { } publicSurvey)
         {
@@ -1781,14 +1895,6 @@ public sealed partial class EfSurveyService(
         if (!publicSurvey.IsOpen)
         {
             return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.LinkNotOpen);
-        }
-
-        var sectionSurvey = await db.CourseSectionSurveys
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.LinkToken == token, cancellationToken);
-        if (sectionSurvey is null)
-        {
-            return Failed<SubmitSurveyResponseDto>(SurveyErrorCodes.LinkNotFound);
         }
 
         // Mỗi câu có thang riêng nên tra được thang nào cho câu nào trước khi kiểm.
@@ -1893,11 +1999,24 @@ public sealed partial class EfSurveyService(
         }));
 
         await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
         return Succeeded(new SubmitSurveyResponseDto(response.ResponseId, response.Score, response.SubmittedAt));
     }
 
     // ------------------------------------------------------------------ Helpers
+
+    private async Task LockTemplateScalesAsync(SaveSurveyTemplateCommand command, CancellationToken cancellationToken)
+    {
+        // A scale edit takes UPDATE on its row. Lock referenced scales in a fixed
+        // order before validation, so a valid attention value cannot disappear
+        // between validating and saving a new/updated question.
+        var ids = (command.Questions ?? []).Select(x => x.AnswerScaleId).Distinct().Order().ToArray();
+        if (ids.Length == 0) return;
+        await db.AnswerScales.FromSqlInterpolated($"""
+            SELECT * FROM "AnswerScales" WHERE "AnswerScaleId" = ANY ({ids}) ORDER BY "AnswerScaleId" FOR SHARE
+            """).AsNoTracking().ToListAsync(cancellationToken);
+    }
 
     /// <summary>Các thang mà bộ câu hỏi của bài khảo sát đang dùng.</summary>
     private async Task<IReadOnlyList<AnswerScaleDto>> ScalesOfSectionSurveyAsync(
@@ -4536,12 +4655,43 @@ public sealed partial class EfSurveyService(
             return Failed<bool>(SurveyErrorCodes.OutOfScope);
         }
 
-        var survey = await db.SemesterSurveys.IgnoreQueryFilters()
-            .FirstOrDefaultAsync(x => x.SemesterSurveyId == semesterSurveyId && x.IsDeleted, cancellationToken);
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        var survey = await db.SemesterSurveys.FromSqlInterpolated($"""
+            SELECT * FROM "SemesterSurveys" WHERE "SemesterSurveyId" = {semesterSurveyId} FOR UPDATE
+            """).IgnoreQueryFilters().FirstOrDefaultAsync(x => x.IsDeleted, cancellationToken);
         if (survey is null) return Failed<bool>(SurveyErrorCodes.SemesterSurveyNotFound);
+        if (!await db.SurveyTemplates.AnyAsync(x => x.SurveyTemplateId == survey.SurveyTemplateId, cancellationToken))
+            return Failed<bool>(SurveyErrorCodes.TemplateNotFound);
+        if (!await (from semester in db.Semesters
+                    join year in db.AcademicYears on semester.AcademicYearId equals year.AcademicYearId
+                    where semester.SemesterId == survey.SemesterId select semester.SemesterId).AnyAsync(cancellationToken))
+            return Failed<bool>(SurveyErrorCodes.SemesterNotFound);
+        var marker = survey.DeletedAt;
+        var links = await db.CourseSectionSurveys.IgnoreQueryFilters()
+            .Where(x => x.SemesterSurveyId == semesterSurveyId && x.IsDeleted
+                && marker != null && x.DeletedAt == marker).ToListAsync(cancellationToken);
+        if (survey.SurveyType == SurveyTypes.Course)
+        {
+            var sectionIds = links.Select(x => x.CourseSectionId).OfType<int>().Distinct().ToList();
+            var activeCount = await (from section in db.CourseSections
+                join course in db.Courses on section.CourseId equals course.CourseId
+                where sectionIds.Contains(section.CourseSectionId) && section.SemesterId == survey.SemesterId
+                select section.CourseSectionId).CountAsync(cancellationToken);
+            if (activeCount != sectionIds.Count || links.Any(x => x.CourseSectionId == null))
+                return Failed<bool>(SurveyErrorCodes.SectionNotFound);
+        }
         survey.IsDeleted = false;
         survey.DeletedAt = null;
+        foreach (var link in links)
+        {
+            link.IsDeleted = false;
+            link.DeletedAt = null;
+        }
         await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        foreach (var link in links) RemovePublicContent(link.LinkToken);
         return Succeeded(true);
     }
 }

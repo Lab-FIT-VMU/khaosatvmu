@@ -11,6 +11,7 @@ export interface AuthContextValue {
   access: AuthAccess | null;
   configuration: AuthConfiguration | null;
   errorCode: string | null;
+  errorTraceId?: string | null;
   refresh: () => Promise<void>;
   devLogin: () => Promise<void>;
   loadPendingProfiles: () => Promise<AuthProfile[]>;

@@ -1298,12 +1298,14 @@ public static class SurveyErrorCodes
 
     /// <summary>Không cho đổi loại thang khi đã có câu hỏi dùng nó.</summary>
     public const string AnswerScaleKindLocked = "SURVEY_ANSWER_SCALE_KIND_LOCKED";
+    public const string AnswerScaleAttentionValueInUse = "SURVEY_ANSWER_SCALE_ATTENTION_VALUE_IN_USE";
 
     public const string TemplateNotFound = "SURVEY_TEMPLATE_NOT_FOUND";
     public const string TemplateNameRequired = "SURVEY_TEMPLATE_NAME_REQUIRED";
     public const string TemplateNameExists = "SURVEY_TEMPLATE_NAME_EXISTS";
     public const string TemplateQuestionsRequired = "SURVEY_TEMPLATE_QUESTIONS_REQUIRED";
     public const string TemplateInUse = "SURVEY_TEMPLATE_IN_USE";
+    public const string TemplateAttentionCheckLocked = "SURVEY_TEMPLATE_ATTENTION_CHECK_LOCKED";
 
     /// <summary>Bộ câu hỏi phải có ít nhất một mục.</summary>
     public const string TemplateSectionsRequired = "SURVEY_TEMPLATE_SECTIONS_REQUIRED";

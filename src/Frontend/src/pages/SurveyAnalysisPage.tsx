@@ -27,7 +27,7 @@ import { ExportDropdown } from '../components/ExportDropdown';
 import type { ExportColumn } from '../services/exportDataService';
 import { UpdateScoresButton } from '../components/UpdateScoresButton';
 import { ScoringConfigNote } from '../components/ScoringConfigNote';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import type {
   LecturerOption,
@@ -243,7 +243,7 @@ function CampaignSelect({
 
 
 function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 /** Dưới mức này thì lớp bị coi là cần cảnh báo — khớp ReportThresholds.LowScore. */

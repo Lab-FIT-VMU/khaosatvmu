@@ -8,8 +8,8 @@ public static class GraduationAnalyticsErrorCodes
     public const string InvalidQuery = "GRADUATION_QUERY_INVALID";
 }
 
-public sealed class GraduationAnalyticsException(string errorCode, string message)
-    : Exception(message)
+public sealed class GraduationAnalyticsException(string errorCode, string message, Exception? innerException = null)
+    : Exception(message, innerException)
 {
     public string ErrorCode { get; } = errorCode;
 }

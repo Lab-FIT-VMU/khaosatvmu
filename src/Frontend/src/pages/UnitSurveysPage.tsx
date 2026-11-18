@@ -25,7 +25,7 @@ import { SurveyFormDesigner } from '../components/SurveyFormDesigner';
 import type { SurveyPreviewData } from '../components/SurveyFormPreview';
 import { TablePagination } from '../components/TablePagination';
 import { useSemester } from '../context/semesterContext';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { catalogApi } from '../services/catalogApi';
 import { cohortApi, type Cohort } from '../services/cohortApi';
 import {
@@ -65,7 +65,7 @@ interface ScheduleForm {
 const unitPageSize = 20;
 
 function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 function toLocalInput(value: string): string {

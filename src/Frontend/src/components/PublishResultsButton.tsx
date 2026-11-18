@@ -4,14 +4,14 @@ import { LoaderCircle, Lock, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole } from '../auth/roles';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { surveyApi, surveyErrorMessage, type SurveyPublication } from '../services/surveyApi';
 import { publishSurveyPublication } from '../hooks/useSurveyPublication';
 import { ConfirmDialog } from './Modal';
 import '../styles/catalogs.css';
 
 const messageFrom = (error: unknown): string =>
-  error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  apiErrorMessage(error, surveyErrorMessage);
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' })

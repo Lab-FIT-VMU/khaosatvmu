@@ -25,10 +25,11 @@ export function LoginPage() {
   const auth = useAuth();
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [localTraceId, setLocalTraceId] = useState<string | null>(null);
   const [isNoProfileDialogOpen, setIsNoProfileDialogOpen] = useState(false);
   const queryError = new URLSearchParams(window.location.search).get('error');
   const errorCode = localError ?? queryError ?? auth.errorCode;
-  const error = authMessage(errorCode);
+  const error = authMessage(errorCode, localError ? localTraceId : queryError ? null : auth.errorTraceId);
   const hasNoProfile = errorCode === 'AUTH_NO_PROFILE';
   const googleAvailable = auth.configuration?.googleConfigured === true;
 
@@ -39,10 +40,12 @@ export function LoginPage() {
   const handleDevLogin = async () => {
     setBusy(true);
     setLocalError(null);
+    setLocalTraceId(null);
     try {
       await auth.devLogin();
     } catch (requestError) {
       setLocalError(requestError instanceof AuthApiError ? requestError.errorCode : 'AUTH_REQUEST_FAILED');
+      setLocalTraceId(requestError instanceof AuthApiError ? requestError.traceId : null);
     } finally {
       setBusy(false);
     }

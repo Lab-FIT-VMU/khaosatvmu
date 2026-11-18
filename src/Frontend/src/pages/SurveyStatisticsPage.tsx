@@ -11,7 +11,7 @@ import {
 import { useSemester } from '../context/semesterContext';
 import { TablePagination } from '../components/TablePagination';
 import { ExportDropdown } from '../components/ExportDropdown';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import type { SectionStatisticsRow, SemesterSurveyStatistics } from '../services/surveyApi';
 import { useSemesterSurveys } from '../hooks/useSemesterSurveys';
@@ -231,7 +231,7 @@ function CampaignSelect({
 
 
 function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 function formatDateTime(value: string | null): string {

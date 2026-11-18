@@ -70,6 +70,39 @@ public class CatalogWriteGuardTests
 
     private static UserScope Admin => UserScope.Unrestricted(RoleCodes.Admin);
 
+    [Fact]
+    public async Task Faculty_CanReuseDeletedName_ButCannotDuplicateActiveName()
+    {
+        await RunInRollbackAsync(async (db, serviceFor) =>
+        {
+            var service = serviceFor(Admin);
+            var command = new SaveFacultyCommand($"Faculty regression {Guid.NewGuid():N}");
+            var first = await service.CreateFacultyAsync(command);
+            first.Succeeded.Should().BeTrue();
+
+            var deletion = await service.DeleteFacultyAsync(first.Value!.FacultyId);
+            deletion.Succeeded.Should().BeTrue();
+            (await db.Faculties.AnyAsync(x => x.FacultyId == first.Value.FacultyId))
+                .Should().BeFalse();
+            (await db.Faculties.IgnoreQueryFilters()
+                .SingleAsync(x => x.FacultyId == first.Value.FacultyId))
+                .IsDeleted.Should().BeTrue();
+
+            var recreated = await service.CreateFacultyAsync(command);
+            recreated.Succeeded.Should().BeTrue();
+            recreated.Value!.FacultyId.Should().NotBe(first.Value.FacultyId);
+
+            var duplicate = await service.CreateFacultyAsync(command);
+            duplicate.Succeeded.Should().BeFalse();
+            duplicate.ErrorCode.Should().Be(CatalogErrorCodes.FacultyNameExists);
+
+            // Exercise the database constraint independently of service validation.
+            db.Faculties.Add(new Faculty { FacultyName = command.FacultyName });
+            var saveDuplicate = () => db.SaveChangesAsync();
+            await saveDuplicate.Should().ThrowAsync<DbUpdateException>();
+        });
+    }
+
     /// <summary>Hai bộ môn khác nhau, để thử chuyện với tay sang bộ môn của người khác.</summary>
     private static async Task<(int Mine, int Other)?> TwoDepartmentsAsync(AppDbContext db)
     {

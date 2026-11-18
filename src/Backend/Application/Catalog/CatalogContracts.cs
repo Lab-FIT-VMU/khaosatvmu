@@ -469,12 +469,14 @@ public interface ICatalogService
     Task<CatalogOperationResult<SemesterDto>> RestoreSemesterAsync(int semesterId, CancellationToken cancellationToken = default);
     Task<CatalogOperationResult<CourseSectionDto>> RestoreCourseSectionAsync(int courseSectionId, CancellationToken cancellationToken = default);
     Task<CatalogOperationResult<LecturerDto>> RestoreLecturerAsync(int lecturerId, CancellationToken cancellationToken = default);
+    Task<CatalogOperationResult<LecturerDto>> RestoreLecturerByEmailAsync(string email, CancellationToken cancellationToken = default);
     Task<CatalogOperationResult<CourseDto>> RestoreCourseAsync(int courseId, CancellationToken cancellationToken = default);
 }
 
 public static class CatalogErrorCodes
 {
     public const string InvalidRequest = "CATALOG_INVALID_REQUEST";
+    public const string RestoreParentDeleted = "CATALOG_RESTORE_PARENT_DELETED";
 
     public const string FacultyNotFound = "CATALOG_FACULTY_NOT_FOUND";
     public const string FacultyNameRequired = "CATALOG_FACULTY_NAME_REQUIRED";
@@ -513,6 +515,8 @@ public static class CatalogErrorCodes
     public const string AcademicYearNameInvalid = "CATALOG_ACADEMIC_YEAR_NAME_INVALID";
     /// <summary>Mã khoá tự sinh từ năm học đã thuộc về một khoá khác.</summary>
     public const string AcademicYearCohortCodeExists = "CATALOG_ACADEMIC_YEAR_COHORT_CODE_EXISTS";
+    public const string AcademicYearInUse = "CATALOG_ACADEMIC_YEAR_IN_USE";
+    public const string SemesterInUse = "CATALOG_SEMESTER_IN_USE";
 
     public const string SemesterNotFound = "CATALOG_SEMESTER_NOT_FOUND";
     public const string SemesterNameRequired = "CATALOG_SEMESTER_NAME_REQUIRED";
@@ -540,6 +544,7 @@ public static class CatalogErrorCodes
     public const string LecturerNameRequired = "CATALOG_LECTURER_NAME_REQUIRED";
     public const string LecturerEmailRequired = "CATALOG_LECTURER_EMAIL_REQUIRED";
     public const string LecturerEmailExists = "CATALOG_LECTURER_EMAIL_EXISTS";
+    public const string LecturerEmailDeleted = "CATALOG_LECTURER_EMAIL_DELETED";
     public const string LecturerEmailDuplicateInFile = "CATALOG_LECTURER_EMAIL_DUPLICATE_IN_FILE";
     public const string LecturerInUse = "CATALOG_LECTURER_IN_USE";
 
