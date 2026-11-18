@@ -267,11 +267,11 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
   const handleImport = async (rows: ImportLecturerRow[]): Promise<CatalogImportResponse> => {
     const result = await onImportLecturers(rows);
     if (result.createdCount > 0) {
-      toast.success(`Đã import ${result.createdCount} giảng viên`, {
+      toast.success(`Đã thêm hoặc khôi phục ${result.createdCount} giảng viên`, {
         description: result.skippedCount > 0 ? `${result.skippedCount} dòng bị bỏ qua` : undefined,
       });
     } else {
-      toast.error('Không có dòng nào được thêm', {
+      toast.error('Không có giảng viên nào được thêm hoặc khôi phục', {
         description: `${result.skippedCount} dòng bị bỏ qua`,
       });
     }

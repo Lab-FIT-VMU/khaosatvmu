@@ -568,6 +568,8 @@ public static class CatalogEndpoints
             CatalogErrorCodes.MajorExists => StatusCodes.Status409Conflict,
             CatalogErrorCodes.LecturerInUse => StatusCodes.Status409Conflict,
             CatalogErrorCodes.FacultyInUse => StatusCodes.Status409Conflict,
+            CatalogErrorCodes.MajorInUse => StatusCodes.Status409Conflict,
+            CatalogErrorCodes.PositionInUse => StatusCodes.Status409Conflict,
             CatalogErrorCodes.DepartmentInUse => StatusCodes.Status409Conflict,
             CatalogErrorCodes.CourseInUse => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest

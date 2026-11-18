@@ -73,6 +73,114 @@ public sealed class CatalogSoftDeleteTests
     private static SaveCourseCommand CourseCommand(string code) => new(code, "Regression course", 3, "Required", null, null, null);
     private static SaveLecturerCommand LecturerCommand(string email) => new("Regression lecturer", null, null, email, null, null);
 
+    [CatalogDatabaseFact]
+    public async Task FacultyWithActiveDepartment_CannotBeDeleted()
+    {
+        await RunAsync(async (db, service) =>
+        {
+            var faculty = await service.CreateFacultyAsync(new($"Protected faculty {Guid.NewGuid():N}"));
+            var departmentId = (await db.Departments.IgnoreQueryFilters().MaxAsync(x => (int?)x.DepartmentId) ?? 0) + 100;
+            var department = await service.CreateDepartmentAsync(new(departmentId, "Protected department", faculty.Value!.FacultyId));
+            department.Succeeded.Should().BeTrue(department.ErrorCode);
+
+            var deleted = await service.DeleteFacultyAsync(faculty.Value.FacultyId);
+            deleted.ErrorCode.Should().Be(CatalogErrorCodes.FacultyInUse);
+            (await db.Faculties.AnyAsync(x => x.FacultyId == faculty.Value.FacultyId)).Should().BeTrue();
+            (await db.Departments.AnyAsync(x => x.DepartmentId == departmentId)).Should().BeTrue();
+        });
+    }
+
+    [CatalogDatabaseFact]
+    public async Task MajorAndFacultyWithActiveCohortMajor_CannotBeDeleted()
+    {
+        await RunAsync(async (db, catalog) =>
+        {
+            var seed = await SeedCohort(db, catalog);
+            var cohorts = new EfCohortService(db);
+            var created = await cohorts.CreateCohortMajorAsync(new(seed.CohortId, "Protected cohort major", seed.A.MajorId, 30));
+            created.Succeeded.Should().BeTrue(created.ErrorCode);
+
+            (await catalog.DeleteMajorAsync(seed.A.MajorId)).ErrorCode.Should().Be(CatalogErrorCodes.MajorInUse);
+            (await catalog.DeleteFacultyAsync(seed.A.FacultyId)).ErrorCode.Should().Be(CatalogErrorCodes.FacultyInUse);
+            (await cohorts.GetCohortMajorsAsync(seed.CohortId)).Should().Contain(x => x.CohortMajorId == created.Value!.CohortMajorId);
+            (await db.Majors.AnyAsync(x => x.MajorId == seed.A.MajorId)).Should().BeTrue();
+
+            // Once the dependent record is deleted, deleting the major is allowed.
+            (await cohorts.DeleteCohortMajorAsync(created.Value!.CohortMajorId)).Succeeded.Should().BeTrue();
+            (await catalog.DeleteMajorAsync(seed.A.MajorId)).Succeeded.Should().BeTrue();
+        });
+    }
+
+    [CatalogDatabaseFact]
+    public async Task DepartmentRestore_RequiresActiveParentFaculty()
+    {
+        await RunAsync(async (db, service) =>
+        {
+            var faculty = await service.CreateFacultyAsync(new($"Restore faculty {Guid.NewGuid():N}"));
+            var departmentId = (await db.Departments.IgnoreQueryFilters().MaxAsync(x => (int?)x.DepartmentId) ?? 0) + 100;
+            (await service.CreateDepartmentAsync(new(departmentId, "Restore department", faculty.Value!.FacultyId))).Succeeded.Should().BeTrue();
+            (await service.DeleteDepartmentAsync(departmentId)).Succeeded.Should().BeTrue();
+            (await service.DeleteFacultyAsync(faculty.Value.FacultyId)).Succeeded.Should().BeTrue();
+            db.ChangeTracker.Clear();
+
+            (await service.RestoreDepartmentAsync(departmentId)).ErrorCode.Should().Be(CatalogErrorCodes.FacultyNotFound);
+            (await db.Departments.IgnoreQueryFilters().SingleAsync(x => x.DepartmentId == departmentId)).IsDeleted.Should().BeTrue();
+            (await service.RestoreFacultyAsync(faculty.Value.FacultyId)).Succeeded.Should().BeTrue();
+            (await service.RestoreDepartmentAsync(departmentId)).Succeeded.Should().BeTrue();
+        });
+    }
+
+    [CatalogDatabaseFact]
+    public async Task PositionInUse_CannotBeDeletedUntilLecturerChangesPosition()
+    {
+        await RunAsync(async (db, service) =>
+        {
+            var position = await service.CreatePositionAsync(new($"Protected position {Guid.NewGuid():N}"));
+            var email = $"regression-{Guid.NewGuid():N}@example.com";
+            var lecturer = await service.CreateLecturerAsync(LecturerCommand(email) with { PositionId = position.Value!.PositionId });
+            lecturer.Succeeded.Should().BeTrue(lecturer.ErrorCode);
+
+            (await service.DeletePositionAsync(position.Value.PositionId)).ErrorCode.Should().Be(CatalogErrorCodes.PositionInUse);
+            (await db.Positions.AnyAsync(x => x.PositionId == position.Value.PositionId)).Should().BeTrue();
+            (await service.UpdateLecturerAsync(lecturer.Value!.LecturerId, LecturerCommand(email))).Succeeded.Should().BeTrue();
+            (await service.DeletePositionAsync(position.Value.PositionId)).Succeeded.Should().BeTrue();
+        });
+    }
+
+    [CatalogDatabaseTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeletedLecturerSessions_StayRevokedAfterRestore(bool alreadyInactive)
+    {
+        await RunAsync(async (db, service) =>
+        {
+            var email = $"sessions-{Guid.NewGuid():N}@example.com";
+            var lecturer = await service.CreateLecturerAsync(LecturerCommand(email));
+            var user = await db.Users.SingleAsync(x => x.LecturerId == lecturer.Value!.LecturerId);
+            var userId = user.Id;
+            var profileId = await db.UserProfiles.Where(x => x.UserId == userId && x.IsActive).Select(x => x.Id).FirstAsync();
+            var sessions = new global::Infrastructure.Auth.EfAuthSessionService(db);
+            var first = await sessions.CreateAsync(userId, profileId);
+            var second = await sessions.CreateAsync(userId, profileId);
+            if (alreadyInactive)
+            {
+                user.IsActive = false;
+                await db.SaveChangesAsync();
+            }
+            db.ChangeTracker.Clear();
+
+            (await service.DeleteLecturerAsync(lecturer.Value!.LecturerId)).Succeeded.Should().BeTrue();
+            var revoked = await db.AuthSessions.AsNoTracking().Where(x => x.UserId == userId).ToListAsync();
+            revoked.Should().HaveCount(2).And.OnlyContain(x => x.RevokedAt != null && x.RevokedReason == "LECTURER_DELETED");
+            db.ChangeTracker.Clear();
+            (await service.RestoreLecturerByEmailAsync(email)).Succeeded.Should().BeTrue();
+            (await sessions.ValidateAsync(first.Id, userId, profileId)).Should().BeFalse();
+            (await sessions.ValidateAsync(second.Id, userId, profileId)).Should().BeFalse();
+            var fresh = await sessions.CreateAsync(userId, profileId);
+            (await sessions.ValidateAsync(fresh.Id, userId, profileId)).Should().BeTrue();
+        });
+    }
+
     private sealed record Entry(int Id, bool Succeeded, string? Error);
     private static Entry EntryOf<T>(CatalogOperationResult<T> result, Func<T, int> id) =>
         new(result.Succeeded ? id(result.Value!) : 0, result.Succeeded, result.ErrorCode);
@@ -260,8 +368,10 @@ public sealed class CatalogSoftDeleteTests
         });
     }
 
-    [CatalogDatabaseFact]
-    public async Task DeletedLecturerEmail_RequiresExplicitRestore_AndKeepsAccountAndProfiles()
+    [CatalogDatabaseTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeletedLecturerEmail_RestoresExplicitlyOrByImport_AndKeepsAccountAndProfiles(bool byImport)
     {
         await RunAsync(async (db, service) =>
         {
@@ -278,18 +388,56 @@ public sealed class CatalogSoftDeleteTests
             db.ChangeTracker.Clear();
             (await service.CreateLecturerAsync(LecturerCommand(email.ToUpperInvariant()))).ErrorCode
                 .Should().Be(CatalogErrorCodes.LecturerEmailDeleted);
-            var imported = await service.ImportLecturersAsync([new(1, "Regression", email, null, null, null, null)]);
-            imported.Value!.CreatedCount.Should().Be(0);
-            imported.Value.Items.Single().ErrorCode.Should().Be(CatalogErrorCodes.LecturerEmailDeleted);
             (await db.Users.SingleAsync(x => x.Id == userId)).IsActive.Should().BeFalse();
             db.ChangeTracker.Clear();
-            var restored = await service.RestoreLecturerByEmailAsync(email.ToUpperInvariant());
-            restored.Succeeded.Should().BeTrue(restored.ErrorCode);
-            restored.Value!.LecturerId.Should().Be(lecturerId);
+            if (byImport)
+            {
+                var imported = await service.ImportLecturersAsync([
+                    new(1, "Updated lecturer", email.ToUpperInvariant(), "0123456789", null, null, null),
+                    new(2, "Duplicate", email, null, null, null, null)]);
+                imported.Succeeded.Should().BeTrue(imported.ErrorCode);
+                imported.Value!.CreatedCount.Should().Be(1);
+                imported.Value.SkippedCount.Should().Be(1);
+                imported.Value.Items.First().Succeeded.Should().BeTrue();
+                imported.Value.Items.Last().ErrorCode.Should().Be(CatalogErrorCodes.LecturerEmailDuplicateInFile);
+                var lecturer = await db.Lecturers.SingleAsync(x => x.LecturerId == lecturerId);
+                lecturer.FullName.Should().Be("Updated lecturer");
+                lecturer.PhoneNumber.Should().Be("0123456789");
+                lecturer.DeletedAt.Should().BeNull();
+                (await db.Lecturers.IgnoreQueryFilters().CountAsync(x => x.Email.ToLower() == email)).Should().Be(1);
+            }
+            else
+            {
+                var restored = await service.RestoreLecturerByEmailAsync(email.ToUpperInvariant());
+                restored.Succeeded.Should().BeTrue(restored.ErrorCode);
+                restored.Value!.LecturerId.Should().Be(lecturerId);
+            }
             (await db.Users.SingleAsync(x => x.LecturerId == lecturerId)).Id.Should().Be(userId);
             (await db.Users.SingleAsync(x => x.Id == userId)).IsActive.Should().BeTrue();
             (await db.UserProfiles.Where(x => x.UserId == userId).Select(x => x.Id).ToListAsync()).Should().BeEquivalentTo(profileIds);
             (await service.CreateLecturerAsync(LecturerCommand(email))).ErrorCode.Should().Be(CatalogErrorCodes.LecturerEmailExists);
+        });
+    }
+
+    [CatalogDatabaseFact]
+    public async Task InvalidLecturerImport_DoesNotRestoreDeletedLecturerOrAccount()
+    {
+        await RunAsync(async (db, service) =>
+        {
+            var email = $"regression-{Guid.NewGuid():N}@example.com";
+            var first = await service.CreateLecturerAsync(LecturerCommand(email));
+            first.Succeeded.Should().BeTrue(first.ErrorCode);
+            var lecturerId = first.Value!.LecturerId;
+            db.ChangeTracker.Clear();
+            (await service.DeleteLecturerAsync(lecturerId)).Succeeded.Should().BeTrue();
+            db.ChangeTracker.Clear();
+
+            var imported = await service.ImportLecturersAsync([
+                new(1, "Updated lecturer", email, null, $"missing-{Guid.NewGuid():N}", null, null)]);
+            imported.Value!.CreatedCount.Should().Be(0);
+            imported.Value.Items.Single().ErrorCode.Should().Be(CatalogErrorCodes.FacultyNotFound);
+            (await db.Lecturers.IgnoreQueryFilters().SingleAsync(x => x.LecturerId == lecturerId)).IsDeleted.Should().BeTrue();
+            (await db.Users.SingleAsync(x => x.LecturerId == lecturerId)).IsActive.Should().BeFalse();
         });
     }
 
@@ -309,30 +457,116 @@ public sealed class CatalogSoftDeleteTests
     }
 
     [CatalogDatabaseFact]
-    public async Task ArchivedEmail_IsRejectedBySectionImportAndLecturerResolution()
+    public async Task SectionImport_RestoresArchivedEmail_AndResolutionReusesIt()
     {
         await RunAsync(async (db, service) =>
         {
             var year = await NewYear(service);
             var email = $"regression-{Guid.NewGuid():N}@example.com";
             var lecturer = await service.CreateLecturerAsync(LecturerCommand(email));
+            var userId = (await db.Users.SingleAsync(x => x.LecturerId == lecturer.Value!.LecturerId)).Id;
             db.ChangeTracker.Clear();
             await service.DeleteLecturerAsync(lecturer.Value!.LecturerId);
             var newCode = $"regression-{Guid.NewGuid():N}";
             var imported = await service.ImportCourseSectionsAsync(year.Semesters.First().SemesterId,
                 [new(1, newCode, "New course", "Section", "3", "10", null, null, null, "Regression", email)]);
             imported.Succeeded.Should().BeTrue(imported.ErrorCode);
-            imported.Value!.Items.Single().ErrorCode.Should().Be(CatalogErrorCodes.LecturerEmailDeleted);
-            (await db.Courses.AnyAsync(x => x.CourseCode == newCode)).Should().BeFalse();
+            imported.Value!.Items.Single().Succeeded.Should().BeTrue();
+            imported.Value.CreatedLecturerCount.Should().Be(1);
+            (await db.Users.SingleAsync(x => x.Id == userId)).IsActive.Should().BeTrue();
+            var importedCourse = await db.Courses.SingleAsync(x => x.CourseCode == newCode);
+            (await db.CourseSections.SingleAsync(x => x.CourseId == importedCourse.CourseId)).LecturerId
+                .Should().Be(lecturer.Value!.LecturerId);
 
-            var course = await service.CreateCourseAsync(CourseCommand(newCode));
-            var section = await service.CreateCourseSectionAsync(new(course.Value!.CourseId,
+            var repeated = await service.ImportCourseSectionsAsync(year.Semesters.First().SemesterId,
+                [new(1, newCode, "New course", "Section", "3", "10", null, null, null, "Regression", email)]);
+            repeated.Value!.CreatedCount.Should().Be(0);
+            repeated.Value.CreatedLecturerCount.Should().Be(0);
+
+            var section = await service.CreateCourseSectionAsync(new(importedCourse.CourseId,
                 year.Semesters.First().SemesterId, null, "Unidentified", 10, "Regression"));
             var resolved = await service.ResolveUnidentifiedLecturerAsync(section.Value!.CourseSectionId,
                 new("Regression", email, null, null));
-            resolved.ErrorCode.Should().Be(CatalogErrorCodes.LecturerEmailDeleted);
+            resolved.Succeeded.Should().BeTrue(resolved.ErrorCode);
             (await db.CourseSections.SingleAsync(x => x.CourseSectionId == section.Value.CourseSectionId))
-                .LecturerId.Should().BeNull();
+                .LecturerId.Should().Be(lecturer.Value.LecturerId);
+        });
+    }
+
+    [CatalogDatabaseFact]
+    public async Task SectionImport_SkippedRowsDoNotCreateCoursesOrLecturers()
+    {
+        await RunAsync(async (db, service) =>
+        {
+            var year = await NewYear(service);
+            var rejectedCode = $"regression-{Guid.NewGuid():N}";
+            var acceptedCode = $"regression-{Guid.NewGuid():N}";
+            var email = $"regression-{Guid.NewGuid():N}@example.com";
+            var duplicateEmail = $"regression-{Guid.NewGuid():N}@example.com";
+            var result = await service.ImportCourseSectionsAsync(year.Semesters.First().SemesterId, [
+                new(1, rejectedCode, "Rejected course", "A", "3", "10", null, null, null, "", email),
+                new(2, acceptedCode, "Accepted course", "A", "3", "10", null, null, null, "Accepted", email),
+                new(3, acceptedCode, "Accepted course", " a ", "3", "10", null, null, null, "Duplicate", duplicateEmail)]);
+            result.Succeeded.Should().BeTrue(result.ErrorCode);
+            result.Value!.CreatedCount.Should().Be(1);
+            result.Value.CreatedCourseCount.Should().Be(1);
+            result.Value.CreatedLecturerCount.Should().Be(1);
+            result.Value.Items[0].ErrorCode.Should().Be(CatalogErrorCodes.LecturerNameRequired);
+            result.Value.Items[2].ErrorCode.Should().Be(CatalogErrorCodes.CourseSectionDuplicateInFile);
+            (await db.Courses.AnyAsync(x => x.CourseCode == rejectedCode)).Should().BeFalse();
+            (await db.Lecturers.AnyAsync(x => x.Email == duplicateEmail)).Should().BeFalse();
+            (await db.Users.AnyAsync(x => x.Email == duplicateEmail)).Should().BeFalse();
+
+            var again = await service.ImportCourseSectionsAsync(year.Semesters.First().SemesterId,
+                [new(1, acceptedCode, "Accepted course", "A", "3", "10", null, null, null, "Other", duplicateEmail)]);
+            again.Value!.Items.Single().ErrorCode.Should().Be(CatalogErrorCodes.CourseSectionExists);
+            (await db.Lecturers.AnyAsync(x => x.Email == duplicateEmail)).Should().BeFalse();
+        });
+    }
+
+    [CatalogDatabaseFact]
+    public async Task LecturerImport_InvalidFirstRowDoesNotBlockValidRowWithSameEmail()
+    {
+        await RunAsync(async (db, service) =>
+        {
+            var email = $"regression-{Guid.NewGuid():N}@example.com";
+            var result = await service.ImportLecturersAsync([
+                new(1, "Invalid", email, null, $"missing-{Guid.NewGuid():N}", null, null),
+                new(2, "Accepted", email, null, null, null, null)]);
+            result.Value!.CreatedCount.Should().Be(1);
+            result.Value.Items[0].ErrorCode.Should().Be(CatalogErrorCodes.FacultyNotFound);
+            result.Value.Items[1].Succeeded.Should().BeTrue();
+        });
+    }
+
+    [CatalogDatabaseTheory]
+    [InlineData("bad-email", "Regression", CatalogErrorCodes.LecturerEmailInvalid)]
+    [InlineData("Display Name <somebody@example.com>", "Regression", CatalogErrorCodes.LecturerEmailInvalid)]
+    [InlineData("", "Regression", CatalogErrorCodes.LecturerEmailRequired)]
+    public async Task LecturerImport_RejectsInvalidEmails(string email, string name, string expected)
+    {
+        await RunAsync(async (db, service) =>
+        {
+            var result = await service.ImportLecturersAsync([new(1, name, email, null, null, null, null)]);
+            result.Value!.CreatedCount.Should().Be(0);
+            result.Value.Items.Single().ErrorCode.Should().Be(expected);
+        });
+    }
+
+    [CatalogDatabaseFact]
+    public async Task SectionImport_InvalidEmailOrLongNameDoesNotCreateAuxiliaryData()
+    {
+        await RunAsync(async (db, service) =>
+        {
+            var year = await NewYear(service);
+            var code = $"regression-{Guid.NewGuid():N}";
+            var result = await service.ImportCourseSectionsAsync(year.Semesters.First().SemesterId, [
+                new(1, code, "Course", "A", "3", "10", null, null, null, "Lecturer", "bad-email"),
+                new(2, code, "Course", "B", "3", "10", null, null, null, new string('x', 201), "valid@example.com")]);
+            result.Value!.CreatedCount.Should().Be(0);
+            result.Value.Items[0].ErrorCode.Should().Be(CatalogErrorCodes.LecturerEmailInvalid);
+            result.Value.Items[1].ErrorCode.Should().Be(CatalogErrorCodes.LecturerNameTooLong);
+            (await db.Courses.AnyAsync(x => x.CourseCode == code)).Should().BeFalse();
         });
     }
 

@@ -148,7 +148,7 @@ public sealed record CourseSectionImportDto(
     IReadOnlyList<CatalogImportItemDto> Items,
     /// <summary>Số học phần được tạo tự động vì chưa có trong danh mục.</summary>
     int CreatedCourseCount,
-    /// <summary>Số giảng viên được tạo tự động từ email trong tệp.</summary>
+    /// <summary>Số giảng viên được tạo hoặc khôi phục tự động từ email trong tệp.</summary>
     int CreatedLecturerCount,
     /// <summary>Số lớp đã có sẵn và được cập nhật lại mã giảng viên.</summary>
     int UpdatedSectionCount,
@@ -498,10 +498,12 @@ public static class CatalogErrorCodes
     public const string DepartmentCodeInvalid = "CATALOG_DEPARTMENT_CODE_INVALID";
 
     public const string PositionNotFound = "CATALOG_POSITION_NOT_FOUND";
+    public const string PositionInUse = "CATALOG_POSITION_IN_USE";
     public const string PositionNameRequired = "CATALOG_POSITION_NAME_REQUIRED";
     public const string PositionNameExists = "CATALOG_POSITION_NAME_EXISTS";
 
     public const string MajorNotFound = "CATALOG_MAJOR_NOT_FOUND";
+    public const string MajorInUse = "CATALOG_MAJOR_IN_USE";
     public const string MajorCodeRequired = "CATALOG_MAJOR_CODE_REQUIRED";
     public const string MajorCodeExists = "CATALOG_MAJOR_CODE_EXISTS";
     public const string MajorNameRequired = "CATALOG_MAJOR_NAME_REQUIRED";
@@ -542,7 +544,9 @@ public static class CatalogErrorCodes
     public const string OutOfScope = "CATALOG_OUT_OF_SCOPE";
 
     public const string LecturerNameRequired = "CATALOG_LECTURER_NAME_REQUIRED";
+    public const string LecturerNameTooLong = "CATALOG_LECTURER_NAME_TOO_LONG";
     public const string LecturerEmailRequired = "CATALOG_LECTURER_EMAIL_REQUIRED";
+    public const string LecturerEmailInvalid = "CATALOG_LECTURER_EMAIL_INVALID";
     public const string LecturerEmailExists = "CATALOG_LECTURER_EMAIL_EXISTS";
     public const string LecturerEmailDeleted = "CATALOG_LECTURER_EMAIL_DELETED";
     public const string LecturerEmailDuplicateInFile = "CATALOG_LECTURER_EMAIL_DUPLICATE_IN_FILE";
