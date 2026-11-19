@@ -19,7 +19,7 @@ import type {
   ImportCourseSectionRow,
   UnidentifiedLecturer,
 } from '../utils/courseSectionImportExcel';
-import { apiRequest, csrfRequest } from './apiClient';
+import { apiRequest, csrfRequest, commonApiErrorMessage } from './apiClient';
 
 /** Kết quả import trả về từ API, dùng chung cho ba danh mục. */
 export interface CatalogImportItem {
@@ -191,6 +191,8 @@ export const catalogApi = {
     ),
 
   lecturers: () => apiRequest<Lecturer[]>('/api/catalog/lecturers'),
+  restoreLecturerByEmail: (email: string) =>
+    csrfRequest<Lecturer>('/api/catalog/lecturers/restore-by-email', 'POST', { email }),
   createLecturer: (lecturer: SaveLecturerPayload) =>
     csrfRequest<Lecturer>('/api/catalog/lecturers', 'POST', lecturer),
   updateLecturer: (lecturerId: number, lecturer: SaveLecturerPayload) =>
@@ -266,11 +268,12 @@ export interface SaveCoursePayload {
 export const catalogErrorMessages: Record<string, string> = {
   CATALOG_OUT_OF_SCOPE: 'Bạn không có quyền thực hiện thao tác này với hồ sơ đang sử dụng.',
   CATALOG_INVALID_REQUEST: 'Dữ liệu gửi lên không hợp lệ.',
+  CATALOG_RESTORE_PARENT_DELETED: 'Hãy khôi phục đợt khảo sát liên quan trước khi khôi phục lớp học phần.',
   CATALOG_FACULTY_NOT_FOUND: 'Không tìm thấy khoa viện.',
   CATALOG_FACULTY_NAME_REQUIRED: 'Thiếu tên khoa viện.',
   CATALOG_FACULTY_NAME_EXISTS: 'Tên khoa viện đã tồn tại.',
   CATALOG_FACULTY_DUPLICATE_IN_FILE: 'Tên bị lặp trong tệp.',
-  CATALOG_FACULTY_IN_USE: 'Khoa viện đang được giảng viên hoặc học phần tham chiếu.',
+  CATALOG_FACULTY_IN_USE: 'Khoa viện đang có bộ môn, giảng viên, học phần hoặc khóa ngành sử dụng. Hãy xử lý dữ liệu liên quan trước khi xóa.',
   CATALOG_DEPARTMENT_NOT_FOUND: 'Không tìm thấy bộ môn.',
   CATALOG_DEPARTMENT_NAME_REQUIRED: 'Thiếu tên bộ môn.',
   CATALOG_DEPARTMENT_ID_REQUIRED: 'Thiếu mã bộ môn hoặc mã không phải số nguyên dương.',
@@ -281,10 +284,12 @@ export const catalogErrorMessages: Record<string, string> = {
   CATALOG_COURSE_NAME_REQUIRED_FOR_AUTO_CREATE:
     'Học phần chưa có trong danh mục nên cần cột "Học phần" để tạo mới.',
   CATALOG_POSITION_NOT_FOUND: 'Không tìm thấy chức vụ.',
+  CATALOG_POSITION_IN_USE: 'Chức vụ đang được giảng viên sử dụng. Hãy đổi chức vụ của giảng viên trước khi xóa.',
   CATALOG_POSITION_NAME_REQUIRED: 'Thiếu tên chức vụ.',
   CATALOG_POSITION_NAME_EXISTS: 'Tên chức vụ đã tồn tại.',
   CATALOG_ACADEMIC_YEAR_START_DATE_REQUIRED: 'Vui lòng chọn ngày bắt đầu năm học.',
   CATALOG_MAJOR_NOT_FOUND: 'Không tìm thấy ngành đào tạo.',
+  CATALOG_MAJOR_IN_USE: 'Ngành đào tạo đang được khóa ngành sử dụng. Hãy xử lý khóa ngành liên quan trước khi xóa.',
   CATALOG_MAJOR_CODE_REQUIRED: 'Thiếu mã ngành.',
   CATALOG_MAJOR_CODE_EXISTS: 'Mã ngành đã tồn tại trong hệ thống.',
   CATALOG_MAJOR_NAME_REQUIRED: 'Thiếu tên ngành đào tạo.',
@@ -311,9 +316,17 @@ export const catalogErrorMessages: Record<string, string> = {
     'Có nhiều giảng viên trùng tên. Hãy ghi thêm email, bộ môn hoặc khoa viện.',
   CATALOG_LECTURER_NOT_FOUND: 'Không tìm thấy giảng viên.',
   CATALOG_LECTURER_NAME_REQUIRED: 'Thiếu họ và tên giảng viên.',
+  CATALOG_LECTURER_NAME_TOO_LONG: 'Họ và tên giảng viên không được vượt quá 200 ký tự.',
+  CATALOG_LECTURER_EMAIL_INVALID: 'Email giảng viên không đúng định dạng hoặc vượt quá 320 ký tự.',
   CATALOG_LECTURER_EMAIL_REQUIRED:
     'Thiếu email giảng viên. Không có email thì không tạo được tài khoản đăng nhập.',
   CATALOG_LECTURER_EMAIL_EXISTS: 'Email đã tồn tại trong danh mục.',
+  CATALOG_LECTURER_EMAIL_DELETED:
+    'Email thuộc giảng viên đã xóa. Hãy khôi phục giảng viên cũ để giữ lịch sử và tài khoản đăng nhập.',
+  CATALOG_ACADEMIC_YEAR_IN_USE:
+    'Năm học đang có khảo sát, khóa ngành hoặc đợt tốt nghiệp. Hãy xử lý dữ liệu liên quan trước khi xóa.',
+  CATALOG_SEMESTER_IN_USE:
+    'Học kỳ đang có khảo sát. Hãy xử lý khảo sát liên quan trước khi xóa.',
   CATALOG_LECTURER_EMAIL_DUPLICATE_IN_FILE: 'Email bị lặp trong tệp.',
   CATALOG_LECTURER_IN_USE: 'Giảng viên đang được lớp học phần tham chiếu.',
   CATALOG_COURSE_NOT_FOUND: 'Không tìm thấy học phần.',
@@ -329,5 +342,5 @@ export const catalogErrorMessages: Record<string, string> = {
 };
 
 export function catalogErrorMessage(errorCode: string | null | undefined): string {
-  return catalogErrorMessages[errorCode ?? ''] ?? 'Không thể kết nối tới máy chủ.';
+  return catalogErrorMessages[errorCode ?? ''] ?? commonApiErrorMessage(errorCode);
 }

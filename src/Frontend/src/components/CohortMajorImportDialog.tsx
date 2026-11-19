@@ -17,7 +17,7 @@ import {
   type CohortMajorImportFileErrorCode,
   type ImportCohortMajorRow,
 } from '../utils/cohortMajorImportExcel';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import {
   cohortErrorMessage,
   type Cohort,
@@ -135,7 +135,7 @@ export function CohortMajorImportDialog({
       setResult(await onImport(Number(cohortId), rows));
     } catch (error) {
       setRequestError(
-        error instanceof ApiError ? cohortErrorMessage(error.errorCode) : cohortErrorMessage(null)
+        apiErrorMessage(error, cohortErrorMessage)
       );
     } finally {
       setImporting(false);

@@ -362,8 +362,16 @@ public interface IReportService
         int? lecturerId,
         string? search,
         bool? validOnly,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        OpenCommentQueryOptions? options = null);
 }
+
+public sealed record OpenCommentQueryOptions(
+    int Page = 1,
+    int PageSize = 20,
+    string? SortKey = null,
+    bool Descending = true,
+    IReadOnlyDictionary<string, string[]>? ColumnFilters = null);
 
 /// <summary>Một ý kiến mở (AdditionalComments) do sinh viên đóng góp trong phiếu khảo sát.</summary>
 /// <param name="Sentiment">
@@ -410,4 +418,7 @@ public sealed record OpenCommentAnalysisReportDto(
     int AnalyzedCommentCount,
     int PendingAnalysisCount,
     int UncertainCount,
-    int ManuallyReviewedCount);
+    int ManuallyReviewedCount,
+    int Page = 1,
+    int PageSize = 0,
+    IReadOnlyDictionary<string, string[]>? FilterValues = null);

@@ -601,6 +601,8 @@ public static class SurveyEndpoints
             SurveyErrorCodes.AnswerScaleNameExists => StatusCodes.Status409Conflict,
             SurveyErrorCodes.TemplateNameExists => StatusCodes.Status409Conflict,
             SurveyErrorCodes.AnswerScaleInUse => StatusCodes.Status409Conflict,
+            SurveyErrorCodes.AnswerScaleAttentionValueInUse => StatusCodes.Status409Conflict,
+            SurveyErrorCodes.TemplateAttentionCheckLocked => StatusCodes.Status409Conflict,
             SurveyErrorCodes.TemplateInUse => StatusCodes.Status409Conflict,
             SurveyErrorCodes.SemesterSurveyHasResponses => StatusCodes.Status409Conflict,
             SurveyErrorCodes.ScopeSectionsAlreadyAdded => StatusCodes.Status409Conflict,

@@ -1,7 +1,7 @@
+import { graduationErrorMessage } from '../../services/graduationErrorMessages';
 import { useEffect, useState, type FormEvent } from 'react';
 import { AlertTriangle, LoaderCircle, Trash2 } from 'lucide-react';
 import { Modal } from '../Modal';
-import { ApiError } from '../../services/apiClient';
 import { graduationAnalytics2Api } from '../../services/graduationAnalytics2Api';
 import type { GraduationManagedPeriod } from '../../types/graduationAnalytics2';
 
@@ -11,15 +11,9 @@ interface GraduationDeletePeriodDialogProps {
   onDeleted: (period: GraduationManagedPeriod) => void | Promise<void>;
 }
 
-const deleteErrorMessage = (error: unknown) => {
-  if (error instanceof ApiError && error.errorCode === 'GRADUATION_V3_PERIOD_NOT_FOUND') {
-    return 'Đợt này không còn tồn tại hoặc đã được người khác xóa.';
-  }
-  if (error instanceof ApiError && error.errorCode === 'GRADUATION_QUERY_INVALID') {
-    return 'Lý do xóa phải có từ 3 đến 1000 ký tự.';
-  }
-  return 'Không thể xóa dữ liệu đợt. Vui lòng thử lại.';
-};
+const deleteErrorMessage = (error: unknown) => graduationErrorMessage(error, {
+  GRADUATION_QUERY_INVALID: 'Lý do xóa phải có từ 3 đến 1000 ký tự.',
+});
 
 export function GraduationDeletePeriodDialog({
   period,

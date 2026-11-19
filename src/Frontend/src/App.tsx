@@ -482,6 +482,16 @@ function DashboardApp() {
     }
   };
 
+  const handleRestoreLecturer = async (email: string): Promise<string | null> => {
+    try {
+      await catalogApi.restoreLecturerByEmail(email);
+      setLecturers(await catalogApi.lecturers());
+      return null;
+    } catch (error) {
+      return errorCodeOf(error);
+    }
+  };
+
   const handleImportLecturers = async (rows: ImportLecturerRow[]) => {
     const result = await catalogApi.importLecturers(rows);
     setLecturers(await catalogApi.lecturers());
@@ -739,6 +749,7 @@ function DashboardApp() {
                 faculties={faculties}
                 departments={departments}
                 onSaveLecturer={handleSaveLecturer}
+                onRestoreLecturer={handleRestoreLecturer}
                 onDeleteLecturer={handleDeleteLecturer}
                 onImportLecturers={handleImportLecturers}
               />

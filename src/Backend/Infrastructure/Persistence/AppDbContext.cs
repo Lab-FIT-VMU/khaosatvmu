@@ -59,6 +59,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDbFunction(typeof(ReportSearchText).GetMethod(nameof(ReportSearchText.Translate))!)
+            .HasName("translate").IsBuiltIn();
         modelBuilder.HasSequence<long>("UserProfileCodeSequence");
 
         // Global soft-delete filters — excluded from queries unless .IgnoreQueryFilters() is used
@@ -215,7 +217,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.ToTable("Faculties");
             entity.HasKey(x => x.FacultyId);
             entity.Property(x => x.FacultyName).IsRequired();
-            entity.HasIndex(x => x.FacultyName).IsUnique();
+            entity.HasIndex(x => x.FacultyName).IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
         });
 
         modelBuilder.Entity<Department>(entity =>
@@ -236,7 +239,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.ToTable("Positions");
             entity.HasKey(x => x.PositionId);
             entity.Property(x => x.PositionName).IsRequired();
-            entity.HasIndex(x => x.PositionName).IsUnique();
+            entity.HasIndex(x => x.PositionName).IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
         });
 
         modelBuilder.Entity<Major>(entity =>
@@ -491,7 +495,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.AcademicYearName).IsRequired();
             entity.Property(x => x.StartDate).HasColumnType("date");
             entity.Property(x => x.EndDate).HasColumnType("date");
-            entity.HasIndex(x => x.AcademicYearName).IsUnique();
+            entity.HasIndex(x => x.AcademicYearName).IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
         });
 
         modelBuilder.Entity<Semester>(entity =>
@@ -499,7 +504,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.ToTable("Semesters");
             entity.HasKey(x => x.SemesterId);
             entity.Property(x => x.SemesterName).IsRequired();
-            entity.HasIndex(x => new { x.AcademicYearId, x.SemesterName }).IsUnique();
+            entity.HasIndex(x => new { x.AcademicYearId, x.SemesterName }).IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
             entity.HasOne<AcademicYear>()
                 .WithMany()
                 .HasForeignKey(x => x.AcademicYearId)
@@ -512,7 +518,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(x => x.CourseSectionId);
             entity.Property(x => x.SectionName).IsRequired();
             entity.Property(x => x.UnidentifiedLecturerName).HasMaxLength(200);
-            entity.HasIndex(x => new { x.CourseId, x.SemesterId, x.SectionName }).IsUnique();
+            entity.HasIndex(x => new { x.CourseId, x.SemesterId, x.SectionName }).IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
             entity.HasIndex(x => x.SemesterId);
             entity.HasIndex(x => x.LecturerId);
             // Lọc nhanh các lớp còn chờ bổ sung email giảng viên.
@@ -564,7 +571,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.CourseName).IsRequired();
             // Nullable: học phần tạo tự động khi import lớp học phần chưa biết loại.
             entity.Property(x => x.CourseType).HasMaxLength(20);
-            entity.HasIndex(x => x.CourseCode).IsUnique();
+            entity.HasIndex(x => x.CourseCode).IsUnique()
+                .HasFilter("\"IsDeleted\" = false");
             entity.HasIndex(x => x.DepartmentId);
             entity.HasIndex(x => x.FacultyId);
             entity.HasIndex(x => x.PrerequisiteCourseId);

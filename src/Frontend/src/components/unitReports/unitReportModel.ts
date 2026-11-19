@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSemester } from '../../context/semesterContext';
-import { ApiError } from '../../services/apiClient';
+import { apiErrorMessage } from '../../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../../services/surveyApi';
 import type {
   FacultyOverview,
@@ -27,7 +27,7 @@ export const unitNounOf: Record<UnitSurveyType, string> = {
 };
 
 export function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 export interface UnitReportState {

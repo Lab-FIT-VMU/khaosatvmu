@@ -1,7 +1,7 @@
+import { graduationErrorMessage } from '../../services/graduationErrorMessages';
 import { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle, FileSpreadsheet, LoaderCircle, Upload } from 'lucide-react';
 import { Modal } from '../Modal';
-import { ApiError } from '../../services/apiClient';
 import { graduationAnalyticsApi } from '../../services/graduationAnalyticsApi';
 import type {
   GraduationImportCommitResultV3,
@@ -30,16 +30,7 @@ const rankLabel = (rank: GraduationRankV3) => ({
   4: 'Trung bình',
 }[rank]);
 
-const errorMessage = (error: unknown) => {
-  if (!(error instanceof ApiError)) return 'Không thể xử lý file. Vui lòng thử lại.';
-  const messages: Record<string, string> = {
-    GRADUATION_IMPORT_INVALID: 'File hoặc metadata import không hợp lệ.',
-    GRADUATION_IMPORT_TOO_LARGE: 'File có quá nhiều dòng dữ liệu.',
-    GRADUATION_V3_CONCURRENT_REPLACE: 'Đợt đã được người khác cập nhật. Hãy đóng cửa sổ và tải lại.',
-    GRADUATION_V3_REPLACE_REASON_REQUIRED: 'Phải nhập lý do khi import lại.',
-  };
-  return messages[error.errorCode] ?? 'Không thể xử lý file. Vui lòng kiểm tra lại dữ liệu.';
-};
+const errorMessage = graduationErrorMessage;
 
 const defaultReview = (academicYearStart: number) => {
   const now = new Date();

@@ -16,7 +16,7 @@ import {
   type FacultyImportFileErrorCode,
   type ImportFacultyRow,
 } from '../utils/facultyImportExcel';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { catalogErrorMessage, type CatalogImportResponse } from '../services/catalogApi';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
 import { Modal } from './Modal';
@@ -92,7 +92,7 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
       setResult(await onImport(rows));
     } catch (error) {
       setRequestError(
-        error instanceof ApiError ? catalogErrorMessage(error.errorCode) : catalogErrorMessage(null)
+        apiErrorMessage(error, catalogErrorMessage)
       );
     } finally {
       setImporting(false);

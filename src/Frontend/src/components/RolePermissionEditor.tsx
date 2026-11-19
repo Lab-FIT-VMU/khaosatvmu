@@ -5,7 +5,8 @@ import { ROLE_DATA_SCOPE_LABELS, roleDisplayName } from '../auth/roles';
 import { Modal } from './Modal';
 import { RoleFormDialog } from './RoleFormDialog';
 import { adminApi } from '../services/adminApi';
-import { ApiError } from '../services/apiClient';
+import { ApiError, apiErrorMessage } from '../services/apiClient';
+import { adminErrorMessage } from '../services/adminErrorMessages';
 import type { AdminRole, RolePermissionMatrix, SaveAdminRole } from '../types';
 import '../styles/auth-admin.css';
 
@@ -36,10 +37,11 @@ const ROLE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
 };
 
 function messageFromError(error: unknown): string {
+  // Mã lỗi riêng của thao tác vai trò trước, còn lại theo bảng lỗi chung của trang quản trị.
   if (error instanceof ApiError && ROLE_ERROR_MESSAGES[error.errorCode]) {
     return ROLE_ERROR_MESSAGES[error.errorCode];
   }
-  return error instanceof Error ? error.message : 'Không thể tải danh sách quyền';
+  return apiErrorMessage(error, adminErrorMessage);
 }
 
 /** Một dòng mô tả ngắn phạm vi và quyền ghi của vai trò. */

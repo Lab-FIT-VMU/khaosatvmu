@@ -13,7 +13,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { Modal } from '../components/Modal';
-import { ApiError } from '../services/apiClient';
+import { ApiError, apiErrorMessage } from '../services/apiClient';
 import { publicSurveyApi, surveyErrorMessage } from '../services/surveyApi';
 import type { AnswerScale, PublicSurvey, SurveyFormConfig } from '../types';
 import {
@@ -232,7 +232,7 @@ interface PublicSurveyPageProps {
 }
 
 function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 function formatRange(startTime: string, endTime: string): string {

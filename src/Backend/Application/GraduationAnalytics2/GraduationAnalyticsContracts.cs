@@ -17,8 +17,8 @@ public sealed record GraduationImportRowError(
     string Reason,
     IReadOnlyList<string> Values);
 
-public sealed class GraduationAnalyticsException(string errorCode, string message)
-    : Exception(message)
+public sealed class GraduationAnalyticsException(string errorCode, string message, Exception? innerException = null)
+    : Exception(message, innerException)
 {
     public string ErrorCode { get; } = errorCode;
 

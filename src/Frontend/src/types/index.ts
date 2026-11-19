@@ -1127,4 +1127,7 @@ export interface OpenCommentAnalysisReport {
   pendingAnalysisCount: number;
   uncertainCount: number;
   manuallyReviewedCount: number;
+  page: number;
+  pageSize: number;
+  filterValues: Record<string, string[]> | null;
 }

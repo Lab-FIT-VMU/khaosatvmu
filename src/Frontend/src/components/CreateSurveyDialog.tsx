@@ -4,7 +4,7 @@ import { Modal } from './Modal';
 import { SearchableSelect } from './SearchableSelect';
 import { SurveyFormDesigner } from './SurveyFormDesigner';
 import type { SurveyPreviewData } from './SurveyFormPreview';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { catalogApi } from '../services/catalogApi';
 import { cohortApi, type Cohort } from '../services/cohortApi';
 import {
@@ -87,7 +87,7 @@ const templateNameOf = (config: SurveyFormConfig | null | undefined): string =>
     ?? 'Chưa chọn mẫu';
 
 function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 interface CreateSurveyDialogProps {

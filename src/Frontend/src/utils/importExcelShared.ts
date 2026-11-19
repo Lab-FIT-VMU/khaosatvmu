@@ -1,5 +1,10 @@
 import type { Sheet, SheetData } from 'write-excel-file/browser';
 
+/** Kiểm tra nhanh trước khi gửi; backend vẫn xác thực email khi lưu. */
+export function isValidImportEmail(value: string): boolean {
+  return value.length <= 320 && /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+$/u.test(value);
+}
+
 /**
  * Phần dùng chung của mọi luồng import Excel: kiểu hàng tiêu đề của tệp mẫu, và
  * việc xuất ngược các dòng lỗi ra tệp.

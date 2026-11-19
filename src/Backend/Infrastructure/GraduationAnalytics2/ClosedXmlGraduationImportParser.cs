@@ -1,4 +1,8 @@
-﻿using System.Globalization;
+using Application.Common.Exceptions;
+using Infrastructure.Imports;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -8,9 +12,11 @@ using Domain;
 
 namespace Infrastructure.GraduationAnalytics2;
 
-public sealed partial class ClosedXmlGraduationImportParser : IGraduationImportParser
+public sealed partial class ClosedXmlGraduationImportParser(ILogger<ClosedXmlGraduationImportParser>? logger = null) : IGraduationImportParser
 {
     private const int HeaderScanLimit = 30;
+
+    internal Func<Stream, XLWorkbook> OpenWorkbook { get; init; } = stream => new XLWorkbook(stream);
 
     private static readonly string[] RequiredHeaderKeys = ["graduationRank", "classCode"];
 
@@ -51,7 +57,8 @@ public sealed partial class ClosedXmlGraduationImportParser : IGraduationImportP
         try
         {
             using var memory = new MemoryStream(bytes, writable: false);
-            using var workbook = new XLWorkbook(memory);
+            GraduationWorkbookErrors.ValidatePackage(memory);
+            using var workbook = OpenWorkbook(memory);
             var match = FindSourceSheet(workbook);
             return ParseSheet(match, SafeFileName(originalFileName), fileHash, cancellationToken);
         }
@@ -59,11 +66,22 @@ public sealed partial class ClosedXmlGraduationImportParser : IGraduationImportP
         {
             throw;
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (GraduationWorkbookErrors.IsInvalidFormat(exception))
         {
+            logger?.LogWarning(exception, "Invalid graduation workbook. TraceId: {TraceId}", Activity.Current?.Id);
             throw new GraduationAnalyticsException(
                 GraduationAnalyticsErrorCodes.InvalidImport,
-                "Không thể đọc workbook Excel. Hãy kiểm tra file không bị hỏng hoặc đặt mật khẩu.");
+                "Không thể đọc workbook Excel. Hãy kiểm tra file không bị hỏng hoặc đặt mật khẩu.", exception);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // A bug or library failure must reach the global handler as a server
+            // error, with the original exception retained for diagnostics.
+            throw new GraduationImportProcessingException(exception);
         }
     }
 

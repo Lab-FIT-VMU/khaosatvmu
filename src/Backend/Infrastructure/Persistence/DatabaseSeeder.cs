@@ -116,7 +116,7 @@ public static class DatabaseSeeder
             (Code: "SURVEY_STATISTICS_ACCESS",    Name: "Bảng dữ liệu khảo sát",             Description: "Truy cập module bảng dữ liệu khảo sát",                 Category: "Thống kê khảo sát học phần"),
             (Code: "REPORTS_ACCESS",              Name: "Thống kê & Báo cáo",                Description: "Truy cập module thống kê và báo cáo",                  Category: "Thống kê khảo sát học phần"),
             (Code: "SURVEY_ANALYSIS_ACCESS",      Name: "Phân tích chuyên sâu",              Description: "Truy cập module phân tích chuyên sâu",                 Category: "Thống kê khảo sát học phần"),
-            (Code: "GRADUATION_UPLOAD_ACCESS",    Name: "Tải lên dữ liệu",                   Description: "Tải lên và xoá đợt dữ liệu tốt nghiệp",                Category: "Thống kê tốt nghiệp"),
+            (Code: "GRADUATION_UPLOAD_ACCESS",    Name: "Tải lên dữ liệu",                  Description: "Tải lên và xoá đợt dữ liệu tốt nghiệp",                Category: "Thống kê tốt nghiệp"),
             (Code: "GRADUATION_ANALYTICS_ACCESS", Name: "Thống kê chi tiết",                 Description: "Xem thống kê sinh viên tốt nghiệp",                    Category: "Thống kê tốt nghiệp"),
             // Phân tích điểm học phần: tải lên và ngưỡng tách khỏi quyền xem như module tốt
             // nghiệp. Ai được sửa phương pháp (ngưỡng bộ luật D, E) do quyền thứ hai quyết định.

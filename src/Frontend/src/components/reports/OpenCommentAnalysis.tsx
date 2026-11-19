@@ -9,11 +9,12 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
-import { DataTable, type Column } from '../DataTable';
+import { DataTable, type Column, type DataTableSortDirection } from '../DataTable';
 import { Modal } from '../Modal';
 import { SentimentAnalysisPanel } from './SentimentAnalysisPanel';
 import { SentimentBadge } from './SentimentBadge';
 import { reportApi } from '../../services/reportApi';
+import { apiErrorMessage } from '../../services/apiClient';
 import { surveyApi } from '../../services/surveyApi';
 import { useAuth } from '../../auth/authContext';
 import type {
@@ -25,7 +26,6 @@ import type {
   OpenCommentSentiment,
   SurveyResponseDetail,
 } from '../../types';
-import { foldVietnamese } from '../../utils/vietnamese';
 import { formatDecimal } from '../../utils/formatNumber';
 
 /** Quyền được sửa nhãn model. Backend vẫn kiểm tra lại; đây chỉ là lớp ẩn nút. */
@@ -66,6 +66,10 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<OpenCommentAnalysisReport | null>(null);
+  const [query, setQuery] = useState({ page: 1, search: '', sortKey: 'submittedAt',
+    sortDirection: 'desc' as DataTableSortDirection, columnFilters: {} as Record<string, string[]> });
+  const pageSize = 20;
+  const requestAbortRef = useRef<AbortController | null>(null);
   const [activeModalComment, setActiveModalComment] = useState<OpenCommentItem | null>(null);
   const [responseDetail, setResponseDetail] = useState<SurveyResponseDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
@@ -89,36 +93,53 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
    * kết quả mới; so số này trước khi ghi state là cách chặn rẻ nhất.
    */
   const requestIdRef = useRef(0);
+  const queryParams = useMemo(() => ({ semesterId, semesterSurveyId, ...query, pageSize }),
+    [semesterId, semesterSurveyId, query]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQuery(current => current.search === search ? current : { ...current, search, page: 1 });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setSearch('');
+    setReport(null);
+    setQuery(current => ({ ...current, page: 1, search: '', columnFilters: {} }));
+  }, [semesterId, semesterSurveyId]);
 
   // Tải dữ liệu ý kiến mở từ backend. `silent` dùng khi tải lại sau hiệu chỉnh để không
   // chớp bảng thành vòng xoay trong lúc người dùng còn đang mở modal.
   const loadComments = useCallback(async (options?: { silent?: boolean }) => {
     const requestId = ++requestIdRef.current;
+    requestAbortRef.current?.abort();
+    const controller = new AbortController();
+    requestAbortRef.current = controller;
     if (!options?.silent) {
       setLoading(true);
     }
     setError(null);
     try {
-      const data = await reportApi.openComments({
-        semesterId,
-        semesterSurveyId,
-      });
-      if (requestId === requestIdRef.current) {
+      const data = await reportApi.openComments(queryParams, controller.signal);
+      if (!controller.signal.aborted && requestId === requestIdRef.current) {
         setReport(data);
       }
-    } catch {
-      if (requestId === requestIdRef.current && !options?.silent) {
-        setError('Không tải được danh sách ý kiến mở. Vui lòng thử lại sau.');
+    } catch (error) {
+      if (!controller.signal.aborted && requestId === requestIdRef.current && !options?.silent) {
+        setError(apiErrorMessage(error));
       }
     } finally {
-      if (requestId === requestIdRef.current && !options?.silent) {
+      if (!controller.signal.aborted && requestId === requestIdRef.current) {
         setLoading(false);
       }
     }
-  }, [semesterId, semesterSurveyId]);
+  }, [queryParams]);
 
   useEffect(() => {
     void loadComments();
+    const controller = requestAbortRef.current;
+    return () => controller?.abort();
   }, [loadComments]);
 
   // Mở chi tiết phiếu khảo sát và nạp toàn bộ câu trả lời
@@ -178,37 +199,24 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
       );
       // Tải lại bảng để KPI và biểu đồ phân bố khớp với nhãn vừa sửa.
       await loadComments({ silent: true });
-    } catch {
-      setReviewError('Không lưu được nhãn. Vui lòng thử lại sau.');
+    } catch (error) {
+      setReviewError(apiErrorMessage(error));
     } finally {
       setReviewSaving(false);
     }
   };
 
-  // Tìm kiếm tức thì không dấu
-  const displayComments = useMemo(() => {
-    if (!report?.comments) return [];
-    const term = foldVietnamese(search.trim().toLowerCase());
-    if (!term) return report.comments;
-
-    return report.comments.filter((item) => {
-      const commentFolded = foldVietnamese(item.additionalComments.toLowerCase());
-      const courseFolded = foldVietnamese(`${item.courseCode} ${item.courseName}`.toLowerCase());
-      const lecturerFolded = foldVietnamese(item.lecturerName.toLowerCase());
-      const sectionFolded = foldVietnamese(item.sectionName.toLowerCase());
-      const deptFolded = foldVietnamese(item.departmentName.toLowerCase());
-      const facFolded = foldVietnamese(item.facultyName.toLowerCase());
-
-      return (
-        commentFolded.includes(term) ||
-        courseFolded.includes(term) ||
-        lecturerFolded.includes(term) ||
-        sectionFolded.includes(term) ||
-        deptFolded.includes(term) ||
-        facFolded.includes(term)
-      );
-    });
-  }, [report, search]);
+  const loadExportComments = useCallback(async () => {
+    const rows: OpenCommentItem[] = [];
+    // Each request is bounded; a normal page view never downloads the full report.
+    for (let page = 1; ; page++) {
+      const batch = await reportApi.openComments({ ...queryParams, page, pageSize: 200 });
+      if (batch.page !== page) break;
+      rows.push(...batch.comments);
+      if (page * batch.pageSize >= batch.totalComments || batch.comments.length === 0) break;
+    }
+    return rows;
+  }, [queryParams]);
 
   const handleCopyComment = (text: string) => {
     void navigator.clipboard.writeText(text);
@@ -410,6 +418,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
     () => ({
       title: 'BÁO CÁO PHÂN TÍCH Ý KIẾN MỞ CỦA SINH VIÊN',
       fileName: `bao-cao-y-kien-mo-${semesterLabel}`,
+      loadData: loadExportComments,
       subtitle: `${semesterLabel}${surveyName ? ` · ${surveyName}` : ''}`,
       breadcrumb: ['Thống kê & Báo cáo', 'Phân tích ý kiến mở'],
       info: {
@@ -472,11 +481,11 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         { key: 'additionalComments', header: 'Nội dung ý kiến đóng góp', width: 45 },
       ],
     }),
-    [semesterLabel, surveyName, report]
+    [semesterLabel, surveyName, report, loadExportComments]
   );
 
   return (
-    <div className="reports-comments-workspace" role="tabpanel" aria-label="Phân tích ý kiến mở">
+    <div className="reports-comments-workspace" role="tabpanel" aria-label="Phân tích ý kiến mở" aria-busy={loading}>
       {/* Tiêu đề khối: dùng đúng class của tab Tổng quan để hai tab nhìn như một hệ. */}
       <header className="reports-exec-header">
         <div className="reports-exec-heading">
@@ -564,12 +573,13 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
 
       {/* 3. Danh sách dữ liệu & DataTable (có sẵn tìm kiếm, sắp xếp và lọc cột) */}
       <section className="reports-table-section" aria-label="Bảng ý kiến mở">
-        {loading ? (
+        {error && report && <p role="alert">{error}</p>}
+        {loading && !report ? (
           <div className="operations-empty" role="status">
             <LoaderCircle className="operation-icon auth-spin" aria-hidden="true" />
             <strong>Đang tải và tổng hợp ý kiến mở...</strong>
           </div>
-        ) : error ? (
+        ) : error && !report ? (
           <div className="public-survey-alert" role="alert">
             <X aria-hidden="true" />
             <span>{error}</span>
@@ -577,7 +587,7 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
         ) : (
           <DataTable
             columns={columns}
-            data={displayComments}
+            data={report?.comments ?? []}
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Tìm kiếm nội dung ý kiến, môn học, lớp, giảng viên, khoa, bộ môn..."
@@ -585,6 +595,15 @@ export const OpenCommentAnalysis: React.FC<OpenCommentAnalysisProps> = ({
             emptyMessage="Không tìm thấy ý kiến mở nào phù hợp."
             keyExtractor={(item) => String(item.responseId)}
             showIndex={true}
+            pageSize={pageSize}
+            sortKey={query.sortKey}
+            sortDirection={query.sortDirection}
+            onSortChange={(key, direction) => setQuery(current => ({ ...current, page: 1,
+              sortKey: key ?? 'submittedAt', sortDirection: direction ?? 'desc' }))}
+            remote={{ page: report?.page ?? query.page, totalItems: report?.totalComments ?? 0,
+              onPageChange: page => setQuery(current => ({ ...current, page })),
+              columnFilters: query.columnFilters, filterValues: report?.filterValues ?? {},
+              onColumnFiltersChange: columnFilters => setQuery(current => ({ ...current, page: 1, columnFilters })) }}
             onRowClick={(item) => void handleOpenDetail(item)}
           />
         )}

@@ -14,7 +14,7 @@ import type {
 } from '../types';
 import { maximumSectionsPerTemplate } from '../types';
 import type { ScoringThresholds } from '../utils/reportThresholds';
-import { ApiError, apiRequest, csrfRequest, getCsrfToken } from './apiClient';
+import { ApiError, apiRequest, csrfRequest, getCsrfToken, commonApiErrorMessage } from './apiClient';
 
 export interface SaveAnswerScaleOptionPayload {
   /** 1..5, không bắt buộc liên tiếp (thang Có/Không dùng 1 và 5). */
@@ -974,6 +974,14 @@ export const surveyTypeLabels: Record<SurveyType, string> = {
 
 /** Thông báo tiếng Việt cho mã lỗi của API bộ câu hỏi khảo sát. */
 export const surveyErrorMessages: Record<string, string> = {
+  SURVEY_OUT_OF_SCOPE: 'Bạn không có quyền thao tác với dữ liệu khảo sát này.',
+  SURVEY_SCOPE_NOT_FOUND: 'Không tìm thấy dữ liệu trong phạm vi khảo sát đã chọn.',
+  SURVEY_SCOPE_TYPE_INVALID: 'Loại phạm vi khảo sát không hợp lệ.',
+  SURVEY_LECTURER_HAS_NO_SECTIONS: 'Giảng viên chưa có lớp học phần trong phạm vi khảo sát này.',
+  SURVEY_SEMESTER_SURVEY_HAS_NO_SECTIONS: 'Đợt khảo sát chưa có lớp học phần nào.',
+  SURVEY_SCORING_THRESHOLD_INVALID: 'Ngưỡng tính điểm không hợp lệ. Vui lòng kiểm tra tỷ lệ đã nhập.',
+  SURVEY_ATTENTION_CHECK_ON_TEXT_SCALE: 'Câu kiểm tra độ tập trung phải dùng thang lựa chọn, không dùng thang tự nhập.',
+  SURVEY_ATTENTION_CHECK_VALUE_INVALID: 'Đáp án câu kiểm tra độ tập trung phải là một mức có trong thang trả lời.',
   SURVEY_INVALID_REQUEST: 'Dữ liệu gửi lên không hợp lệ.',
   SURVEY_ANSWER_SCALE_NOT_FOUND: 'Không tìm thấy thang trả lời.',
   SURVEY_ANSWER_SCALE_NAME_REQUIRED: 'Thiếu tên thang trả lời.',
@@ -982,6 +990,10 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_ANSWER_SCALE_OPTION_TEXT_REQUIRED: 'Thiếu nhãn hiển thị của một mức trả lời.',
   SURVEY_ANSWER_SCALE_IN_USE: 'Thang trả lời đang được bộ câu hỏi sử dụng.',
   SURVEY_TEMPLATE_SCALE_NOT_FOUND: 'Vui lòng chọn thang trả lời cho bộ câu hỏi.',
+  SURVEY_ANSWER_SCALE_ATTENTION_VALUE_IN_USE:
+    'Không thể xóa mức trả lời đang là đáp án câu bẫy, kể cả câu hỏi đã xóa. Hãy giữ mức này hoặc dùng thang mới.',
+  SURVEY_TEMPLATE_ATTENTION_CHECK_LOCKED:
+    'Câu hỏi đã có phiếu trả lời nên không thể thêm, bỏ hoặc đổi đáp án câu bẫy. Hãy tạo bộ câu hỏi mới nếu cần thay đổi.',
   SURVEY_TEMPLATE_NOT_FOUND: 'Không tìm thấy bộ câu hỏi.',
   SURVEY_TEMPLATE_NAME_REQUIRED: 'Thiếu tên bộ câu hỏi.',
   SURVEY_TEMPLATE_NAME_EXISTS: 'Tên bộ câu hỏi đã tồn tại.',
@@ -1049,5 +1061,5 @@ export const surveyErrorMessages: Record<string, string> = {
 };
 
 export function surveyErrorMessage(errorCode: string | null | undefined): string {
-  return surveyErrorMessages[errorCode ?? ''] ?? 'Không thể kết nối tới máy chủ.';
+  return surveyErrorMessages[errorCode ?? ''] ?? commonApiErrorMessage(errorCode);
 }

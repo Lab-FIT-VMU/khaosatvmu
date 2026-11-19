@@ -17,7 +17,7 @@ import {
   type CourseSectionImportFileErrorCode,
   type ImportCourseSectionRow,
 } from '../utils/courseSectionImportExcel';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { catalogErrorMessage, type CourseSectionImportResponse } from '../services/catalogApi';
 import { buildLecturerLookupRows } from '../utils/importLookupRows';
 import type { Department, Faculty, Lecturer } from '../types';
@@ -112,7 +112,7 @@ export function CourseSectionImportDialog({
       setResult(await onImport(rows));
     } catch (error) {
       setRequestError(
-        error instanceof ApiError ? catalogErrorMessage(error.errorCode) : catalogErrorMessage(null)
+        apiErrorMessage(error, catalogErrorMessage)
       );
     } finally {
       setImporting(false);
@@ -212,6 +212,7 @@ export function CourseSectionImportDialog({
             viên tra theo <strong>Email</strong>: chưa có thì tạo mới với chức vụ Giảng viên, bỏ
             trống email thì lớp vẫn được tạo nhưng để trống mã giảng viên. Bộ môn tra theo{' '}
             <strong>Mã BM</strong>, trống mới tra theo tên.
+            {' '}Email của giảng viên đã xóa sẽ tự khôi phục hồ sơ và tài khoản cũ.
           </p>
         </div>
 
@@ -366,8 +367,8 @@ export function CourseSectionImportDialog({
               <div className="admin-alert" role="status">
                 <CircleAlert aria-hidden="true" />
                 <span>
-                  Đã tạo tự động {result.createdCourseCount} học phần và{' '}
-                  {result.createdLecturerCount} giảng viên chưa có trong danh mục.
+                  Đã tạo tự động {result.createdCourseCount} học phần; thêm hoặc khôi phục{' '}
+                  {result.createdLecturerCount} giảng viên.
                 </span>
               </div>
             )}

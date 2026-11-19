@@ -131,7 +131,12 @@ export const reportApi = {
     lecturerId?: number;
     search?: string;
     validOnly?: boolean;
-  }) => {
+    page?: number;
+    pageSize?: number;
+    sortKey?: string;
+    sortDirection?: 'asc' | 'desc';
+    columnFilters?: Record<string, string[]>;
+  }, signal?: AbortSignal) => {
     const query = new URLSearchParams();
     if (params?.semesterId) query.append('semesterId', String(params.semesterId));
     if (params?.semesterSurveyId) query.append('semesterSurveyId', String(params.semesterSurveyId));
@@ -140,9 +145,15 @@ export const reportApi = {
     if (params?.lecturerId) query.append('lecturerId', String(params.lecturerId));
     if (params?.search) query.append('search', params.search);
     if (params?.validOnly !== undefined) query.append('validOnly', String(params.validOnly));
+    if (params?.page) query.append('page', String(params.page));
+    if (params?.pageSize) query.append('pageSize', String(params.pageSize));
+    if (params?.sortKey) query.append('sortKey', params.sortKey);
+    if (params?.sortDirection) query.append('sortDirection', params.sortDirection);
+    if (params?.columnFilters) query.append('columnFilters', JSON.stringify(params.columnFilters));
     const queryString = query.toString();
     return apiRequest<OpenCommentAnalysisReport>(
       queryString ? `/api/v1/reports/open-comments?${queryString}` : '/api/v1/reports/open-comments',
+      { signal },
     );
   },
 

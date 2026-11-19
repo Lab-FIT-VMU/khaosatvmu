@@ -309,9 +309,15 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
             return Failed<CohortImportDto>(CohortErrorCodes.ImportCohortMismatch);
         }
 
-        var majors = await db.Majors.AsNoTracking()
-            .Select(x => new { x.MajorId, x.MajorCode, x.MajorName })
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        var majors = await (
+            from major in db.Majors.AsNoTracking()
+            join faculty in db.Faculties.AsNoTracking() on major.FacultyId equals faculty.FacultyId
+            select new { major.MajorId, major.MajorCode, major.MajorName })
             .ToListAsync(cancellationToken);
+        var activeMajorIds = majors.Select(x => x.MajorId).ToHashSet();
         var majorIdsByName = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal);
         foreach (var major in majors)
         {
@@ -320,7 +326,8 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
         }
         foreach (var alias in await db.MajorImportAliases.AsNoTracking().ToListAsync(cancellationToken))
         {
-            AddName(majorIdsByName, MatchKey(alias.Alias), alias.MajorId);
+            if (activeMajorIds.Contains(alias.MajorId))
+                AddName(majorIdsByName, MatchKey(alias.Alias), alias.MajorId);
         }
 
         var existing = await db.CohortMajors
@@ -331,6 +338,7 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
         var items = new List<CohortImportItemDto>(rows.Count);
         var created = 0;
         var updated = 0;
+        var pendingCreates = new List<CohortMajor>();
 
         foreach (var row in rows)
         {
@@ -357,9 +365,21 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
 
             if (existing.TryGetValue(name, out var current))
             {
+                if (current.MajorId != majorId && takenMajors.Contains(majorId))
+                {
+                    items.Add(new(row.RowNumber, name, false, CohortErrorCodes.CohortMajorExists));
+                    continue;
+                }
+                var previousMajorId = current.MajorId;
+                takenMajors.Remove(previousMajorId);
+                takenMajors.Add(majorId);
                 current.MajorId = majorId;
                 current.StudentCount = studentCount;
                 current.NotGraduatedCount = Math.Max(0, studentCount - current.GraduatedCount);
+                // Flush a released key before a later row reuses it. EF does not
+                // guarantee an ordering between updates to different existing rows.
+                if (previousMajorId != majorId && db.Entry(current).State != EntityState.Detached)
+                    await db.SaveChangesAsync(cancellationToken);
                 updated++;
                 items.Add(new(row.RowNumber, name, true, null));
                 continue;
@@ -379,7 +399,7 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
                 StudentCount = studentCount,
                 NotGraduatedCount = studentCount,
             };
-            db.CohortMajors.Add(entity);
+            pendingCreates.Add(entity);
             existing[name] = entity;
             created++;
             items.Add(new(row.RowNumber, name, true, null));
@@ -387,8 +407,13 @@ public sealed class EfCohortService(AppDbContext db) : ICohortService
 
         if (created > 0 || updated > 0)
         {
+            // Release keys held by updated rows before inserting replacements that
+            // reuse them. Both saves belong to the same transaction.
+            await db.SaveChangesAsync(cancellationToken);
+            db.CohortMajors.AddRange(pendingCreates);
             await db.SaveChangesAsync(cancellationToken);
         }
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
         return Ok(new CohortImportDto(
             rows.Count, created, updated, rows.Count - created - updated, items));

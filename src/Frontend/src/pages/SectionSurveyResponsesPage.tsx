@@ -15,7 +15,7 @@ import { ConfirmDialog, Modal } from '../components/Modal';
 import { QuestionAnalysisChart } from '../components/QuestionAnalysisChart';
 import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole } from '../auth/roles';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { reportApi } from '../services/reportApi';
 import { surveyApi, surveyErrorMessage } from '../services/surveyApi';
 import { rejectionReasonTexts } from '../types';
@@ -48,7 +48,7 @@ interface SectionSurveyResponsesPageProps {
 }
 
 function messageFrom(error: unknown): string {
-  return error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  return apiErrorMessage(error, surveyErrorMessage);
 }
 
 const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {

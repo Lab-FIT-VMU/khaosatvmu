@@ -46,6 +46,7 @@
 
 1. Mở **Giảng viên**, tìm theo tên hoặc email; chỉ ra khoa, bộ môn và chức vụ của giảng viên.
 2. Mở **Ngành đào tạo**, chọn một ngành và chỉ ra khoa quản lý.
+3. Khi import Excel giảng viên, giải thích: email đã thuộc giảng viên bị xóa sẽ tự khôi phục giảng viên và tài khoản cũ, giữ lịch sử và cập nhật thông tin theo file.
 
 **Lời dẫn:**
 
@@ -59,6 +60,7 @@
 2. Mở **Lớp học phần**, chọn năm học và học kỳ trên cây bên trái.
 3. Mở một lớp để minh họa liên kết giữa học phần, giảng viên, nhóm lớp và sĩ số.
 4. Giới thiệu import Excel và chức năng cập nhật giảng viên chưa xác định.
+   Khi import lớp học phần, email thuộc giảng viên đã xóa sẽ tự khôi phục hồ sơ và tài khoản cũ. Dòng lỗi bị bỏ qua mà không tạo thêm học phần hay giảng viên; lỗi trong quá trình lưu sẽ hoàn tác toàn bộ lần import.
 
 **Lời dẫn:**
 

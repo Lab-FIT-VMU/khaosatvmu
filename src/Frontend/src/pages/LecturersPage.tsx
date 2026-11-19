@@ -6,7 +6,7 @@ import type { Column } from '../components/DataTable';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { LecturerImportDialog } from '../components/LecturerImportDialog';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import {
   catalogApi,
   catalogErrorMessage,
@@ -29,6 +29,7 @@ interface LecturersPageProps {
     lecturer: SaveLecturerPayload,
   ) => Promise<string | null>;
   onDeleteLecturer: (lecturerId: number) => Promise<string | null>;
+  onRestoreLecturer: (email: string) => Promise<string | null>;
   onImportLecturers: (rows: ImportLecturerRow[]) => Promise<CatalogImportResponse>;
 }
 
@@ -64,6 +65,7 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
   departments,
   onSaveLecturer,
   onDeleteLecturer,
+  onRestoreLecturer,
   onImportLecturers,
 }) => {
   const [search, setSearch] = useState('');
@@ -84,6 +86,7 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
   const [editing, setEditing] = useState<Lecturer | null>(null);
   const [toDelete, setToDelete] = useState<Lecturer | null>(null);
   const [validationError, setValidationError] = useState('');
+  const [deletedEmail, setDeletedEmail] = useState<string | null>(null);
   const [form, setForm] = useState<LecturerForm>(emptyForm);
 
   // ----------------------------------------------------------- Chức vụ
@@ -110,7 +113,7 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
   }, []);
 
   const messageFrom = (error: unknown) =>
-    error instanceof ApiError ? catalogErrorMessage(error.errorCode) : catalogErrorMessage(null);
+    apiErrorMessage(error, catalogErrorMessage);
 
   const openPositionCreate = () => {
     setPositionError(null);
@@ -169,13 +172,17 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
   const positionNameOf = (positionId: number | null) =>
     positions.find((position) => position.positionId === positionId)?.positionName ?? '—';
 
-  const updateForm = (patch: Partial<LecturerForm>) => setForm((prev) => ({ ...prev, ...patch }));
+  const updateForm = (patch: Partial<LecturerForm>) => {
+    if (patch.email !== undefined) setDeletedEmail(null);
+    setForm((prev) => ({ ...prev, ...patch }));
+  };
   const facultyNameOf = (facultyId: number | null) =>
     faculties.find((faculty) => faculty.facultyId === facultyId)?.facultyName ?? '—';
   const departmentNameOf = (departmentId: number | null) =>
     departments.find((department) => department.departmentId === departmentId)?.departmentName ?? '—';
 
   const openCreate = () => {
+    setDeletedEmail(null);
     setEditing(null);
     setForm(emptyForm);
     setValidationError('');
@@ -183,6 +190,7 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
   };
 
   const openEdit = (lecturer: Lecturer) => {
+    setDeletedEmail(null);
     setEditing(lecturer);
     setForm({
       fullName: lecturer.fullName,
@@ -214,6 +222,7 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
     }
 
     setSaving(true);
+    setDeletedEmail(null);
     const errorCode = await onSaveLecturer(editing?.lecturerId ?? null, {
       fullName,
       departmentId: form.departmentId ? Number(form.departmentId) : null,
@@ -225,6 +234,7 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
     setSaving(false);
     if (errorCode) {
       setValidationError(catalogErrorMessage(errorCode));
+      if (!editing && errorCode === 'CATALOG_LECTURER_EMAIL_DELETED') setDeletedEmail(email);
       return;
     }
 
@@ -235,14 +245,33 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
     setValidationError('');
   };
 
+  const handleRestore = async () => {
+    if (!deletedEmail || saving) return;
+    setSaving(true);
+    try {
+      const errorCode = await onRestoreLecturer(deletedEmail);
+      if (errorCode) {
+        setValidationError(catalogErrorMessage(errorCode));
+        return;
+      }
+      toast.success('Đã khôi phục giảng viên và tài khoản cũ', { description: deletedEmail });
+      setDeletedEmail(null);
+      setIsModalOpen(false);
+      setForm(emptyForm);
+      setValidationError('');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleImport = async (rows: ImportLecturerRow[]): Promise<CatalogImportResponse> => {
     const result = await onImportLecturers(rows);
     if (result.createdCount > 0) {
-      toast.success(`Đã import ${result.createdCount} giảng viên`, {
+      toast.success(`Đã thêm hoặc khôi phục ${result.createdCount} giảng viên`, {
         description: result.skippedCount > 0 ? `${result.skippedCount} dòng bị bỏ qua` : undefined,
       });
     } else {
-      toast.error('Không có dòng nào được thêm', {
+      toast.error('Không có giảng viên nào được thêm hoặc khôi phục', {
         description: `${result.skippedCount} dòng bị bỏ qua`,
       });
     }
@@ -403,6 +432,15 @@ export const LecturersPage: React.FC<LecturersPageProps> = ({
         <form className="catalog-form" onSubmit={(event) => void handleSubmit(event)}>
           {validationError && (
             <div className="catalog-validation-error" role="alert">{validationError}</div>
+          )}
+          {deletedEmail && canManageAll && (
+            <div>
+              <p>Khôi phục thông tin đã lưu và mở lại tài khoản của {deletedEmail}. Sau đó bạn có thể sửa thông tin giảng viên.</p>
+              <button type="button" className="btn btn-secondary" disabled={saving}
+                onClick={() => void handleRestore()}>
+                {saving ? 'Đang khôi phục...' : 'Khôi phục giảng viên cũ'}
+              </button>
+            </div>
           )}
           <div className="form-group">
             <label htmlFor="lecturer-name">Họ và tên</label>

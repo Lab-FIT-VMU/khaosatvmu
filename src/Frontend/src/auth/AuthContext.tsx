@@ -18,8 +18,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState(anonymousState);
   const [configuration, setConfiguration] = useState<AuthConfiguration | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorTraceId, setErrorTraceId] = useState<string | null>(null);
 
   const applyAuthenticatedSession = useCallback(async (response: AuthMeResponse) => {
+    setErrorCode(null);
+    setErrorTraceId(null);
     if (!response.authenticated || !response.user || !response.activeProfile) {
       setSession(anonymousState);
       setStatus('anonymous');
@@ -45,7 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await applyAuthenticatedSession(response);
     } catch (error) {
       setSession(anonymousState);
-      setErrorCode(error instanceof AuthApiError ? error.errorCode : 'AUTH_API_UNAVAILABLE');
+      setErrorCode(error instanceof AuthApiError ? error.errorCode : 'AUTH_REQUEST_FAILED');
+      setErrorTraceId(error instanceof AuthApiError ? error.traceId : null);
       setStatus('error');
     }
   }, [applyAuthenticatedSession]);
@@ -59,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ...session,
     configuration,
     errorCode,
+    errorTraceId,
     refresh,
     devLogin: async () => {
       const response = await authApi.devLogin();
@@ -98,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         window.history.replaceState(null, '', '/login');
       }
     },
-  }), [applyAuthenticatedSession, configuration, errorCode, refresh, session, status]);
+  }), [applyAuthenticatedSession, configuration, errorCode, errorTraceId, refresh, session, status]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

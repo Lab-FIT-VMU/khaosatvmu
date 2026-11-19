@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/authContext';
+import { ApiError } from '../services/apiClient';
 import { ProfileSelectionDialog } from '../components/ProfileSelectionDialog';
 import type { AuthProfile } from '../types';
 import '../styles/auth-admin.css';
@@ -9,22 +10,28 @@ export function ProfileSelectionPage() {
   const [profiles, setProfiles] = useState<AuthProfile[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [errorTraceId, setErrorTraceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     auth.loadPendingProfiles()
       .then(setProfiles)
-      .catch(() => setErrorCode('AUTH_SESSION_EXPIRED'))
+      .catch(error => {
+        setErrorCode(error instanceof ApiError ? error.errorCode : 'AUTH_REQUEST_FAILED');
+        setErrorTraceId(error instanceof ApiError ? error.traceId : null);
+      })
       .finally(() => setLoading(false));
   }, [auth]);
 
   const selectProfile = async (profileId: string) => {
     setSelectedId(profileId);
     setErrorCode(null);
+    setErrorTraceId(null);
     try {
       await auth.selectPendingProfile(profileId);
-    } catch {
-      setErrorCode('AUTH_REQUEST_FAILED');
+    } catch (error) {
+      setErrorCode(error instanceof ApiError ? error.errorCode : 'AUTH_REQUEST_FAILED');
+      setErrorTraceId(error instanceof ApiError ? error.traceId : null);
       setSelectedId(null);
     }
   };
@@ -63,6 +70,7 @@ export function ProfileSelectionPage() {
         loading={loading}
         selectedId={selectedId}
         errorCode={errorCode}
+        errorTraceId={errorTraceId}
         title="Chọn phiên làm việc"
         description="Chọn vai trò và phạm vi bạn sẽ sử dụng trong phiên này."
         onSelect={(profileId) => void selectProfile(profileId)}

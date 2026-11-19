@@ -1282,11 +1282,15 @@ public static class SurveyErrorCodes
     public const string AnswerScaleOptionTextRequired = "SURVEY_ANSWER_SCALE_OPTION_TEXT_REQUIRED";
     public const string AnswerScaleInUse = "SURVEY_ANSWER_SCALE_IN_USE";
 
+    /// <summary>Bỏ một mức của thang mà mức đó đang là đáp án câu bẫy (kể cả câu đã xóa).</summary>
+    public const string AnswerScaleAttentionValueInUse = "SURVEY_ANSWER_SCALE_ATTENTION_VALUE_IN_USE";
+
     public const string TemplateNotFound = "SURVEY_TEMPLATE_NOT_FOUND";
     public const string TemplateNameRequired = "SURVEY_TEMPLATE_NAME_REQUIRED";
     public const string TemplateNameExists = "SURVEY_TEMPLATE_NAME_EXISTS";
     public const string TemplateQuestionsRequired = "SURVEY_TEMPLATE_QUESTIONS_REQUIRED";
     public const string TemplateInUse = "SURVEY_TEMPLATE_IN_USE";
+    public const string TemplateAttentionCheckLocked = "SURVEY_TEMPLATE_ATTENTION_CHECK_LOCKED";
 
     /// <summary>Bộ câu hỏi phải có ít nhất một mục.</summary>
     public const string TemplateSectionsRequired = "SURVEY_TEMPLATE_SECTIONS_REQUIRED";

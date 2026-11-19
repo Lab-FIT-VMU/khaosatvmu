@@ -148,7 +148,7 @@ public sealed record CourseSectionImportDto(
     IReadOnlyList<CatalogImportItemDto> Items,
     /// <summary>Số học phần được tạo tự động vì chưa có trong danh mục.</summary>
     int CreatedCourseCount,
-    /// <summary>Số giảng viên được tạo tự động từ email trong tệp.</summary>
+    /// <summary>Số giảng viên được tạo hoặc khôi phục tự động từ email trong tệp.</summary>
     int CreatedLecturerCount,
     /// <summary>Số lớp đã có sẵn và được cập nhật lại mã giảng viên.</summary>
     int UpdatedSectionCount,
@@ -469,12 +469,14 @@ public interface ICatalogService
     Task<CatalogOperationResult<SemesterDto>> RestoreSemesterAsync(int semesterId, CancellationToken cancellationToken = default);
     Task<CatalogOperationResult<CourseSectionDto>> RestoreCourseSectionAsync(int courseSectionId, CancellationToken cancellationToken = default);
     Task<CatalogOperationResult<LecturerDto>> RestoreLecturerAsync(int lecturerId, CancellationToken cancellationToken = default);
+    Task<CatalogOperationResult<LecturerDto>> RestoreLecturerByEmailAsync(string email, CancellationToken cancellationToken = default);
     Task<CatalogOperationResult<CourseDto>> RestoreCourseAsync(int courseId, CancellationToken cancellationToken = default);
 }
 
 public static class CatalogErrorCodes
 {
     public const string InvalidRequest = "CATALOG_INVALID_REQUEST";
+    public const string RestoreParentDeleted = "CATALOG_RESTORE_PARENT_DELETED";
 
     public const string FacultyNotFound = "CATALOG_FACULTY_NOT_FOUND";
     public const string FacultyNameRequired = "CATALOG_FACULTY_NAME_REQUIRED";
@@ -496,10 +498,12 @@ public static class CatalogErrorCodes
     public const string DepartmentCodeInvalid = "CATALOG_DEPARTMENT_CODE_INVALID";
 
     public const string PositionNotFound = "CATALOG_POSITION_NOT_FOUND";
+    public const string PositionInUse = "CATALOG_POSITION_IN_USE";
     public const string PositionNameRequired = "CATALOG_POSITION_NAME_REQUIRED";
     public const string PositionNameExists = "CATALOG_POSITION_NAME_EXISTS";
 
     public const string MajorNotFound = "CATALOG_MAJOR_NOT_FOUND";
+    public const string MajorInUse = "CATALOG_MAJOR_IN_USE";
     public const string MajorCodeRequired = "CATALOG_MAJOR_CODE_REQUIRED";
     public const string MajorCodeExists = "CATALOG_MAJOR_CODE_EXISTS";
     public const string MajorNameRequired = "CATALOG_MAJOR_NAME_REQUIRED";
@@ -513,6 +517,8 @@ public static class CatalogErrorCodes
     public const string AcademicYearNameInvalid = "CATALOG_ACADEMIC_YEAR_NAME_INVALID";
     /// <summary>Mã khoá tự sinh từ năm học đã thuộc về một khoá khác.</summary>
     public const string AcademicYearCohortCodeExists = "CATALOG_ACADEMIC_YEAR_COHORT_CODE_EXISTS";
+    public const string AcademicYearInUse = "CATALOG_ACADEMIC_YEAR_IN_USE";
+    public const string SemesterInUse = "CATALOG_SEMESTER_IN_USE";
 
     public const string SemesterNotFound = "CATALOG_SEMESTER_NOT_FOUND";
     public const string SemesterNameRequired = "CATALOG_SEMESTER_NAME_REQUIRED";
@@ -538,8 +544,11 @@ public static class CatalogErrorCodes
     public const string OutOfScope = "CATALOG_OUT_OF_SCOPE";
 
     public const string LecturerNameRequired = "CATALOG_LECTURER_NAME_REQUIRED";
+    public const string LecturerNameTooLong = "CATALOG_LECTURER_NAME_TOO_LONG";
     public const string LecturerEmailRequired = "CATALOG_LECTURER_EMAIL_REQUIRED";
+    public const string LecturerEmailInvalid = "CATALOG_LECTURER_EMAIL_INVALID";
     public const string LecturerEmailExists = "CATALOG_LECTURER_EMAIL_EXISTS";
+    public const string LecturerEmailDeleted = "CATALOG_LECTURER_EMAIL_DELETED";
     public const string LecturerEmailDuplicateInFile = "CATALOG_LECTURER_EMAIL_DUPLICATE_IN_FILE";
     public const string LecturerInUse = "CATALOG_LECTURER_IN_USE";
 

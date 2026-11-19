@@ -13,11 +13,12 @@ import {
   downloadLecturerFailedRows,
   downloadLecturerImportTemplate,
   parseLecturerImportFile,
+  lecturerImportRowError,
   LecturerImportFileError,
   type LecturerImportFileErrorCode,
   type ImportLecturerRow,
 } from '../utils/lecturerImportExcel';
-import { ApiError } from '../services/apiClient';
+import { apiErrorMessage } from '../services/apiClient';
 import { catalogErrorMessage, type CatalogImportResponse } from '../services/catalogApi';
 import { buildDepartmentLookupRows } from '../utils/importLookupRows';
 import type { Department, Faculty } from '../types';
@@ -105,7 +106,7 @@ export function LecturerImportDialog({
       setResult(await onImport(rows));
     } catch (error) {
       setRequestError(
-        error instanceof ApiError ? catalogErrorMessage(error.errorCode) : catalogErrorMessage(null)
+        apiErrorMessage(error, catalogErrorMessage)
       );
     } finally {
       setImporting(false);
@@ -135,15 +136,14 @@ export function LecturerImportDialog({
     row.positionName,
   ];
 
-  // Chỉ họ tên là bắt buộc; các cột còn lại để trống vẫn import được.
-  const invalidRows = rows.filter((row) => row.fullName.length === 0);
+  const invalidRows = rows.filter((row) => lecturerImportRowError(row) !== null);
 
   const exportInvalidRows = () =>
     downloadLecturerFailedRows(
       invalidRows.map((row) => ({
         rowNumber: row.rowNumber,
         values: rowValues(row),
-        reason: 'Thiếu họ và tên',
+        reason: lecturerImportRowError(row)!,
       }))
     );
 
@@ -168,10 +168,13 @@ export function LecturerImportDialog({
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
           <p>
-            Hàng đầu tiên cần có cột <strong>Họ và tên</strong>. Các cột Email, Số điện thoại, Tên
+            Hàng đầu tiên cần có cột <strong>Họ và tên</strong> và <strong>Email</strong>;
+            mỗi dòng phải điền đủ hai cột này. Các cột Số điện thoại, Tên
             khoa viện, Tên bộ môn, Chức vụ là tùy chọn; tên khoa viện, bộ môn và chức vụ được tra
             ngược ra id. Dòng nào bỏ trống cột <strong>Chức vụ</strong> sẽ mặc định là{' '}
             <strong>{defaultPositionName}</strong>.
+            {' '}Email của giảng viên đã xóa sẽ tự khôi phục giảng viên và tài khoản cũ,
+            giữ lịch sử và cập nhật thông tin theo file.
           </p>
         </div>
 
@@ -245,10 +248,10 @@ export function LecturerImportDialog({
             {rows.length > 0 && (
               <section className="admin-import-preview" aria-label="Xem trước dữ liệu import">
                 <header>
-                  <strong>{rows.length} giảng viên sẵn sàng import</strong>
+                  <strong>{rows.length} dòng giảng viên trong tệp</strong>
                   <span>
                     {invalidRows.length > 0
-                      ? `${invalidRows.length} dòng thiếu họ và tên`
+                      ? `${invalidRows.length} dòng cần sửa dữ liệu`
                       : 'Hiển thị toàn bộ danh sách'}
                   </span>
                 </header>
@@ -274,7 +277,13 @@ export function LecturerImportDialog({
                               <span className="admin-import-invalid">Thiếu họ tên</span>
                             )}
                           </td>
-                          <td>{row.email || '—'}</td>
+                          <td>
+                            {lecturerImportRowError(row) ? (
+                              <span className="admin-import-invalid">
+                                {row.email || 'Chưa có email'} — {lecturerImportRowError(row)}
+                              </span>
+                            ) : row.email}
+                          </td>
                           <td>{row.facultyName || '—'}</td>
                           <td>{row.departmentName || '—'}</td>
                           <td>
@@ -303,7 +312,7 @@ export function LecturerImportDialog({
               <div>
                 <strong>Hoàn tất import {result.totalCount} dòng</strong>
                 <span>
-                  {result.createdCount} đã thêm, {result.skippedCount} bị bỏ qua
+                  {result.createdCount} đã thêm hoặc khôi phục, {result.skippedCount} bị bỏ qua
                 </span>
               </div>
             </div>

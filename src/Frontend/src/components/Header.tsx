@@ -1,3 +1,4 @@
+import { authRequestErrorMessage } from '../auth/authMessages';
 import { Fragment, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -78,9 +79,9 @@ export function Header({
         description: selectedProfile?.name,
       });
       setIsProfileDialogOpen(false);
-    } catch {
+    } catch (error) {
       toast.error('Không thể đổi hồ sơ', {
-        description: 'Hãy kiểm tra lại phiên đăng nhập và thử lại.',
+        description: authRequestErrorMessage(error),
       });
     } finally {
       setBusy(false);

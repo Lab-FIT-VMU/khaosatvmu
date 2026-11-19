@@ -4,7 +4,7 @@ import { QuestionAnalysisChart } from '../QuestionAnalysisChart';
 import { TablePagination } from '../TablePagination';
 import { useColumnFilters, type FilterableColumn } from '../../hooks/useColumnFilters';
 import { usePaginatedItems } from '../../hooks/usePaginatedItems';
-import { ApiError } from '../../services/apiClient';
+import { apiErrorMessage } from '../../services/apiClient';
 import { surveyApi, surveyErrorMessage } from '../../services/surveyApi';
 import type {
   CourseDiagnosisRow,
@@ -33,7 +33,7 @@ const scopeLabels: Record<SurveyAnalysisScopeType, string> = {
 const scopePageSize = 20;
 
 const messageFrom = (error: unknown): string =>
-  error instanceof ApiError ? surveyErrorMessage(error.errorCode) : surveyErrorMessage(null);
+  apiErrorMessage(error, surveyErrorMessage);
 
 /**
  * Một dòng của bảng chi tiết.

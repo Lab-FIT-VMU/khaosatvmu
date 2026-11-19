@@ -3,6 +3,7 @@ import type { SheetData } from 'write-excel-file/browser';
 import {
   buildLookupSheet,
   downloadFailedRows,
+  isValidImportEmail,
   templateHeaderRow,
   writeWorkbook,
   type FailedRowExport,
@@ -62,6 +63,14 @@ export interface ImportLecturerRow {
   departmentName: string;
   /** Tra ngược ra "Lecturers"."PositionId"; để trống thì backend dùng defaultPositionName. */
   positionName: string;
+}
+
+export function lecturerImportRowError(row: ImportLecturerRow): string | null {
+  if (!row.fullName.trim()) return 'Thiếu họ và tên';
+  if (row.fullName.trim().length > 200) return 'Họ và tên không được vượt quá 200 ký tự';
+  if (!row.email.trim()) return 'Thiếu email';
+  if (!isValidImportEmail(row.email.trim())) return 'Email không đúng định dạng hoặc vượt quá 320 ký tự';
+  return null;
 }
 
 export type LecturerImportFileErrorCode =
@@ -190,8 +199,10 @@ export async function parseLecturerImportFile(file: File): Promise<ImportLecture
   if (nameIndex < 0) {
     throw new LecturerImportFileError('NAME_HEADER_MISSING');
   }
-  // Cột Email là tùy chọn: "Lecturers"."Email" cho phép NULL.
   const emailIndex = indexOf(emailHeaders);
+  if (emailIndex < 0) {
+    throw new LecturerImportFileError('EMAIL_HEADER_MISSING');
+  }
   const phoneIndex = indexOf(phoneHeaders);
   const facultyIndex = indexOf(facultyNameHeaders);
   const departmentIndex = indexOf(departmentNameHeaders);

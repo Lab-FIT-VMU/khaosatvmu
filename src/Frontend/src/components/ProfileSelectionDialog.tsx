@@ -19,6 +19,7 @@ interface ProfileSelectionDialogProps {
   loading?: boolean;
   selectedId: string | null;
   errorCode?: string | null;
+  errorTraceId?: string | null;
   currentProfileId?: string;
   dismissible?: boolean;
   title: string;
@@ -32,6 +33,7 @@ export function ProfileSelectionDialog({
   loading = false,
   selectedId,
   errorCode,
+  errorTraceId,
   currentProfileId,
   dismissible = false,
   title,
@@ -133,7 +135,7 @@ export function ProfileSelectionDialog({
             <div className="auth-alert" role="alert">
               <CircleAlert aria-hidden="true" />
               <span>
-                {authMessage(errorCode)}{' '}
+                {authMessage(errorCode, errorTraceId)}{' '}
                 {!dismissible && <a href="/login">Đăng nhập lại</a>}
               </span>
             </div>
