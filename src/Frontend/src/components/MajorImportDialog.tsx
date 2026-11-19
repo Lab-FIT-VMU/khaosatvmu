@@ -19,7 +19,10 @@ import {
 import { apiErrorMessage } from '../services/apiClient';
 import { catalogErrorMessage, type CatalogImportResponse } from '../services/catalogApi';
 import type { Faculty } from '../types';
+import { majorImportReason } from '../utils/catalogImportRowReasons';
+import type { ImportSheetChoice } from '../utils/importSheets';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
+import { ImportSheetPicker } from './ImportSheetPicker';
 import { Modal } from './Modal';
 
 interface MajorImportDialogProps {
@@ -51,6 +54,9 @@ export function MajorImportDialog({
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
+  // Giữ tệp để đọc lại khi người dùng đổi sheet.
+  const [file, setFile] = useState<File | null>(null);
+  const [sheetChoice, setSheetChoice] = useState<ImportSheetChoice | null>(null);
   const [rows, setRows] = useState<ImportMajorRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [result, setResult] = useState<CatalogImportResponse | null>(null);
@@ -63,6 +69,8 @@ export function MajorImportDialog({
   const reset = () => {
     if (inputRef.current) inputRef.current.value = '';
     setFileName('');
+    setFile(null);
+    setSheetChoice(null);
     setRows([]);
     setParseError(null);
     setRequestError(null);
@@ -75,23 +83,34 @@ export function MajorImportDialog({
     onClose();
   };
 
-  const handleFileChange = async (file?: File) => {
-    reset();
-    if (!file) return;
-
-    setFileName(file.name);
+  /** Đọc tệp; `sheetName` bỏ trống thì tự chọn sheet đủ cột bắt buộc. */
+  const readFile = async (source: File, sheetName?: string) => {
     setParsing(true);
+    setParseError(null);
+    setRows([]);
     try {
-      setRows(await parseMajorImportFile(file));
+      const parsed = await parseMajorImportFile(source, sheetName);
+      setRows(parsed.rows);
+      setSheetChoice(parsed);
     } catch (error) {
       setParseError(
         error instanceof MajorImportFileError
           ? fileErrorMessages[error.code]
           : fileErrorMessages.READ_FAILED
       );
+      if (sheetName) setSheetChoice((previous) => (previous ? { ...previous, sheetName } : previous));
     } finally {
       setParsing(false);
     }
+  };
+
+  const handleFileChange = async (selected?: File) => {
+    reset();
+    if (!selected) return;
+
+    setFileName(selected.name);
+    setFile(selected);
+    await readFile(selected);
   };
 
   const handleImport = async () => {
@@ -123,6 +142,11 @@ export function MajorImportDialog({
 
   const failedItems = result?.items.filter((item) => !item.succeeded) ?? [];
 
+  // Lý do cụ thể của từng dòng bị bỏ qua: nêu giá trị gây lỗi, gợi ý giá trị đúng, dòng trùng trước đó.
+  const rowByNumber = new Map(rows.map((row) => [row.rowNumber, row]));
+  const reasonOf = (item: { rowNumber: number; errorCode?: string | null }) =>
+    majorImportReason(item.errorCode, rowByNumber.get(item.rowNumber), rows, faculties);
+
   const exportFailedItems = () => {
     const rowByNumber = new Map(rows.map((row) => [row.rowNumber, row]));
 
@@ -136,7 +160,7 @@ export function MajorImportDialog({
             row?.majorName ?? item.name ?? '',
             row?.facultyName ?? item.facultyName ?? '',
           ],
-          reason: catalogErrorMessage(item.errorCode),
+          reason: reasonOf(item),
         };
       })
     );
@@ -199,6 +223,13 @@ export function MajorImportDialog({
                 onChange={(event) => void handleFileChange(event.target.files?.[0])}
               />
             </label>
+
+            <ImportSheetPicker
+              choice={sheetChoice}
+              disabled={parsing}
+              requiredColumnsLabel="Mã ngành / Tên ngành / Tên khoa viện"
+              onChange={(name) => file && void readFile(file, name)}
+            />
 
             {parsing && (
               <div className="admin-import-state" role="status">
@@ -301,7 +332,7 @@ export function MajorImportDialog({
                         <td style={{ textAlign: 'right' }}>{item.rowNumber}</td>
                         <td>{item.name || 'Không có'}</td>
                         <td>{item.facultyName || 'Không có'}</td>
-                        <td>{catalogErrorMessage(item.errorCode)}</td>
+                        <td>{reasonOf(item)}</td>
                       </tr>
                     ))}
                   </tbody>

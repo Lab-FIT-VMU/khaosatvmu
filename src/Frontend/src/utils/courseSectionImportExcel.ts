@@ -322,8 +322,39 @@ export async function downloadUnidentifiedLecturerFile(
   }).toFile(unidentifiedLecturerFileName);
 }
 
-/** Đọc tệp .xlsx của danh sách lớp học phần. */
-export async function parseCourseSectionImportFile(file: File): Promise<ImportCourseSectionRow[]> {
+/** Kết quả đọc tệp: các dòng của sheet đã chọn, kèm danh sách sheet để người dùng đổi. */
+export interface CourseSectionImportParseResult {
+  rows: ImportCourseSectionRow[];
+  /** Sheet đang đọc. */
+  sheetName: string;
+  /** Mọi sheet trong tệp, đúng thứ tự trong tệp. */
+  sheetNames: string[];
+  /** Các sheet có hàng tiêu đề đủ cột "Mã HP" và "Nhóm". */
+  usableSheetNames: string[];
+}
+
+type SheetRows = readonly (readonly (CellValue | null)[])[];
+
+/** Hàng đầu có đủ cột Mã HP và Nhóm thì sheet đọc được. */
+function isUsableSheet(data: SheetRows): boolean {
+  if (data.length === 0) return false;
+  const headers = data[0].map((value) => normalizeHeader(cellText(value)));
+  return headers.some((header) => courseCodeHeaders.has(header))
+    && headers.some((header) => sectionNameHeaders.has(header));
+}
+
+/**
+ * Đọc tệp .xlsx của danh sách lớp học phần.
+ *
+ * Tệp có nhiều sheet thì KHÔNG mặc định lấy sheet đầu: trước đây tệp có một sheet nháp đứng
+ * trước sheet "Lop hoc phan" bị nạp nhầm mà không ai biết. Không chỉ định thì chọn sheet có
+ * đủ cột Mã HP / Nhóm, ưu tiên sheet tên "Lớp học phần"; giao diện báo rõ đang đọc sheet nào
+ * và cho đổi.
+ */
+export async function parseCourseSectionImportFile(
+  file: File,
+  sheetName?: string,
+): Promise<CourseSectionImportParseResult> {
   if (!file.name.toLowerCase().endsWith('.xlsx')) {
     throw new CourseSectionImportFileError('FILE_TYPE');
   }
@@ -331,14 +362,33 @@ export async function parseCourseSectionImportFile(file: File): Promise<ImportCo
     throw new CourseSectionImportFileError('FILE_SIZE');
   }
 
-  let sheet;
+  let sheets: { sheet: string; data: SheetRows }[];
   try {
-    const { readSheet } = await import('read-excel-file/browser');
-    sheet = await readSheet(file);
+    const { default: readXlsxFile } = await import('read-excel-file/browser');
+    sheets = await readXlsxFile(file);
   } catch {
     throw new CourseSectionImportFileError('READ_FAILED');
   }
 
+  if (sheets.length === 0) {
+    throw new CourseSectionImportFileError('FILE_EMPTY');
+  }
+
+  const usable = sheets.filter((item) => isUsableSheet(item.data));
+  const chosen = (sheetName ? sheets.find((item) => item.sheet === sheetName) : undefined)
+    ?? usable.find((item) => normalizeHeader(item.sheet).replace(/[^a-z0-9]/g, '').includes('lophocphan'))
+    ?? usable[0]
+    ?? sheets[0];
+
+  return {
+    rows: parseSheetRows(chosen.data),
+    sheetName: chosen.sheet,
+    sheetNames: sheets.map((item) => item.sheet),
+    usableSheetNames: usable.map((item) => item.sheet),
+  };
+}
+
+function parseSheetRows(sheet: SheetRows): ImportCourseSectionRow[] {
   if (sheet.length === 0) {
     throw new CourseSectionImportFileError('FILE_EMPTY');
   }

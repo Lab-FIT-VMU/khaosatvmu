@@ -19,7 +19,10 @@ import {
 import { apiErrorMessage } from '../services/apiClient';
 import { catalogErrorMessage, type CatalogImportResponse } from '../services/catalogApi';
 import type { Faculty } from '../types';
+import { departmentImportReason } from '../utils/catalogImportRowReasons';
+import type { ImportSheetChoice } from '../utils/importSheets';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
+import { ImportSheetPicker } from './ImportSheetPicker';
 import { Modal } from './Modal';
 
 interface DepartmentImportDialogProps {
@@ -51,6 +54,9 @@ export function DepartmentImportDialog({
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
+  // Giữ tệp để đọc lại khi người dùng đổi sheet.
+  const [file, setFile] = useState<File | null>(null);
+  const [sheetChoice, setSheetChoice] = useState<ImportSheetChoice | null>(null);
   const [rows, setRows] = useState<ImportDepartmentRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [result, setResult] = useState<CatalogImportResponse | null>(null);
@@ -63,6 +69,8 @@ export function DepartmentImportDialog({
   const reset = () => {
     if (inputRef.current) inputRef.current.value = '';
     setFileName('');
+    setFile(null);
+    setSheetChoice(null);
     setRows([]);
     setParseError(null);
     setRequestError(null);
@@ -75,23 +83,34 @@ export function DepartmentImportDialog({
     onClose();
   };
 
-  const handleFileChange = async (file?: File) => {
-    reset();
-    if (!file) return;
-
-    setFileName(file.name);
+  /** Đọc tệp; `sheetName` bỏ trống thì tự chọn sheet đủ cột bắt buộc. */
+  const readFile = async (source: File, sheetName?: string) => {
     setParsing(true);
+    setParseError(null);
+    setRows([]);
     try {
-      setRows(await parseDepartmentImportFile(file));
+      const parsed = await parseDepartmentImportFile(source, sheetName);
+      setRows(parsed.rows);
+      setSheetChoice(parsed);
     } catch (error) {
       setParseError(
         error instanceof DepartmentImportFileError
           ? fileErrorMessages[error.code]
           : fileErrorMessages.READ_FAILED
       );
+      if (sheetName) setSheetChoice((previous) => (previous ? { ...previous, sheetName } : previous));
     } finally {
       setParsing(false);
     }
+  };
+
+  const handleFileChange = async (selected?: File) => {
+    reset();
+    if (!selected) return;
+
+    setFileName(selected.name);
+    setFile(selected);
+    await readFile(selected);
   };
 
   const handleImport = async () => {
@@ -144,6 +163,11 @@ export function DepartmentImportDialog({
 
   // Dòng bị API trả về lỗi. Dựng lại giá trị từ chính tệp vừa đọc theo số dòng,
   // vì phản hồi của API chỉ mang tên và mã lỗi chứ không đủ các cột.
+  // Lý do cụ thể của từng dòng bị bỏ qua: nêu giá trị gây lỗi, gợi ý giá trị đúng, dòng trùng trước đó.
+  const rowByNumber = new Map(rows.map((row) => [row.rowNumber, row]));
+  const reasonOf = (item: { rowNumber: number; errorCode?: string | null }) =>
+    departmentImportReason(item.errorCode, rowByNumber.get(item.rowNumber), rows, faculties);
+
   const exportFailedItems = () => {
     const rowByNumber = new Map(rows.map((row) => [row.rowNumber, row]));
 
@@ -157,7 +181,7 @@ export function DepartmentImportDialog({
             row?.departmentName ?? item.name ?? '',
             row?.facultyName ?? item.facultyName ?? '',
           ],
-          reason: catalogErrorMessage(item.errorCode),
+          reason: reasonOf(item),
         };
       })
     );
@@ -221,6 +245,13 @@ export function DepartmentImportDialog({
                 onChange={(event) => void handleFileChange(event.target.files?.[0])}
               />
             </label>
+
+            <ImportSheetPicker
+              choice={sheetChoice}
+              disabled={parsing}
+              requiredColumnsLabel="Mã bộ môn / Tên bộ môn / Tên khoa viện"
+              onChange={(name) => file && void readFile(file, name)}
+            />
 
             {parsing && (
               <div className="admin-import-state" role="status">
@@ -326,7 +357,7 @@ export function DepartmentImportDialog({
                         <td style={{ textAlign: 'right' }}>{item.rowNumber}</td>
                         <td>{item.name || 'Không có'}</td>
                         <td>{item.facultyName || 'Không có'}</td>
-                        <td>{catalogErrorMessage(item.errorCode)}</td>
+                        <td>{reasonOf(item)}</td>
                       </tr>
                     ))}
                   </tbody>

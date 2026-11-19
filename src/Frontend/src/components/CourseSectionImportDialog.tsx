@@ -20,8 +20,10 @@ import {
 import { apiErrorMessage } from '../services/apiClient';
 import { catalogErrorMessage, type CourseSectionImportResponse } from '../services/catalogApi';
 import { buildLecturerLookupRows } from '../utils/importLookupRows';
+import { courseSectionFailureReason } from '../utils/courseSectionImportReasons';
 import type { Department, Faculty, Lecturer } from '../types';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
+import { ImportSheetPicker } from './ImportSheetPicker';
 import { Modal } from './Modal';
 
 interface CourseSectionImportDialogProps {
@@ -58,6 +60,13 @@ export function CourseSectionImportDialog({
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
+  // Giữ tệp để đọc lại khi người dùng đổi sheet.
+  const [file, setFile] = useState<File | null>(null);
+  const [sheetInfo, setSheetInfo] = useState<{
+    sheetName: string;
+    sheetNames: string[];
+    usableSheetNames: string[];
+  } | null>(null);
   const [rows, setRows] = useState<ImportCourseSectionRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [result, setResult] = useState<CourseSectionImportResponse | null>(null);
@@ -72,6 +81,8 @@ export function CourseSectionImportDialog({
   const reset = () => {
     if (inputRef.current) inputRef.current.value = '';
     setFileName('');
+    setFile(null);
+    setSheetInfo(null);
     setRows([]);
     setParseError(null);
     setRequestError(null);
@@ -85,23 +96,41 @@ export function CourseSectionImportDialog({
     onClose();
   };
 
-  const handleFileChange = async (file?: File) => {
-    reset();
-    if (!file) return;
-
-    setFileName(file.name);
+  /** Đọc tệp; `sheetName` bỏ trống thì tự chọn sheet có đủ cột Mã HP / Nhóm. */
+  const readFile = async (source: File, sheetName?: string) => {
     setParsing(true);
+    setParseError(null);
+    setRows([]);
     try {
-      setRows(await parseCourseSectionImportFile(file));
+      const parsed = await parseCourseSectionImportFile(source, sheetName);
+      setRows(parsed.rows);
+      setSheetInfo({
+        sheetName: parsed.sheetName,
+        sheetNames: parsed.sheetNames,
+        usableSheetNames: parsed.usableSheetNames,
+      });
     } catch (error) {
       setParseError(
         error instanceof CourseSectionImportFileError
           ? fileErrorMessages[error.code]
           : fileErrorMessages.READ_FAILED
       );
+      // Sheet chọn tay không đọc được: vẫn giữ tên sheet để ô chọn hiện đúng.
+      if (sheetName) {
+        setSheetInfo((previous) => (previous ? { ...previous, sheetName } : previous));
+      }
     } finally {
       setParsing(false);
     }
+  };
+
+  const handleFileChange = async (selected?: File) => {
+    reset();
+    if (!selected) return;
+
+    setFileName(selected.name);
+    setFile(selected);
+    await readFile(selected);
   };
 
   const handleImport = async () => {
@@ -180,20 +209,23 @@ export function CourseSectionImportDialog({
       }))
     );
 
-  const exportFailedItems = () => {
-    const rowByNumber = new Map(rows.map((row) => [row.rowNumber, row]));
+  // Lý do cụ thể của từng dòng bị bỏ qua: nêu giá trị gây lỗi và gợi ý giá trị đúng.
+  const rowByNumber = new Map(rows.map((row) => [row.rowNumber, row]));
+  const reasonContext = { rows, departments, faculties };
+  const reasonOf = (item: { rowNumber: number; errorCode?: string | null }) =>
+    courseSectionFailureReason(item.errorCode, rowByNumber.get(item.rowNumber), reasonContext);
 
-    return downloadCourseSectionFailedRows(
+  const exportFailedItems = () =>
+    downloadCourseSectionFailedRows(
       failedItems.map((item) => {
         const row = rowByNumber.get(item.rowNumber);
         return {
           rowNumber: item.rowNumber,
           values: row ? rowValues(row) : ['', '', '', '', '', '', '', '', '', ''],
-          reason: catalogErrorMessage(item.errorCode),
+          reason: reasonOf(item),
         };
       })
     );
-  };
 
   const unidentifiedLecturers = result?.unidentifiedLecturers ?? [];
   // Các dòng trong tệp xuất ra được xếp liền nhau theo bộ môn.
@@ -265,6 +297,13 @@ export function CourseSectionImportDialog({
                 onChange={(event) => void handleFileChange(event.target.files?.[0])}
               />
             </label>
+
+            <ImportSheetPicker
+              choice={sheetInfo}
+              disabled={parsing}
+              requiredColumnsLabel="Mã HP / Nhóm"
+              onChange={(name) => file && void readFile(file, name)}
+            />
 
             {parsing && (
               <div className="admin-import-state" role="status">
@@ -462,7 +501,7 @@ export function CourseSectionImportDialog({
                         <td style={{ textAlign: 'right' }}>{item.rowNumber}</td>
                         <td>{item.name || 'Không có'}</td>
                         <td>{item.facultyName || 'Không có'}</td>
-                        <td>{catalogErrorMessage(item.errorCode)}</td>
+                        <td>{reasonOf(item)}</td>
                       </tr>
                     ))}
                   </tbody>

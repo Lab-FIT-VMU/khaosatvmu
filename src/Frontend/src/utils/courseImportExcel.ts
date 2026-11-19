@@ -7,6 +7,7 @@ import {
   writeWorkbook,
   type FailedRowExport,
 } from './importExcelShared';
+import { pickImportSheet, type ImportParseResult } from './importSheets';
 import {
   departmentLookupHeaders,
   departmentLookupValues,
@@ -155,7 +156,10 @@ export async function downloadCourseFailedRows(rows: FailedRowExport[]): Promise
 }
 
 /** Đọc tệp .xlsx của danh mục học phần. */
-export async function parseCourseImportFile(file: File): Promise<ImportCourseRow[]> {
+export async function parseCourseImportFile(
+  file: File,
+  sheetName?: string,
+): Promise<ImportParseResult<ImportCourseRow>> {
   if (!file.name.toLowerCase().endsWith('.xlsx')) {
     throw new CourseImportFileError('FILE_TYPE');
   }
@@ -163,13 +167,18 @@ export async function parseCourseImportFile(file: File): Promise<ImportCourseRow
     throw new CourseImportFileError('FILE_SIZE');
   }
 
-  let sheet;
+  // Tệp nhiều sheet: đọc `sheetName`, bỏ trống thì tự chọn sheet đủ cột (xem importSheets).
+  let picked: Awaited<ReturnType<typeof pickImportSheet>>;
   try {
-    const { readSheet } = await import('read-excel-file/browser');
-    sheet = await readSheet(file);
+    picked = await pickImportSheet(file, {
+      sheetName,
+      requiredHeaders: [courseCodeHeaders, courseNameHeaders],
+      preferredNames: ['hocphan'],
+    });
   } catch {
     throw new CourseImportFileError('READ_FAILED');
   }
+  const sheet = picked.data;
 
   if (sheet.length === 0) {
     throw new CourseImportFileError('FILE_EMPTY');
@@ -214,5 +223,5 @@ export async function parseCourseImportFile(file: File): Promise<ImportCourseRow
     throw new CourseImportFileError('NO_DATA_ROWS');
   }
 
-  return rows;
+  return { rows, ...picked.choice };
 }

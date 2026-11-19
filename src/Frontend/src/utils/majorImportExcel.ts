@@ -7,6 +7,7 @@ import {
   writeWorkbook,
   type FailedRowExport,
 } from './importExcelShared';
+import { pickImportSheet, type ImportParseResult } from './importSheets';
 
 const maximumFileSize = 5 * 1024 * 1024;
 const majorCodeHeaders = new Set(['ma nganh', 'majorcode', 'major code']);
@@ -140,7 +141,10 @@ export async function downloadMajorFailedRows(rows: FailedRowExport[]): Promise<
 }
 
 /** Đọc tệp .xlsx và lấy ba trường danh mục chuẩn. */
-export async function parseMajorImportFile(file: File): Promise<ImportMajorRow[]> {
+export async function parseMajorImportFile(
+  file: File,
+  sheetName?: string,
+): Promise<ImportParseResult<ImportMajorRow>> {
   if (!file.name.toLowerCase().endsWith('.xlsx')) {
     throw new MajorImportFileError('FILE_TYPE');
   }
@@ -148,13 +152,18 @@ export async function parseMajorImportFile(file: File): Promise<ImportMajorRow[]
     throw new MajorImportFileError('FILE_SIZE');
   }
 
-  let sheet;
+  // Tệp nhiều sheet: đọc `sheetName`, bỏ trống thì tự chọn sheet đủ cột (xem importSheets).
+  let picked: Awaited<ReturnType<typeof pickImportSheet>>;
   try {
-    const { readSheet } = await import('read-excel-file/browser');
-    sheet = await readSheet(file);
+    picked = await pickImportSheet(file, {
+      sheetName,
+      requiredHeaders: [majorCodeHeaders, majorNameHeaders, facultyNameHeaders],
+      preferredNames: ['nganh'],
+    });
   } catch {
     throw new MajorImportFileError('READ_FAILED');
   }
+  const sheet = picked.data;
 
   if (sheet.length === 0) {
     throw new MajorImportFileError('FILE_EMPTY');
@@ -187,5 +196,5 @@ export async function parseMajorImportFile(file: File): Promise<ImportMajorRow[]
     throw new MajorImportFileError('NO_DATA_ROWS');
   }
 
-  return rows;
+  return { rows, ...picked.choice };
 }

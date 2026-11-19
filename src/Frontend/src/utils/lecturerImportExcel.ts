@@ -8,6 +8,7 @@ import {
   writeWorkbook,
   type FailedRowExport,
 } from './importExcelShared';
+import { pickImportSheet, type ImportParseResult } from './importSheets';
 import {
   departmentLookupHeaders,
   departmentLookupValues,
@@ -170,8 +171,14 @@ export async function downloadLecturerFailedRows(rows: FailedRowExport[]): Promi
   });
 }
 
-/** Đọc tệp .xlsx của danh mục giảng viên. */
-export async function parseLecturerImportFile(file: File): Promise<ImportLecturerRow[]> {
+/**
+ * Đọc tệp .xlsx của danh mục giảng viên. Tệp nhiều sheet: đọc `sheetName`, bỏ trống thì tự
+ * chọn sheet đủ cột họ tên và email (xem importSheets).
+ */
+export async function parseLecturerImportFile(
+  file: File,
+  sheetName?: string,
+): Promise<ImportParseResult<ImportLecturerRow>> {
   if (!file.name.toLowerCase().endsWith('.xlsx')) {
     throw new LecturerImportFileError('FILE_TYPE');
   }
@@ -179,13 +186,17 @@ export async function parseLecturerImportFile(file: File): Promise<ImportLecture
     throw new LecturerImportFileError('FILE_SIZE');
   }
 
-  let sheet;
+  let picked: Awaited<ReturnType<typeof pickImportSheet>>;
   try {
-    const { readSheet } = await import('read-excel-file/browser');
-    sheet = await readSheet(file);
+    picked = await pickImportSheet(file, {
+      sheetName,
+      requiredHeaders: [fullNameHeaders, emailHeaders],
+      preferredNames: ['giangvien'],
+    });
   } catch {
     throw new LecturerImportFileError('READ_FAILED');
   }
+  const sheet = picked.data;
 
   if (sheet.length === 0) {
     throw new LecturerImportFileError('FILE_EMPTY');
@@ -229,5 +240,5 @@ export async function parseLecturerImportFile(file: File): Promise<ImportLecture
     throw new LecturerImportFileError('NO_DATA_ROWS');
   }
 
-  return rows;
+  return { rows, ...picked.choice };
 }

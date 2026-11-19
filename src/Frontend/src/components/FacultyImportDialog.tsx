@@ -18,7 +18,10 @@ import {
 } from '../utils/facultyImportExcel';
 import { apiErrorMessage } from '../services/apiClient';
 import { catalogErrorMessage, type CatalogImportResponse } from '../services/catalogApi';
+import { facultyImportReason } from '../utils/catalogImportRowReasons';
+import type { ImportSheetChoice } from '../utils/importSheets';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
+import { ImportSheetPicker } from './ImportSheetPicker';
 import { Modal } from './Modal';
 
 interface FacultyImportDialogProps {
@@ -41,6 +44,9 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
+  // Giữ tệp để đọc lại khi người dùng đổi sheet.
+  const [file, setFile] = useState<File | null>(null);
+  const [sheetChoice, setSheetChoice] = useState<ImportSheetChoice | null>(null);
   const [rows, setRows] = useState<ImportFacultyRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [result, setResult] = useState<CatalogImportResponse | null>(null);
@@ -53,6 +59,8 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
   const reset = () => {
     if (inputRef.current) inputRef.current.value = '';
     setFileName('');
+    setFile(null);
+    setSheetChoice(null);
     setRows([]);
     setParseError(null);
     setRequestError(null);
@@ -65,23 +73,34 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
     onClose();
   };
 
-  const handleFileChange = async (file?: File) => {
-    reset();
-    if (!file) return;
-
-    setFileName(file.name);
+  /** Đọc tệp; `sheetName` bỏ trống thì tự chọn sheet có cột tên khoa viện. */
+  const readFile = async (source: File, sheetName?: string) => {
     setParsing(true);
+    setParseError(null);
+    setRows([]);
     try {
-      setRows(await parseFacultyImportFile(file));
+      const parsed = await parseFacultyImportFile(source, sheetName);
+      setRows(parsed.rows);
+      setSheetChoice(parsed);
     } catch (error) {
       setParseError(
         error instanceof FacultyImportFileError
           ? fileErrorMessages[error.code]
           : fileErrorMessages.READ_FAILED
       );
+      if (sheetName) setSheetChoice((previous) => (previous ? { ...previous, sheetName } : previous));
     } finally {
       setParsing(false);
     }
+  };
+
+  const handleFileChange = async (selected?: File) => {
+    reset();
+    if (!selected) return;
+
+    setFileName(selected.name);
+    setFile(selected);
+    await readFile(selected);
   };
 
   const handleImport = async () => {
@@ -113,12 +132,17 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
 
   const failedItems = result?.items.filter((item) => !item.succeeded) ?? [];
 
+  // Lý do cụ thể của từng dòng bị bỏ qua (nêu giá trị gây lỗi, dòng trùng trước đó...).
+  const rowByNumber = new Map(rows.map((row) => [row.rowNumber, row]));
+  const reasonOf = (item: { rowNumber: number; errorCode: string | null }) =>
+    facultyImportReason(item.errorCode, rowByNumber.get(item.rowNumber), rows);
+
   const exportFailedItems = () =>
     downloadFacultyFailedRows(
       failedItems.map((item) => ({
         rowNumber: item.rowNumber,
         values: [item.name ?? ''],
-        reason: catalogErrorMessage(item.errorCode),
+        reason: reasonOf(item),
       }))
     );
 
@@ -175,6 +199,13 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
                 onChange={(event) => void handleFileChange(event.target.files?.[0])}
               />
             </label>
+
+            <ImportSheetPicker
+              choice={sheetChoice}
+              disabled={parsing}
+              requiredColumnsLabel="Tên khoa viện"
+              onChange={(name) => file && void readFile(file, name)}
+            />
 
             {parsing && (
               <div className="admin-import-state" role="status">
@@ -259,7 +290,7 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
                       <tr key={`${item.rowNumber}-${item.name}`}>
                         <td style={{ textAlign: 'right' }}>{item.rowNumber}</td>
                         <td>{item.name || 'Không có'}</td>
-                        <td>{catalogErrorMessage(item.errorCode)}</td>
+                        <td>{reasonOf(item)}</td>
                       </tr>
                     ))}
                   </tbody>

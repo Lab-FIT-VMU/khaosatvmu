@@ -1239,6 +1239,33 @@
   font-size: 13px;
 }
 
+/* Hộp thoại import: chọn sheet của tệp nhiều sheet. */
+.import-sheet-picker {
+  display: grid;
+  gap: 6px;
+}
+
+.import-sheet-picker label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.import-sheet-picker select {
+  min-width: 220px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid #cfd7dc;
+  background: #ffffff;
+  font: inherit;
+}
+
+.import-sheet-picker small {
+  color: #6b4a14;
+  font-size: 12.5px;
+}
+
 /* ----- Chọn phạm vi phát phiếu khảo sát ----- */
 
 /* Dùng span thay label vì nhóm nút không trỏ tới một input đơn nào. */
