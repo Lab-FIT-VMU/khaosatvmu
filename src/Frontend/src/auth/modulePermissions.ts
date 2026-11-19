@@ -8,6 +8,9 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   reports: 'REPORTS_ACCESS',
   'survey-statistics': 'SURVEY_STATISTICS_ACCESS',
   'survey-analysis': 'SURVEY_ANALYSIS_ACCESS',
+  // Tạm thời mục này chỉ là đường dẫn ra trang ngoài; quyền dùng đúng mã của module điểm
+  // bên nhánh hoang12345 để khi gộp vẫn giữ nguyên cấu hình phân quyền đã bật tắt.
+  'course-grade-analysis': 'COURSE_GRADE_ANALYSIS_ACCESS',
   // Tải lên tách khỏi xem: đây là thao tác ghi trên dữ liệu toàn trường.
   'graduation-data-upload': 'GRADUATION_UPLOAD_ACCESS',
   'graduation-statistics': 'GRADUATION_ANALYTICS_ACCESS',
