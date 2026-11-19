@@ -7,6 +7,8 @@ import type { UnitReportRow, UnitSurveyReport } from '../../types';
 import { formatDecimal, formatDecimalOrDash } from '../../utils/formatNumber';
 import { validRateOf } from '../../utils/reportThresholds';
 import { foldVietnamese } from '../../utils/vietnamese';
+import { useStatusColors } from '../../utils/statusColors';
+import { StatusColorSettings } from '../StatusColorSettings';
 import { UnitReportBody, UnitReportToolbar, UnitScoringNote } from '../unitReports/UnitReportFrame';
 import {
   attentionCheckCountOf,
@@ -53,6 +55,8 @@ const StatisticsContent: React.FC<{
   const [eligibilityFilter, setEligibilityFilter] = useState<EligibilityFilter>('all');
   const [page, setPage] = useState(1);
   const report = state.report;
+  // Màu Đủ / Không đủ điều kiện: mỗi người tự chỉnh, lưu trên trình duyệt.
+  const statusColors = useStatusColors('program-statistics');
 
   const columns = useMemo(() => (report ? scoredQuestionsOf(report) : []), [report]);
   const rows = useMemo(() => report?.units ?? [], [report]);
@@ -126,7 +130,7 @@ const StatisticsContent: React.FC<{
   };
 
   return (
-    <>
+    <div className="status-color-scope" style={statusColors.style}>
       <UnitReportToolbar surveyType="PROGRAM" state={state} idPrefix="program-statistics" />
       <UnitScoringNote report={report} surveyType="PROGRAM" />
 
@@ -186,11 +190,22 @@ const StatisticsContent: React.FC<{
                   </label>
                 ))}
               </div>
-              {exportOptions && (
-                <div style={{ marginLeft: 'auto' }}>
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <StatusColorSettings
+                  items={[
+                    { tone: 'success', label: 'Đủ điều kiện' },
+                    { tone: 'danger', label: 'Không đủ điều kiện' },
+                  ]}
+                  colors={statusColors.colors}
+                  isCustom={statusColors.isCustom}
+                  onChange={statusColors.setColor}
+                  onApplyPreset={statusColors.applyPreset}
+                  onReset={statusColors.reset}
+                />
+                {exportOptions && (
                   <ExportDropdown buttonLabel="Xuất bảng dữ liệu" size="sm" options={exportOptions} />
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {orderedRows.length === 0 ? (
@@ -332,7 +347,7 @@ const StatisticsContent: React.FC<{
           </>
         )}
       </UnitReportBody>
-    </>
+    </div>
   );
 };
 

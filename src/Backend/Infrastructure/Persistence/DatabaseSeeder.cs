@@ -123,6 +123,10 @@ public static class DatabaseSeeder
             (Code: "COURSE_GRADE_UPLOAD_ACCESS",     Name: "Tải lên dữ liệu điểm",        Description: "Tải lên, nạp lại và gỡ file điểm học phần theo học kỳ", Category: "Phân tích điểm học phần"),
             (Code: "COURSE_GRADE_THRESHOLDS_ACCESS", Name: "Ngưỡng phân tích",            Description: "Sửa và khôi phục ngưỡng phân tích điểm học phần",       Category: "Phân tích điểm học phần"),
             (Code: "COURSE_GRADE_ANALYSIS_ACCESS",   Name: "Báo cáo phân tích",           Description: "Xem báo cáo phân tích điểm học phần",                   Category: "Phân tích điểm học phần"),
+            // Module audit chạy riêng trong container audit-grade: một mục trên thanh điều
+            // hướng, một quyền. Mặc định chỉ cấp cho ADMIN (dữ liệu có tên giảng viên, không lọc
+            // theo khoa / bộ môn).
+            (Code: "AUDIT_GRADE_MODULE_ACCESS",      Name: "Phân tích điểm (bản audit)",  Description: "Mở module phân tích điểm học phần bản audit: xem báo cáo, nạp học kỳ, sửa tham số", Category: "Phân tích điểm (bản audit)"),
             (Code: "ACADEMIC_YEARS_ACCESS",       Name: "Năm học & học kỳ",                  Description: "Truy cập module quản lý năm học và học kỳ",            Category: "Danh mục đào tạo"),
             (Code: "FACULTIES_ACCESS",            Name: "Khoa / Viện",                       Description: "Truy cập module quản lý khoa và viện",                  Category: "Danh mục đào tạo"),
             (Code: "DEPARTMENTS_ACCESS",          Name: "Bộ môn",                            Description: "Truy cập module quản lý bộ môn",                        Category: "Danh mục đào tạo"),
@@ -131,10 +135,10 @@ public static class DatabaseSeeder
             (Code: "COHORT_MAJORS_ACCESS",        Name: "Khoá ngành đào tạo",                Description: "Truy cập module quản lý khoá học và khoá ngành đào tạo", Category: "Danh mục đào tạo"),
             (Code: "COURSES_ACCESS",              Name: "Học phần",                          Description: "Truy cập module quản lý học phần",                      Category: "Danh mục đào tạo"),
             (Code: "COURSE_SECTIONS_ACCESS",      Name: "Lớp học phần",                      Description: "Truy cập module quản lý lớp học phần",                  Category: "Danh mục đào tạo"),
-            (Code: "COURSE_QUESTION_SETS_ACCESS", Name: "Danh sách bộ câu hỏi",              Description: "Truy cập module bộ câu hỏi khảo sát học phần",         Category: "Khảo sát học phần"),
-            (Code: "COURSE_CAMPAIGNS_ACCESS",     Name: "Danh sách bài khảo sát",            Description: "Truy cập module đợt khảo sát học phần",                Category: "Khảo sát học phần"),
-            (Code: "PROGRAM_CAMPAIGNS_ACCESS",    Name: "Đợt khảo sát CTĐT",                 Description: "Truy cập module đợt khảo sát chương trình đào tạo",     Category: "Khảo sát chương trình"),
-            (Code: "PROGRAM_CRITERIA_ACCESS",     Name: "Tiêu chí CTĐT",                     Description: "Truy cập module tiêu chí chương trình đào tạo",        Category: "Khảo sát chương trình"),
+            // Nhóm "Khảo sát" trên thanh điều hướng: một trang bộ câu hỏi và một trang đợt dùng
+            // chung cho cả ba loại khảo sát (học phần, CTĐT, giảng viên).
+            (Code: "COURSE_QUESTION_SETS_ACCESS", Name: "Danh sách bộ câu hỏi",              Description: "Truy cập module bộ câu hỏi khảo sát",                  Category: "Khảo sát"),
+            (Code: "COURSE_CAMPAIGNS_ACCESS",     Name: "Danh sách bài khảo sát",            Description: "Truy cập module đợt khảo sát của cả ba loại khảo sát", Category: "Khảo sát"),
             (Code: "USER_ADMIN_ACCESS",           Name: "Người dùng & phân quyền",           Description: "Truy cập module quản trị người dùng và phân quyền",    Category: "Quản trị"),
             // Hai quyền dưới đây không mở thêm mục nào trên menu. Chúng khoá hai thao tác
             // ghi của tính năng phân loại cảm xúc: sửa nhãn model đã đoán, và chạy lại model.
@@ -170,7 +174,18 @@ public static class DatabaseSeeder
         // tắt không có tác dụng gì. Dòng RolePermissions đi theo nhờ khoá ngoại xoá dây chuyền.
         // STUDENTS_ACCESS: trang Danh mục sinh viên đã bỏ cùng bảng Students — hệ thống
         // không lưu sinh viên nữa.
-        string[] retiredModuleCodes = ["STUDENTS_ACCESS"];
+        // Đợt khảo sát CTĐT / Tiêu chí CTĐT (và các quyền tab của chúng): hai trang cũ đã gộp
+        // vào nhóm "Khảo sát" chung, không còn mục nào trên thanh điều hướng.
+        string[] retiredModuleCodes =
+        [
+            "STUDENTS_ACCESS",
+            "PROGRAM_CAMPAIGNS_ACCESS",
+            "PROGRAM_CAMPAIGNS_TAB_COURSE",
+            "PROGRAM_CAMPAIGNS_TAB_PROGRAM",
+            "PROGRAM_CRITERIA_ACCESS",
+            "PROGRAM_CRITERIA_TAB_COURSE",
+            "PROGRAM_CRITERIA_TAB_PROGRAM",
+        ];
         await db.Permissions
             .Where(x => SurveyStatisticsPermissions.RetiredUnitCodes.Contains(x.Code)
                 || retiredModuleCodes.Contains(x.Code))
@@ -231,6 +246,7 @@ public static class DatabaseSeeder
             (RoleCode: "ADMIN", PermissionCode: "COURSE_GRADE_UPLOAD_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_GRADE_THRESHOLDS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_GRADE_ANALYSIS_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "AUDIT_GRADE_MODULE_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "ACADEMIC_YEARS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),
@@ -241,8 +257,6 @@ public static class DatabaseSeeder
             (RoleCode: "ADMIN", PermissionCode: "COURSE_SECTIONS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_QUESTION_SETS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_CAMPAIGNS_ACCESS"),
-            (RoleCode: "ADMIN", PermissionCode: "PROGRAM_CAMPAIGNS_ACCESS"),
-            (RoleCode: "ADMIN", PermissionCode: "PROGRAM_CRITERIA_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "USER_ADMIN_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "OPEN_COMMENT_SENTIMENT_REVIEW"),
             (RoleCode: "ADMIN", PermissionCode: "OPEN_COMMENT_MODEL_ADMIN"),
@@ -269,8 +283,6 @@ public static class DatabaseSeeder
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_SECTIONS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_QUESTION_SETS_ACCESS"),
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "COURSE_CAMPAIGNS_ACCESS"),
-            (RoleCode: "SURVEY_ADMIN", PermissionCode: "PROGRAM_CAMPAIGNS_ACCESS"),
-            (RoleCode: "SURVEY_ADMIN", PermissionCode: "PROGRAM_CRITERIA_ACCESS"),
             // SURVEY_ADMIN sửa được nhãn nhưng không quản trị model: đổi model là thay đổi
             // kỹ thuật, phải để lại dấu vết ở tài khoản quản trị hệ thống.
             (RoleCode: "SURVEY_ADMIN", PermissionCode: "OPEN_COMMENT_SENTIMENT_REVIEW"),
@@ -298,8 +310,6 @@ public static class DatabaseSeeder
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COURSE_SECTIONS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COURSE_QUESTION_SETS_ACCESS"),
             (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "COURSE_CAMPAIGNS_ACCESS"),
-            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "PROGRAM_CAMPAIGNS_ACCESS"),
-            (RoleCode: "BOARD_OF_DIRECTORS", PermissionCode: "PROGRAM_CRITERIA_ACCESS"),
 
             // DEPARTMENT_MANAGER: chỉ tiến độ và báo cáo trong Phase 2.
             (RoleCode: "DEPARTMENT_MANAGER", PermissionCode: "PROGRESS_ACCESS"),

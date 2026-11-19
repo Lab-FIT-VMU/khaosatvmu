@@ -5,8 +5,6 @@ import { DataTable } from '../components/DataTable';
 import type { Column } from '../components/DataTable';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import type { Criterion } from '../types';
-import { useAuth } from '../auth/authContext';
-import { canAccessTab, TAB_PERMISSION } from '../auth/modulePermissions';
 import '../styles/survey-operations.css';
 import { foldVietnamese } from '../utils/vietnamese';
 
@@ -25,15 +23,12 @@ export const CriteriaPage: React.FC<CriteriaPageProps> = ({
   onAddCriterion,
   onDeleteCriterion,
 }) => {
-  const [selectedTab, setActiveTab] = useState<'Học phần' | 'Chương trình đào tạo'>(
+  const [activeTab, setActiveTab] = useState<'Học phần' | 'Chương trình đào tạo'>(
     surveyType || 'Học phần'
   );
-  // Tab nào hiện do quản trị bật tắt ở trang Phân quyền Module. Tab đang chọn bị khoá
-  // thì mở tab còn lại.
-  const { access } = useAuth();
-  const allowedTabs = CRITERIA_TABS.filter((item) =>
-    canAccessTab(access?.permissions, TAB_PERMISSION.programCriteria[item]));
-  const activeTab = allowedTabs.includes(selectedTab) ? selectedTab : (allowedTabs[0] ?? selectedTab);
+  // Trang cũ, chỉ còn mở được qua đường dẫn cũ (#program-criteria) và không còn quyền
+  // tab riêng: ai vào được trang (quyền Danh sách bộ câu hỏi) thì thấy đủ hai tab.
+  const allowedTabs: readonly (typeof CRITERIA_TABS)[number][] = CRITERIA_TABS;
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);

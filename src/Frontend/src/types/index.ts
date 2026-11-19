@@ -558,6 +558,11 @@ export interface SurveyFormConfig {
   notOpenMessage?: string | null;
   closedMessage?: string | null;
   classFullMessage?: string | null;
+
+  /** Chữ của ô "Ý kiến khác" cuối bài làm; bỏ trống là câu mặc định. */
+  commentHeading?: string | null;
+  commentHint?: string | null;
+  commentPlaceholder?: string | null;
 }
 
 export interface SurveyCampaign {

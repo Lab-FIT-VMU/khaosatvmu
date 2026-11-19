@@ -452,11 +452,11 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         [SurveyStatisticsPermissions.CourseCategory] = 1,
         [SurveyStatisticsPermissions.UnitGroups[0].Category] = 2,
         [SurveyStatisticsPermissions.UnitGroups[1].Category] = 3,
-        // Cùng thứ tự với thanh điều hướng: "Phân tích điểm học phần" đứng ngay trước "Thống kê tốt nghiệp".
+        // Cùng thứ tự với thanh điều hướng: hai mục phân tích điểm đứng ngay trước "Thống kê tốt nghiệp".
         ["Phân tích điểm học phần"] = 4,
-        ["Thống kê tốt nghiệp"] = 5,
-        ["Khảo sát học phần"] = 6,
-        ["Khảo sát chương trình"] = 7,
+        ["Phân tích điểm (bản audit)"] = 5,
+        ["Thống kê tốt nghiệp"] = 6,
+        ["Khảo sát"] = 7,
         ["Danh mục đào tạo"] = 8,
         ["Quản trị"] = 9
     };
@@ -489,12 +489,11 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         ["COHORT_MAJORS_ACCESS"] = 6,
         ["COURSES_ACCESS"] = 7,
         ["COURSE_SECTIONS_ACCESS"] = 8,
-        // Khảo sát học phần
+        // Phân tích điểm (bản audit)
+        ["AUDIT_GRADE_MODULE_ACCESS"] = 1,
+        // Khảo sát
         ["COURSE_QUESTION_SETS_ACCESS"] = 1,
         ["COURSE_CAMPAIGNS_ACCESS"] = 2,
-        // Khảo sát chương trình
-        ["PROGRAM_CAMPAIGNS_ACCESS"] = 1,
-        ["PROGRAM_CRITERIA_ACCESS"] = 2,
         // Quản trị
         ["USER_ADMIN_ACCESS"] = 1
     };

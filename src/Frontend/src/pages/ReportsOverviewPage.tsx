@@ -72,6 +72,13 @@ import {
   responseRateOf,
   validRateOf,
 } from '../utils/reportThresholds';
+import {
+  reportCompletionColor,
+  reportScoreColor,
+  reportTableColorItems,
+  useStatusColors,
+} from '../utils/statusColors';
+import { StatusColorSettings } from '../components/StatusColorSettings';
 import { toVietnameseFileSlug } from '../utils/vietnamese';
 import type { QuestionAnalysisExportMetadata } from '../services/exportQuestionAnalysisService';
 import '../styles/survey-operations.css';
@@ -298,15 +305,12 @@ interface RankedCourse extends RankedUnit {
   departmentName: string;
 }
 
-const scoreColor = (score: number): string =>
-  score >= 4.5 ? '#137b3b' : score >= 4.0 ? '#0788b8' : '#b86216';
+// Màu số liệu trong bảng: đọc biến --status-… mà nút "Màu" của trang đặt (mỗi người tự
+// chỉnh, lưu trên trình duyệt), thiếu thì dùng màu mặc định như Phân tích điểm học phần.
+const scoreColor = (score: number): string => reportScoreColor(score);
 
 const completionColor = (rate: number): string =>
-  rate >= COMPLETED_COMPLETION_RATE
-    ? '#137b3b'
-    : rate >= LAGGING_COMPLETION_RATE
-      ? '#0788b8'
-      : '#b86216';
+  reportCompletionColor(rate, COMPLETED_COMPLETION_RATE, LAGGING_COMPLETION_RATE);
 
 /**
  * Bảng xếp hạng đã mở ra một phạm vi — đích của nút Quay lại ở trang chi tiết.
@@ -1008,6 +1012,8 @@ export const ReportsOverviewPage: React.FC = () => {
   const initialRoute = useMemo(() => parseReportRoute(), []);
   const thresholds = useScoringThresholds();
   const { access, activeProfile } = useAuth();
+  // Màu số liệu trong các bảng của trang: mỗi người tự chỉnh, lưu trên trình duyệt.
+  const tableColors = useStatusColors('course-reports', reportTableColorItems);
   const {
     academicYears,
     activeSemesterId,
@@ -2515,7 +2521,7 @@ export const ReportsOverviewPage: React.FC = () => {
   ];
 
   return (
-    <div className="survey-operations-page reports-module">
+    <div className="survey-operations-page reports-module" style={tableColors.style}>
       {/* Thanh tiêu đề + chọn học kỳ */}
       {/* Bốn phần nằm ngang một hàng ở góc trái trên, đứng trước tiêu đề — giống
           hệt trang Tổng quan khảo sát. */}
@@ -2572,6 +2578,14 @@ export const ReportsOverviewPage: React.FC = () => {
           <BarChart3 className="operation-icon" aria-hidden="true" />
           Thống kê kết quả khảo sát học phần
         </h1>
+        <StatusColorSettings
+          items={reportTableColorItems}
+          colors={tableColors.colors}
+          isCustom={tableColors.isCustom}
+          onChange={tableColors.setColor}
+          onApplyPreset={tableColors.applyPreset}
+          onReset={tableColors.reset}
+        />
       </div>
 
       {/* Ngưỡng quyết định lớp nào được gộp vào mọi con số của trang này, nên in

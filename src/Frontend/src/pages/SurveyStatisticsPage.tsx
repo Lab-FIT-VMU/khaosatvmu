@@ -27,6 +27,8 @@ import {
   validRateOf,
 } from '../utils/reportThresholds';
 import { foldVietnamese } from '../utils/vietnamese';
+import { useStatusColors } from '../utils/statusColors';
+import { StatusColorSettings } from '../components/StatusColorSettings';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
@@ -353,6 +355,9 @@ export const SurveyStatisticsPage: React.FC = () => {
   const eligibleCount = eligibleIds.size;
   const ineligibleCount = rows.length - eligibleCount;
 
+  // Màu Đủ / Không đủ điều kiện: mỗi người tự chỉnh, lưu trên trình duyệt.
+  const statusColors = useStatusColors('course-statistics');
+
   // Ô tìm kiếm và ba ô chọn nhóm lớp phía trên bảng. Chỉ chọn được một nhóm.
   const [searchText, setSearchText] = useState('');
   const [eligibilityFilter, setEligibilityFilter] = useState<'all' | 'eligible' | 'ineligible'>('all');
@@ -614,7 +619,7 @@ export const SurveyStatisticsPage: React.FC = () => {
 
 
   return (
-    <div className="survey-operations-page survey-statistics-page">
+    <div className="survey-operations-page survey-statistics-page" style={statusColors.style}>
       <section className="statistics-toolbar">
         <label className="form-group">
           <span>Học kỳ</span>
@@ -760,15 +765,26 @@ export const SurveyStatisticsPage: React.FC = () => {
             ))}
           </div>
           {/* Nút xuất đứng cùng hàng với ô tìm kiếm, dồn sát mép phải, ngay trên bảng nó xuất. */}
-          {exportOptions && rows.length > 0 && (
-            <div style={{ marginLeft: 'auto' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StatusColorSettings
+              items={[
+                { tone: 'success', label: 'Đủ điều kiện' },
+                { tone: 'danger', label: 'Không đủ điều kiện' },
+              ]}
+              colors={statusColors.colors}
+              isCustom={statusColors.isCustom}
+              onChange={statusColors.setColor}
+              onApplyPreset={statusColors.applyPreset}
+              onReset={statusColors.reset}
+            />
+            {exportOptions && rows.length > 0 && (
               <ExportDropdown
                 buttonLabel="Xuất bảng dữ liệu"
                 size="sm"
                 options={exportOptions}
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {orderedRows.length === 0 ? (

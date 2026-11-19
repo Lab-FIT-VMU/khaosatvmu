@@ -58,6 +58,24 @@ export const surveyQuizBlocks: { code: string; label: string; hint?: string }[] 
   },
 ];
 
+/**
+ * Chữ mặc định của ô "Ý kiến khác". Đợt sửa ở Cấu hình phiếu thì dùng chữ của đợt; phiếu
+ * thật và bản xem trước cùng đọc ở đây nên luôn giống nhau.
+ */
+export const defaultCommentTexts = {
+  heading: 'Ý kiến khác của bạn (nếu có)',
+  hint:
+    'Bạn có thể chia sẻ thêm ý kiến, đề xuất hoặc góp ý khác về giảng dạy, học phần hoặc nhà trường (không bắt buộc).',
+  placeholder: 'Nhập ý kiến của bạn tại đây...',
+} as const;
+
+/** Chữ của ô "Ý kiến khác" theo cấu hình đợt, thiếu đoạn nào thì lấy mặc định đoạn đó. */
+export const commentTextsOf = (config: SurveyFormConfig | null | undefined) => ({
+  heading: textOr(config?.commentHeading, defaultCommentTexts.heading),
+  hint: textOr(config?.commentHint, defaultCommentTexts.hint),
+  placeholder: textOr(config?.commentPlaceholder, defaultCommentTexts.placeholder),
+});
+
 /** Thông tin có được hiện không. Không có cấu hình, hoặc không nằm trong danh sách ẩn, thì hiện. */
 export const isFieldVisible = (
   config: SurveyFormConfig | null | undefined,

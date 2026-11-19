@@ -21,8 +21,6 @@ public static class AuthPolicies
     public const string CoursesRead = "PERMISSION_COURSES_READ";
     public const string CourseQuestionSetsAccess = "PERMISSION_COURSE_QUESTION_SETS_ACCESS";
     public const string CourseCampaignsAccess = "PERMISSION_COURSE_CAMPAIGNS_ACCESS";
-    public const string ProgramCampaignsAccess = "PERMISSION_PROGRAM_CAMPAIGNS_ACCESS";
-    public const string ProgramCriteriaAccess = "PERMISSION_PROGRAM_CRITERIA_ACCESS";
     public const string ProgressAccess = "PERMISSION_PROGRESS_ACCESS";
     public const string ReportsAccess = "PERMISSION_REPORTS_ACCESS";
     public const string SurveyDashboardAccess = "PERMISSION_SURVEY_DASHBOARD_ACCESS";
@@ -37,6 +35,8 @@ public static class AuthPolicies
     /// <summary>Sửa ngưỡng của bộ luật D, E. Ai được sửa phương pháp do quyền này quyết định.</summary>
     public const string CourseGradeThresholdsAccess = "PERMISSION_COURSE_GRADE_THRESHOLDS_ACCESS";
     public const string CourseGradeAnalysisAccess = "PERMISSION_COURSE_GRADE_ANALYSIS_ACCESS";
+    /// <summary>Mở module phân tích điểm bản audit (/api/audit-grades). Mặc định chỉ ADMIN.</summary>
+    public const string AuditGradeModuleAccess = "PERMISSION_AUDIT_GRADE_MODULE_ACCESS";
     /// <summary>Hiệu chỉnh nhãn cảm xúc do model dự đoán. Không nằm trong nhóm mở module.</summary>
     public const string OpenCommentSentimentReview = "PERMISSION_OPEN_COMMENT_SENTIMENT_REVIEW";
     /// <summary>Xem trạng thái model cảm xúc và chạy lại phân tích.</summary>

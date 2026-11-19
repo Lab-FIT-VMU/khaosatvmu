@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { useAuth } from './auth/authContext';
 import { canAccessModule } from './auth/modulePermissions';
 import { readSemesterSurveysCache, writeSemesterSurveysCache } from './hooks/useSemesterSurveys';
-import { canAccessDashboard, isUnrestrictedRole, ROLE_CODES, seesAllData, seesOnlyOwnSections } from './auth/roles';
+import { canAccessDashboard, isUnrestrictedRole, seesAllData, seesOnlyOwnSections } from './auth/roles';
 import { AuthLoading } from './components/AuthLoading';
 import { getHashRoot } from './pages/reportRoute';
 
@@ -232,7 +232,6 @@ function DashboardApp() {
       !canAccessModule(permissions, currentTab)
       || (currentTab === 'overview' && !dashboardAllowed)
       || (unitStatisticsTab !== null && !isUnrestrictedRole(auth.activeProfile?.roleCode))
-      || (currentTab === 'audit-grade-module' && auth.activeProfile?.roleCode !== ROLE_CODES.admin)
       // Trang Thống kê theo mục đã bỏ khỏi menu; địa chỉ cũ còn lưu thì đưa về trang đầu.
       || currentTab === 'survey-section-scores';
     if (blocked) {
@@ -714,7 +713,7 @@ function DashboardApp() {
               />
             )}
             {currentTab === 'course-grade-thresholds' && <CourseGradeThresholdsPage />}
-            {currentTab === 'audit-grade-module' && auth.activeProfile?.roleCode === ROLE_CODES.admin && (
+            {currentTab === 'audit-grade-module' && canAccessModule(permissions, 'audit-grade-module') && (
               <AuditGradeModulePage />
             )}
 

@@ -2741,6 +2741,31 @@
   display: none;
 }
 
+/* Ô sửa chữ của khối "Ý kiến khác" trong bảng bên phải. */
+.survey-designer__text-field {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.survey-designer__text-field input,
+.survey-designer__text-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #cfd7dc;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.survey-designer__text-field input:focus,
+.survey-designer__text-field textarea:focus {
+  outline: none;
+  border-color: #0788b8;
+  box-shadow: 0 0 0 2px rgba(7, 136, 184, 0.18);
+}
+
 /* Nhãn của ô ảnh trong bảng bên phải: không phải <label> vì không trỏ tới ô nhập nào. */
 .survey-designer__label {
   display: block;

@@ -71,7 +71,6 @@ select:hover,input:hover{border-color:var(--brand-700)}
 .page-head{display:flex;flex-wrap:wrap;gap:var(--sp-3);align-items:flex-end;justify-content:space-between}
 .page-head p{color:var(--text-2);margin-top:6px;max-width:900px;font-size:16px}
 .crumb{font-size:13.5px;color:var(--brand-700);font-weight:700;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
-.demo-note{font-size:var(--fs-sm);color:var(--text-2);background:#fff;border:1px dashed var(--border-strong);padding:5px 10px;border-radius:var(--r-sm)}
 
 /* ================= THÀNH PHẦN ================= */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:var(--sp-5)}

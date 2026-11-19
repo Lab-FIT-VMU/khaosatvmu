@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { canAccessModule } from '../auth/modulePermissions';
 import { useAuth } from '../auth/authContext';
-import { canAccessDashboard, isUnrestrictedRole, ROLE_CODES } from '../auth/roles';
+import { canAccessDashboard, isUnrestrictedRole } from '../auth/roles';
 import { HeaderSemesterPicker } from './HeaderSemesterPicker';
 import { isMenuGroup, menuStructure } from './sidebarMenu';
 import { parseUnitStatisticsTab } from './surveyStatisticsTabs';
@@ -28,7 +28,6 @@ interface SidebarItem {
   badge?: number;
   externalUrl?: string;
   section?: string;
-  adminOnly?: boolean;
 }
 
 interface SidebarGroup {
@@ -89,7 +88,6 @@ export function Sidebar({
       // quyền đó, và backend vẫn từ chối nếu ai đó bật nhầm.
       canAccessModule(permissions, item.id)
       && (page !== 'overview' || dashboardAllowed)
-      && (!item.adminOnly || activeProfile?.roleCode === ROLE_CODES.admin)
     );
   };
 

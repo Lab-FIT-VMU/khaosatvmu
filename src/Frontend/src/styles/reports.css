@@ -1228,7 +1228,8 @@
 
 /* Phiếu lỗi chỉ cần đỏ là đủ nhận ra, khỏi cần khung với chấm. */
 .reports-invalid-count {
-  color: #b52d2d;
+  /* Đổi được ở nút "Màu" của trang Thống kê & Báo cáo (utils/statusColors.ts). */
+  color: var(--status-invalid, #7a6bb0);
   font-weight: 700;
 }
 

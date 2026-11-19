@@ -3,7 +3,6 @@ namespace UnitTests.API;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
-using Application.Auth;
 using FluentAssertions;
 using global::API.AuditGrades;
 using Microsoft.AspNetCore.Http;
@@ -12,19 +11,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 /// <summary>
-/// Cửa vào module phân tích điểm bản audit: chỉ ADMIN, yêu cầu ghi phải cùng nguồn, chuyển tiếp
+/// Cửa vào module phân tích điểm bản audit (quyền AUDIT_GRADE_MODULE_ACCESS kiểm ở RequireAuthorization):
+/// yêu cầu ghi phải cùng nguồn, chuyển tiếp
 /// đúng đường dẫn / truy vấn / thân, không chuyển cookie, container tắt thì báo 502.
 /// </summary>
 public class AuditGradeModuleEndpointsTests
 {
-    private static readonly UserScope Admin = new(RoleCodes.Admin, null, null, null, true, Domain.RoleDataScopes.All, CanWrite: true);
-    private static readonly UserScope SurveyAdmin = new(RoleCodes.SurveyAdmin, null, null, null, true, Domain.RoleDataScopes.All, CanWrite: true);
-
-    private sealed class FixedScope(UserScope scope) : IUserScopeResolver
-    {
-        public Task<UserScope> ResolveAsync(CancellationToken cancellationToken = default) => Task.FromResult(scope);
-    }
-
     private sealed class RecordingHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> respond) : HttpMessageHandler
     {
         public HttpRequestMessage? Request { get; private set; }
@@ -70,8 +62,9 @@ public class AuditGradeModuleEndpointsTests
         return context;
     }
 
-    private static Task Send(DefaultHttpContext context, UserScope scope, HttpMessageHandler handler) =>
-        AuditGradeModuleEndpoints.ForwardAsync(context, new FixedScope(scope), new Factory(handler), NullLoggerFactory.Instance);
+    // Quyền AUDIT_GRADE_MODULE_ACCESS do RequireAuthorization kiểm trước khi tới hàm này.
+    private static Task Send(DefaultHttpContext context, HttpMessageHandler handler) =>
+        AuditGradeModuleEndpoints.ForwardAsync(context, new Factory(handler), NullLoggerFactory.Instance);
 
     private static string ResponseText(DefaultHttpContext context)
     {
@@ -80,24 +73,12 @@ public class AuditGradeModuleEndpointsTests
     }
 
     [Fact]
-    public async Task NonAdmin_IsForbidden_AndNothingIsForwarded()
-    {
-        var handler = Ok();
-        var context = Context("GET", "/api/audit-grades/data/danh_sach_ky.json");
-
-        await Send(context, SurveyAdmin, handler);
-
-        context.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
-        handler.Request.Should().BeNull();
-    }
-
-    [Fact]
     public async Task Get_ForwardsPathAndQuery_CopiesResponse_WithoutCookie()
     {
         var handler = Ok("[1,2]");
         var context = Context("GET", "/api/audit-grades/data/ho_so/2425_HK1/111.json", "?v=2");
 
-        await Send(context, Admin, handler);
+        await Send(context, handler);
 
         handler.Request!.RequestUri.Should().Be(new Uri("http://audit-grade:8770/data/ho_so/2425_HK1/111.json?v=2"));
         handler.Request.Headers.Contains("Cookie").Should().BeFalse();
@@ -112,7 +93,7 @@ public class AuditGradeModuleEndpointsTests
         var handler = Ok();
         var context = Context("GET", "/api/audit-grades");
 
-        await Send(context, Admin, handler);
+        await Send(context, handler);
 
         context.Response.StatusCode.Should().Be(StatusCodes.Status302Found);
         context.Response.Headers.Location.ToString().Should().Be("/api/audit-grades/");
@@ -132,7 +113,7 @@ public class AuditGradeModuleEndpointsTests
             context.Request.Headers["Sec-Fetch-Site"] = fetchSite;
         }
 
-        await Send(context, Admin, handler);
+        await Send(context, handler);
 
         context.Response.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
         handler.Request.Should().BeNull();
@@ -149,7 +130,7 @@ public class AuditGradeModuleEndpointsTests
         context.Request.ContentType = "application/json";
         context.Request.ContentLength = body.Length;
 
-        await Send(context, Admin, handler);
+        await Send(context, handler);
 
         handler.Request!.Method.Should().Be(HttpMethod.Post);
         handler.Request.RequestUri!.AbsolutePath.Should().Be("/api/go-ky");
@@ -167,7 +148,7 @@ public class AuditGradeModuleEndpointsTests
         }));
         var context = Context("GET", "/api/audit-grades/data/khong-co.json");
 
-        await Send(context, Admin, handler);
+        await Send(context, handler);
 
         context.Response.StatusCode.Should().Be(StatusCodes.Status404NotFound);
     }
@@ -178,7 +159,7 @@ public class AuditGradeModuleEndpointsTests
         var handler = new RecordingHandler(_ => throw new HttpRequestException("connection refused"));
         var context = Context("GET", "/api/audit-grades/");
 
-        await Send(context, Admin, handler);
+        await Send(context, handler);
 
         context.Response.StatusCode.Should().Be(StatusCodes.Status502BadGateway);
         ResponseText(context).Should().Contain("chưa chạy");

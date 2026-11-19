@@ -448,12 +448,13 @@
   white-space: normal;
 }
 
+/* Màu theo ngưỡng: mặc định như Phân tích điểm học phần, mỗi người đổi được ở nút "Màu". */
 .statistics-table .statistics-eligibility--yes {
-  color: #1a6b2f;
+  color: var(--status-success, #0f5e5e);
 }
 
 .statistics-table .statistics-eligibility--no {
-  color: #a3321f;
+  color: var(--status-danger, #7a6bb0);
 }
 
 /*
@@ -1123,11 +1124,11 @@
 /* Hai lớp này phải nêu kèm trang, nếu không quy tắc chữ đậm chung của .app-container
    (cùng một hạng cụ thể mà đứng sau) sẽ đè mất màu xanh / đỏ ở đây. */
 .survey-statistics-page .statistics-count--eligible {
-  color: #137b3b;
+  color: var(--status-success, #0f5e5e);
 }
 
 .survey-statistics-page .statistics-count--ineligible {
-  color: #b52d2d;
+  color: var(--status-danger, #7a6bb0);
 }
 
 /*

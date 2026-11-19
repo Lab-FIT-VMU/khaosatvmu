@@ -103,7 +103,7 @@ const th=(label,{unit='',cls='',sort=true}={})=>`<th class="${cls}" ${sort?'data
 function toast(msg,ms=4000){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(toast._t);toast._t=setTimeout(()=>t.style.display='none',ms)}
 
 const route=()=>(location.hash||'#bgh').slice(1);
-const head=(crumb,title,desc,right='')=>`<div class="page-head"><div><div class="crumb">${crumb}</div><h1>${title}</h1><p>${desc}</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="demo-note">${V('chung.du_lieu_gia')}</span>${right}</div></div>`;
+const head=(crumb,title,desc,right='')=>`<div class="page-head"><div><div class="crumb">${crumb}</div><h1>${title}</h1><p>${desc}</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${right}</div></div>`;
 const hpCell=(ten,ma)=>`<span class="hp-name">${esc(ten)}</span><span class="hp-code">Mã học phần ${ma}</span>`;
 const sel=(id,label,opts,val)=>`<div class="field"><label for="${id}">${label}</label><select id="${id}" data-f="${id}">${opts.map(([v,t])=>`<option value="${esc(v)}" ${String(v)===String(val)?'selected':''}>${esc(t)}</option>`).join('')}</select></div>`;
 const filters=inner=>`<div class="filters"><span class="ftitle"><svg><use href="#i-filter"/></svg>Bộ lọc</span>${inner}</div>`;

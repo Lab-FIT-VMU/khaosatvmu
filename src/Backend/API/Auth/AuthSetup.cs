@@ -44,8 +44,6 @@ public static class AuthSetup
             AddPermissionPolicy(AuthPolicies.AcademicYearsAccess, "ACADEMIC_YEARS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseQuestionSetsAccess, "COURSE_QUESTION_SETS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseCampaignsAccess, "COURSE_CAMPAIGNS_ACCESS");
-            AddPermissionPolicy(AuthPolicies.ProgramCampaignsAccess, "PROGRAM_CAMPAIGNS_ACCESS");
-            AddPermissionPolicy(AuthPolicies.ProgramCriteriaAccess, "PROGRAM_CRITERIA_ACCESS");
             AddPermissionPolicy(AuthPolicies.ProgressAccess, "PROGRESS_ACCESS");
             AddPermissionPolicy(AuthPolicies.ReportsAccess, "REPORTS_ACCESS");
             AddPermissionPolicy(AuthPolicies.SurveyDashboardAccess, "SURVEY_DASHBOARD_ACCESS");
@@ -56,6 +54,7 @@ public static class AuthSetup
             AddPermissionPolicy(AuthPolicies.CourseGradeUploadAccess, "COURSE_GRADE_UPLOAD_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseGradeThresholdsAccess, "COURSE_GRADE_THRESHOLDS_ACCESS");
             AddPermissionPolicy(AuthPolicies.CourseGradeAnalysisAccess, "COURSE_GRADE_ANALYSIS_ACCESS");
+            AddPermissionPolicy(AuthPolicies.AuditGradeModuleAccess, "AUDIT_GRADE_MODULE_ACCESS");
             AddPermissionPolicy(AuthPolicies.CohortMajorsAccess, "COHORT_MAJORS_ACCESS");
             AddPermissionPolicy(AuthPolicies.OpenCommentSentimentReview, "OPEN_COMMENT_SENTIMENT_REVIEW");
             AddPermissionPolicy(AuthPolicies.OpenCommentModelAdmin, "OPEN_COMMENT_MODEL_ADMIN");

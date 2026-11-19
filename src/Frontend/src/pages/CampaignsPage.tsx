@@ -25,8 +25,6 @@ import { ConfirmDialog, Modal } from '../components/Modal';
 import { InlineTreeWizard } from '../components/InlineTreeWizard';
 import { TablePagination } from '../components/TablePagination';
 import { useSemester } from '../context/semesterContext';
-import { useAuth } from '../auth/authContext';
-import { canAccessTab, TAB_PERMISSION } from '../auth/modulePermissions';
 import { useSetBreadcrumbTrail } from '../context/breadcrumbTrail';
 import { usePaginatedItems } from '../hooks/usePaginatedItems';
 import type {
@@ -72,15 +70,11 @@ export const CampaignsPage: React.FC<CampaignsPageProps> = ({
   onOpenQR,
 }) => {
   const { activeSemester, activeYear } = useSemester();
-  const [selectedTab, setActiveTab] = useState<'Học phần' | 'Chương trình đào tạo'>(
+  const [activeTab, setActiveTab] = useState<'Học phần' | 'Chương trình đào tạo'>(
     surveyType || 'Học phần'
   );
-  // Tab nào hiện do quản trị bật tắt ở trang Phân quyền Module. Tab đang chọn bị khoá
-  // thì mở tab còn lại.
-  const { access } = useAuth();
-  const allowedTabs = CAMPAIGN_TABS.filter((item) =>
-    canAccessTab(access?.permissions, TAB_PERMISSION.programCampaigns[item]));
-  const activeTab = allowedTabs.includes(selectedTab) ? selectedTab : (allowedTabs[0] ?? selectedTab);
+  // Trang cũ (không còn gắn vào điều hướng), không còn quyền tab riêng: hiện đủ hai tab.
+  const allowedTabs: readonly (typeof CAMPAIGN_TABS)[number][] = CAMPAIGN_TABS;
 
   // Loại khảo sát đang xem là cấp dưới của mục trên thanh điều hướng.
   useSetBreadcrumbTrail([activeTab]);

@@ -1,5 +1,5 @@
 using System.Net;
-using Application.Auth;
+using API.Auth;
 
 namespace API.AuditGrades;
 
@@ -17,8 +17,8 @@ public sealed class AuditGradeModuleOptions
 /// riêng, ĐỘC LẬP với module phân tích điểm của khaosatvmu (dữ liệu, tham số, giao diện riêng).
 /// API chỉ làm cửa vào: chuyển tiếp mọi yêu cầu dưới /api/audit-grades/ tới container, sau khi kiểm
 /// <list type="bullet">
-/// <item>người gọi đã đăng nhập và hồ sơ đang dùng là ADMIN — module không lọc dữ liệu theo khoa /
-/// bộ môn và hiện tên giảng viên;</item>
+/// <item>người gọi đã đăng nhập và vai trò đang dùng có quyền AUDIT_GRADE_MODULE_ACCESS (mặc định
+/// chỉ ADMIN) — module không lọc dữ liệu theo khoa / bộ môn và hiện tên giảng viên;</item>
 /// <item>yêu cầu ghi (POST) xuất phát từ chính trang này (Sec-Fetch-Site: same-origin). Giao diện
 /// audit không gửi mã chống giả mạo của khaosatvmu, nên chặn nguồn khác ở đây.</item>
 /// </list>
@@ -49,7 +49,7 @@ public static class AuditGradeModuleEndpoints
     public static IEndpointRouteBuilder MapAuditGradeModuleEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapMethods(BasePath + "/{**path}", ForwardedMethods, ForwardAsync)
-            .RequireAuthorization()
+            .RequireAuthorization(AuthPolicies.AuditGradeModuleAccess)
             .ExcludeFromDescription();
 
         return app;
@@ -57,19 +57,11 @@ public static class AuditGradeModuleEndpoints
 
     public static async Task ForwardAsync(
         HttpContext context,
-        IUserScopeResolver userScope,
         IHttpClientFactory httpClientFactory,
         ILoggerFactory loggerFactory)
     {
+        // Ai được vào do quyền AUDIT_GRADE_MODULE_ACCESS quyết định (RequireAuthorization ở trên).
         var cancellationToken = context.RequestAborted;
-        var scope = await userScope.ResolveAsync(cancellationToken);
-        if (!string.Equals(scope.RoleCode, RoleCodes.Admin, StringComparison.Ordinal))
-        {
-            await Results.Json(new { errorCode = "AUDIT_GRADE_ADMIN_ONLY" }, statusCode: StatusCodes.Status403Forbidden)
-                .ExecuteAsync(context);
-            return;
-        }
-
         var request = context.Request;
         // Giao diện audit dùng đường dẫn tương đối (data/…, api/…, assets/…): trang phải mở ở địa
         // chỉ có "/" cuối thì các đường dẫn đó mới nằm dưới /api/audit-grades/. (Route khớp cả hai

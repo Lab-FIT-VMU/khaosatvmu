@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { SurveyFormConfig, SurveyType } from '../types';
 import {
+  commentTextsOf,
   coverStyleOf,
   isFieldVisible,
   textOr,
@@ -460,8 +461,9 @@ export const SurveyFormPreview: React.FC<{
                 <MessageSquare aria-hidden="true" />
                 Ý kiến khác
               </span>
-              <h2>Ý kiến khác của bạn (nếu có)</h2>
-              <textarea rows={2} readOnly placeholder="Ý kiến của sinh viên..." />
+              <h2>{commentTextsOf(config).heading}</h2>
+              <p className="public-quiz-comments-hint">{commentTextsOf(config).hint}</p>
+              <textarea rows={2} readOnly placeholder={commentTextsOf(config).placeholder} />
             </section>
           )}
 

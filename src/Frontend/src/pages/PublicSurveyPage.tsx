@@ -17,6 +17,7 @@ import { ApiError, apiErrorMessage } from '../services/apiClient';
 import { publicSurveyApi, surveyErrorMessage } from '../services/surveyApi';
 import type { AnswerScale, PublicSurvey, SurveyFormConfig } from '../types';
 import {
+  commentTextsOf,
   coverStyleOf,
   customText,
   isFieldVisible,
@@ -881,17 +882,14 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
               <MessageSquare aria-hidden="true" />
               Ý kiến khác
             </span>
-            <h2>Ý kiến khác của bạn (nếu có)</h2>
-            <p className="public-quiz-comments-hint">
-              Bạn có thể chia sẻ thêm ý kiến, đề xuất hoặc góp ý khác về giảng dạy, học phần
-              hoặc nhà trường (không bắt buộc).
-            </p>
+            <h2>{commentTextsOf(form).heading}</h2>
+            <p className="public-quiz-comments-hint">{commentTextsOf(form).hint}</p>
             <textarea
               id="public-survey-comments"
               rows={5}
               maxLength={maximumCommentLength}
-              placeholder="Nhập ý kiến của bạn tại đây..."
-              aria-label="Ý kiến khác của bạn"
+              placeholder={commentTextsOf(form).placeholder}
+              aria-label={commentTextsOf(form).heading}
               value={comments}
               disabled={!survey.isOpen || submitting}
               onChange={(event) => setComments(event.target.value)}

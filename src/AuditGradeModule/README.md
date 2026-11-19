@@ -8,12 +8,14 @@ Bản nguyên của module audit (`E:\PRJ\project-audit\project-audit`), chạy 
 
 ```text
 Trình duyệt ──(cookie đăng nhập)──> API khaosatvmu /api/audit-grades/…  ──>  container audit-grade:8770
-                                    chỉ ADMIN, chặn yêu cầu ghi khác nguồn      python chay.py (web/ + /api)
+                                    quyền AUDIT_GRADE_MODULE_ACCESS,             python chay.py (web/ + /api)
+                                    chặn yêu cầu ghi khác nguồn
 ```
 
 - Container `khaosatvmu_audit_grade` (dịch vụ `audit-grade` trong `docker-compose.yml`), `restart:
   unless-stopped` nên tự chạy cùng Docker như CSDL. Cổng 8770 chỉ mở trên `127.0.0.1`.
-- Trên web: mục **Phân tích điểm (bản audit)** ở sidebar, chỉ vai trò ADMIN thấy. Trang nhúng
+- Trên web: mục **Phân tích điểm (bản audit)** ở sidebar, cần quyền "Phân tích điểm (bản audit)"
+  (`AUDIT_GRADE_MODULE_ACCESS`; mặc định chỉ ADMIN, bật cho vai trò khác ở Phân quyền Module). Trang nhúng
   nguyên giao diện audit (Ban giám hiệu, khoa/viện, bộ môn, truy vết, diễn biến, nạp & quản lý học
   kỳ, tham số, thuật ngữ).
 - Dữ liệu nằm trong volume Docker `audit_grade_data` (`/data/kho`, `/data/web_data`), dạng file như
@@ -33,6 +35,8 @@ Chỉ các chỗ sau, đều không đụng phép tính:
 2. `chay.py`: sửa lỗi của bản gốc ở `log_message` — khi trả lỗi (vd 404) hàm này gặp `TypeError`
    nên kết nối bị cắt thay vì trả mã lỗi.
 3. Thư mục `kho/` và `web/data/` là liên kết tới volume; múi giờ Asia/Ho_Chi_Minh (Dockerfile).
+4. Giao diện: bỏ nhãn "Dữ liệu giả lập" ở đầu mỗi trang, dòng "dữ liệu giả lập, chỉ dùng để thử
+   nghiệm" ở chân sidebar và chữ "(thử nghiệm)" ở đầu trang — module đã dùng số liệu thật.
 
 Không chép: `kho/` và `web/data/` (dữ liệu), `Data/Du lieu gia lap/`, `tests/`, `Bao cao/`. Chạy kiểm
 thử của bản gốc ở thư mục gốc của audit.

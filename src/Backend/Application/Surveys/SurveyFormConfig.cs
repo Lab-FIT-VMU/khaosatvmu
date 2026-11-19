@@ -94,7 +94,15 @@ public sealed record SurveyFormConfigDto(
     // chưa (phiếu ẩn danh), nên không có câu "bạn đã nộp rồi".
     string? NotOpenMessage = null,
     string? ClosedMessage = null,
-    string? ClassFullMessage = null);
+    string? ClassFullMessage = null,
+
+    // ----- Chữ của ô "Ý kiến khác" cuối bài làm. Bỏ trống là câu mặc định.
+    /// <summary>Tiêu đề ô; mặc định "Ý kiến khác của bạn (nếu có)".</summary>
+    string? CommentHeading = null,
+    /// <summary>Dòng giải thích dưới tiêu đề.</summary>
+    string? CommentHint = null,
+    /// <summary>Chữ mờ trong ô nhập khi chưa gõ gì.</summary>
+    string? CommentPlaceholder = null);
 
 /// <summary>Đọc, ghi và kiểm tra <see cref="SurveyFormConfigDto"/>.</summary>
 public static class SurveyFormConfig
@@ -323,5 +331,8 @@ public static class SurveyFormConfig
         yield return config.NotOpenMessage;
         yield return config.ClosedMessage;
         yield return config.ClassFullMessage;
+        yield return config.CommentHeading;
+        yield return config.CommentHint;
+        yield return config.CommentPlaceholder;
     }
 }

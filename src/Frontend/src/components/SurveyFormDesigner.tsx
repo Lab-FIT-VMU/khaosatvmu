@@ -18,6 +18,7 @@ import {
   surveyFormFonts,
   surveyInfoFields,
   surveyQuizBlocks,
+  defaultCommentTexts,
   isFieldVisible,
   toggleHiddenField,
 } from '../utils/surveyForm';
@@ -471,6 +472,51 @@ export const SurveyFormDesigner: React.FC<{
           </div>
         </section>
 
+        {isFieldVisible(draft, 'commentBox') && (
+          <section className="survey-designer__comment">
+            <h3>Chữ của ô "Ý kiến khác"</h3>
+            <p className="survey-designer__hint">Bỏ trống ô nào thì dùng câu mặc định của ô đó.</p>
+            <label className="survey-designer__text-field">
+              <span className="survey-designer__label">Tiêu đề</span>
+              <input
+                type="text"
+                maxLength={1000}
+                placeholder={defaultCommentTexts.heading}
+                value={draft.commentHeading ?? ''}
+                onChange={(event) => set({ commentHeading: event.target.value || null })}
+              />
+            </label>
+            <label className="survey-designer__text-field">
+              <span className="survey-designer__label">Dòng giải thích</span>
+              <textarea
+                rows={3}
+                maxLength={1000}
+                placeholder={defaultCommentTexts.hint}
+                value={draft.commentHint ?? ''}
+                onChange={(event) => set({ commentHint: event.target.value || null })}
+              />
+            </label>
+            <label className="survey-designer__text-field">
+              <span className="survey-designer__label">Chữ mờ trong ô nhập</span>
+              <input
+                type="text"
+                maxLength={1000}
+                placeholder={defaultCommentTexts.placeholder}
+                value={draft.commentPlaceholder ?? ''}
+                onChange={(event) => set({ commentPlaceholder: event.target.value || null })}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={!draft.commentHeading && !draft.commentHint && !draft.commentPlaceholder}
+              onClick={() => set({ commentHeading: null, commentHint: null, commentPlaceholder: null })}
+            >
+              <RotateCcw className="operation-icon" aria-hidden="true" />
+              Về mặc định
+            </button>
+          </section>
+        )}
       </>
     );
   };

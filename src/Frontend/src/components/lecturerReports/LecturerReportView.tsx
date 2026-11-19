@@ -11,10 +11,17 @@ import { NoteModalButton } from '../NoteModalButton';
 import { FacultyScoreChart } from '../reports/FacultyScoreChart';
 import { SchoolCriteriaChart } from '../reports/SchoolCriteriaChart';
 import { WeakestQuestionsPanel } from '../reports/WeakestQuestionsPanel';
-import { completionColor, scoreColor } from '../reports/theme';
+import { COMPLETED_COMPLETION_RATE, LAGGING_COMPLETION_RATE } from '../../utils/reportThresholds';
 import type { UnitReportComment, UnitReportRow, UnitSurveyReport } from '../../types';
 import { formatDecimal, formatNumber, formatPercent } from '../../utils/formatNumber';
 import { foldVietnamese } from '../../utils/vietnamese';
+import {
+  reportCompletionColor,
+  reportScoreColor,
+  reportTableColorItems,
+  useStatusColors,
+} from '../../utils/statusColors';
+import { StatusColorSettings } from '../StatusColorSettings';
 import { UnitReportBody, UnitReportToolbar, UnitScoringNote } from '../unitReports/UnitReportFrame';
 import {
   scoredValidResponseCountOf,
@@ -51,9 +58,11 @@ const validRateOf = (valid: number, total: number) => (total === 0 ? 0 : (valid 
 export const LecturerReportView: React.FC = () => {
   const state = useUnitSurveyReport('LECTURER');
   const [workspace, setWorkspace] = useState<Workspace>('overview');
+  // Màu số liệu trong các bảng của trang: mỗi người tự chỉnh, lưu trên trình duyệt.
+  const tableColors = useStatusColors('lecturer-reports', reportTableColorItems);
 
   return (
-    <div className="survey-operations-page reports-module">
+    <div className="survey-operations-page reports-module" style={tableColors.style}>
       <UnitReportToolbar surveyType="LECTURER" state={state} idPrefix="lecturer-reports" />
 
       <div className="reports-header">
@@ -61,6 +70,14 @@ export const LecturerReportView: React.FC = () => {
           <BarChart3 className="operation-icon" aria-hidden="true" />
           Thống kê kết quả khảo sát giảng viên
         </h1>
+        <StatusColorSettings
+          items={reportTableColorItems}
+          colors={tableColors.colors}
+          isCustom={tableColors.isCustom}
+          onChange={tableColors.setColor}
+          onApplyPreset={tableColors.applyPreset}
+          onReset={tableColors.reset}
+        />
       </div>
 
       <UnitScoringNote report={state.report} surveyType="LECTURER" />
@@ -370,6 +387,11 @@ const OverviewWorkspace: React.FC<{ report: UnitSurveyReport }> = ({ report }) =
 
 // --------------------------------------------------------- Bảng xếp hạng nhóm
 
+// Màu số liệu trong bảng: đọc biến --status-… mà nút "Màu" của trang đặt (mỗi người tự chỉnh).
+const completionColor = (rate: number) =>
+  reportCompletionColor(rate, COMPLETED_COMPLETION_RATE, LAGGING_COMPLETION_RATE);
+const scoreColor = reportScoreColor;
+
 const countCell = (value: number) => <span className="catalog-cell-number">{value}</span>;
 
 const rateCell = (value: number | null, colored: boolean) => (
@@ -486,6 +508,8 @@ const RankedUnitTable: React.FC<{ report: UnitSurveyReport; title: string }> = (
 
 const CommentsWorkspace: React.FC<{ report: UnitSurveyReport }> = ({ report }) => {
   const [search, setSearch] = useState('');
+  // Màu Hợp lệ / Bị lọc của cột Phiếu: mỗi người tự chỉnh, lưu trên trình duyệt.
+  const statusColors = useStatusColors('lecturer-report-comments');
   const keyword = foldVietnamese(search);
   const rows = report.comments.filter((comment) =>
     foldVietnamese([comment.comment, comment.unitName].join(' '))
@@ -526,7 +550,7 @@ const CommentsWorkspace: React.FC<{ report: UnitSurveyReport }> = ({ report }) =
   ];
 
   return (
-    <section className="reports-rank" aria-label="Phân tích ý kiến mở">
+    <section className="reports-rank" aria-label="Phân tích ý kiến mở" style={statusColors.style}>
       <header className="reports-rank-header">
         <span className="reports-rank-title">
           <h3>Ý kiến mở ({report.comments.length} ý kiến)</h3>
@@ -538,6 +562,19 @@ const CommentsWorkspace: React.FC<{ report: UnitSurveyReport }> = ({ report }) =
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Tìm nội dung ý kiến, khoa/viện..."
+        toolbarActions={(
+          <StatusColorSettings
+            items={[
+              { tone: 'success', label: 'Hợp lệ' },
+              { tone: 'danger', label: 'Bị lọc' },
+            ]}
+            colors={statusColors.colors}
+            isCustom={statusColors.isCustom}
+            onChange={statusColors.setColor}
+            onApplyPreset={statusColors.applyPreset}
+            onReset={statusColors.reset}
+          />
+        )}
         exportConfig={{
           title: 'TỔNG HỢP Ý KIẾN MỞ KHẢO SÁT GIẢNG VIÊN',
           fileName: 'y-kien-mo-giang-vien',

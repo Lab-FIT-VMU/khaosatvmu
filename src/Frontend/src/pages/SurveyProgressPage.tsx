@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole } from '../auth/roles';
 import { COMPLETED_COMPLETION_RATE } from '../utils/reportThresholds';
+import { useStatusColors } from '../utils/statusColors';
+import { StatusColorSettings } from '../components/StatusColorSettings';
 import { surveyApi } from '../services/surveyApi';
 import '../styles/survey-operations.css';
 // Thanh chọn học kỳ / đợt dùng .statistics-toolbar nằm trong tệp này.
@@ -298,6 +300,8 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
    */
   const { activeProfile } = useAuth();
   const canSetTarget = isUnrestrictedRole(activeProfile?.roleCode);
+  // Màu trạng thái của bảng: mỗi người tự chỉnh, lưu trên trình duyệt.
+  const statusColors = useStatusColors('course-progress');
   const [targetRate, setTargetRate] = useState<number>(COMPLETED_COMPLETION_RATE);
   /** Số đang lưu trên máy chủ, để biết rời ô có cần lưu không và lưu hỏng thì trả về đâu. */
   const [savedTargetRate, setSavedTargetRate] = useState<number>(COMPLETED_COMPLETION_RATE);
@@ -640,7 +644,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
   ];
 
   return (
-    <div className="survey-operations-page operations-table-page survey-progress-page">
+    <div className="survey-operations-page operations-table-page survey-progress-page" style={statusColors.style}>
       {loadError && (
         <div className="operations-feedback operations-feedback--error" role="alert">
           <CircleAlert aria-hidden="true" />
@@ -734,6 +738,19 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
             // Chỉ tiêu của riêng trang này, đặt sát bảng vì nó chỉ quyết định nhãn
             // trạng thái của từng lớp bên dưới.
             toolbarActions={(
+              <>
+              <StatusColorSettings
+                items={[
+                  { tone: 'success', label: 'Đạt chỉ tiêu' },
+                  { tone: 'warning', label: 'Đang thu' },
+                  { tone: 'danger', label: 'Không đạt chỉ tiêu' },
+                ]}
+                colors={statusColors.colors}
+                isCustom={statusColors.isCustom}
+                onChange={statusColors.setColor}
+                onApplyPreset={statusColors.applyPreset}
+                onReset={statusColors.reset}
+              />
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 650 }}>
                 <span style={{ whiteSpace: 'nowrap' }}>Tỷ lệ phản hồi (%)</span>
                 <input
@@ -765,6 +782,7 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
                   }}
                 />
               </label>
+              </>
             )}
             emptyMessage="Chưa có lớp học phần nào được phát phiếu khảo sát."
             keyExtractor={(item) => item.id}

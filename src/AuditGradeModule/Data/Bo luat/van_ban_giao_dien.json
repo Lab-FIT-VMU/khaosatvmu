@@ -81,7 +81,6 @@
     "chua_xac_dinh_on_dinh": "Chưa xác định (thiếu điều kiện so sánh)",
     "g1_dang": "Đang tiếp diễn",
     "g1_truoc": "Đã ghi nhận trước đây",
-    "du_lieu_gia": "Dữ liệu giả lập – không phải số liệu thật",
     "chua_co_ky_tieu_de": "Chưa có học kỳ nào được nạp",
     "chua_co_ky_tren_may": "Hãy nạp học kỳ đầu tiên để xem báo cáo. Phần so sánh qua các học kỳ chỉ có từ học kỳ thứ hai.",
     "chua_co_ky_github": "Bản xem trên GitHub chưa có dữ liệu. Hãy nạp học kỳ trên máy rồi đưa thư mục web/data lên GitHub.",

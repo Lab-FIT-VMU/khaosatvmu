@@ -8,8 +8,7 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   reports: 'REPORTS_ACCESS',
   'survey-statistics': 'SURVEY_STATISTICS_ACCESS',
   'survey-analysis': 'SURVEY_ANALYSIS_ACCESS',
-  // Tạm thời mục này chỉ là đường dẫn ra trang ngoài; quyền dùng đúng mã của module điểm
-  // bên nhánh hoang12345 để khi gộp vẫn giữ nguyên cấu hình phân quyền đã bật tắt.
+  // Mã nhóm "Phân tích điểm học phần" (trước là một đường dẫn ra trang ngoài).
   'course-grade-analysis': 'COURSE_GRADE_ANALYSIS_ACCESS',
   // Tải lên tách khỏi xem: đây là thao tác ghi trên dữ liệu toàn trường.
   'graduation-data-upload': 'GRADUATION_UPLOAD_ACCESS',
@@ -25,9 +24,9 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   'course-grade-report-trends': 'COURSE_GRADE_ANALYSIS_ACCESS',
   'course-grade-glossary': 'COURSE_GRADE_ANALYSIS_ACCESS',
   'course-grade-design': 'COURSE_GRADE_ANALYSIS_ACCESS',
-  // Module audit (bản nguyên, độc lập): không có quyền module, chỉ vai trò ADMIN — App và
-  // Sidebar kiểm theo vai trò, backend (/api/audit-grades) cũng vậy.
-  'audit-grade-module': null,
+  // Module audit (bản nguyên, độc lập): quyền riêng, mặc định chỉ cấp cho ADMIN. Backend
+  // (/api/audit-grades) cũng kiểm đúng quyền này.
+  'audit-grade-module': 'AUDIT_GRADE_MODULE_ACCESS',
   // Giữ hash cũ để bookmark tự chuyển vào module thống nhất.
   'graduation-analytics': 'GRADUATION_ANALYTICS_ACCESS',
   'graduation-analytics-2': 'GRADUATION_ANALYTICS_ACCESS',
@@ -46,10 +45,12 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   criteria: 'COURSE_QUESTION_SETS_ACCESS',
   'course-campaigns': 'COURSE_CAMPAIGNS_ACCESS',
   campaigns: 'COURSE_CAMPAIGNS_ACCESS',
-  'program-campaigns': 'PROGRAM_CAMPAIGNS_ACCESS',
-  // Tạm dùng chung quyền đợt CTĐT tới khi có quyền riêng cho khảo sát giảng viên.
-  'lecturer-campaigns': 'PROGRAM_CAMPAIGNS_ACCESS',
-  'program-criteria': 'PROGRAM_CRITERIA_ACCESS',
+  // Hash cũ của trang đợt CTĐT / giảng viên: nay mở trang đợt chung (một trang cho cả ba
+  // loại khảo sát) nên dùng chung quyền Danh sách bài khảo sát.
+  'program-campaigns': 'COURSE_CAMPAIGNS_ACCESS',
+  'lecturer-campaigns': 'COURSE_CAMPAIGNS_ACCESS',
+  // Trang tiêu chí CTĐT cũ, chỉ còn mở qua hash cũ.
+  'program-criteria': 'COURSE_QUESTION_SETS_ACCESS',
   'users-admin': 'USER_ADMIN_ACCESS',
 };
 
@@ -93,14 +94,6 @@ export const TAB_PERMISSION = {
     courses: 'SURVEY_ANALYSIS_TAB_COURSES',
     normalizationSections: 'SURVEY_ANALYSIS_TAB_SECTIONS',
     lecturer: 'SURVEY_ANALYSIS_TAB_LECTURERS',
-  },
-  programCampaigns: {
-    'Học phần': 'PROGRAM_CAMPAIGNS_TAB_COURSE',
-    'Chương trình đào tạo': 'PROGRAM_CAMPAIGNS_TAB_PROGRAM',
-  },
-  programCriteria: {
-    'Học phần': 'PROGRAM_CRITERIA_TAB_COURSE',
-    'Chương trình đào tạo': 'PROGRAM_CRITERIA_TAB_PROGRAM',
   },
   usersAdmin: {
     users: 'USER_ADMIN_TAB_ACCOUNTS',

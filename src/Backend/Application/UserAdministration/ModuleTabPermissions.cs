@@ -35,14 +35,6 @@ public static class ModuleTabPermissions
         new("SURVEY_ANALYSIS_TAB_SECTIONS", "Phân tích theo lớp học phần", "SURVEY_ANALYSIS_ACCESS"),
         new("SURVEY_ANALYSIS_TAB_LECTURERS", "Báo cáo giảng viên", "SURVEY_ANALYSIS_ACCESS"),
 
-        // Đợt khảo sát CTĐT
-        new("PROGRAM_CAMPAIGNS_TAB_COURSE", "Học phần", "PROGRAM_CAMPAIGNS_ACCESS"),
-        new("PROGRAM_CAMPAIGNS_TAB_PROGRAM", "Chương trình đào tạo", "PROGRAM_CAMPAIGNS_ACCESS"),
-
-        // Tiêu chí CTĐT
-        new("PROGRAM_CRITERIA_TAB_COURSE", "Học phần", "PROGRAM_CRITERIA_ACCESS"),
-        new("PROGRAM_CRITERIA_TAB_PROGRAM", "Chương trình đào tạo", "PROGRAM_CRITERIA_ACCESS"),
-
         // Người dùng & phân quyền
         new("USER_ADMIN_TAB_ACCOUNTS", "Tài khoản và hồ sơ", "USER_ADMIN_ACCESS"),
         new("USER_ADMIN_TAB_AUDIT", "Nhật ký hệ thống", "USER_ADMIN_ACCESS"),

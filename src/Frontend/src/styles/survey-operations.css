@@ -984,6 +984,51 @@
   background: #b86216;
 }
 
+/*
+  Các trang thống kê khảo sát (tiến độ, báo cáo, bảng dữ liệu; cả ba loại khảo sát): thanh
+  tỷ lệ và nhãn trạng thái trong bảng dùng màu cố định của Phân tích điểm học phần
+  (course-grade-reports.css) — không đỏ / cam / xanh lá, màu không gợi ý tốt xấu:
+  đạt = xanh mòng két (--cga-ok), đang thu = xanh dương (--cga-brand-700),
+  không đạt / không hợp lệ = tím (--cga-down). Các trang khác giữ màu cũ.
+  Mỗi người đổi được màu ở nút "Màu" cạnh bảng (utils/statusColors.ts): màu đó đổ vào ba
+  biến --status-success / --status-warning / --status-danger trên trang.
+*/
+.survey-progress-page .operations-status--success,
+.reports-module .operations-status--success,
+.survey-statistics-page .operations-status--success {
+  color: var(--status-success, #0f5e5e);
+}
+
+.survey-progress-page .operations-status--warning,
+.reports-module .operations-status--warning,
+.survey-statistics-page .operations-status--warning {
+  color: var(--status-warning, #1450b8);
+}
+
+.survey-progress-page .operations-status--danger,
+.reports-module .operations-status--danger,
+.survey-statistics-page .operations-status--danger {
+  color: var(--status-danger, #7a6bb0);
+}
+
+.survey-progress-page .operations-progress-fill,
+.reports-module .operations-progress-fill,
+.survey-statistics-page .operations-progress-fill {
+  background: var(--status-danger, #7a6bb0);
+}
+
+.survey-progress-page .operations-progress-fill--success,
+.reports-module .operations-progress-fill--success,
+.survey-statistics-page .operations-progress-fill--success {
+  background: var(--status-success, #0f5e5e);
+}
+
+.survey-progress-page .operations-progress-fill--warning,
+.reports-module .operations-progress-fill--warning,
+.survey-statistics-page .operations-progress-fill--warning {
+  background: var(--status-warning, #1450b8);
+}
+
 .student-survey {
   max-width: 820px;
   margin: 0 auto;

@@ -10,6 +10,8 @@ import type { UnitReportRow, UnitSurveyReport } from '../../types';
 import { foldVietnamese } from '../../utils/vietnamese';
 import { UnitReportBody, UnitReportToolbar, UnitScoringNote } from '../unitReports/UnitReportFrame';
 import { useUnitSurveyReport } from '../unitReports/unitReportModel';
+import { useStatusColors } from '../../utils/statusColors';
+import { StatusColorSettings } from '../StatusColorSettings';
 import '../../styles/survey-operations.css';
 import '../../styles/survey-statistics.css';
 import '../../styles/catalogs.css';
@@ -47,6 +49,8 @@ export const LecturerProgressView: React.FC = () => {
 
 const ProgressContent: React.FC<{ report: UnitSurveyReport }> = ({ report }) => {
   const [search, setSearch] = useState('');
+  // Màu trạng thái của bảng: mỗi người tự chỉnh, lưu trên trình duyệt.
+  const statusColors = useStatusColors('lecturer-progress');
 
   const items = useMemo((): ProgressItem[] => report.units.map((row: UnitReportRow) => ({
     id: String(row.courseSectionSurveyId),
@@ -98,7 +102,7 @@ const ProgressContent: React.FC<{ report: UnitSurveyReport }> = ({ report }) => 
   ];
 
   return (
-    <>
+    <div className="status-color-scope" style={statusColors.style}>
       <section className="operations-metrics" aria-label="Tổng quan tiến độ">
         <div className="operation-metric">
           <span className="operation-metric-icon"><UsersRound className="operation-icon" aria-hidden="true" /></span>
@@ -134,6 +138,19 @@ const ProgressContent: React.FC<{ report: UnitSurveyReport }> = ({ report }) => 
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Tìm khoa/viện..."
+        toolbarActions={(
+          <StatusColorSettings
+            items={[
+              { tone: 'success', label: 'Đã có phiếu' },
+              { tone: 'danger', label: 'Chưa có phiếu' },
+            ]}
+            colors={statusColors.colors}
+            isCustom={statusColors.isCustom}
+            onChange={statusColors.setColor}
+            onApplyPreset={statusColors.applyPreset}
+            onReset={statusColors.reset}
+          />
+        )}
         exportConfig={{
           fileName: `bao-cao-tien-do-thu-phieu-${report.surveyName}`,
           title: 'BÁO CÁO TIẾN ĐỘ THU PHIẾU KHẢO SÁT GIẢNG VIÊN',
@@ -155,6 +172,6 @@ const ProgressContent: React.FC<{ report: UnitSurveyReport }> = ({ report }) => 
         keyExtractor={(item) => item.id}
         showIndex={false}
       />
-    </>
+    </div>
   );
 };
