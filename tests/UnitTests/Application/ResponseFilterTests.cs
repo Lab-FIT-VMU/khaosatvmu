@@ -21,12 +21,12 @@ public class ResponseFilterTests
         ResponseFilter.MinimumSeconds(questionCount);
 
     [Fact]
-    public void MinimumSeconds_LaMotRuoiGiayMoiCau()
+    public void MinimumSeconds_LaKhongPhayBayLamGiayMoiCau()
     {
-        ResponseFilter.SecondsPerQuestion.Should().Be(1.5);
-        ResponseFilter.MinimumSeconds(30).Should().Be(45);
-        // Số câu lẻ thì ngưỡng lẻ nửa giây, không được làm tròn xuống.
-        ResponseFilter.MinimumSeconds(29).Should().Be(43.5);
+        ResponseFilter.SecondsPerQuestion.Should().Be(0.75);
+        ResponseFilter.MinimumSeconds(30).Should().Be(22.5);
+        // Số câu không chia hết cho 4 thì ngưỡng có phần lẻ, không được làm tròn xuống.
+        ResponseFilter.MinimumSeconds(29).Should().Be(21.75);
     }
 
     [Fact]
@@ -57,8 +57,8 @@ public class ResponseFilterTests
             new FilterAnswer(3, "4"),
         };
 
-        // 3 câu, ngưỡng 4.5 giây.
-        var result = ResponseFilter.Evaluate(questions, answers, 4);
+        // 3 câu, ngưỡng 2.25 giây.
+        var result = ResponseFilter.Evaluate(questions, answers, 2);
 
         result.IsValid.Should().BeFalse();
         result.RejectionReasons.Should().Be(RejectionReasonCodes.TooFast);
@@ -70,8 +70,8 @@ public class ResponseFilterTests
         var questions = new[] { Scored(1), Scored(2) };
         var answers = new[] { new FilterAnswer(1, "5"), new FilterAnswer(2, "2") };
 
-        // 2 câu, ngưỡng đúng 3 giây.
-        var result = ResponseFilter.Evaluate(questions, answers, 3);
+        // 2 câu, ngưỡng đúng 1.5 giây.
+        var result = ResponseFilter.Evaluate(questions, answers, 1.5);
 
         result.IsValid.Should().BeTrue();
     }
@@ -79,7 +79,7 @@ public class ResponseFilterTests
     [Fact]
     public void CauTuNhapVaCauBay_VanTinhVaoNguongThoiGian()
     {
-        // 1 câu chấm điểm + 1 câu tự nhập + 1 câu bẫy = 3 câu, ngưỡng 4.5 giây.
+        // 1 câu chấm điểm + 1 câu tự nhập + 1 câu bẫy = 3 câu, ngưỡng 2.25 giây.
         var questions = new[] { Scored(1), Text(2), Trap(3, 3) };
         var answers = new[]
         {
@@ -88,9 +88,9 @@ public class ResponseFilterTests
             new FilterAnswer(3, "3"),
         };
 
-        ResponseFilter.Evaluate(questions, answers, 4).RejectionReasons
+        ResponseFilter.Evaluate(questions, answers, 2).RejectionReasons
             .Should().Be(RejectionReasonCodes.TooFast);
-        ResponseFilter.Evaluate(questions, answers, 4.5).IsValid
+        ResponseFilter.Evaluate(questions, answers, 2.25).IsValid
             .Should().BeTrue();
     }
 
@@ -139,23 +139,56 @@ public class ResponseFilterTests
         result.RejectionReasons.Should().Be(RejectionReasonCodes.SingleAnswer);
     }
 
-    [Fact]
-    public void CauBayLamDung_KhongCuuDuocPhieuChonMotMuc()
+    [Theory]
+    [InlineData("3")] // câu thường toàn 5, câu bẫy chọn đúng mức 3
+    public void ChonMotMuc_NhungLamDungCauBay_VanDuocTinh(string trapAnswer)
     {
-        // Đây là cái bẫy của chính phép kiểm: đáp án thô là {5,5,3} nên nếu tính
-        // cả câu bẫy thì thấy có hai giá trị và lọt lưới. Phải bỏ câu bẫy ra.
+        // Làm đúng câu bẫy là bằng chứng có đọc câu hỏi, nên không định SINGLE_ANSWER.
         var questions = new[] { Scored(1), Scored(2), Trap(3, 3) };
         var answers = new[]
         {
             new FilterAnswer(1, "5"),
             new FilterAnswer(2, "5"),
+            new FilterAnswer(3, trapAnswer),
+        };
+
+        var result = ResponseFilter.Evaluate(questions, answers, SlowEnough(3));
+
+        result.IsValid.Should().BeTrue();
+        result.RejectionReasons.Should().BeNull();
+    }
+
+    [Fact]
+    public void ChonMotMuc_KeCaCauBay_MaCauBayDungMucDo_VanDuocTinh()
+    {
+        // Toàn mức 3, câu bẫy cũng bắt mức 3: đúng câu bẫy nên được tính.
+        var questions = new[] { Scored(1), Scored(2), Trap(3, 3) };
+        var answers = new[]
+        {
+            new FilterAnswer(1, "3"),
+            new FilterAnswer(2, "3"),
             new FilterAnswer(3, "3"),
+        };
+
+        ResponseFilter.Evaluate(questions, answers, SlowEnough(3)).IsValid
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void ChonMotMuc_VaSaiCauBay_ThiDinhCaHaiLoi()
+    {
+        var questions = new[] { Scored(1), Scored(2), Trap(3, 3) };
+        var answers = new[]
+        {
+            new FilterAnswer(1, "5"),
+            new FilterAnswer(2, "5"),
+            new FilterAnswer(3, "5"),
         };
 
         var result = ResponseFilter.Evaluate(questions, answers, SlowEnough(3));
 
         result.IsValid.Should().BeFalse();
-        result.RejectionReasons.Should().Be(RejectionReasonCodes.SingleAnswer);
+        result.RejectionReasons.Should().Be("SINGLE_ANSWER,ATTENTION_CHECK_FAILED");
     }
 
     [Fact]

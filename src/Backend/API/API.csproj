@@ -2,10 +2,12 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <FileVersion>1.0.0.22</FileVersion>
+    <FileVersion>1.0.0.25</FileVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>khaosatvmu-api-local-google-oauth</UserSecretsId>
+    <!-- Không tạo API.exe; `dotnet run` chạy thẳng API.dll. -->
+    <UseAppHost>false</UseAppHost>
   </PropertyGroup>
 
   <ItemGroup>
