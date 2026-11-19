@@ -39,10 +39,10 @@ public static class ResponseFilter
     /// Số giây tối thiểu cho mỗi câu hỏi. Viết cứng theo quyết định A-c, không
     /// đọc từ cấu hình và không cho sửa qua giao diện.
     ///
-    /// Là số thực chứ không phải số nguyên: ngưỡng 1.5 giây/câu cho ra tổng lẻ
-    /// nửa giây với bộ đề có số câu lẻ, làm tròn xuống int sẽ nới ngưỡng ra.
+    /// Là số thực chứ không phải số nguyên: ngưỡng 0.75 giây/câu cho ra tổng lẻ
+    /// với bộ đề có số câu không chia hết cho 4, làm tròn xuống int sẽ nới ngưỡng ra.
     /// </summary>
-    public const double SecondsPerQuestion = 1.5;
+    public const double SecondsPerQuestion = 0.75;
 
     /// <summary>
     /// Ngưỡng thời gian tối thiểu của cả bài: tính trên TỔNG số câu, kể cả câu
@@ -77,6 +77,7 @@ public static class ResponseFilter
         // cố định nên nếu tính vào đây thì người chọn tất cả mức 5 mà làm đúng
         // câu bẫy mức 3 sẽ có hai giá trị khác nhau và lọt lưới.
         var scoredValues = new List<string>();
+        var hasAttentionCheck = false;
         var failedAttentionCheck = false;
 
         foreach (var question in questions)
@@ -85,6 +86,7 @@ public static class ResponseFilter
 
             if (question.AttentionCheckValue is { } required)
             {
+                hasAttentionCheck = true;
                 if (!int.TryParse(value, out var selected) || selected != required)
                 {
                     // Sai một câu bẫy là đủ để lọc (quyết định A-f).
@@ -97,7 +99,11 @@ public static class ResponseFilter
         }
 
         // Một câu duy nhất thì không nói lên điều gì, phải từ hai câu trở lên.
-        if (scoredValues.Count >= 2 && scoredValues.Distinct().Count() == 1)
+        // Làm đúng mọi câu bẫy là bằng chứng người trả lời có đọc câu hỏi, nên chọn
+        // cùng một mức cho mọi câu khi đó vẫn được tính. Bộ không có câu bẫy, hoặc sai
+        // câu bẫy, thì luật một đáp án áp như thường.
+        var passedAttentionCheck = hasAttentionCheck && !failedAttentionCheck;
+        if (!passedAttentionCheck && scoredValues.Count >= 2 && scoredValues.Distinct().Count() == 1)
         {
             reasons.Add(RejectionReasonCodes.SingleAnswer);
         }
