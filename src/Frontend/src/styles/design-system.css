@@ -1,0 +1,83 @@
+/* Trang Design System chung: ô màu chỉnh được và các bộ màu gợi ý. */
+
+.ds-swatch {
+  position: relative;
+  cursor: pointer;
+}
+
+.ds-swatch input[type='color'] {
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin-bottom: 6px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.ds-swatch input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.ds-swatch input[type='color']::-webkit-color-swatch {
+  border: 0;
+  border-radius: 5px;
+}
+
+.ds-swatch:hover {
+  border-color: var(--cga-brand-700);
+}
+
+.ds-swatch__custom {
+  color: var(--cga-brand-700);
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.ds-presets {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.ds-preset {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--cga-border);
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--cga-text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ds-preset:hover {
+  border-color: var(--cga-border-strong);
+  background: var(--cga-surface-2);
+}
+
+.ds-preset.is-active {
+  border-color: var(--cga-brand-700);
+  background: var(--cga-brand-50);
+  box-shadow: inset 0 0 0 1px var(--cga-brand-700);
+}
+
+.ds-preset__swatches {
+  display: inline-flex;
+  flex: none;
+  gap: 3px;
+}
+
+.ds-preset__swatches i {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+}

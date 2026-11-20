@@ -74,8 +74,8 @@ const COURSE_GRADE_REPORT_VIEWS: Record<string, CourseGradeReportView> = {
   'course-grade-report-department': 'department',
   'course-grade-report-trends': 'trends',
   'course-grade-glossary': 'glossary',
-  'course-grade-design': 'design',
 };
+const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage').then(m => ({ default: m.DesignSystemPage })));
 const courseGradeReportTab = (view: CourseGradeReportView) =>
   Object.keys(COURSE_GRADE_REPORT_VIEWS).find((tab) => COURSE_GRADE_REPORT_VIEWS[tab] === view) ?? 'course-grade-report-school';
 const CourseGradeThresholdsPage = lazy(() => import('./pages/CourseGradeThresholdsPage').then(m => ({ default: m.CourseGradeThresholdsPage })));
@@ -218,6 +218,8 @@ function DashboardApp() {
   // Báo cáo phân tích điểm cũ là một trang có thanh tab; nay tách thành bốn mục trên sidebar.
   useEffect(() => {
     if (currentTab === 'course-grade-reports') setCurrentTab(courseGradeReportTab('school'));
+    // Design System đã thành mục riêng (bộ màu chung), không còn nằm trong nhóm Phân tích điểm.
+    if (currentTab === 'course-grade-design') setCurrentTab('design-system');
   }, [currentTab, setCurrentTab]);
 
   useEffect(() => {
@@ -716,6 +718,7 @@ function DashboardApp() {
             {currentTab === 'audit-grade-module' && canAccessModule(permissions, 'audit-grade-module') && (
               <AuditGradeModulePage />
             )}
+            {currentTab === 'design-system' && <DesignSystemPage />}
 
 
             {currentTab === 'academic-years' && <AcademicYearsPage />}

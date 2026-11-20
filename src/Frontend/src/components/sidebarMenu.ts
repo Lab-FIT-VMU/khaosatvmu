@@ -142,7 +142,6 @@ export const menuStructure: SidebarMenuEntry[] = [
       { id: 'course-grade-report-department', label: 'Cấp bộ môn', icon: BookOpen, section: 'Báo cáo' },
       { id: 'course-grade-report-trends', label: 'Diễn biến qua các học kỳ', icon: History, section: 'Báo cáo' },
       { id: 'course-grade-glossary', label: 'Giải thích thuật ngữ', icon: CircleHelp, section: 'Trợ giúp' },
-      { id: 'course-grade-design', label: 'Design System', icon: Palette, section: 'Trợ giúp' },
     ],
   },
   // Module audit chạy nguyên bản, độc lập với nhóm trên (src/AuditGradeModule): một mục mở
@@ -191,6 +190,9 @@ export const menuStructure: SidebarMenuEntry[] = [
       { id: 'users-admin', label: 'Người dùng & phân quyền', icon: UserCog },
     ],
   },
+  // Bộ màu chung của bảng thống kê khảo sát và Phân tích điểm học phần. Mỗi người tự chỉnh
+  // trên máy mình nên ai đăng nhập cũng mở được (không có quyền module).
+  { id: 'design-system', label: 'Design System', icon: Palette },
 ];
 
 /** Nhãn mục điều hướng theo mã tab — thanh trên cùng dùng để mở đầu đường dẫn. */

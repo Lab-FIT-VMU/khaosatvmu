@@ -24,7 +24,6 @@ interface Props {
   courses: AnalysisCourse[];
 }
 
-const ACCENTS = ['#1D63D6', '#6A55C2', '#138A8A', '#2E3F9E'];
 
 function TrendChart({ title, description, data, digits, suffix = '', color }: {
   title: string;
@@ -207,10 +206,10 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
       >
         {upToNow.length < 2 && <div className="cga-info">Mới có một học kỳ; đường xu hướng có từ học kỳ thứ hai.</div>}
         <div className="cga-grid-2">
-          <TrendChart title="Tỷ lệ mất tư cách dự thi" description="Phần trăm lượt sinh viên không đủ điều kiện dự thi." data={upToNow.map((t) => ({ label: t.label, value: t.summary?.i1 != null ? t.summary.i1 * 100 : null }))} digits={1} suffix="%" color={ACCENTS[0]} />
-          <TrendChart title="Tỷ lệ trượt do điểm thi" description="Phần trăm sinh viên dự thi bị điểm F vì điểm thi dưới mức tối thiểu." data={upToNow.map((t) => ({ label: t.label, value: t.summary?.i2 != null ? t.summary.i2 * 100 : null }))} digits={1} suffix="%" color={ACCENTS[1]} />
-          <TrendChart title="Chênh lệch điểm quá trình – điểm thi" description="Điểm quá trình trung bình trừ điểm thi trung bình (điểm)." data={upToNow.map((t) => ({ label: t.label, value: t.summary?.i5 ?? null }))} digits={2} color={ACCENTS[2]} />
-          <TrendChart title="Mức độ khớp điểm quá trình – điểm thi" description="Trung vị hệ số tương quan r của các lớp (0 đến 1)." data={upToNow.map((t) => ({ label: t.label, value: t.summary?.i6 ?? null }))} digits={2} color={ACCENTS[3]} />
+          <TrendChart title="Tỷ lệ mất tư cách dự thi" description="Phần trăm lượt sinh viên không đủ điều kiện dự thi." data={upToNow.map((t) => ({ label: t.label, value: t.summary?.i1 != null ? t.summary.i1 * 100 : null }))} digits={1} suffix="%" color={COLORS.accents[0]} />
+          <TrendChart title="Tỷ lệ trượt do điểm thi" description="Phần trăm sinh viên dự thi bị điểm F vì điểm thi dưới mức tối thiểu." data={upToNow.map((t) => ({ label: t.label, value: t.summary?.i2 != null ? t.summary.i2 * 100 : null }))} digits={1} suffix="%" color={COLORS.accents[1]} />
+          <TrendChart title="Chênh lệch điểm quá trình – điểm thi" description="Điểm quá trình trung bình trừ điểm thi trung bình (điểm)." data={upToNow.map((t) => ({ label: t.label, value: t.summary?.i5 ?? null }))} digits={2} color={COLORS.accents[2]} />
+          <TrendChart title="Mức độ khớp điểm quá trình – điểm thi" description="Trung vị hệ số tương quan r của các lớp (0 đến 1)." data={upToNow.map((t) => ({ label: t.label, value: t.summary?.i6 ?? null }))} digits={2} color={COLORS.accents[3]} />
         </div>
       </SectionCard>
 
@@ -227,7 +226,7 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
           anonymous
           legend={mapFaculty === null
             ? [{ label: 'Học phần', color: COLORS.scale[3] }]
-            : [{ label: `Học phần của ${facultyName.get(mapFaculty) ?? 'khoa đã chọn'}`, color: COLORS.scale[3] }, { label: 'Học phần khác', color: '#B8C2D3' }]}
+            : [{ label: `Học phần của ${facultyName.get(mapFaculty) ?? 'khoa đã chọn'}`, color: COLORS.scale[3] }, { label: 'Học phần khác', color: COLORS.muted }]}
           controls={overview.faculties.length > 1 && (
             <Field label="Tô nổi khoa/viện">
               <select value={mapFaculty ?? ''} onChange={(event) => setMapFaculty(event.target.value ? Number(event.target.value) : null)}>
@@ -300,7 +299,7 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
             description={`Toàn trường, ${scoreName}.`}
             data={spreadTrend}
             digits={2}
-            color={ACCENTS[0]}
+            color={COLORS.accents[0]}
           />
           <TrendChart
             title={`Tỷ lệ học phần có “${FLAG_LABELS[spreadFlag]?.name}”`}
@@ -308,7 +307,7 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
             data={shareTrend}
             digits={1}
             suffix="%"
-            color={ACCENTS[1]}
+            color={COLORS.accents[1]}
           />
         </div>
       </SectionCard>

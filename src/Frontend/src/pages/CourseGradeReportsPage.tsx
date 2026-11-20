@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircleAlert, LoaderCircle, Printer } from 'lucide-react';
-import { DesignSystemView } from '../components/courseGrades/DesignSystemView';
 import { GlossaryView } from '../components/courseGrades/GlossaryView';
 import { SchoolOverview } from '../components/courseGrades/SchoolOverview';
 import { SectionsView } from '../components/courseGrades/SectionsView';
@@ -58,7 +57,6 @@ const CRUMB: Record<CourseGradeReportView, string> = {
   department: 'Báo cáo · Cấp bộ môn',
   trends: 'Báo cáo · Diễn biến qua các học kỳ',
   glossary: 'Trợ giúp',
-  design: 'Trợ giúp',
 };
 
 interface Props {
@@ -104,7 +102,7 @@ export function CourseGradeReportsPage({ view, onNavigate }: Props) {
   }, []);
 
   useEffect(() => {
-    if (semesterId === null || view === 'glossary' || view === 'design') return;
+    if (semesterId === null || view === 'glossary') return;
     let cancelled = false;
     setLoadingCourses(true);
     courseGradeAnalysisApi.courses(semesterId)
@@ -153,7 +151,7 @@ export function CourseGradeReportsPage({ view, onNavigate }: Props) {
   // Thanh ngữ cảnh: học kỳ ở mọi cấp; khoa ở cấp khoa, bộ môn, diễn biến; bộ môn ở cấp bộ môn và diễn biến.
   const showFaculty = (view === 'faculty' || view === 'department' || view === 'trends') && overview.faculties.length > 1;
   const showDepartment = view === 'department' || view === 'trends';
-  const contextBar = view !== 'glossary' && view !== 'design' && overview.terms.length > 0 && (
+  const contextBar = view !== 'glossary' && overview.terms.length > 0 && (
     <div className="cga-context">
       <label className="cga-context__field">
         Học kỳ
@@ -206,11 +204,6 @@ export function CourseGradeReportsPage({ view, onNavigate }: Props) {
           title: 'Diễn biến qua các học kỳ',
           description: `${facultyName} · ${viInt(termIndex + 1)} học kỳ tính đến học kỳ đang chọn. Một điểm lưu ý xuất hiện ở một học kỳ có thể chỉ là dao động ngẫu nhiên; chỉ nên chú ý khi **cùng một đặc điểm lặp lại ở cùng một học phần qua từ 2 học kỳ trở lên**.`,
         };
-      case 'design':
-        return {
-          title: 'Design System',
-          description: 'Bảng màu, quy tắc màu số liệu (M1–M5) và các thành phần dùng chung của module. Màu số liệu **không dùng đỏ, cam, xanh lá** và không gợi ý tốt hay xấu.',
-        };
       default:
         return {
           title: 'Giải thích thuật ngữ',
@@ -235,7 +228,7 @@ export function CourseGradeReportsPage({ view, onNavigate }: Props) {
 
       {runNote && <div className="cga-info">{runNote}</div>}
 
-      {view === 'design' ? <DesignSystemView /> : view === 'glossary' ? <GlossaryView overview={overview} /> : overview.runId === null ? (
+      {view === 'glossary' ? <GlossaryView overview={overview} /> : overview.runId === null ? (
         <div className="cga-empty">
           <p><strong>Chưa có kết quả phân tích.</strong></p>
           <p className="cga-muted">
