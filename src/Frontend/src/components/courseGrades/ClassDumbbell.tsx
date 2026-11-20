@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import type { AnalysisSection } from '../../types/courseGradeAnalysis';
-import { vi } from './courseGradeFormat';
+import { COLORS, vi } from './courseGradeFormat';
 import { Field, Filters } from './courseGradeUi';
 
 /** Màu hai loại điểm của bản audit (--score-qt, --score-thi). */
-const SCORE_X = '#1D63D6';
-const SCORE_Y = '#1F2633';
 
 type Sort = 'gap' | 'x' | 'name';
 
@@ -61,12 +59,12 @@ export function ClassDumbbell({ sections, baseCourseCode }: { sections: Analysis
               <text x={sx(v)} y={height - pad.b + 18} textAnchor="middle" fontSize={12} fill="#475569">{v}</text>
             </g>
           ))}
-          <line x1={sx(avgX)} x2={sx(avgX)} y1={pad.t - 10} y2={height - pad.b} stroke={SCORE_X} strokeWidth={2} strokeDasharray="8 5" />
-          <line x1={sx(avgY)} x2={sx(avgY)} y1={pad.t - 10} y2={height - pad.b} stroke={SCORE_Y} strokeWidth={2} strokeDasharray="2 4" />
-          <text x={sx(avgX) + (avgX >= avgY ? 6 : -6)} y={pad.t - 16} textAnchor={avgX >= avgY ? 'start' : 'end'} fontSize={12} fontWeight={600} fill={SCORE_X}>
+          <line x1={sx(avgX)} x2={sx(avgX)} y1={pad.t - 10} y2={height - pad.b} stroke={COLORS.process} strokeWidth={2} strokeDasharray="8 5" />
+          <line x1={sx(avgY)} x2={sx(avgY)} y1={pad.t - 10} y2={height - pad.b} stroke={COLORS.exam} strokeWidth={2} strokeDasharray="2 4" />
+          <text x={sx(avgX) + (avgX >= avgY ? 6 : -6)} y={pad.t - 16} textAnchor={avgX >= avgY ? 'start' : 'end'} fontSize={12} fontWeight={600} fill={COLORS.process}>
             TB điểm quá trình: {vi(avgX)}
           </text>
-          <text x={sx(avgY) + (avgX >= avgY ? -6 : 6)} y={pad.t - 16} textAnchor={avgX >= avgY ? 'end' : 'start'} fontSize={12} fontWeight={600} fill={SCORE_Y}>
+          <text x={sx(avgY) + (avgX >= avgY ? -6 : 6)} y={pad.t - 16} textAnchor={avgX >= avgY ? 'end' : 'start'} fontSize={12} fontWeight={600} fill={COLORS.exam}>
             TB điểm thi: {vi(avgY)}
           </text>
           {rows.map((r, i) => {
@@ -78,10 +76,10 @@ export function ClassDumbbell({ sections, baseCourseCode }: { sections: Analysis
                   <title>{r.label}</title>
                 </text>
                 <line x1={sx(r.x)} x2={sx(r.y)} y1={cy} y2={cy} stroke="#94a3b8" strokeWidth={3} />
-                <circle cx={sx(r.x)} cy={cy} r={6} fill={SCORE_X}>
+                <circle cx={sx(r.x)} cy={cy} r={6} fill={COLORS.process}>
                   <title>{`${r.label}\nĐiểm quá trình trung bình: ${vi(r.x)}\nChênh với điểm thi: ${vi(r.x - r.y)}`}</title>
                 </circle>
-                <rect x={sx(r.y) - 5.5} y={cy - 5.5} width={11} height={11} fill={SCORE_Y}>
+                <rect x={sx(r.y) - 5.5} y={cy - 5.5} width={11} height={11} fill={COLORS.exam}>
                   <title>{`${r.label}\nĐiểm thi trung bình: ${vi(r.y)}`}</title>
                 </rect>
               </g>
@@ -90,8 +88,8 @@ export function ClassDumbbell({ sections, baseCourseCode }: { sections: Analysis
         </svg>
       </div>
       <div className="cga-legend">
-        <span><i style={{ background: SCORE_X }} />Điểm quá trình trung bình (tròn)</span>
-        <span><i style={{ background: SCORE_Y, borderRadius: 0 }} />Điểm thi trung bình (vuông)</span>
+        <span><i style={{ background: COLORS.process }} />Điểm quá trình trung bình (tròn)</span>
+        <span><i style={{ background: COLORS.exam, borderRadius: 0 }} />Điểm thi trung bình (vuông)</span>
         <span>Đoạn nối càng dài, hai loại điểm của lớp càng chênh nhau; so giữa các lớp, không so với một con số cố định.</span>
       </div>
     </div>

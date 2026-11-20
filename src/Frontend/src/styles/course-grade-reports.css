@@ -6,10 +6,12 @@
 */
 
 .cga-page {
-  --cga-brand-900: #0A2463;
-  --cga-brand-800: #0D3B8C;
-  --cga-brand-700: #1450B8;
-  --cga-brand-100: #DCE8FC;
+  /* Màu thương hiệu, chiều lệch, ổn định đọc từ bộ màu chung (trang Design System,
+     utils/designTokens.ts đặt biến --ds-* trên <html>); thiếu thì dùng mặc định. */
+  --cga-brand-900: var(--ds-brand-900, #0A2463);
+  --cga-brand-800: var(--ds-brand-800, #0D3B8C);
+  --cga-brand-700: var(--ds-brand-700, #1450B8);
+  --cga-brand-100: var(--ds-brand-100, #DCE8FC);
   --cga-brand-50: #F0F5FE;
   --cga-text: #0B0F19;
   --cga-text-2: #1C2330;
@@ -18,10 +20,10 @@
   --cga-surface-2: #F6F9FD;
   --cga-border: #D3DCEA;
   --cga-border-strong: #9FAEC6;
-  --cga-up: #2A8C8C;
-  --cga-down: #7A6BB0;
+  --cga-up: var(--ds-up, #2A8C8C);
+  --cga-down: var(--ds-down, #7A6BB0);
   /* Trạng thái ổn định: xanh mòng két đậm như bản audit (--s-ok), không dùng xanh lá (luật M1). */
-  --cga-ok: #0F5E5E;
+  --cga-ok: var(--ds-ok, #0F5E5E);
   --cga-shadow: 0 1px 2px rgba(10, 36, 99, 0.06), 0 2px 8px rgba(10, 36, 99, 0.06);
 
   display: flex;
@@ -117,10 +119,10 @@
 }
 .cga-kpi__icon { display: grid; flex: none; place-items: center; width: 44px; height: 44px; border-radius: 12px; }
 .cga-kpi__icon svg { width: 22px; height: 22px; }
-.cga-kpi__icon--blue { background: #E3EDFD; color: #1D63D6; }
-.cga-kpi__icon--teal { background: #DDF2F2; color: #138A8A; }
-.cga-kpi__icon--violet { background: #ECE8FA; color: #6A55C2; }
-.cga-kpi__icon--indigo { background: #E4E7F7; color: #2E3F9E; }
+.cga-kpi__icon--blue { background: #E3EDFD; color: var(--ds-accent-1, #1D63D6); }
+.cga-kpi__icon--teal { background: #DDF2F2; color: var(--ds-accent-3, #138A8A); }
+.cga-kpi__icon--violet { background: #ECE8FA; color: var(--ds-accent-2, #6A55C2); }
+.cga-kpi__icon--indigo { background: #E4E7F7; color: var(--ds-accent-4, #2E3F9E); }
 .cga-kpi dt { color: var(--cga-text-2); font-size: 14px; font-weight: 600; }
 .cga-kpi dd { margin: 2px 0 0; color: var(--cga-text); font-size: 28px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .cga-kpi p { margin: 4px 0 0; color: var(--cga-text-3); font-size: 13px; }

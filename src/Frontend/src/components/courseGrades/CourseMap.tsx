@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import type { AnalysisCourse } from '../../types/courseGradeAnalysis';
 import { FLAG_LABELS } from './courseGradeLabels';
-import { median, vi, viInt } from './courseGradeFormat';
+import { COLORS, median, vi, viInt } from './courseGradeFormat';
 import { Field, Filters } from './courseGradeUi';
 
 type Axis = 'icc' | 'tau';
@@ -41,7 +41,6 @@ interface Point {
   label: string | null;
 }
 
-const MUTED = '#B8C2D3';
 const ZONES_THRESHOLD = ['dưới ngưỡng ở cả hai loại điểm', 'chỉ vượt ngưỡng ở điểm quá trình', 'chỉ vượt ngưỡng ở điểm thi', 'vượt ngưỡng ở cả hai loại điểm'];
 const ZONES_MEDIAN = ['dưới trung vị ở cả hai loại điểm', 'chỉ trên trung vị ở điểm quá trình', 'chỉ trên trung vị ở điểm thi', 'trên trung vị ở cả hai loại điểm'];
 
@@ -64,7 +63,7 @@ export function CourseMap({ courses, thresholds, colorOf, highlight = () => true
         zeroX: course.data.tau_x === 0,
         zeroY: course.data.tau_y === 0,
         on,
-        color: on ? colorOf(course) : MUTED,
+        color: on ? colorOf(course) : COLORS.muted,
       };
     });
     const rx = axis === 'icc'
@@ -124,8 +123,8 @@ export function CourseMap({ courses, thresholds, colorOf, highlight = () => true
               <YAxis type="number" dataKey="y" tick={{ fontSize: 11 }} width={48}
                 label={{ value: 'Các lớp chênh lệch về điểm thi →', angle: -90, position: 'insideLeft', fontSize: 12, dy: 90 }} />
               <ZAxis range={[40, 40]} />
-              <ReferenceLine x={refX} stroke="#D32F2F" strokeDasharray="5 4" strokeWidth={1.5} />
-              <ReferenceLine y={refY} stroke="#D32F2F" strokeDasharray="5 4" strokeWidth={1.5} />
+              <ReferenceLine x={refX} stroke={COLORS.threshold} strokeDasharray="5 4" strokeWidth={1.5} />
+              <ReferenceLine y={refY} stroke={COLORS.threshold} strokeDasharray="5 4" strokeWidth={1.5} />
               <Tooltip
                 cursor={{ strokeDasharray: '3 3' }}
                 content={({ payload }) => {

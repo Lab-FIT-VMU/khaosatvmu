@@ -7,7 +7,7 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <FileVersion>1.0.0.24</FileVersion>
+    <FileVersion>1.0.0.26</FileVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
