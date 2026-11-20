@@ -18,24 +18,26 @@ import {
   type ImportCourseSectionRow,
 } from '../utils/courseSectionImportExcel';
 import { apiErrorMessage } from '../services/apiClient';
-import { catalogErrorMessage, type CourseSectionImportResponse } from '../services/catalogApi';
+import { catalogApi, catalogErrorMessage, type CourseSectionImportPreviewResponse, type CourseSectionImportResponse } from '../services/catalogApi';
 import { buildLecturerLookupRows } from '../utils/importLookupRows';
 import { courseSectionFailureReason } from '../utils/courseSectionImportReasons';
 import type { Department, Faculty, Lecturer } from '../types';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
 import { ImportSheetPicker } from './ImportSheetPicker';
 import { Modal } from './Modal';
+import { ImportConfirmation } from './ImportConfirmation';
 
 interface CourseSectionImportDialogProps {
   isOpen: boolean;
   onClose: () => void;
   /** Học kỳ đang chọn, hiển thị để người dùng biết import vào đâu. */
   semesterLabel: string;
+  semesterId: number | null;
   /** Dựng sheet tra cứu giảng viên trong tệp mẫu. */
   lecturers: Lecturer[];
   departments: Department[];
   faculties: Faculty[];
-  onImport: (rows: ImportCourseSectionRow[]) => Promise<CourseSectionImportResponse>;
+  onImport: (rows: ImportCourseSectionRow[], previewToken: string) => Promise<CourseSectionImportResponse>;
 }
 
 const fileErrorMessages: Record<CourseSectionImportFileErrorCode, string> = {
@@ -52,6 +54,7 @@ export function CourseSectionImportDialog({
   isOpen,
   onClose,
   semesterLabel,
+  semesterId,
   lecturers,
   departments,
   faculties,
@@ -70,6 +73,8 @@ export function CourseSectionImportDialog({
   const [rows, setRows] = useState<ImportCourseSectionRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [result, setResult] = useState<CourseSectionImportResponse | null>(null);
+  const [preview, setPreview] = useState<CourseSectionImportPreviewResponse | null>(null);
+  const [checking, setChecking] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -87,11 +92,12 @@ export function CourseSectionImportDialog({
     setParseError(null);
     setRequestError(null);
     setResult(null);
+    setPreview(null);
     setUnidentifiedError(null);
   };
 
   const handleClose = () => {
-    if (parsing || importing) return;
+    if (parsing || checking || importing) return;
     reset();
     onClose();
   };
@@ -101,6 +107,7 @@ export function CourseSectionImportDialog({
     setParsing(true);
     setParseError(null);
     setRows([]);
+    setPreview(null);
     try {
       const parsed = await parseCourseSectionImportFile(source, sheetName);
       setRows(parsed.rows);
@@ -133,12 +140,28 @@ export function CourseSectionImportDialog({
     await readFile(selected);
   };
 
+  const handlePreview = async () => {
+    if (rows.length === 0 || semesterId === null) return false;
+    setChecking(true);
+    setPreview(null);
+    setRequestError(null);
+    try {
+      setPreview(await catalogApi.previewCourseSections(semesterId, rows));
+      return true;
+    } catch (error) {
+      setRequestError(apiErrorMessage(error, catalogErrorMessage));
+      return false;
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const handleImport = async () => {
-    if (rows.length === 0) return;
+    if (rows.length === 0 || !preview || preview.result.createdCount === 0) return;
     setImporting(true);
     setRequestError(null);
     try {
-      setResult(await onImport(rows));
+      setResult(await onImport(rows, preview.previewToken));
     } catch (error) {
       setRequestError(
         apiErrorMessage(error, catalogErrorMessage)
@@ -153,7 +176,9 @@ export function CourseSectionImportDialog({
     setTemplateError(null);
     try {
       await downloadCourseSectionImportTemplate(
-        buildLecturerLookupRows(lecturers, departments, faculties)
+        buildLecturerLookupRows(lecturers, departments, faculties),
+        departments,
+        faculties,
       );
     } catch {
       setTemplateError('Không thể tạo tệp mẫu. Hãy thử lại.');
@@ -163,11 +188,11 @@ export function CourseSectionImportDialog({
   };
 
   const handleDownloadUnidentified = async () => {
-    if (!result || result.unidentifiedLecturers.length === 0) return;
+    if (!activeReport || activeReport.unidentifiedLecturers.length === 0) return;
     setDownloadingUnidentified(true);
     setUnidentifiedError(null);
     try {
-      await downloadUnidentifiedLecturerFile(result.unidentifiedLecturers);
+      await downloadUnidentifiedLecturerFile(activeReport.unidentifiedLecturers);
     } catch {
       setUnidentifiedError('Không thể tạo tệp giảng viên thiếu email. Hãy thử lại.');
     } finally {
@@ -175,7 +200,9 @@ export function CourseSectionImportDialog({
     }
   };
 
-  const failedItems = result?.items.filter((item) => !item.succeeded) ?? [];
+  const activeReport = result ?? preview?.result ?? null;
+  const failedItems = activeReport?.items.filter((item) => !item.succeeded) ?? [];
+  const failedByRow = new Map(failedItems.map(item => [item.rowNumber, item]));
 
   // Mười cột đúng thứ tự tệp gốc, để tệp dòng lỗi nạp lại được thẳng vào đây.
   const rowValues = (row: ImportCourseSectionRow) => [
@@ -227,15 +254,16 @@ export function CourseSectionImportDialog({
       })
     );
 
-  const unidentifiedLecturers = result?.unidentifiedLecturers ?? [];
+  const unidentifiedLecturers = activeReport?.unidentifiedLecturers ?? [];
+  const unidentifiedRowNumbers = new Set(unidentifiedLecturers.map(lecturer => lecturer.rowNumber));
   // Các dòng trong tệp xuất ra được xếp liền nhau theo bộ môn.
   const unidentifiedDepartmentCount = new Set(
     unidentifiedLecturers.map((lecturer) => lecturer.departmentName ?? 'Chưa rõ bộ môn')
   ).size;
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Import lớp học phần từ Excel">
-      <div className="admin-import-dialog" aria-busy={parsing}>
+    <Modal stepFlow isOpen={isOpen} onClose={handleClose} title="Import lớp học phần từ Excel">
+      <div className="admin-import-dialog" aria-busy={parsing || checking || importing}>
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
           <p>
@@ -243,7 +271,9 @@ export function CourseSectionImportDialog({
             có trong danh mục sẽ được <strong>tạo tự động</strong> từ cột Học phần và TCHT. Giảng
             viên tra theo <strong>Email</strong>: chưa có thì tạo mới với chức vụ Giảng viên, bỏ
             trống email thì lớp vẫn được tạo nhưng để trống mã giảng viên. Bộ môn tra theo{' '}
-            <strong>Mã BM</strong>, trống mới tra theo tên.
+            <strong>Mã BM</strong> trong sheet Danh mục bộ môn của file mẫu. Nếu bỏ trống mã,
+            dùng đúng tên bộ môn trong danh mục. Cột <strong>Khoa</strong> nhận mã hoặc tên
+            khoa / viện trong file mẫu.
             {' '}Email của giảng viên đã xóa sẽ tự khôi phục hồ sơ và tài khoản cũ.
           </p>
         </div>
@@ -293,14 +323,14 @@ export function CourseSectionImportDialog({
                 id={inputId}
                 type="file"
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                disabled={parsing}
+                disabled={parsing || checking || importing}
                 onChange={(event) => void handleFileChange(event.target.files?.[0])}
               />
             </label>
 
             <ImportSheetPicker
               choice={sheetInfo}
-              disabled={parsing}
+              disabled={parsing || checking || importing}
               requiredColumnsLabel="Mã HP / Nhóm"
               onChange={(name) => file && void readFile(file, name)}
             />
@@ -528,23 +558,74 @@ export function CourseSectionImportDialog({
                 type="button"
                 className="btn btn-secondary"
                 onClick={handleClose}
-                disabled={parsing || importing}
+                disabled={parsing || checking || importing}
               >
                 Hủy
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => void handleImport()}
-                disabled={rows.length === 0 || parsing || importing}
-              >
-                {importing ? (
-                  <LoaderCircle className="auth-spin" aria-hidden="true" />
-                ) : (
-                  <Upload aria-hidden="true" />
+              <ImportConfirmation
+                rows={rows}
+                fileName={fileName}
+                sheetName={sheetInfo?.sheetName}
+                destination={semesterLabel}
+                onPrepare={handlePreview}
+                confirmDisabled={!preview || preview.result.createdCount === 0}
+                confirmText={`Xác nhận lưu ${(preview?.result.createdCount ?? 0).toLocaleString('vi-VN')} dòng hợp lệ`}
+                reviewSummary={preview && (
+                  <section className="course-section-import-check" aria-label="Kết quả kiểm tra trước khi lưu">
+                    <strong>Đã kiểm tra {preview.result.totalCount.toLocaleString('vi-VN')} dòng — chưa lưu dữ liệu.</strong>
+                    <span>
+                      {preview.result.createdCount - preview.result.updatedSectionCount} lớp sẽ thêm ·{' '}
+                      {preview.result.updatedSectionCount} lớp sẽ bổ sung giảng viên ·{' '}
+                      {preview.result.skippedCount} dòng bị từ chối.
+                    </span>
+                    {(preview.result.createdCourseCount > 0 || preview.result.createdLecturerCount > 0) && (
+                      <span>Sẽ tạo {preview.result.createdCourseCount} học phần; tạo hoặc khôi phục {preview.result.createdLecturerCount} giảng viên.</span>
+                    )}
+                    {unidentifiedLecturers.length > 0 && (
+                      <span className="admin-import-invalid">
+                        {unidentifiedLecturers.length} dòng thiếu email, thuộc {unidentifiedDepartmentCount} bộ môn: nếu xác nhận, lớp vẫn được lưu nhưng chưa gắn giảng viên.
+                      </span>
+                    )}
+                    {preview.result.createdCount === 0 && <span role="alert">Không có dòng hợp lệ để lưu. Hãy sửa file và kiểm tra lại.</span>}
+                    <div className="course-section-import-check-actions">
+                      <ExportFailedRowsButton count={failedItems.length} onExport={exportFailedItems} />
+                      {unidentifiedLecturers.length > 0 && (
+                        <button type="button" className="btn btn-secondary btn-sm" disabled={downloadingUnidentified}
+                          onClick={() => void handleDownloadUnidentified()}>
+                          <Download aria-hidden="true" />Tải file giảng viên thiếu email
+                        </button>
+                      )}
+                      {unidentifiedError && <span role="alert">{unidentifiedError}</span>}
+                    </div>
+                  </section>
                 )}
-                {importing ? 'Đang lưu...' : `Import ${rows.length || ''} lớp học phần`}
-              </button>
+                rowFilters={[
+                  { key: 'all', label: `Tất cả (${rows.length})`, matches: () => true },
+                  { key: 'valid', label: `Hợp lệ (${preview?.result.createdCount ?? 0})`, matches: row => !failedByRow.has(row.rowNumber) },
+                  { key: 'invalid', label: `Bị từ chối (${failedItems.length})`, matches: row => failedByRow.has(row.rowNumber) },
+                  { key: 'missingEmail', label: `Thiếu email (${unidentifiedLecturers.length})`, matches: row => unidentifiedRowNumbers.has(row.rowNumber) },
+                ]}
+                rowStatus={row => {
+                  const failed = failedByRow.get(row.rowNumber);
+                  return failed ? <span className="admin-import-invalid">{reasonOf(failed)}</span>
+                    : unidentifiedRowNumbers.has(row.rowNumber) ? 'Hợp lệ · chưa gắn giảng viên (thiếu email)' : 'Hợp lệ';
+                }}
+                description="Học phần chưa có sẽ được tạo mới. Email giảng viên chưa có sẽ tạo hồ sơ và tài khoản; email đã xóa sẽ khôi phục hồ sơ cũ. Lớp đã có nhưng chưa gắn giảng viên có thể được bổ sung giảng viên. Dòng thiếu email vẫn có thể tạo lớp với giảng viên chưa xác định."
+                columns={[
+                  { key: 'courseCode', label: 'Mã học phần' },
+                  { key: 'courseName', label: 'Tên học phần' },
+                  { key: 'sectionName', label: 'Nhóm' },
+                  { key: 'credits', label: 'Tín chỉ' },
+                  { key: 'classSize', label: 'Sĩ số' },
+                  { key: 'departmentCode', label: 'Mã BM' },
+                  { key: 'departmentName', label: 'Bộ môn' },
+                  { key: 'facultyName', label: 'Khoa / viện' },
+                  { key: 'lecturerFullName', label: 'Giảng viên' },
+                  { key: 'lecturerEmail', label: 'Email' },
+                ]}
+                disabled={rows.length === 0 || semesterId === null || parsing || importing}
+                onConfirm={handleImport}
+              />
             </>
           )}
         </div>

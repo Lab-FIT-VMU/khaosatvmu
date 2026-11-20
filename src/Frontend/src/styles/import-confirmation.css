@@ -1,0 +1,209 @@
+.catalog-modal-backdrop.modal-backdrop.catalog-modal-backdrop--step {
+  padding: 12px;
+}
+
+.catalog-modal-card.modal-card.catalog-modal-card--step {
+  width: calc(100dvw - 24px);
+  max-width: none;
+  height: calc(100dvh - 24px);
+  max-height: calc(100dvh - 24px);
+}
+
+.catalog-modal-card.modal-card.catalog-modal-card--step > .catalog-modal-header.modal-header {
+  flex-shrink: 0;
+  min-height: 48px;
+  padding: 8px 16px;
+}
+
+.catalog-modal-card.modal-card.catalog-modal-card--step > .catalog-modal-header h3 {
+  font-size: 18px;
+}
+
+.catalog-modal-card.modal-card.catalog-modal-card--step > .catalog-modal-body.modal-body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  padding: 10px 16px;
+  max-height: none;
+  overflow: hidden;
+}
+
+.catalog-modal-step:not([hidden]) {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.catalog-modal-step > .import-confirmation {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  max-height: none;
+  margin-top: 0;
+  min-width: 0;
+  min-height: 0;
+  text-align: left;
+}
+
+.catalog-modal-card .import-confirmation > .admin-import-table-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+}
+
+.catalog-modal-card .import-confirmation--wide table {
+  min-width: 1100px;
+}
+
+.catalog-modal-card .import-confirmation th {
+  white-space: nowrap;
+}
+
+.catalog-modal-card .import-confirmation td {
+  max-width: 360px;
+  vertical-align: top;
+}
+
+.import-confirmation > :not(.admin-import-table-scroll) {
+  flex-shrink: 0;
+}
+
+.import-confirmation-details {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 6px;
+  margin: 8px 10px;
+  font-size: 13px;
+}
+
+.import-confirmation-details > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+}
+
+.import-confirmation-details dt {
+  font-weight: 600;
+}
+
+.import-confirmation-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.import-confirmation-description,
+.import-confirmation-notes p {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+
+.import-confirmation-notes {
+  max-height: 120px;
+  margin: 0 10px 8px;
+  overflow: auto;
+  font-size: 13px;
+}
+
+.import-confirmation-notes summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.import-confirmation-caption {
+  padding: 4px 10px;
+  text-align: left;
+}
+
+.import-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.import-confirmation-footer {
+  border-top: 1px solid var(--ops-border, #dfe4e8);
+  padding: 8px 10px;
+  margin-top: 0;
+  background: var(--ops-surface, #fff);
+}
+
+.import-confirmation-footer > nav {
+  margin-top: 0;
+  margin-right: auto;
+}
+
+.import-confirmation-summary {
+  max-height: 180px;
+  overflow: auto;
+  padding: 6px 10px;
+  background: #fff8ed;
+  font-size: 13px;
+}
+
+.course-section-import-check {
+  display: grid;
+  gap: 3px;
+}
+
+.course-section-import-check-actions,
+.import-confirmation-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.import-confirmation-filters {
+  padding: 6px 10px;
+  max-height: 96px;
+  overflow: auto;
+}
+
+.import-confirmation-filters button[aria-pressed='true'] {
+  border-color: var(--ops-primary, #136c88);
+  background: #e7f5fa;
+}
+
+.import-confirmation-row-status {
+  min-width: 240px;
+  max-width: 360px;
+}
+
+@media (max-width: 700px) {
+  .catalog-modal-backdrop.modal-backdrop.catalog-modal-backdrop--step {
+    padding: 0;
+  }
+
+  .catalog-modal-card.modal-card.catalog-modal-card--step {
+    width: 100dvw;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+
+  .catalog-modal-card.modal-card.catalog-modal-card--step > .catalog-modal-body.modal-body {
+    padding: 8px;
+  }
+
+  .import-confirmation-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .import-confirmation-details > div {
+    grid-template-columns: 50px minmax(0, 1fr);
+  }
+
+  .import-confirmation-footer > nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .import-confirmation-footer > button {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: normal;
+  }
+}

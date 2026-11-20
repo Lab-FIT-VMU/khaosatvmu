@@ -1,5 +1,6 @@
 import type { CellValue } from 'read-excel-file/browser';
 import type { SheetData } from 'write-excel-file/browser';
+import type { Department, Faculty } from '../types';
 import {
   buildLookupSheet,
   downloadFailedRows,
@@ -190,54 +191,14 @@ const templateColumnWidths = [
 /**
  * Tạo và tải tệp Excel mẫu cho lớp học phần, dựng đúng 10 cột của tệp gốc.
  * Học kỳ lấy từ học kỳ đang chọn trên cây bên trái nên tệp không cần cột học kỳ.
- * Dòng cuối cố tình bỏ trống Email để minh hoạ nhánh giảng viên chưa xác định.
  */
 export async function downloadCourseSectionImportTemplate(
-  lecturerRows: LecturerLookupRow[] = []
+  lecturerRows: LecturerLookupRow[],
+  departments: readonly Department[],
+  faculties: readonly Faculty[],
 ): Promise<void> {
-  const rows = [
-    [
-      '11107E',
-      'La bàn từ',
-      'N94',
-      '2',
-      '30',
-      'Cơ sở hàng hải',
-      'Hàng hải',
-      'Bùi Văn Hưng',
-      'buivanhung@vimaru.edu.vn',
-      '111',
-    ],
-    [
-      '11110',
-      'Đại cương hàng hải',
-      'N01',
-      '2',
-      '26',
-      'Cơ sở hàng hải',
-      'Hàng hải',
-      'Nguyễn Văn Quang',
-      'nguyenvanquang@vimaru.edu.vn',
-      '111',
-    ],
-    [
-      '11216E',
-      'Thu nhận và PT các TTTT trên biển',
-      'N92',
-      '2',
-      '39',
-      'Hàng hải',
-      'Hàng hải',
-      'Lê Tuấn Sơn',
-      '',
-      '112',
-    ],
-  ];
-
-  const data: SheetData = [
-    templateHeaderRow(templateHeader),
-    ...rows.map((row) => row.map((value) => ({ value, type: String }))),
-  ];
+  const data: SheetData = [templateHeaderRow(templateHeader)];
+  const facultyNames = new Map(faculties.map((faculty) => [faculty.facultyId, faculty.facultyName]));
 
   await writeWorkbook(
     [
@@ -246,6 +207,23 @@ export async function downloadCourseSectionImportTemplate(
         sheet: 'Lop hoc phan',
         columns: templateColumnWidths,
       } as never,
+      buildLookupSheet(
+        'Danh muc khoa vien',
+        ['Mã khoa', 'Tên khoa / viện'],
+        faculties.map((faculty) => [String(faculty.facultyId), faculty.facultyName]),
+        [12, 38],
+      ),
+      buildLookupSheet(
+        'Danh muc bo mon',
+        ['Mã BM', 'Tên bộ môn', 'Mã khoa', 'Tên khoa / viện'],
+        departments.map((department) => [
+          String(department.departmentId),
+          department.departmentName,
+          department.facultyId == null ? '' : String(department.facultyId),
+          department.facultyId == null ? '' : facultyNames.get(department.facultyId) ?? '',
+        ]),
+        [12, 38, 12, 38],
+      ),
       buildLookupSheet(
         'Danh sach giang vien',
         lecturerLookupHeaders,

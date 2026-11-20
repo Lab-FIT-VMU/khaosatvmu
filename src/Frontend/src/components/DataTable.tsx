@@ -96,6 +96,12 @@ interface DataTableProps<T> {
   onRowClick?: (item: T) => void;
   /** Dòng tổng kết ở cuối bảng, nhận toàn bộ dữ liệu sau tìm kiếm/lọc cột. */
   renderFooter?: (rows: T[]) => ReactNode;
+  selection?: {
+    selectedKeys: ReadonlySet<string>;
+    onChange: (keys: Set<string>) => void;
+    labelFor: (item: T) => string;
+    disabled?: boolean;
+  };
   remote?: {
     page: number;
     totalItems: number;
@@ -130,6 +136,7 @@ export function DataTable<T>({
   exportConfig,
   onRowClick,
   renderFooter,
+  selection,
   remote,
 }: DataTableProps<T>) {
   const resolvedAddLabel = addNewLabel.replace(/^\+\s*/, '');
@@ -228,6 +235,19 @@ export function DataTable<T>({
 
   const firstIndex = ((remote?.page ?? page) - 1) * pageSize;
   const visibleRows = remote ? sortedData : sortedData.slice(firstIndex, firstIndex + pageSize);
+  const selectedOnPage = visibleRows.filter(item => selection?.selectedKeys.has(keyExtractor(item))).length;
+  const allOnPageSelected = visibleRows.length > 0 && selectedOnPage === visibleRows.length;
+
+  const toggleSelection = (items: T[], checked: boolean) => {
+    if (!selection || selection.disabled) return;
+    const next = new Set(selection.selectedKeys);
+    items.forEach(item => {
+      const key = keyExtractor(item);
+      if (checked) next.add(key);
+      else next.delete(key);
+    });
+    selection.onChange(next);
+  };
 
   const exportColumns = useMemo<ExportColumn<T>[]>(() => {
     if (exportConfig?.columns) {
@@ -333,6 +353,7 @@ export function DataTable<T>({
     );
 
   const applyColumnFilter = (key: string, selected: string[] | null) => {
+    selection?.onChange(new Set());
     if (remote) {
       const next = { ...remote.columnFilters };
       if (selected === null) delete next[key];
@@ -371,6 +392,13 @@ export function DataTable<T>({
         </div>
 
         <div className="catalog-toolbar__actions">
+          {selection && !remote && sortedData.length > 0 && (
+            <button type="button" className="btn btn-secondary btn-sm"
+              disabled={selection.disabled}
+              onClick={() => toggleSelection(sortedData, true)}>
+              Chọn tất cả {sortedData.length} kết quả
+            </button>
+          )}
           {filterOptions && onFilterChange && (
             <label className="catalog-filter">
               <span className="catalog-sr-only">Lọc danh mục</span>
@@ -407,6 +435,15 @@ export function DataTable<T>({
         <table className="catalog-table">
           <thead>
             <tr>
+              {selection && (
+                <th scope="col" className="catalog-table__selection">
+                  <input type="checkbox" aria-label="Chọn tất cả dòng trong trang này"
+                    checked={allOnPageSelected}
+                    ref={input => { if (input) input.indeterminate = selectedOnPage > 0 && !allOnPageSelected; }}
+                    disabled={selection.disabled || visibleRows.length === 0}
+                    onChange={event => toggleSelection(visibleRows, event.target.checked)} />
+                </th>
+              )}
               {showIndex && <th className="catalog-table__index" scope="col">STT</th>}
               {columns.map((column) => {
                 const filterValues = column.filterValue ? valuesFor(column) : [];
@@ -485,7 +522,7 @@ export function DataTable<T>({
           <tbody>
             {visibleRows.length === 0 ? (
               <tr>
-                <td className="catalog-empty" colSpan={columns.length + (showIndex ? 1 : 0)}>
+                <td className="catalog-empty" colSpan={columns.length + (showIndex ? 1 : 0) + (selection ? 1 : 0)}>
                   <Inbox aria-hidden="true" size={24} />
                   <strong>{hasQuery ? 'Không tìm thấy kết quả phù hợp' : emptyMessage}</strong>
                   {hasQuery && <span>Thử thay đổi từ khóa hoặc bộ lọc hiện tại.</span>}
@@ -506,6 +543,14 @@ export function DataTable<T>({
                   }
                   style={onRowClick ? { cursor: 'pointer' } : undefined}
                 >
+                  {selection && (
+                    <td className="catalog-table__selection">
+                      <input type="checkbox" aria-label={`Chọn ${selection.labelFor(item)}`}
+                        checked={selection.selectedKeys.has(keyExtractor(item))}
+                        disabled={selection.disabled}
+                        onChange={event => toggleSelection([item], event.target.checked)} />
+                    </td>
+                  )}
                   {showIndex && (
                     <td className="catalog-table__index" style={{ textAlign: 'right' }}>{firstIndex + index + 1}</td>
                   )}

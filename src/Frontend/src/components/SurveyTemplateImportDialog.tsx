@@ -16,6 +16,7 @@ import { maximumSectionsPerTemplate } from '../types';
 import type { AnswerScale } from '../types';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
 import { Modal } from './Modal';
+import { ImportConfirmation } from './ImportConfirmation';
 import '../styles/auth-admin.css';
 
 interface SurveyTemplateImportDialogProps {
@@ -184,7 +185,7 @@ export function SurveyTemplateImportDialog({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Tạo bộ câu hỏi từ Excel">
+    <Modal stepFlow isOpen={isOpen} onClose={handleClose} title="Tạo bộ câu hỏi từ Excel">
       <div className="admin-import-dialog" aria-busy={parsing || saving}>
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
@@ -415,26 +416,28 @@ export function SurveyTemplateImportDialog({
           >
             Hủy
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void handleImport()}
+          <ImportConfirmation
+            rows={rows}
+            fileName={fileName}
+            destination={`Bộ câu hỏi: ${templateName.trim()} · Thang: ${scale?.answerScaleName ?? "Chưa chọn"}`}
+            key={`${templateName}|${answerScaleId}`}
+            description="Tạo bộ câu hỏi mới theo thứ tự các mục và câu hỏi trong tệp. Ô đáp án bắt buộc để trống là câu hỏi bình thường."
+            columns={[
+              { key: 'sectionName', label: 'Mục' },
+              { key: 'questionText', label: 'Nội dung câu hỏi' },
+              { key: 'rawAttention', label: 'Đáp án bắt buộc' },
+            ]}
             disabled={
               rows.length === 0
+              || !templateName.trim()
               || !scale
               || invalidSectionRows.length > 0
               || invalidTrapRows.length > 0
               || parsing
               || saving
             }
-          >
-            {saving ? (
-              <LoaderCircle className="auth-spin" aria-hidden="true" />
-            ) : (
-              <Upload aria-hidden="true" />
-            )}
-            {saving ? 'Đang lưu...' : `Tạo bộ ${rows.length || ''} câu hỏi`}
-          </button>
+            onConfirm={handleImport}
+          />
         </div>
       </div>
     </Modal>

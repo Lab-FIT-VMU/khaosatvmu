@@ -27,6 +27,7 @@ import type { ImportSheetChoice } from '../utils/importSheets';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
 import { ImportSheetPicker } from './ImportSheetPicker';
 import { Modal } from './Modal';
+import { ImportConfirmation } from './ImportConfirmation';
 
 interface LecturerImportDialogProps {
   isOpen: boolean;
@@ -187,7 +188,7 @@ export function LecturerImportDialog({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Import giảng viên từ Excel">
+    <Modal stepFlow isOpen={isOpen} onClose={handleClose} title="Import giảng viên từ Excel">
       <div className="admin-import-dialog" aria-busy={parsing}>
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
@@ -243,14 +244,14 @@ export function LecturerImportDialog({
                 id={inputId}
                 type="file"
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                disabled={parsing}
+                disabled={parsing || importing}
                 onChange={(event) => void handleFileChange(event.target.files?.[0])}
               />
             </label>
 
             <ImportSheetPicker
               choice={sheetChoice}
-              disabled={parsing}
+              disabled={parsing || importing}
               requiredColumnsLabel="Họ và tên / Email"
               onChange={(name) => file && void readFile(file, name)}
             />
@@ -398,19 +399,23 @@ export function LecturerImportDialog({
               >
                 Hủy
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => void handleImport()}
+              <ImportConfirmation
+                rows={rows}
+                fileName={fileName}
+                sheetName={sheetChoice?.sheetName}
+                destination="Danh mục giảng viên"
+                description="Giảng viên chưa có sẽ được tạo mới; email của giảng viên đã xóa sẽ khôi phục hồ sơ và tài khoản cũ. Chức vụ bỏ trống mặc định là Giảng viên."
+                columns={[
+                  { key: 'fullName', label: 'Họ và tên' },
+                  { key: 'email', label: 'Email' },
+                  { key: 'phoneNumber', label: 'Điện thoại' },
+                  { key: 'facultyName', label: 'Khoa / viện' },
+                  { key: 'departmentName', label: 'Bộ môn' },
+                  { key: 'positionName', label: 'Chức vụ' },
+                ]}
                 disabled={rows.length === 0 || parsing || importing}
-              >
-                {importing ? (
-                  <LoaderCircle className="auth-spin" aria-hidden="true" />
-                ) : (
-                  <Upload aria-hidden="true" />
-                )}
-                {importing ? 'Đang lưu...' : `Import ${rows.length || ''} giảng viên`}
-              </button>
+                onConfirm={handleImport}
+              />
             </>
           )}
         </div>

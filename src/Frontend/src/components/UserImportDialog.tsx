@@ -17,6 +17,7 @@ import {
   type UserImportFileErrorCode,
 } from '../utils/userImportExcel';
 import { Modal } from './Modal';
+import { ImportConfirmation } from './ImportConfirmation';
 
 interface UserImportDialogProps {
   isOpen: boolean;
@@ -99,7 +100,7 @@ export function UserImportDialog({ isOpen, onClose, onImported }: UserImportDial
   const failedItems = result?.items.filter((item) => !item.succeeded) ?? [];
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Import người dùng từ Excel">
+    <Modal stepFlow isOpen={isOpen} onClose={handleClose} title="Import người dùng từ Excel">
       <div className="admin-import-dialog" aria-busy={parsing || importing}>
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
@@ -226,10 +227,17 @@ export function UserImportDialog({ isOpen, onClose, onImported }: UserImportDial
           ) : (
             <>
               <button type="button" className="btn btn-secondary" onClick={handleClose} disabled={parsing || importing}>Hủy</button>
-              <button type="button" className="btn btn-primary" onClick={() => void handleImport()} disabled={rows.length === 0 || parsing || importing}>
-                {importing ? <LoaderCircle className="auth-spin" aria-hidden="true" /> : <Upload aria-hidden="true" />}
-                {importing ? 'Đang import...' : `Import ${rows.length || ''} người dùng`}
-              </button>
+              <ImportConfirmation
+                rows={rows}
+                fileName={fileName}
+                destination="Danh sách người dùng"
+                columns={[
+                  { key: 'email', label: 'Email' },
+                  { key: 'displayName', label: 'Họ và tên' },
+                ]}
+                disabled={rows.length === 0 || parsing || importing}
+                onConfirm={handleImport}
+              />
             </>
           )}
         </div>

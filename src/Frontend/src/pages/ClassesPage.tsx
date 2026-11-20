@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   CalendarDays,
   ChevronDown,
@@ -95,6 +95,12 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
   const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<CourseSection | null>(null);
   const [sectionToDelete, setSectionToDelete] = useState<CourseSection | null>(null);
+  const [selectedSectionIds, setSelectedSectionIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteSections, setBulkDeleteSections] = useState<CourseSection[] | null>(null);
+  const [bulkDeleteContext, setBulkDeleteContext] = useState('');
+  const [bulkDeleteErrors, setBulkDeleteErrors] = useState<Map<number, string>>(new Map());
+  const [deletingSections, setDeletingSections] = useState(false);
+  const bulkDeleteInFlight = useRef(false);
   const [sectionForm, setSectionForm] = useState<SectionForm>(emptySectionForm);
   const [sectionError, setSectionError] = useState('');
   const [savingSection, setSavingSection] = useState(false);
@@ -233,6 +239,8 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
   useEffect(() => {
     let cancelled = false;
 
+    setSections([]);
+    setSelectedSectionIds(new Set());
     const load = async () => {
       if (selectedSemesterId === null) {
         setSections([]);
@@ -359,6 +367,48 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
     setSectionToDelete(null);
   };
 
+  const openBulkDelete = () => {
+    const selected = sections.filter(section => selectedSectionIds.has(String(section.courseSectionId)));
+    if (!canManageCatalog || selected.length === 0 || deletingSections) return;
+    setBulkDeleteContext(`${selectedSemester?.semesterName ?? ''} · ${selectedYear?.academicYearName ?? ''}`);
+    setBulkDeleteErrors(new Map());
+    setBulkDeleteSections(selected);
+  };
+
+  const handleBulkDelete = async () => {
+    if (!canManageCatalog || !bulkDeleteSections?.length || bulkDeleteInFlight.current) return;
+    bulkDeleteInFlight.current = true;
+    setDeletingSections(true);
+    const succeeded = new Set<string>();
+    const failed: CourseSection[] = [];
+    const errors = new Map<number, string>();
+    try {
+      // Use the existing delete endpoint so every row retains its permission checks
+      // and the same soft-delete behavior. Bound concurrency for large imports.
+      for (let offset = 0; offset < bulkDeleteSections.length; offset += 4) {
+        const batch = bulkDeleteSections.slice(offset, offset + 4);
+        const results = await Promise.allSettled(batch.map(section => catalogApi.deleteCourseSection(section.courseSectionId)));
+        results.forEach((result, index) => {
+          const section = batch[index];
+          if (result.status === 'fulfilled') succeeded.add(String(section.courseSectionId));
+          else {
+            failed.push(section);
+            errors.set(section.courseSectionId, catalogErrorMessage(errorCodeOf(result.reason)));
+          }
+        });
+      }
+      setSections(current => current.filter(section => !succeeded.has(String(section.courseSectionId))));
+      setSelectedSectionIds(current => new Set([...current].filter(id => !succeeded.has(id))));
+      setBulkDeleteErrors(errors);
+      setBulkDeleteSections(failed.length ? failed : null);
+      if (succeeded.size > 0) toast.success(`Đã xóa ${succeeded.size} lớp học phần`);
+      if (failed.length > 0) toast.error(`Không thể xóa ${failed.length} lớp. Xem lý do trong danh sách xác nhận.`);
+    } finally {
+      bulkDeleteInFlight.current = false;
+      setDeletingSections(false);
+    }
+  };
+
   // ----- Bổ sung giảng viên cho lớp chưa xác định ----------------------------
   // Điền sẵn theo học phần sở hữu lớp: tệp import cũng lấy bộ môn và khoa viện từ
   // chính dòng đó, nên mặc định này khớp với đường import lại.
@@ -415,11 +465,11 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
     }
   };
 
-  const handleImportSections = async (rows: ImportCourseSectionRow[]) => {
+  const handleImportSections = async (rows: ImportCourseSectionRow[], previewToken: string) => {
     if (selectedSemesterId === null) {
       throw new ApiError(400, 'CATALOG_SEMESTER_NOT_FOUND');
     }
-    const result = await catalogApi.importCourseSections(selectedSemesterId, rows);
+    const result = await catalogApi.importCourseSections(selectedSemesterId, rows, previewToken);
     // Nạp học phần và giảng viên TRƯỚC, vì import vừa rồi có thể đã tự tạo thêm.
     // Nạp lớp học phần trước thì bảng vẽ ra khi hai danh mục kia còn thiếu,
     // cột Học phần và Giảng viên sẽ tra không ra tên.
@@ -455,6 +505,8 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
     // email. Sort ổn định nên các lớp còn lại giữ nguyên thứ tự cũ.
     .sort((left, right) =>
       Number(left.lecturerId !== null) - Number(right.lecturerId !== null));
+
+  const selectedSectionCount = sections.filter(section => selectedSectionIds.has(String(section.courseSectionId))).length;
 
   const columns: Column<CourseSection>[] = [
     {
@@ -751,7 +803,10 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
                   type="button"
                   className="btn btn-secondary btn-sm"
                   aria-pressed={showOnlyUnidentified}
-                  onClick={() => setShowOnlyUnidentified((current) => !current)}
+                  onClick={() => {
+                    setSelectedSectionIds(new Set());
+                    setShowOnlyUnidentified((current) => !current);
+                  }}
                 >
                   {showOnlyUnidentified ? 'Hiện tất cả lớp' : 'Chỉ hiện lớp chưa xác định'}
                 </button>
@@ -777,10 +832,20 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
 
           {selectedSemester ? (
             <DataTable
+              key={selectedSemesterId}
               columns={columns}
               data={filteredSections}
               searchValue={search}
-              onSearchChange={setSearch}
+              onSearchChange={value => {
+                setSelectedSectionIds(new Set());
+                setSearch(value);
+              }}
+              selection={canManageCatalog ? {
+                selectedKeys: selectedSectionIds,
+                onChange: setSelectedSectionIds,
+                labelFor: section => `lớp ${courseOf(section.courseId)?.courseCode ?? ''} · ${section.sectionName}`,
+                disabled: deletingSections,
+              } : undefined}
               searchPlaceholder="Tìm tên lớp hoặc học phần..."
               exportConfig={{
                 title: `DANH SÁCH LỚP HỌC PHẦN - ${selectedSemester.semesterName} (${selectedYear?.academicYearName || ''})`,
@@ -791,6 +856,20 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
               onAddNew={canManageCatalog ? openCreateSection : undefined}
               addNewLabel="Thêm lớp học phần"
               toolbarActions={canManageAll ? (
+                <>
+                {selectedSectionCount > 0 && (
+                  <>
+                    <button type="button" className="btn btn-secondary btn-sm"
+                      disabled={deletingSections} onClick={() => setSelectedSectionIds(new Set())}>
+                      Bỏ chọn ({selectedSectionCount})
+                    </button>
+                    <button type="button" className="btn btn-danger btn-sm"
+                      disabled={deletingSections} onClick={openBulkDelete}>
+                      <Trash2 aria-hidden="true" size={16} />
+                      Xóa {selectedSectionCount} lớp đã chọn
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm catalog-add-button"
@@ -799,6 +878,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
                   <FileSpreadsheet aria-hidden="true" size={16} />
                   <span>Import Excel</span>
                 </button>
+                </>
               ) : undefined}
               emptyMessage="Học kỳ này chưa có lớp học phần nào."
               keyExtractor={(item) => String(item.courseSectionId)}
@@ -1110,6 +1190,8 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
       </Modal>
 
       <CourseSectionImportDialog
+        key={selectedSemesterId}
+        semesterId={selectedSemesterId}
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         semesterLabel={`${selectedSemester?.semesterName ?? ''} · ${
@@ -1129,6 +1211,44 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
         recordName={sectionToDelete?.sectionName ?? ''}
         confirmText="Xóa"
       />
+
+      <Modal
+        isOpen={bulkDeleteSections !== null}
+        onClose={() => { if (!deletingSections) setBulkDeleteSections(null); }}
+        title="Xóa các lớp học phần đã chọn?"
+        closeOnBackdropClick={false}
+      >
+        <div className="admin-import-dialog" aria-busy={deletingSections}>
+          <p><strong>{bulkDeleteSections?.length ?? 0} lớp học phần</strong> · {bulkDeleteContext}</p>
+          <div className="admin-alert" role="note">
+            <TriangleAlert aria-hidden="true" />
+            <span>Các lớp và bài khảo sát gắn với lớp sẽ bị xóa mềm. Link khảo sát của các lớp này sẽ ngừng sử dụng và báo cáo khảo sát có thể thay đổi. Kiểm tra kỹ danh sách trước khi xác nhận.</span>
+          </div>
+          <div className="admin-import-table-scroll">
+            <table>
+              <thead><tr><th>Mã học phần</th><th>Học phần</th><th>Nhóm</th><th>Giảng viên</th>{bulkDeleteErrors.size > 0 && <th>Lý do chưa xóa được</th>}</tr></thead>
+              <tbody>
+                {(bulkDeleteSections ?? []).map(section => (
+                  <tr key={section.courseSectionId}>
+                    <td>{courseOf(section.courseId)?.courseCode ?? '—'}</td>
+                    <td>{courseOf(section.courseId)?.courseName ?? '—'}</td>
+                    <td>{section.sectionName}</td>
+                    <td>{section.lecturerName ?? section.unidentifiedLecturerName ?? 'Chưa xác định'}</td>
+                    {bulkDeleteErrors.size > 0 && <td>{bulkDeleteErrors.get(section.courseSectionId)}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="modal-footer admin-inline-footer">
+            <button type="button" className="btn btn-secondary" disabled={deletingSections} onClick={() => setBulkDeleteSections(null)}>Hủy</button>
+            <button type="button" className="btn btn-danger" disabled={deletingSections || !bulkDeleteSections?.length}
+              onClick={() => void handleBulkDelete()}>
+              {deletingSections ? 'Đang xóa...' : bulkDeleteErrors.size > 0 ? `Thử xóa lại ${bulkDeleteSections?.length ?? 0} lớp` : `Xác nhận xóa ${bulkDeleteSections?.length ?? 0} lớp`}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
     </div>
   );

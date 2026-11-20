@@ -12,6 +12,7 @@ import {
 } from '../utils/profileImportExcel';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
 import { Modal } from './Modal';
+import { ImportConfirmation } from './ImportConfirmation';
 import '../styles/auth-admin.css';
 
 interface ProfileImportDialogProps {
@@ -112,7 +113,7 @@ export function ProfileImportDialog({ isOpen, onClose, roleOptions, onImport }: 
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Cấp hồ sơ từ Excel">
+    <Modal stepFlow isOpen={isOpen} onClose={handleClose} title="Cấp hồ sơ từ Excel">
       <div className="admin-import-dialog" aria-busy={parsing || saving}>
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
@@ -244,19 +245,20 @@ export function ProfileImportDialog({ isOpen, onClose, roleOptions, onImport }: 
           >
             Hủy
           </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void handleImport()}
+          <ImportConfirmation
+            rows={rows}
+            fileName={fileName}
+            destination="Hồ sơ người dùng"
+            description="Mỗi dòng cấp một hồ sơ theo vai trò cho tài khoản có email tương ứng. Họ tên trong tệp chỉ dùng để đối chiếu."
+            columns={[
+              { key: 'fullName', label: 'Họ và tên' },
+              { key: 'email', label: 'Email' },
+              { key: 'roleLabel', label: 'Vai trò' },
+              { key: 'roleCode', label: 'Mã vai trò' },
+            ]}
             disabled={rows.length === 0 || invalidRoleRows.length > 0 || parsing || saving}
-          >
-            {saving ? (
-              <LoaderCircle className="auth-spin" aria-hidden="true" />
-            ) : (
-              <Upload aria-hidden="true" />
-            )}
-            {saving ? 'Đang cấp hồ sơ...' : `Cấp ${rows.length || ''} hồ sơ`}
-          </button>
+            onConfirm={handleImport}
+          />
         </div>
       </div>
     </Modal>

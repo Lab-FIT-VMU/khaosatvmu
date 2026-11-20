@@ -12,14 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-/// <summary>
-/// Bộ môn của lớp khi import file lớp, theo bộ luật B-T1: gộp 194/195 → 191, mã 121… → 122,
-/// Mã BM "#N/A" hoặc trống thì suy từ mã học phần. Trước đây ba trường hợp này làm lớp bị bỏ
-/// (DepartmentNotFound / DepartmentCodeInvalid) hoặc mất bộ môn.
-///
-/// Chạy trên Postgres trong một transaction rồi rollback; tự tạo bộ môn và học kỳ cần dùng.
-/// Không đặt <c>ConnectionStrings__DefaultConnection</c> thì tự bỏ qua.
-/// </summary>
+/// <summary>PostgreSQL coverage for course section import against the active catalog.</summary>
 public class CourseSectionImportDepartmentTests
 {
     private sealed class FixedScopeResolver(UserScope scope) : IUserScopeResolver
@@ -87,32 +80,38 @@ public class CourseSectionImportDepartmentTests
         await db.Courses.Where(x => x.CourseCode == courseCode).Select(x => x.DepartmentId).SingleAsync();
 
     [Fact]
-    public async Task MergedDepartmentCodes_194And195_GoTo191()
+    public async Task ArchivedDepartmentCode_IsRejectedEvenWhenItsNameMatches()
     {
         await RunInRollbackAsync(async (db, service, semesterId) =>
         {
-            var result = await service.ImportCourseSectionsAsync(semesterId,
-            [
-                Row(1, "99401", "194"),
-                Row(2, "99501", "195"),
-            ]);
+            var activeName = await db.Departments.Where(x => x.DepartmentId == 191)
+                .Select(x => x.DepartmentName).SingleAsync();
+            var archived = await db.Departments.IgnoreQueryFilters().SingleOrDefaultAsync(x => x.DepartmentId == 195);
+            if (archived is null)
+            {
+                archived = new Department { DepartmentId = 195, DepartmentName = activeName };
+                db.Departments.Add(archived);
+            }
+            archived.IsDeleted = true;
+            await db.SaveChangesAsync();
 
-            result.Succeeded.Should().BeTrue();
-            result.Value!.CreatedCount.Should().Be(2);
-            (await DepartmentOfCourseAsync(db, "99401")).Should().Be(191);
-            (await DepartmentOfCourseAsync(db, "99501")).Should().Be(191);
+            var result = await service.ImportCourseSectionsAsync(semesterId, [Row(1, "99501", "195", activeName)]);
+
+            result.Value!.CreatedCount.Should().Be(0);
+            result.Value.Items.Single().ErrorCode.Should().Be(CatalogErrorCodes.DepartmentNotFound);
+            (await db.Courses.AnyAsync(x => x.CourseCode == "99501")).Should().BeFalse();
         });
     }
 
     [Fact]
-    public async Task CourseCode121_AlwaysGoesTo122_IgnoringFileValue()
+    public async Task CourseCodePrefix_DoesNotOverrideActiveDepartmentCode()
     {
         await RunInRollbackAsync(async (db, service, semesterId) =>
         {
-            var result = await service.ImportCourseSectionsAsync(semesterId, [Row(1, "12199", "123")]);
+            var result = await service.ImportCourseSectionsAsync(semesterId, [Row(1, "12199", "175")]);
 
             result.Value!.CreatedCount.Should().Be(1);
-            (await DepartmentOfCourseAsync(db, "12199")).Should().Be(122);
+            (await DepartmentOfCourseAsync(db, "12199")).Should().Be(175);
         });
     }
 
@@ -120,14 +119,60 @@ public class CourseSectionImportDepartmentTests
     [InlineData("#N/A")]
     [InlineData("")]
     [InlineData(null)]
-    public async Task MissingDepartmentCode_IsDerivedFromCourseCode(string? departmentCode)
+    public async Task MissingDepartmentCode_UsesCatalogNameInsteadOfCoursePrefix(string? departmentCode)
     {
         await RunInRollbackAsync(async (db, service, semesterId) =>
         {
-            var result = await service.ImportCourseSectionsAsync(semesterId, [Row(1, "17599", departmentCode)]);
+            var name = await db.Departments.Where(x => x.DepartmentId == 191)
+                .Select(x => x.DepartmentName).SingleAsync();
+            var result = await service.ImportCourseSectionsAsync(semesterId, [Row(1, "17599", departmentCode, name)]);
 
-            result.Value!.CreatedCount.Should().Be(1, "Mã BM #N/A hoặc trống không còn làm lớp bị bỏ");
-            (await DepartmentOfCourseAsync(db, "17599")).Should().Be(175);
+            result.Value!.CreatedCount.Should().Be(1);
+            (await DepartmentOfCourseAsync(db, "17599")).Should().Be(191);
+        });
+    }
+
+    [Fact]
+    public async Task ExistingCourse_RejectsConflictingDepartmentAndUsesCatalogWhenOmitted()
+    {
+        await RunInRollbackAsync(async (db, service, semesterId) =>
+        {
+            var firstImport = await service.ImportCourseSectionsAsync(semesterId, [Row(1, "17596", "175")]);
+            firstImport.Value!.CreatedCount.Should().Be(1);
+
+            var result = await service.ImportCourseSectionsAsync(semesterId,
+                [Row(2, "17596", "191") with { SectionName = "N02" },
+                 Row(3, "17596", null) with { SectionName = "N03" }]);
+
+            result.Value!.CreatedCount.Should().Be(1);
+            result.Value.Items[0].ErrorCode.Should().Be(CatalogErrorCodes.CourseSectionDepartmentMismatch);
+            result.Value.UnidentifiedLecturers.Single().DepartmentId.Should().Be(175);
+            (await DepartmentOfCourseAsync(db, "17596")).Should().Be(175);
+        });
+    }
+
+    [Fact]
+    public async Task FacultyCode_MustMatchTheDepartmentInCatalog()
+    {
+        await RunInRollbackAsync(async (db, service, semesterId) =>
+        {
+            var nextFacultyId = await db.Faculties.IgnoreQueryFilters().MaxAsync(x => (int?)x.FacultyId) ?? 0;
+            var ownFacultyId = nextFacultyId + 1;
+            var otherFacultyId = nextFacultyId + 2;
+            db.Faculties.AddRange(
+                new Faculty { FacultyId = ownFacultyId, FacultyName = "Import test faculty" },
+                new Faculty { FacultyId = otherFacultyId, FacultyName = "Other import test faculty" });
+            var department = await db.Departments.SingleAsync(x => x.DepartmentId == 175);
+            department.FacultyId = ownFacultyId;
+            await db.SaveChangesAsync();
+
+            var result = await service.ImportCourseSectionsAsync(semesterId,
+                [Row(1, "17595", "175") with { FacultyName = otherFacultyId.ToString() },
+                 Row(2, "17595", "175") with { FacultyName = ownFacultyId.ToString() }]);
+
+            result.Value!.CreatedCount.Should().Be(1);
+            result.Value.Items[0].ErrorCode.Should().Be(CatalogErrorCodes.CourseSectionFacultyMismatch);
+            (await db.Courses.SingleAsync(x => x.CourseCode == "17595")).FacultyId.Should().Be(ownFacultyId);
         });
     }
 

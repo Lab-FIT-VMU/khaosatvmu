@@ -154,6 +154,9 @@ public sealed record CourseSectionImportDto(
     int UpdatedSectionCount,
     IReadOnlyList<UnidentifiedLecturerDto> UnidentifiedLecturers);
 
+/// <summary>Read-only validation result, bound to the rows and proposed changes.</summary>
+public sealed record CourseSectionImportPreviewDto(CourseSectionImportDto Result, string PreviewToken);
+
 /// <summary>
 /// Bổ sung thông tin cho một giảng viên đang ở trạng thái "chưa xác định" của một
 /// lớp học phần. Đúng những gì tệp import mang theo cho một dòng thiếu email:
@@ -399,6 +402,17 @@ public interface ICatalogService
         IReadOnlyList<ImportCourseSectionRowCommand> rows,
         CancellationToken cancellationToken = default);
 
+    Task<CatalogOperationResult<CourseSectionImportPreviewDto>> PreviewCourseSectionsAsync(
+        int semesterId,
+        IReadOnlyList<ImportCourseSectionRowCommand> rows,
+        CancellationToken cancellationToken = default);
+
+    Task<CatalogOperationResult<CourseSectionImportDto>> CommitCourseSectionsAsync(
+        int semesterId,
+        IReadOnlyList<ImportCourseSectionRowCommand> rows,
+        string previewToken,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<LecturerDto>> GetLecturersAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -529,6 +543,9 @@ public static class CatalogErrorCodes
     public const string CourseSectionExists = "CATALOG_COURSE_SECTION_EXISTS";
     public const string CourseSectionSizeInvalid = "CATALOG_COURSE_SECTION_SIZE_INVALID";
     public const string CourseSectionDuplicateInFile = "CATALOG_COURSE_SECTION_DUPLICATE_IN_FILE";
+    public const string CourseSectionDepartmentMismatch = "CATALOG_COURSE_SECTION_DEPARTMENT_MISMATCH";
+    public const string CourseSectionFacultyMismatch = "CATALOG_COURSE_SECTION_FACULTY_MISMATCH";
+    public const string CourseSectionPreviewChanged = "CATALOG_COURSE_SECTION_PREVIEW_CHANGED";
     public const string SectionLecturerRequired = "CATALOG_SECTION_LECTURER_REQUIRED";
 
     /// <summary>Lớp đã có mã giảng viên nên không còn gì để bổ sung email.</summary>

@@ -1,6 +1,8 @@
 ﻿using System.Globalization;
 using System.Net.Mail;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Application.Auth;
 using Application.Catalog;
@@ -1075,10 +1077,47 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         return Succeeded(true);
     }
 
-    public async Task<CatalogOperationResult<CourseSectionImportDto>> ImportCourseSectionsAsync(
+    public Task<CatalogOperationResult<CourseSectionImportDto>> ImportCourseSectionsAsync(
+        int semesterId,
+        IReadOnlyList<ImportCourseSectionRowCommand> rows,
+        CancellationToken cancellationToken = default) =>
+        ProcessCourseSectionsAsync(semesterId, rows, false, null, cancellationToken);
+
+    public async Task<CatalogOperationResult<CourseSectionImportPreviewDto>> PreviewCourseSectionsAsync(
         int semesterId,
         IReadOnlyList<ImportCourseSectionRowCommand> rows,
         CancellationToken cancellationToken = default)
+    {
+        var preview = await ProcessCourseSectionsAsync(semesterId, rows, true, null, cancellationToken);
+        return preview.Succeeded
+            ? Succeeded(new CourseSectionImportPreviewDto(preview.Value!, CourseSectionPreviewToken(semesterId, rows, preview.Value!)))
+            : Failed<CourseSectionImportPreviewDto>(preview.ErrorCode!);
+    }
+
+    public Task<CatalogOperationResult<CourseSectionImportDto>> CommitCourseSectionsAsync(
+        int semesterId,
+        IReadOnlyList<ImportCourseSectionRowCommand> rows,
+        string previewToken,
+        CancellationToken cancellationToken = default) =>
+        string.IsNullOrWhiteSpace(previewToken)
+            ? Task.FromResult(Failed<CourseSectionImportDto>(CatalogErrorCodes.CourseSectionPreviewChanged))
+            : ProcessCourseSectionsAsync(semesterId, rows, false, previewToken, cancellationToken);
+
+    private static string CourseSectionPreviewToken(int semesterId,
+        IReadOnlyList<ImportCourseSectionRowCommand> rows, CourseSectionImportDto result) =>
+        Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
+        {
+            SemesterId = semesterId,
+            Rows = rows.Select(NormalizeImportRow).ToList(),
+            Result = result,
+        })));
+
+    private async Task<CatalogOperationResult<CourseSectionImportDto>> ProcessCourseSectionsAsync(
+        int semesterId,
+        IReadOnlyList<ImportCourseSectionRowCommand> rows,
+        bool previewOnly,
+        string? expectedPreviewToken,
+        CancellationToken cancellationToken)
     {
         // Import chỉ dành cho quản trị, đúng câu D-d. Mỗi dòng trong tệp mang bộ môn
         // riêng và còn tự tạo học phần lẫn giảng viên mới, nên không có cách nào ép
@@ -1101,7 +1140,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         // để hai bước bên dưới và phân tích điểm đọc cùng một chuỗi.
         rows = rows.Select(NormalizeImportRow).ToList();
 
-        await using var transaction = db.Database.CurrentTransaction is null
+        await using var transaction = !previewOnly && db.Database.CurrentTransaction is null
             ? await db.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
@@ -1110,21 +1149,25 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         var courseIdByCode = new Dictionary<string, int>();
         // Tên và số tín chỉ đi kèm để dòng thiếu email xuất lại được ĐÚNG cấu trúc
         // tệp import, gồm cả cột "Học phần" và "TCHT".
-        var courseInfoById = new Dictionary<int, (string CourseName, int Credits)>();
+        var courseInfoById = new Dictionary<int, (string CourseName, int Credits, int? DepartmentId, int? FacultyId)>();
         foreach (var course in await db.Courses
-            .Select(x => new { x.CourseId, x.CourseCode, x.CourseName, x.Credits })
+            .Select(x => new { x.CourseId, x.CourseCode, x.CourseName, x.Credits, x.DepartmentId, x.FacultyId })
             .ToListAsync(cancellationToken))
         {
             courseIdByCode[NormalizeKey(course.CourseCode)] = course.CourseId;
-            courseInfoById[course.CourseId] = (course.CourseName, course.Credits);
+            courseInfoById[course.CourseId] = (course.CourseName, course.Credits, course.DepartmentId, course.FacultyId);
         }
 
         var departmentNameById = await db.Departments
             .ToDictionaryAsync(x => x.DepartmentId, x => x.DepartmentName, cancellationToken);
         var departmentFacultyById = await db.Departments
             .ToDictionaryAsync(x => x.DepartmentId, x => x.FacultyId, cancellationToken);
-        var departmentIdByName = await LoadDepartmentIdByNameAsync(cancellationToken);
+        var departmentIdByName = departmentNameById
+            .GroupBy(x => NormalizeKey(x.Value))
+            .Where(group => group.Count() == 1)
+            .ToDictionary(group => group.Key, group => group.Single().Key);
         var facultyIdByName = await LoadFacultyIdByNameAsync(cancellationToken);
+        var activeFacultyIds = (await db.Faculties.Select(x => x.FacultyId).ToListAsync(cancellationToken)).ToHashSet();
 
         var lecturerIdByEmail = new Dictionary<string, int>();
         var deletedLecturers = (await db.Lecturers.IgnoreQueryFilters()
@@ -1156,6 +1199,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
 
         var seenInFile = new HashSet<string>();
         var itemsByRow = new Dictionary<int, CatalogImportItemDto>();
+        var departmentByRow = new Dictionary<int, int?>();
         var unidentifiedLecturers = new List<UnidentifiedLecturerDto>();
         var createdSections = new List<CourseSection>();
         var createdCourseCount = 0;
@@ -1211,34 +1255,54 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 continue;
             }
 
-            // Khoa: tên trong file khớp danh mục thì dùng như trước. File lớp thật ghi tên viết
-            // tắt ("Hàng hải", "Điện- ĐTTB") còn danh mục ghi đủ ("Khoa Hàng hải"), nên khi tên
-            // không khớp mà đã biết bộ môn thì lấy khoa của bộ môn (bộ luật B-T1: khoa suy từ bộ
-            // môn), thay vì bỏ cả dòng. Chỉ báo lỗi khi không suy được từ đâu.
-            int? facultyId = null;
+            var courseKey = NormalizeKey(courseCode);
+            var existsInCatalog = courseIdByCode.TryGetValue(courseKey, out var existingCourseId);
+            var existingCourse = courseInfoById.GetValueOrDefault(existingCourseId);
+            pendingCourses.TryGetValue(courseKey, out var pendingCourse);
+            var catalogDepartment = existsInCatalog ? existingCourse.DepartmentId : pendingCourse?.DepartmentId;
+            var catalogFaculty = existsInCatalog ? existingCourse.FacultyId : pendingCourse?.FacultyId;
+            if ((existsInCatalog || pendingCourse is not null) && departmentId is { } suppliedDepartment
+                && catalogDepartment != suppliedDepartment)
+            {
+                itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.CourseSectionDepartmentMismatch);
+                continue;
+            }
+
+            departmentId ??= catalogDepartment;
+            if (departmentId is { } resolvedDepartment && !departmentNameById.ContainsKey(resolvedDepartment))
+            {
+                itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.DepartmentNotFound);
+                continue;
+            }
+
+            var departmentFaculty = departmentId is { } department ? departmentFacultyById.GetValueOrDefault(department) : null;
+            var facultyId = catalogFaculty ?? departmentFaculty;
             var facultyName = row.FacultyName?.Trim() ?? string.Empty;
             if (CourseSectionImportRules.IsSpreadsheetError(facultyName))
             {
                 facultyName = string.Empty;
             }
-            if (facultyName.Length > 0 && facultyIdByName.TryGet(facultyName, out var foundFaculty))
+            if (facultyName.Length > 0)
             {
-                facultyId = foundFaculty;
-            }
-            else if (departmentId is { } resolvedDepartment
-                && departmentFacultyById.GetValueOrDefault(resolvedDepartment) is { } departmentFaculty)
-            {
-                facultyId = departmentFaculty;
-            }
-            else if (facultyName.Length > 0)
-            {
-                itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.FacultyNotFound);
-                continue;
+                var found = int.TryParse(facultyName, out var suppliedFaculty)
+                    ? activeFacultyIds.Contains(suppliedFaculty)
+                    : facultyIdByName.TryGet(facultyName, out suppliedFaculty);
+                if (!found)
+                {
+                    itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.FacultyNotFound);
+                    continue;
+                }
+                if ((facultyId is { } expectedFaculty && suppliedFaculty != expectedFaculty)
+                    || (departmentFaculty is { } expectedDepartmentFaculty && suppliedFaculty != expectedDepartmentFaculty))
+                {
+                    itemsByRow[row.RowNumber] = new CatalogImportItemDto(row.RowNumber, sectionName, courseCode, false, CatalogErrorCodes.CourseSectionFacultyMismatch);
+                    continue;
+                }
+                facultyId = suppliedFaculty;
             }
 
-            var courseKey = NormalizeKey(courseCode);
             // Từ chối lớp đã có giảng viên trước khi tạo hay khôi phục dữ liệu phụ.
-            if (courseIdByCode.TryGetValue(courseKey, out var existingCourseId)
+            if (existsInCatalog
                 && sectionByKey.TryGetValue($"{existingCourseId}|{NormalizeKey(sectionName)}", out var existing)
                 && (existing.LecturerId is not null || lecturerEmail.Length == 0))
             {
@@ -1321,9 +1385,47 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 continue;
             }
             // Chỉ nhận dữ liệu phụ sau khi toàn bộ dòng hợp lệ và không trùng lớp.
+            departmentByRow[row.RowNumber] = departmentId;
             if (newCourse is not null) pendingCourses[courseKey] = newCourse;
             if (newLecturer is not null) pendingLecturers[NormalizeKey(lecturerEmail)] = newLecturer;
             if (restoringLecturer is not null) restoringLecturers[NormalizeKey(lecturerEmail)] = restoringLecturer;
+        }
+
+        // Build the exact validation report BEFORE any Add, restore, account update,
+        // or SaveChanges. Preview returns here without writing to the database.
+        var acceptedRows = rows.Where(row => !itemsByRow.ContainsKey(row.RowNumber)).ToList();
+        var proposedUpdates = acceptedRows.Count(row =>
+            courseIdByCode.TryGetValue(NormalizeKey(row.CourseCode), out var courseId)
+            && sectionByKey.ContainsKey($"{courseId}|{NormalizeKey(row.SectionName)}"));
+        var proposedUnidentified = new List<UnidentifiedLecturerDto>();
+        foreach (var row in acceptedRows.Where(row => string.IsNullOrWhiteSpace(row.LecturerEmail)
+                     && !string.IsNullOrWhiteSpace(row.LecturerFullName)))
+        {
+            var key = NormalizeKey(row.CourseCode);
+            var departmentId = departmentByRow[row.RowNumber];
+            var courseName = courseIdByCode.TryGetValue(key, out var courseId)
+                ? courseInfoById[courseId].CourseName : pendingCourses[key].CourseName;
+            var credits = courseIdByCode.ContainsKey(key)
+                ? courseInfoById[courseId].Credits : pendingCourses[key].Credits;
+            int.TryParse(row.ClassSize, out var classSize);
+            proposedUnidentified.Add(new UnidentifiedLecturerDto(
+                row.RowNumber, row.LecturerFullName!, departmentId,
+                departmentId is { } id && departmentNameById.TryGetValue(id, out var name)
+                    ? name : NullIfBlank(row.DepartmentName),
+                NullIfBlank(row.FacultyName), row.CourseCode, row.SectionName,
+                courseName, credits, classSize));
+        }
+        var proposed = new CourseSectionImportDto(
+            rows.Count, acceptedRows.Count, rows.Count - acceptedRows.Count,
+            rows.Select(row => itemsByRow.GetValueOrDefault(row.RowNumber,
+                new CatalogImportItemDto(row.RowNumber, row.SectionName, row.CourseCode, true, null))).ToList(),
+            pendingCourses.Count, pendingLecturers.Count + restoringLecturers.Count,
+            proposedUpdates, proposedUnidentified);
+        if (previewOnly) return Succeeded(proposed);
+        if (expectedPreviewToken is not null
+            && !string.Equals(expectedPreviewToken, CourseSectionPreviewToken(semesterId, rows, proposed), StringComparison.Ordinal))
+        {
+            return Failed<CourseSectionImportDto>(CatalogErrorCodes.CourseSectionPreviewChanged);
         }
 
         // Tạo toàn bộ học phần mới trong 1 lượt lưu
@@ -1334,7 +1436,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             foreach (var (codeKey, course) in pendingCourses)
             {
                 courseIdByCode[codeKey] = course.CourseId;
-                courseInfoById[course.CourseId] = (course.CourseName, course.Credits);
+                courseInfoById[course.CourseId] = (course.CourseName, course.Credits, course.DepartmentId, course.FacultyId);
             }
             createdCourseCount = pendingCourses.Count;
         }
@@ -1368,8 +1470,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             var classSizeText = row.ClassSize?.Trim() ?? string.Empty;
             int.TryParse(classSizeText, out var classSize);
 
-            // Dòng tới được đây đã qua bước 1, nên bộ môn luôn tra được (hoặc để trống).
-            var departmentId = ResolveImportDepartment(row, departmentNameById, departmentIdByName).DepartmentId;
+            var departmentId = departmentByRow[row.RowNumber];
             var departmentName = row.DepartmentName?.Trim() ?? string.Empty;
 
             var facultyName = row.FacultyName?.Trim() ?? string.Empty;
@@ -1396,9 +1497,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             else if (lecturerFullName.Length > 0)
             {
                 unidentifiedLecturerName = lecturerFullName;
-                var courseInfo = courseInfoById.TryGetValue(courseId, out var found)
-                    ? found
-                    : (CourseName: row.CourseName?.Trim() ?? string.Empty, Credits: 0);
+                var courseInfo = courseInfoById[courseId];
                 unidentifiedLecturers.Add(new UnidentifiedLecturerDto(
                     row.RowNumber,
                     lecturerFullName,
@@ -2402,28 +2501,11 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         LecturerEmail = CourseSectionImportRules.NormalizeText(row.LecturerEmail),
     };
 
-    /// <summary>
-    /// Bộ môn của một dòng file lớp, theo thứ tự của bộ luật B-T1:
-    /// <list type="number">
-    /// <item>Mã học phần 121… luôn thuộc bộ môn 122 (khi bộ môn 122 có trong danh mục).</item>
-    /// <item>Cột "Mã BM", sau khi gộp 194/195 → 191.</item>
-    /// <item>Cột "Bộ môn" (tên), khi "Mã BM" trống.</item>
-    /// <item>Cả hai trống hoặc ghi lỗi công thức (#N/A): suy từ 3 chữ số đầu mã học phần;
-    /// suy không ra bộ môn có trong danh mục thì để trống như trước.</item>
-    /// </list>
-    /// </summary>
     private static (int? DepartmentId, string? ErrorCode) ResolveImportDepartment(
         ImportCourseSectionRowCommand row,
         IReadOnlyDictionary<int, string> departmentNameById,
-        NameLookup departmentIdByName)
+        IReadOnlyDictionary<string, int> departmentIdByName)
     {
-        var courseCode = row.CourseCode?.Trim() ?? string.Empty;
-        if (CourseSectionImportRules.ForcedDepartmentFor(courseCode) is { } forced
-            && departmentNameById.ContainsKey(forced))
-        {
-            return (forced, null);
-        }
-
         var departmentCode = row.DepartmentCode?.Trim() ?? string.Empty;
         var departmentName = row.DepartmentName?.Trim() ?? string.Empty;
         if (CourseSectionImportRules.IsSpreadsheetError(departmentCode))
@@ -2442,23 +2524,19 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
                 return (null, CatalogErrorCodes.DepartmentCodeInvalid);
             }
 
-            var merged = CourseSectionImportRules.ApplyDepartmentMerge(parsed);
-            return departmentNameById.ContainsKey(merged)
-                ? (merged, null)
+            return departmentNameById.ContainsKey(parsed)
+                ? (parsed, null)
                 : (null, CatalogErrorCodes.DepartmentNotFound);
         }
 
         if (departmentName.Length > 0)
         {
-            return departmentIdByName.TryGet(departmentName, out var byName)
+            return departmentIdByName.TryGetValue(NormalizeKey(departmentName), out var byName)
                 ? (byName, null)
                 : (null, CatalogErrorCodes.DepartmentNotFound);
         }
 
-        return CourseSectionImportRules.DeriveDepartmentFromCourseCode(courseCode) is { } derived
-            && departmentNameById.ContainsKey(derived)
-                ? (derived, null)
-                : (null, null);
+        return (null, null);
     }
 
     private static string NormalizeMajorCode(string? value)

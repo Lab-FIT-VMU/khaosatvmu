@@ -2864,3 +2864,14 @@
     grid-template-columns: 1fr;
   }
 }
+.catalog-table__selection {
+  width: 42px;
+  text-align: center;
+}
+
+.catalog-table__selection input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--ops-primary, #136c88);
+}

@@ -1,5 +1,6 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { ModalStepContext } from './modalStepContext';
 
 interface ModalProps {
   isOpen: boolean;
@@ -14,6 +15,8 @@ interface ModalProps {
    * là mất hết những gì đang sửa dở.
    */
   closeOnBackdropClick?: boolean;
+  /** Allow an import confirmation to replace the body with its next step. */
+  stepFlow?: boolean;
 }
 
 interface ConfirmDialogProps {
@@ -43,15 +46,24 @@ export const Modal: React.FC<ModalProps> = ({
   submitText = 'Lưu thay đổi',
   size = 'workspace',
   closeOnBackdropClick = true,
+  stepFlow = false,
 }) => {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [stepTarget, setStepTarget] = useState<HTMLDivElement | null>(null);
+  const [stepActive, setStepActive] = useState(false);
+  const stepContext = useMemo(() => ({ target: stepTarget, setActive: setStepActive }), [stepTarget]);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
 
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
+
+  useLayoutEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [stepActive]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -76,7 +88,7 @@ export const Modal: React.FC<ModalProps> = ({
       if (event.key !== 'Tab' || !dialog) return;
       const elements = Array.from(dialog.querySelectorAll<HTMLElement>(
         'input, select, textarea, button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
-      ));
+      )).filter(element => element.getClientRects().length > 0);
       if (elements.length === 0) {
         event.preventDefault();
         dialog.focus();
@@ -106,14 +118,14 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className="modal-backdrop catalog-modal-backdrop"
+      className={`modal-backdrop catalog-modal-backdrop${stepActive ? ' catalog-modal-backdrop--step' : ''}`}
       onMouseDown={(event) => {
         if (closeOnBackdropClick && event.target === event.currentTarget) onClose();
       }}
     >
       <div
         ref={dialogRef}
-        className={`modal-card catalog-modal-card catalog-modal-card--${size}`}
+        className={`modal-card catalog-modal-card catalog-modal-card--${size}${stepActive ? ' catalog-modal-card--step' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -132,7 +144,16 @@ export const Modal: React.FC<ModalProps> = ({
           </button>
         </header>
 
-        <div className="modal-body catalog-modal-body">{children}</div>
+        <div ref={bodyRef} className={`modal-body catalog-modal-body${stepActive ? ' catalog-modal-body--step' : ''}`}>
+          <ModalStepContext.Provider value={stepContext}>
+            {stepFlow ? (
+              <>
+                <div hidden={stepActive} style={{ display: stepActive ? 'none' : 'contents' }}>{children}</div>
+                <div ref={setStepTarget} hidden={!stepActive} className="catalog-modal-step" />
+              </>
+            ) : children}
+          </ModalStepContext.Provider>
+        </div>
 
         {onSubmit && (
           <footer className="modal-footer catalog-modal-footer">

@@ -361,11 +361,24 @@ public static class CatalogEndpoints
                     x.LecturerFullName,
                     x.LecturerEmail))
                 .ToList() ?? [];
-            return ToResult(await service.ImportCourseSectionsAsync(
+            return ToResult(await service.CommitCourseSectionsAsync(
                 request.SemesterId,
                 rows,
+                request.PreviewToken ?? string.Empty,
                 cancellationToken));
         }).AddEndpointFilter<RequireAntiforgeryFilter>();
+
+        courseSections.MapPost("/import/preview", async (
+            ImportCourseSectionsRequest request, ICatalogService service, CancellationToken cancellationToken) =>
+            ToResult(await service.PreviewCourseSectionsAsync(
+                request.SemesterId, request.ToRows(), cancellationToken)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
+
+        courseSections.MapPost("/import/commit", async (
+            ImportCourseSectionsRequest request, ICatalogService service, CancellationToken cancellationToken) =>
+            ToResult(await service.CommitCourseSectionsAsync(
+                request.SemesterId, request.ToRows(), request.PreviewToken ?? string.Empty, cancellationToken)))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
 
         // ------------------------------------------------------------ Lecturers
 
@@ -538,6 +551,7 @@ public static class CatalogEndpoints
         var statusCode = result.ErrorCode switch
         {
             CatalogErrorCodes.OutOfScope => StatusCodes.Status403Forbidden,
+            CatalogErrorCodes.CourseSectionPreviewChanged => StatusCodes.Status409Conflict,
             CatalogErrorCodes.RestoreParentDeleted => StatusCodes.Status409Conflict,
             CatalogErrorCodes.FacultyNotFound => StatusCodes.Status404NotFound,
             CatalogErrorCodes.DepartmentNotFound => StatusCodes.Status404NotFound,
@@ -636,7 +650,15 @@ public static class CatalogEndpoints
 
     public sealed record ImportCourseSectionsRequest(
         int SemesterId,
-        IReadOnlyList<ImportCourseSectionRowRequest>? Rows);
+        IReadOnlyList<ImportCourseSectionRowRequest>? Rows,
+        string? PreviewToken = null)
+    {
+        public IReadOnlyList<ImportCourseSectionRowCommand> ToRows() => Rows?
+            .Select(row => new ImportCourseSectionRowCommand(row.RowNumber,
+                row.CourseCode ?? string.Empty, row.CourseName, row.SectionName ?? string.Empty,
+                row.Credits, row.ClassSize, row.DepartmentName, row.DepartmentCode,
+                row.FacultyName, row.LecturerFullName, row.LecturerEmail)).ToList() ?? [];
+    }
 
     /// <summary>Các trường tương ứng cột trong tệp Excel gốc của đơn vị đào tạo.</summary>
     public sealed record ImportCourseSectionRowRequest(

@@ -25,6 +25,7 @@ import type { ImportSheetChoice } from '../utils/importSheets';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
 import { ImportSheetPicker } from './ImportSheetPicker';
 import { Modal } from './Modal';
+import { ImportConfirmation } from './ImportConfirmation';
 
 interface CourseImportDialogProps {
   isOpen: boolean;
@@ -195,7 +196,7 @@ export function CourseImportDialog({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Import học phần từ Excel">
+    <Modal stepFlow isOpen={isOpen} onClose={handleClose} title="Import học phần từ Excel">
       <div className="admin-import-dialog" aria-busy={parsing}>
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
@@ -247,14 +248,14 @@ export function CourseImportDialog({
                 id={inputId}
                 type="file"
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                disabled={parsing}
+                disabled={parsing || importing}
                 onChange={(event) => void handleFileChange(event.target.files?.[0])}
               />
             </label>
 
             <ImportSheetPicker
               choice={sheetChoice}
-              disabled={parsing}
+              disabled={parsing || importing}
               requiredColumnsLabel="Mã học phần / Tên học phần"
               onChange={(name) => file && void readFile(file, name)}
             />
@@ -396,19 +397,23 @@ export function CourseImportDialog({
               >
                 Hủy
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => void handleImport()}
+              <ImportConfirmation
+                rows={rows}
+                fileName={fileName}
+                sheetName={sheetChoice?.sheetName}
+                destination="Danh mục học phần"
+                columns={[
+                  { key: 'courseCode', label: 'Mã học phần' },
+                  { key: 'courseName', label: 'Tên học phần' },
+                  { key: 'credits', label: 'Tín chỉ' },
+                  { key: 'courseType', label: 'Loại học phần' },
+                  { key: 'facultyName', label: 'Khoa / viện' },
+                  { key: 'departmentName', label: 'Bộ môn' },
+                  { key: 'prerequisiteCourseCode', label: 'Học phần tiên quyết' },
+                ]}
                 disabled={rows.length === 0 || parsing || importing}
-              >
-                {importing ? (
-                  <LoaderCircle className="auth-spin" aria-hidden="true" />
-                ) : (
-                  <Upload aria-hidden="true" />
-                )}
-                {importing ? 'Đang lưu...' : `Import ${rows.length || ''} học phần`}
-              </button>
+                onConfirm={handleImport}
+              />
             </>
           )}
         </div>

@@ -37,6 +37,12 @@ export function courseSectionFailureReason(
     case 'CATALOG_DEPARTMENT_NOT_FOUND':
       return departmentNotFoundReason(row.departmentName, row.departmentCode, context.departments);
 
+    case 'CATALOG_COURSE_SECTION_DEPARTMENT_MISMATCH':
+      return `Bộ môn trong tệp khác danh mục của học phần ${code}. Kiểm tra lại cột "Mã BM" và "Bộ môn".`;
+
+    case 'CATALOG_COURSE_SECTION_FACULTY_MISMATCH':
+      return `Cột "Khoa" của học phần ${code} không khớp với khoa trong danh mục học phần hoặc bộ môn.`;
+
     case 'CATALOG_FACULTY_NOT_FOUND':
       return facultyNotFoundReason(row.facultyName, context.faculties);
 

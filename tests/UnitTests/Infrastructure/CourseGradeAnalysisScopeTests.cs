@@ -3,6 +3,7 @@ namespace UnitTests.InfrastructureTests;
 using Application;
 using Application.Auth;
 using Application.CourseGrades;
+using Domain;
 using FluentAssertions;
 using global::Infrastructure.CourseGrades;
 using global::Infrastructure.Persistence;
@@ -70,6 +71,50 @@ public class CourseGradeAnalysisScopeTests
 
     private static readonly UserScope Board =
         new(RoleCodes.BoardOfDirectors, LecturerId: null, DepartmentId: null, FacultyId: null, SeesEverything: true);
+
+    [Fact]
+    public async Task CourseStatistics_ExcludeOtherUnitsUsingTheSameBaseCourseCode()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var db = new AppDbContext(options);
+        db.GradeAnalysisRuns.Add(new GradeAnalysisRun { RunId = 1, IsCurrent = true });
+        db.GradeAnalysisCourseResults.Add(new GradeAnalysisCourseResult
+        {
+            RunId = 1, SemesterId = 1, BaseCourseCode = "12345", FacultyId = 10, DepartmentId = 100,
+        });
+        db.GradeAnalysisSectionResults.AddRange(
+            new GradeAnalysisSectionResult
+            {
+                CourseSectionId = 1, RunId = 1, SemesterId = 1, BaseCourseCode = "12345",
+                FacultyId = 10, DepartmentId = 100, IncludedInStats = true,
+                DataJson = """{"n_mat":2,"n_diem":30,"r":0.7}""",
+            },
+            new GradeAnalysisSectionResult
+            {
+                CourseSectionId = 2, RunId = 1, SemesterId = 1, BaseCourseCode = "12345",
+                FacultyId = 10, DepartmentId = 200, IncludedInStats = true,
+                DataJson = """{"n_mat":9,"n_diem":40,"r":0.1}""",
+            },
+            new GradeAnalysisSectionResult
+            {
+                CourseSectionId = 3, RunId = 1, SemesterId = 1, BaseCourseCode = "12345",
+                FacultyId = 20, DepartmentId = 300, IncludedInStats = true,
+                DataJson = """{"n_mat":8,"n_diem":50,"r":0.3}""",
+            });
+        await db.SaveChangesAsync();
+
+        foreach (var scope in new[] { DepartmentManager(100), FacultyManager(10), Board })
+        {
+            var service = new EfCourseGradeAnalysisService(db, new FixedScopeResolver(scope));
+            var course = (await service.GetCoursesAsync(1, null, null)).Should().ContainSingle().Subject;
+            var statistics = course.Data["lop_tk"]!;
+            statistics["n_mat"]!.GetValue<int>().Should().Be(2);
+            statistics["n_diem"]!.GetValue<int>().Should().Be(30);
+            statistics["r"]!.AsArray().Select(r => r!.GetValue<double>()).Should().Equal(0.7);
+        }
+    }
 
     [Fact]
     public async Task AdminAndBoard_SeeEverything_IncludingLecturerNames()

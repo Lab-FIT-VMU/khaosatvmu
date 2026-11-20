@@ -265,17 +265,27 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
         // Tổng các lớp đưa vào thống kê của từng học phần (bảng bộ môn ở cấp khoa, như bản audit:
         // tỷ lệ mất tư cách = Σ n_mat / Σ n_diem và trung vị r trên các lớp này).
         var codesInPage = parsed.Select(x => x.Row.BaseCourseCode).ToList();
-        var statsSections = await db.GradeAnalysisSectionResults.AsNoTracking()
+        var statsQuery = InScope(db.GradeAnalysisSectionResults.AsNoTracking(),
+            view, (q, f) => q.Where(x => x.FacultyId == f), (q, d) => q.Where(x => x.DepartmentId == d));
+        if (facultyId is { } statsFaculty)
+        {
+            statsQuery = statsQuery.Where(x => x.FacultyId == statsFaculty);
+        }
+        if (departmentId is { } statsDepartment)
+        {
+            statsQuery = statsQuery.Where(x => x.DepartmentId == statsDepartment);
+        }
+        var statsSections = await statsQuery
             .Where(x => x.RunId == run.RunId && x.SemesterId == semesterId && x.IncludedInStats
                 && codesInPage.Contains(x.BaseCourseCode))
-            .Select(x => new { x.BaseCourseCode, x.DataJson })
+            .Select(x => new { x.BaseCourseCode, x.FacultyId, x.DepartmentId, x.DataJson })
             .ToListAsync(cancellationToken);
         var statsByCourse = statsSections
-            .GroupBy(x => x.BaseCourseCode, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.Select(x => JsonNode.Parse(x.DataJson)!).ToList(), StringComparer.Ordinal);
+            .GroupBy(x => (x.BaseCourseCode, x.FacultyId, x.DepartmentId))
+            .ToDictionary(g => g.Key, g => g.Select(x => JsonNode.Parse(x.DataJson)!).ToList());
         foreach (var (row, data) in parsed)
         {
-            var sections = statsByCourse.GetValueOrDefault(row.BaseCourseCode) ?? [];
+            var sections = statsByCourse.GetValueOrDefault((row.BaseCourseCode, row.FacultyId, row.DepartmentId)) ?? [];
             data["lop_tk"] = new JsonObject
             {
                 ["n_mat"] = sections.Sum(s => s["n_mat"]?.GetValue<int>() ?? 0),

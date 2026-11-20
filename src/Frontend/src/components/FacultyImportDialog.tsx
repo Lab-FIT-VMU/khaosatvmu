@@ -23,6 +23,7 @@ import type { ImportSheetChoice } from '../utils/importSheets';
 import { ExportFailedRowsButton } from './ExportFailedRowsButton';
 import { ImportSheetPicker } from './ImportSheetPicker';
 import { Modal } from './Modal';
+import { ImportConfirmation } from './ImportConfirmation';
 
 interface FacultyImportDialogProps {
   isOpen: boolean;
@@ -147,7 +148,7 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
     );
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Import khoa / viện từ Excel">
+    <Modal stepFlow isOpen={isOpen} onClose={handleClose} title="Import khoa / viện từ Excel">
       <div className="admin-import-dialog" aria-busy={parsing}>
         <div className="admin-form-intro">
           <FileSpreadsheet aria-hidden="true" />
@@ -195,14 +196,14 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
                 id={inputId}
                 type="file"
                 accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                disabled={parsing}
+                disabled={parsing || importing}
                 onChange={(event) => void handleFileChange(event.target.files?.[0])}
               />
             </label>
 
             <ImportSheetPicker
               choice={sheetChoice}
-              disabled={parsing}
+              disabled={parsing || importing}
               requiredColumnsLabel="Tên khoa viện"
               onChange={(name) => file && void readFile(file, name)}
             />
@@ -321,19 +322,17 @@ export function FacultyImportDialog({ isOpen, onClose, onImport }: FacultyImport
               >
                 Hủy
               </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => void handleImport()}
+              <ImportConfirmation
+                rows={rows}
+                fileName={fileName}
+                sheetName={sheetChoice?.sheetName}
+                destination="Danh mục khoa / viện"
+                columns={[
+                  { key: 'facultyName', label: 'Khoa / viện' },
+                ]}
                 disabled={rows.length === 0 || parsing || importing}
-              >
-                {importing ? (
-                  <LoaderCircle className="auth-spin" aria-hidden="true" />
-                ) : (
-                  <Upload aria-hidden="true" />
-                )}
-                {importing ? 'Đang lưu...' : `Import ${rows.length || ''} khoa / viện`}
-              </button>
+                onConfirm={handleImport}
+              />
             </>
           )}
         </div>

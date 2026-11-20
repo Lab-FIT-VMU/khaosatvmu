@@ -48,6 +48,11 @@ export interface CourseSectionImportResponse extends CatalogImportResponse {
   unidentifiedLecturers: UnidentifiedLecturer[];
 }
 
+export interface CourseSectionImportPreviewResponse {
+  result: CourseSectionImportResponse;
+  previewToken: string;
+}
+
 /** Một lớp chưa gắn được giảng viên, dựng lại từ dữ liệu chứ không từ tệp import. */
 export interface UnidentifiedSection {
   courseSectionId: number;
@@ -158,10 +163,16 @@ export const catalogApi = {
     csrfRequest<CourseSection>(`/api/catalog/course-sections/${courseSectionId}`, 'PUT', section),
   deleteCourseSection: (courseSectionId: number) =>
     csrfRequest<boolean>(`/api/catalog/course-sections/${courseSectionId}`, 'DELETE'),
-  importCourseSections: (semesterId: number, rows: ImportCourseSectionRow[]) =>
-    csrfRequest<CourseSectionImportResponse>('/api/catalog/course-sections/import', 'POST', {
+  previewCourseSections: (semesterId: number, rows: ImportCourseSectionRow[]) =>
+    csrfRequest<CourseSectionImportPreviewResponse>('/api/catalog/course-sections/import/preview', 'POST', {
       semesterId,
       rows,
+    }),
+  importCourseSections: (semesterId: number, rows: ImportCourseSectionRow[], previewToken: string) =>
+    csrfRequest<CourseSectionImportResponse>('/api/catalog/course-sections/import/commit', 'POST', {
+      semesterId,
+      rows,
+      previewToken,
     }),
 
   /**
@@ -266,6 +277,8 @@ export interface SaveCoursePayload {
 
 /** Thông báo tiếng Việt cho mã lỗi của API danh mục. */
 export const catalogErrorMessages: Record<string, string> = {
+  CATALOG_COURSE_SECTION_PREVIEW_CHANGED:
+    'Dữ liệu hoặc danh mục đã thay đổi sau lần kiểm tra. Chưa lưu thay đổi nào. Hãy kiểm tra lại trước khi xác nhận.',
   CATALOG_OUT_OF_SCOPE: 'Bạn không có quyền thực hiện thao tác này với hồ sơ đang sử dụng.',
   CATALOG_INVALID_REQUEST: 'Dữ liệu gửi lên không hợp lệ.',
   CATALOG_RESTORE_PARENT_DELETED: 'Hãy khôi phục đợt khảo sát liên quan trước khi khôi phục lớp học phần.',

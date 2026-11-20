@@ -27,31 +27,6 @@ public class CourseSectionImportRulesTests
     public void NormalizeText_KeepsNull() => CourseSectionImportRules.NormalizeText(null).Should().BeNull();
 
     [Theory]
-    [InlineData(194, 191)]
-    [InlineData(195, 191)]
-    [InlineData(191, 191)]
-    [InlineData(175, 175)]
-    public void ApplyDepartmentMerge_MergesKnownPairs(int input, int expected) =>
-        CourseSectionImportRules.ApplyDepartmentMerge(input).Should().Be(expected);
-
-    [Theory]
-    [InlineData("12101", 122)]
-    [InlineData("12160H", 122)]
-    [InlineData("12201", null)]
-    [InlineData("17540", null)]
-    public void ForcedDepartmentFor_OnlyCoursesStartingWith121(string courseCode, int? expected) =>
-        CourseSectionImportRules.ForcedDepartmentFor(courseCode).Should().Be(expected);
-
-    [Theory]
-    [InlineData("17540", 175)]
-    [InlineData("19412", 191)]
-    [InlineData("19501H", 191)]
-    [InlineData("AB123", null)]
-    [InlineData("12", null)]
-    public void DeriveDepartmentFromCourseCode_UsesFirstThreeDigitsAndMerges(string courseCode, int? expected) =>
-        CourseSectionImportRules.DeriveDepartmentFromCourseCode(courseCode).Should().Be(expected);
-
-    [Theory]
     [InlineData("#N/A", true)]
     [InlineData(" #REF!", true)]
     [InlineData("175", false)]
