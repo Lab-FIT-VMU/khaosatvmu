@@ -16,6 +16,20 @@ using Xunit;
 public sealed class GlobalExceptionHandlerTests
 {
     [Theory]
+    [InlineData(PostgresErrorCodes.SerializationFailure)]
+    [InlineData(PostgresErrorCodes.DeadlockDetected)]
+    public async Task ConcurrentWriteConflict_Returns409ThroughEfWrappers(string sqlState)
+    {
+        var postgres = new PostgresException("private transaction details", "ERROR", "ERROR", sqlState);
+        var wrapped = new InvalidOperationException("transient database failure",
+            new DbUpdateException("write failed", postgres));
+        var (status, body) = await Handle(wrapped);
+        status.Should().Be(409);
+        body.GetProperty("errorCode").GetString().Should().Be("DATA_CONFLICT");
+        body.ToString().Should().NotContain("private");
+    }
+
+    [Theory]
     [InlineData("IX_Faculties_FacultyName", "CATALOG_FACULTY_NAME_EXISTS")]
     [InlineData("IX_CohortMajors_CohortId_MajorId", "COHORT_MAJOR_EXISTS")]
     [InlineData("IX_CourseSections_CourseId_SemesterId_SectionName", "CATALOG_COURSE_SECTION_EXISTS")]

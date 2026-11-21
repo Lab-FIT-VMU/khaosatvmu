@@ -127,6 +127,7 @@ public static class DatabaseSeeder
             // hướng, một quyền. Mặc định chỉ cấp cho ADMIN (dữ liệu có tên giảng viên, không lọc
             // theo khoa / bộ môn).
             (Code: "AUDIT_GRADE_MODULE_ACCESS",      Name: "Phân tích điểm (bản audit)",  Description: "Mở module phân tích điểm học phần bản audit: xem báo cáo, nạp học kỳ, sửa tham số", Category: "Phân tích điểm (bản audit)"),
+            (Code: "DESIGN_SYSTEM_ACCESS",       Name: "Design System",                    Description: "Truy cập và tùy chỉnh bộ màu chung trên trình duyệt",     Category: "Design System"),
             (Code: "ACADEMIC_YEARS_ACCESS",       Name: "Năm học & học kỳ",                  Description: "Truy cập module quản lý năm học và học kỳ",            Category: "Danh mục đào tạo"),
             (Code: "FACULTIES_ACCESS",            Name: "Khoa / Viện",                       Description: "Truy cập module quản lý khoa và viện",                  Category: "Danh mục đào tạo"),
             (Code: "DEPARTMENTS_ACCESS",          Name: "Bộ môn",                            Description: "Truy cập module quản lý bộ môn",                        Category: "Danh mục đào tạo"),
@@ -247,6 +248,7 @@ public static class DatabaseSeeder
             (RoleCode: "ADMIN", PermissionCode: "COURSE_GRADE_THRESHOLDS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "COURSE_GRADE_ANALYSIS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "AUDIT_GRADE_MODULE_ACCESS"),
+            (RoleCode: "ADMIN", PermissionCode: "DESIGN_SYSTEM_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "ACADEMIC_YEARS_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "FACULTIES_ACCESS"),
             (RoleCode: "ADMIN", PermissionCode: "DEPARTMENTS_ACCESS"),

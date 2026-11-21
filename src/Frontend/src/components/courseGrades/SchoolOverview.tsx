@@ -82,6 +82,10 @@ export function SchoolOverview({ overview, semesterId, courses }: Props) {
     [courses],
   );
 
+  if (overview.viewLevel === 'unit') {
+    return <p className="cga-muted">Chọn báo cáo cấp khoa hoặc bộ môn để xem số liệu trong phạm vi của bạn.</p>;
+  }
+
   if (!summary) {
     return <p className="cga-muted">Chưa có số liệu cho học kỳ này.</p>;
   }

@@ -16,6 +16,10 @@ internal static class GradeAnalysisRunQueue
     public static async Task<GradeAnalysisRun> QueueAsync(
         AppDbContext db, string trigger, Guid actorId, DateTime now, CancellationToken cancellationToken)
     {
+        // Shared with the Python publisher. Input changes and their new run commit together.
+        await db.Database.ExecuteSqlRawAsync(
+            "SELECT pg_advisory_xact_lock(1447908657, 1)", cancellationToken);
+
         await db.GradeAnalysisRuns
             .Where(x => x.Status == GradeAnalysisRunStatus.Queued)
             .ExecuteDeleteAsync(cancellationToken);

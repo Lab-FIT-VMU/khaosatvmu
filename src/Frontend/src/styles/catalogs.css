@@ -2363,6 +2363,7 @@
    Forms cho bấm thẳng vào từng khối trên biểu mẫu. */
 .survey-region {
   position: relative;
+  pointer-events: auto;
   outline: 1px dashed transparent;
   outline-offset: 2px;
   cursor: pointer;

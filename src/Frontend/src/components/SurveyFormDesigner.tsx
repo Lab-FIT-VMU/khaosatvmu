@@ -156,6 +156,20 @@ export const SurveyFormDesigner: React.FC<{
    * việc hay làm nhất, phần còn lại vẫn nằm ở bảng bên phải.
    */
   const regionToolbar = () => {
+    if (region === 'commentHeading') {
+      return (
+        <button
+          type="button"
+          className="survey-region__btn"
+          disabled={!draft.commentHeading}
+          onClick={() => set({ commentHeading: null })}
+        >
+          <RotateCcw className="operation-icon" aria-hidden="true" />
+          Về tiêu đề mặc định
+        </button>
+      );
+    }
+
     if (region === 'cover') {
       return (
         <>
@@ -475,9 +489,9 @@ export const SurveyFormDesigner: React.FC<{
         {isFieldVisible(draft, 'commentBox') && (
           <section className="survey-designer__comment">
             <h3>Chữ của ô "Ý kiến khác"</h3>
-            <p className="survey-designer__hint">Bỏ trống ô nào thì dùng câu mặc định của ô đó.</p>
+            <p className="survey-designer__hint">Bấm vào tiêu đề trên bản xem trước để sửa trực tiếp, hoặc nhập bên dưới. Bỏ trống ô nào thì dùng câu mặc định của ô đó.</p>
             <label className="survey-designer__text-field">
-              <span className="survey-designer__label">Tiêu đề</span>
+              <span className="survey-designer__label">Nhãn dòng ý kiến</span>
               <input
                 type="text"
                 maxLength={1000}
@@ -578,8 +592,9 @@ export const SurveyFormDesigner: React.FC<{
             config={draft}
             screen={screen}
             data={data}
-            // Chỉ màn hình bắt đầu làm bài sửa được tại chỗ; thẻ Bài làm vẫn chỉ để xem.
+            // Bài làm cho sửa tiêu đề ô ý kiến, các câu hỏi vẫn chỉ để xem.
             editable={screen === 'intro'}
+            editableCommentHeading={screen === 'quiz'}
             selected={region}
             onSelect={(next) => {
               setRegion(next);

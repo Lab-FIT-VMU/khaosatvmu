@@ -6,6 +6,9 @@ namespace API.Auth;
 
 public static class AuthPolicies
 {
+    public const string UserAdminAccounts = "PERMISSION_USER_ADMIN_TAB_ACCOUNTS";
+    public const string UserAdminAudit = "PERMISSION_USER_ADMIN_TAB_AUDIT";
+    public const string UserAdminPermissions = "PERMISSION_USER_ADMIN_TAB_PERMISSIONS";
     public const string UserAdminAccess = "PERMISSION_USER_ADMIN_ACCESS";
     public const string FacultiesAccess = "PERMISSION_FACULTIES_ACCESS";
     public const string DepartmentsAccess = "PERMISSION_DEPARTMENTS_ACCESS";

@@ -4,7 +4,7 @@ import unicodedata
 from decimal import Decimal, ROUND_HALF_UP
 
 # Học kỳ phụ mang mã P (khaosatvmu có Học kỳ phụ đứng đầu năm học, trước HK1).
-RE_KY = re.compile(r'^(\d{2})(\d{2})_HK([12P])$')
+RE_KY = re.compile(r'^(\d{2})(\d{2})_HK([12PX])(?:_\d+)?$')
 
 
 def van_ban(s):
@@ -54,13 +54,13 @@ def ma_goc(ma):
 def kiem_tra_ma_ky(ky):
     """'2425_HK1' -> f_nhhk '242512'. Báo lỗi nếu sai dạng. Học kỳ phụ không có mã f_nhhk."""
     m = RE_KY.match(ky or '')
-    if not m or m.group(3) == 'P':
+    if not m or m.group(3) not in ('1', '2'):
         raise ValueError('Mã học kỳ phải có dạng NNNN_HKx, ví dụ 2425_HK1')
     return f'{m.group(1)}{m.group(2)}' + ('12' if m.group(3) == '1' else '21')
 
 
 def _ten_hk(hk):
-    return 'HK phụ' if hk == 'P' else f'HK{hk}'
+    return {'P': 'HK phụ', 'X': 'HK bổ sung'}.get(hk, f'HK{hk}')
 
 
 def nhan_ky(ky):
@@ -74,7 +74,7 @@ def nhan_ky_ngan(ky):
 
 
 # Thứ tự trong năm học theo CSDL khaosatvmu: Học kỳ phụ → HK1 → HK2.
-_VI_TRI_TRONG_NAM = {'P': 0, '1': 1, '2': 2}
+_VI_TRI_TRONG_NAM = {'P': 0, '1': 1, '2': 2, 'X': 3}
 
 
 def thu_tu_ky(ky):
@@ -91,4 +91,4 @@ def stt_ky(ky):
     """
     m = RE_KY.match(ky)
     nam, hk = int(m.group(1)), m.group(3)
-    return nam * 2 + {'P': -0.5, '1': 0, '2': 1}[hk]
+    return nam * 2 + {'P': -0.5, '1': 0, '2': 1, 'X': 1.25}[hk]

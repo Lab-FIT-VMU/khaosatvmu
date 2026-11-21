@@ -411,7 +411,8 @@ public class SurveyTypeUnitTests
             {
                 (await SubmitAsync(service, unitA.LinkToken, seed.QuestionId, answer)).Succeeded.Should().BeTrue();
             }
-            (await SubmitAsync(service, unitA.LinkToken, seed.QuestionId, "5", elapsedSeconds: 1)).Succeeded.Should().BeTrue();
+            (await SubmitAsync(service, unitA.LinkToken, seed.QuestionId, "5",
+                elapsedSeconds: ResponseFilter.MinimumSeconds(1) / 2)).Succeeded.Should().BeTrue();
 
             var report = await service.GetUnitSurveyReportAsync(surveyId);
             report.Succeeded.Should().BeTrue(report.ErrorCode);

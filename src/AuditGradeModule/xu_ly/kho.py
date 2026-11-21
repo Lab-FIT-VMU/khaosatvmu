@@ -15,7 +15,7 @@ from collections import defaultdict
 import gzip
 import io
 import json
-import pickle
+import re
 import secrets
 import shutil
 import sys
@@ -125,25 +125,27 @@ def chuan_bi_nap(ky, file_lop, file_diem, ten_lop=None, ten_diem=None):
     }
     TAM.mkdir(parents=True, exist_ok=True)
     token = secrets.token_hex(8)
-    with open(TAM / f'{token}.pkl', 'wb') as f:
-        pickle.dump({'ky': ky, 'lop': lop, 'diem': da_ghep, 'doi_soat': doi_soat}, f)
+    _ghi_json(TAM / f'{token}.json', {
+        'ky': ky, 'lop': list(lop.values()), 'diem': da_ghep, 'doi_soat': doi_soat,
+    })
     doi_soat['token'] = token
     return doi_soat
 
 
 def xac_nhan_nap(token):
-    p = TAM / f'{token}.pkl'
+    if not isinstance(token, str) or re.fullmatch(r'[0-9a-f]{16}', token) is None:
+        raise ValueError('Mã xác nhận nạp không hợp lệ.')
+    p = TAM / f'{token}.json'
     if not p.exists():
         raise ValueError('Phiên nạp đã hết hạn, hãy chọn lại file.')
-    with open(p, 'rb') as f:
-        d = pickle.load(f)
+    d = _doc_json(p)
     p.unlink()
     ky = d['ky']
     thu_muc = KHO / 'ky' / ky
     if thu_muc.exists():
         shutil.rmtree(thu_muc)
     thu_muc.mkdir(parents=True)
-    _ghi_json(thu_muc / 'lop.json', [dict(v, nhom=k[1]) for k, v in d['lop'].items()])
+    _ghi_json(thu_muc / 'lop.json', d['lop'])
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(['masv', 'mamh', 'loptc', 'X', 'Y', 'Z'])
@@ -179,6 +181,7 @@ def tinh_ky(ky):
 
 
 def go_ky(ky):
+    kiem_tra_ma_ky(ky)
     thu_muc = KHO / 'ky' / ky
     if not thu_muc.exists():
         raise ValueError(f'Không có học kỳ {ky} trong kho.')

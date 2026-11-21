@@ -7,7 +7,7 @@ import {
   CalendarRange,
   ChartColumn,
   ChartNoAxesCombined,
-  ChartScatter,
+  // ChartScatter,
   CircleHelp,
   ClipboardCheck,
   ClipboardList,
@@ -146,7 +146,7 @@ export const menuStructure: SidebarMenuEntry[] = [
   },
   // Module audit chạy nguyên bản, độc lập với nhóm trên (src/AuditGradeModule): một mục mở
   // giao diện riêng của nó (các cấp báo cáo, nạp kỳ, tham số…). Quyền AUDIT_GRADE_MODULE_ACCESS.
-  { id: 'audit-grade-module', label: 'Phân tích điểm (bản audit)', icon: ChartScatter },
+  // { id: 'audit-grade-module', label: 'Phân tích điểm (bản audit)', icon: ChartScatter },
   {
     id: 'graduation',
     label: 'Thống kê tốt nghiệp',
@@ -190,8 +190,8 @@ export const menuStructure: SidebarMenuEntry[] = [
       { id: 'users-admin', label: 'Người dùng & phân quyền', icon: UserCog },
     ],
   },
-  // Bộ màu chung của bảng thống kê khảo sát và Phân tích điểm học phần. Mỗi người tự chỉnh
-  // trên máy mình nên ai đăng nhập cũng mở được (không có quyền module).
+  // Bộ màu chung của bảng thống kê khảo sát và Phân tích điểm học phần.
+  // Quyền DESIGN_SYSTEM_ACCESS quyết định ai được mở trang chỉnh màu trên trình duyệt.
   { id: 'design-system', label: 'Design System', icon: Palette },
 ];
 

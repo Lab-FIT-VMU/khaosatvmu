@@ -84,6 +84,29 @@ public sealed class EndpointAuthorizationTests
     }
 
     [Theory]
+    [InlineData("/api/admin/users", "GET", AuthPolicies.UserAdminAccounts)]
+    [InlineData("/api/admin/users/profiles/import", "POST", AuthPolicies.UserAdminPermissions)]
+    [InlineData("/api/admin/users/{userId:guid}/profiles", "POST", AuthPolicies.UserAdminPermissions)]
+    [InlineData("/api/admin/roles/{roleId:guid}", "PUT", AuthPolicies.UserAdminPermissions)]
+    [InlineData("/api/admin/roles/{roleId:guid}/permissions", "PUT", AuthPolicies.UserAdminPermissions)]
+    [InlineData("/api/admin/audit-logs", "GET", AuthPolicies.UserAdminAudit)]
+    public void AdminEndpoints_RequireTheCorrespondingTabPermission(string route, string method, string policy)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddModuleAuthorizationPolicies();
+        builder.Services.AddSingleton(Mock.Of<IUserAdministrationService>());
+        var app = builder.Build();
+        app.MapUserAdministrationEndpoints();
+
+        var endpoint = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Single(x => x.RoutePattern.RawText == route
+                && x.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods.Contains(method));
+        endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()
+            .Should().Contain(x => x.Policy == policy);
+    }
+
+    [Theory]
     [InlineData("/api/v1/graduation-analytics/managed-periods", "GET")]
     [InlineData("/api/v1/graduation-analytics/managed-periods/{periodId:long}", "DELETE")]
     [InlineData("/api/v1/graduation-analytics/managed-periods/{periodId:long}/revisions", "GET")]

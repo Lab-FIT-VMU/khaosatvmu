@@ -67,7 +67,9 @@ public class SurveyPublicationScoresTests
         try
         {
             await db.Database.ExecuteSqlInterpolatedAsync($"""
-                UPDATE "SemesterSurveys" SET "EndTime" = NOW() - INTERVAL '1 day'
+                UPDATE "SemesterSurveys"
+                SET "StartTime" = LEAST("StartTime", NOW() - INTERVAL '2 days'),
+                    "EndTime" = NOW() - INTERVAL '1 day'
                 WHERE "SemesterSurveyId" = {semesterSurveyId};
 
                 UPDATE "CourseSectionSurveys" css

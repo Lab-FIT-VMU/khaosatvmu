@@ -20,7 +20,7 @@ export function DesignSystemPage() {
       <PageHead
         crumb="Design System"
         title="Design System"
-        description="Bộ màu chung của các bảng thống kê khảo sát và Phân tích điểm học phần. Bấm vào ô màu để đổi — mọi trang đổi theo, kể cả nút “Màu” cạnh các bảng thống kê. Màu chỉ lưu trên trình duyệt của bạn, người khác không bị ảnh hưởng."
+        description="Bộ màu chung của các bảng thống kê khảo sát và Phân tích điểm học phần. Bấm vào ô màu để đổi — mọi trang đổi theo. Màu chỉ lưu trên trình duyệt của bạn, người khác không bị ảnh hưởng."
         actions={(
           <button type="button" className="btn btn-secondary" disabled={!anyCustom} onClick={() => resetDesignTokens()}>
             <RotateCcw size={16} aria-hidden="true" /> Về mặc định tất cả

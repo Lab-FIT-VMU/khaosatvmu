@@ -458,7 +458,8 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         ["Thống kê tốt nghiệp"] = 6,
         ["Khảo sát"] = 7,
         ["Danh mục đào tạo"] = 8,
-        ["Quản trị"] = 9
+        ["Quản trị"] = 9,
+        ["Design System"] = 10
     };
 
     private static int GetCategoryOrder(string category) =>
@@ -495,7 +496,9 @@ public sealed partial class EfUserAdministrationService(AppDbContext db) : IUser
         ["COURSE_QUESTION_SETS_ACCESS"] = 1,
         ["COURSE_CAMPAIGNS_ACCESS"] = 2,
         // Quản trị
-        ["USER_ADMIN_ACCESS"] = 1
+        ["USER_ADMIN_ACCESS"] = 1,
+        // Design System
+        ["DESIGN_SYSTEM_ACCESS"] = 1
     };
 
     /// <summary>

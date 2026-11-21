@@ -46,6 +46,17 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
         : view.FacultyId is { } faculty ? byFaculty(query, faculty)
         : byDepartment(query, view.DepartmentId!.Value);
 
+    // The worker groups coded variants together and assigns a single unit to the aggregate.
+    // Exclude entire histories with sections outside the viewer's scope.
+    private IQueryable<string> OutsideCourseCodes(long runId, View view)
+    {
+        var sections = db.GradeAnalysisSectionResults.Where(x => x.RunId == runId);
+        return (view.FacultyId is { } faculty
+                ? sections.Where(x => x.FacultyId != faculty)
+                : sections.Where(x => x.DepartmentId != view.DepartmentId))
+            .Select(x => x.BaseCourseCode);
+    }
+
     private Task<GradeAnalysisRun?> CurrentRunAsync(CancellationToken cancellationToken) =>
         db.GradeAnalysisRuns.AsNoTracking().SingleOrDefaultAsync(x => x.IsCurrent, cancellationToken);
 
@@ -74,7 +85,7 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
             join semester in db.Semesters.AsNoTracking() on term.SemesterId equals semester.SemesterId
             join year in db.AcademicYears.AsNoTracking() on semester.AcademicYearId equals year.AcademicYearId
             where term.RunId == run.RunId
-            select new { term.SemesterId, term.DataJson, semester.SemesterName, year.AcademicYearName })
+            select new { term.SemesterId, DataJson = view.Level == CourseGradeViewLevels.Full ? term.DataJson : null, semester.SemesterName, year.AcademicYearName })
             .ToListAsync(cancellationToken);
         var order = run.SemesterIds.Select((id, index) => (id, index)).ToDictionary(x => x.id, x => x.index);
         var terms = termRows
@@ -83,13 +94,19 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
                 x.SemesterId,
                 termBySemester.GetValueOrDefault(x.SemesterId, string.Empty),
                 $"{x.SemesterName} {x.AcademicYearName}",
-                JsonNode.Parse(x.DataJson)?["tong"]))
+                x.DataJson is null ? null : JsonNode.Parse(x.DataJson)?["tong"]))
             .ToList();
 
         // Đơn vị và học phần có trong kết quả, trong phạm vi người xem.
-        var courseUnits = await InScope(
+        var courseUnitQuery = InScope(
                 db.GradeAnalysisCourseResults.AsNoTracking().Where(x => x.RunId == run.RunId), view,
-                (q, f) => q.Where(x => x.FacultyId == f), (q, d) => q.Where(x => x.DepartmentId == d))
+                (q, f) => q.Where(x => x.FacultyId == f), (q, d) => q.Where(x => x.DepartmentId == d));
+        if (view.Level == CourseGradeViewLevels.Unit)
+        {
+            var outside = OutsideCourseCodes(run.RunId, view);
+            courseUnitQuery = courseUnitQuery.Where(x => !outside.Contains(x.BaseCourseCode));
+        }
+        var courseUnits = await courseUnitQuery
             .Select(x => new { x.BaseCourseCode, x.DepartmentId, x.FacultyId, x.SemesterId })
             .ToListAsync(cancellationToken);
         var facultyIds = courseUnits.Where(x => x.FacultyId != null).Select(x => x.FacultyId!.Value).ToHashSet();
@@ -107,6 +124,10 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
 
         if (crossTerm is not null && view.Level == CourseGradeViewLevels.Unit)
         {
+            // These aggregates cover the whole school, even when course histories are filtered below.
+            crossTerm.AsObject().Remove("xu_huong");
+            crossTerm.AsObject().Remove("g1_ngau_nhien");
+
             // Lịch sử theo học phần chỉ giữ học phần trong đơn vị của người xem.
             var allowed = courseUnits.Select(x => x.BaseCourseCode).ToHashSet(StringComparer.Ordinal);
             foreach (var key in new[] { "co_hp", "de_thi", "de_thi_lech" })
@@ -169,11 +190,15 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
     private async Task<List<GradeAnalysisRepetitionDto>> RepetitionAsync(
         long runId, View view, IReadOnlyDictionary<string, int> semesterByTerm, CancellationToken cancellationToken)
     {
-        var rows = await InScope(
+        var query = InScope(
                 db.GradeAnalysisLecturerCourseResults.AsNoTracking().Where(x => x.RunId == runId), view,
-                (q, f) => q.Where(x => x.FacultyId == f), (q, d) => q.Where(x => x.DepartmentId == d))
-            .Select(x => x.DataJson)
-            .ToListAsync(cancellationToken);
+                (q, f) => q.Where(x => x.FacultyId == f), (q, d) => q.Where(x => x.DepartmentId == d));
+        if (view.Level == CourseGradeViewLevels.Unit)
+        {
+            var outside = OutsideCourseCodes(runId, view);
+            query = query.Where(x => !outside.Contains(x.BaseCourseCode));
+        }
+        var rows = await query.Select(x => x.DataJson).ToListAsync(cancellationToken);
 
         var pairs = new Dictionary<string, int>();
         var byMarker = new Dictionary<string, Dictionary<string, int>>();
@@ -235,6 +260,11 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
         if (departmentId is { } d)
         {
             query = query.Where(x => x.DepartmentId == d);
+        }
+        if (view.Level == CourseGradeViewLevels.Unit)
+        {
+            var outside = OutsideCourseCodes(run.RunId, view);
+            query = query.Where(x => !outside.Contains(x.BaseCourseCode));
         }
         var rows = await query.OrderBy(x => x.BaseCourseCode).ToListAsync(cancellationToken);
 
@@ -331,6 +361,11 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
             var code = courseCode.Trim().ToUpperInvariant();
             query = query.Where(x => x.BaseCourseCode == code);
         }
+        if (view.Level == CourseGradeViewLevels.Unit)
+        {
+            var outside = OutsideCourseCodes(run.RunId, view);
+            query = query.Where(x => !outside.Contains(x.BaseCourseCode));
+        }
         var rows = await query.OrderBy(x => x.BaseCourseCode).ThenBy(x => x.CourseSectionId).ToListAsync(cancellationToken);
         var names = await LecturerNamesAsync(rows.Select(x => x.LecturerId).OfType<int>().ToHashSet(), cancellationToken);
 
@@ -369,6 +404,11 @@ public sealed class EfCourseGradeAnalysisService(AppDbContext db, IUserScopeReso
         {
             var code = courseCode.Trim().ToUpperInvariant();
             query = query.Where(x => x.BaseCourseCode == code);
+        }
+        if (view.Level == CourseGradeViewLevels.Unit)
+        {
+            var outside = OutsideCourseCodes(run.RunId, view);
+            query = query.Where(x => !outside.Contains(x.BaseCourseCode));
         }
         var rows = await query.OrderBy(x => x.BaseCourseCode).ThenBy(x => x.LecturerId).ToListAsync(cancellationToken);
         var names = await LecturerNamesAsync(rows.Select(x => x.LecturerId).ToHashSet(), cancellationToken);

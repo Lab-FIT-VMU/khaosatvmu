@@ -12,6 +12,7 @@ import {
 import type { SurveyFormConfig, SurveyType } from '../types';
 import {
   commentTextsOf,
+  defaultCommentTexts,
   coverStyleOf,
   isFieldVisible,
   textOr,
@@ -34,10 +35,10 @@ import '../styles/public-survey.css';
 export type SurveyPreviewScreen = 'intro' | 'quiz';
 
 /** Các vùng bấm chọn được trên màn hình bắt đầu làm bài. */
-export type SurveyFormRegion = 'cover' | 'logo' | 'title' | 'noticeHeading' | 'noticeText';
+export type SurveyFormRegion = 'cover' | 'logo' | 'title' | 'noticeHeading' | 'noticeText' | 'commentHeading';
 
 /** Những đoạn chữ sửa thẳng trên bản dựng. */
-export type SurveyFormTextField = 'title' | 'introHeading' | 'intro';
+export type SurveyFormTextField = 'title' | 'introHeading' | 'intro' | 'commentHeading';
 
 /**
  * Dữ liệu dựng phiếu. Tên đợt, tên bộ câu hỏi và các câu hỏi lấy từ chính bộ quản trị
@@ -138,6 +139,8 @@ export const SurveyFormPreview: React.FC<{
   data?: SurveyPreviewData;
   /** Bấm thẳng vào từng vùng trên phiếu để chọn và sửa, kiểu Google Forms. */
   editable?: boolean;
+  /** Cho phép sửa tiêu đề ý kiến trên bản xem trước bài làm. */
+  editableCommentHeading?: boolean;
   selected?: SurveyFormRegion | null;
   onSelect?: (region: SurveyFormRegion | null) => void;
   /** Chữ vừa sửa tại chỗ; null nghĩa là trả về câu mặc định. */
@@ -150,6 +153,7 @@ export const SurveyFormPreview: React.FC<{
   compact = false,
   data,
   editable = false,
+  editableCommentHeading = false,
   selected = null,
   onSelect,
   onTextChange,
@@ -178,7 +182,7 @@ export const SurveyFormPreview: React.FC<{
    * ở thẻ mẫu không dính thêm thẻ div nào.
    */
   const region = (name: SurveyFormRegion, children: React.ReactNode) => {
-    if (!editable) return children;
+    if (!editable && !(name === 'commentHeading' && editableCommentHeading)) return children;
 
     return (
       <div
@@ -225,7 +229,7 @@ export const SurveyFormPreview: React.FC<{
     value: string,
     fallback: string,
   ) => {
-    if (!editable) return value;
+    if (!editable && !(field === 'commentHeading' && editableCommentHeading)) return value;
 
     return (
       <span
@@ -461,7 +465,9 @@ export const SurveyFormPreview: React.FC<{
                 <MessageSquare aria-hidden="true" />
                 Ý kiến khác
               </span>
-              <h2>{commentTextsOf(config).heading}</h2>
+              {region('commentHeading', (
+                <h2>{editableText('commentHeading', commentTextsOf(config).heading, defaultCommentTexts.heading)}</h2>
+              ))}
               <p className="public-quiz-comments-hint">{commentTextsOf(config).hint}</p>
               <textarea rows={2} readOnly placeholder={commentTextsOf(config).placeholder} />
             </section>

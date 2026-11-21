@@ -139,6 +139,9 @@ public static class AuditGradeModuleEndpoints
                 }
             }
             response.Headers["X-Content-Type-Options"] = "nosniff";
+            response.Headers["Content-Security-Policy"] =
+                "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; "
+                + "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com";
             if (upstreamResponse.StatusCode != HttpStatusCode.NotModified && !HttpMethods.IsHead(request.Method))
             {
                 await upstreamResponse.Content.CopyToAsync(response.Body, cancellationToken);

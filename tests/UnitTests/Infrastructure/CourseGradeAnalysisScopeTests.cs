@@ -73,6 +73,69 @@ public class CourseGradeAnalysisScopeTests
         new(RoleCodes.BoardOfDirectors, LecturerId: null, DepartmentId: null, FacultyId: null, SeesEverything: true);
 
     [Fact]
+    public async Task Overview_RestrictsSchoolTotalsToFullScope_WithoutChangingStoredResults()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var db = new AppDbContext(options);
+        const string crossTermJson = """
+            {
+              "ky":["2526_HK1"], "semester_by_ky":{"2526_HK1":1},
+              "xu_huong":{"2526_HK1":{"so_hp":99}},
+              "g1_ngau_nhien":{"2526_HK1":0.25},
+              "co_hp":{"12345":{"2526_HK1":["H1"]},"67890":{"2526_HK1":["H2"]}},
+              "de_thi":{"12345":{"2526_HK1":7},"67890":{"2526_HK1":8}},
+              "de_thi_lech":{"12345":{},"67890":{}}
+            }
+            """;
+        db.AcademicYears.Add(new AcademicYear { AcademicYearId = 1, AcademicYearName = "2025-2026" });
+        db.Semesters.Add(new Semester { SemesterId = 1, AcademicYearId = 1, SemesterName = "Học kỳ 1" });
+        db.GradeAnalysisRuns.Add(new GradeAnalysisRun
+        {
+            RunId = 1, IsCurrent = true, SemesterIds = [1], CrossTermJson = crossTermJson,
+        });
+        db.GradeAnalysisTermResults.Add(new GradeAnalysisTermResult
+        {
+            RunId = 1, SemesterId = 1, DataJson = """{"tong":{"so_hp":99}}""",
+        });
+        db.GradeAnalysisCourseResults.AddRange(
+            new GradeAnalysisCourseResult
+            {
+                RunId = 1, SemesterId = 1, BaseCourseCode = "12345", FacultyId = 10, DepartmentId = 100,
+            },
+            new GradeAnalysisCourseResult
+            {
+                RunId = 1, SemesterId = 1, BaseCourseCode = "67890", FacultyId = 20, DepartmentId = 200,
+            });
+        await db.SaveChangesAsync();
+
+        foreach (var scope in new[] { DepartmentManager(100), FacultyManager(10) })
+        {
+            var overview = await new EfCourseGradeAnalysisService(db, new FixedScopeResolver(scope)).GetOverviewAsync();
+            overview.Terms.Should().ContainSingle().Which.Summary.Should().BeNull();
+            var crossTerm = overview.CrossTerm!.AsObject();
+            crossTerm.ContainsKey("xu_huong").Should().BeFalse();
+            crossTerm.ContainsKey("g1_ngau_nhien").Should().BeFalse();
+            foreach (var key in new[] { "co_hp", "de_thi", "de_thi_lech" })
+            {
+                crossTerm[key]!.AsObject().Select(x => x.Key).Should().Equal("12345");
+            }
+            crossTerm["semester_by_ky"]!["2526_HK1"]!.GetValue<int>().Should().Be(1);
+        }
+
+        foreach (var scope in new[] { UserScope.Unrestricted(RoleCodes.Admin), Board })
+        {
+            var overview = await new EfCourseGradeAnalysisService(db, new FixedScopeResolver(scope)).GetOverviewAsync();
+            overview.Terms.Should().ContainSingle().Which.Summary!["so_hp"]!.GetValue<int>().Should().Be(99);
+            overview.CrossTerm!["xu_huong"]!["2526_HK1"]!["so_hp"]!.GetValue<int>().Should().Be(99);
+            overview.CrossTerm["g1_ngau_nhien"]!["2526_HK1"]!.GetValue<double>().Should().Be(0.25);
+            overview.CrossTerm["co_hp"]!.AsObject().Should().HaveCount(2);
+        }
+        (await db.GradeAnalysisRuns.AsNoTracking().SingleAsync()).CrossTermJson.Should().Be(crossTermJson);
+    }
+
+    [Fact]
     public async Task CourseStatistics_ExcludeOtherUnitsUsingTheSameBaseCourseCode()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
@@ -105,15 +168,19 @@ public class CourseGradeAnalysisScopeTests
             });
         await db.SaveChangesAsync();
 
-        foreach (var scope in new[] { DepartmentManager(100), FacultyManager(10), Board })
+        foreach (var scope in new[] { DepartmentManager(100), FacultyManager(10) })
         {
             var service = new EfCourseGradeAnalysisService(db, new FixedScopeResolver(scope));
-            var course = (await service.GetCoursesAsync(1, null, null)).Should().ContainSingle().Subject;
-            var statistics = course.Data["lop_tk"]!;
-            statistics["n_mat"]!.GetValue<int>().Should().Be(2);
-            statistics["n_diem"]!.GetValue<int>().Should().Be(30);
-            statistics["r"]!.AsArray().Select(r => r!.GetValue<double>()).Should().Equal(0.7);
+            (await service.GetCoursesAsync(1, null, null)).Should().BeEmpty();
+            (await service.GetSectionsAsync(1, 100, null)).Should().BeEmpty();
         }
+
+        var boardService = new EfCourseGradeAnalysisService(db, new FixedScopeResolver(Board));
+        var course = (await boardService.GetCoursesAsync(1, null, null)).Should().ContainSingle().Subject;
+        var statistics = course.Data["lop_tk"]!;
+        statistics["n_mat"]!.GetValue<int>().Should().Be(2);
+        statistics["n_diem"]!.GetValue<int>().Should().Be(30);
+        statistics["r"]!.AsArray().Select(r => r!.GetValue<double>()).Should().Equal(0.7);
     }
 
     [Fact]

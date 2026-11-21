@@ -15,8 +15,8 @@ import {
   Màu theo ngưỡng của các bảng thống kê khảo sát (Đạt chỉ tiêu / Đang thu / Không đạt,
   Đủ điều kiện / Không đủ điều kiện, Hợp lệ / Bị lọc, màu số liệu Thống kê & Báo cáo).
 
-  Màu thuộc bộ màu chung ở trang Design System (utils/designTokens.ts): nút "Màu" cạnh bảng
-  chỉ là lối tắt chỉnh vào chính bộ màu đó, đổi ở đâu thì mọi trang đổi theo. Mỗi người tự
+  Màu thuộc bộ màu chung ở trang Design System (utils/designTokens.ts): chỉnh ở đó thì
+  mọi trang đổi theo. Mỗi người tự
   chỉnh, lưu trên trình duyệt. Màu tới trang qua biến CSS `--status-<khoá>` đặt trên <html>.
 */
 

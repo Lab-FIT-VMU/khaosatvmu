@@ -8,7 +8,6 @@ import { formatDecimal, formatDecimalOrDash } from '../../utils/formatNumber';
 import { validRateOf } from '../../utils/reportThresholds';
 import { foldVietnamese } from '../../utils/vietnamese';
 import { useStatusColors } from '../../utils/statusColors';
-import { StatusColorSettings } from '../StatusColorSettings';
 import { UnitReportBody, UnitReportToolbar, UnitScoringNote } from '../unitReports/UnitReportFrame';
 import {
   attentionCheckCountOf,
@@ -187,17 +186,6 @@ const StatisticsContent: React.FC<{
                 ))}
               </div>
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <StatusColorSettings
-                  items={[
-                    { tone: 'success', label: 'Đủ điều kiện' },
-                    { tone: 'danger', label: 'Không đủ điều kiện' },
-                  ]}
-                  colors={statusColors.colors}
-                  isCustom={statusColors.isCustom}
-                  onChange={statusColors.setColor}
-                  onApplyPreset={statusColors.applyPreset}
-                  onReset={statusColors.reset}
-                />
                 {exportOptions && (
                   <ExportDropdown buttonLabel="Xuất bảng dữ liệu" size="sm" options={exportOptions} />
                 )}

@@ -199,6 +199,7 @@ export function UsersAdminPage() {
   const { access } = useAuth();
   const allowedViews = ADMIN_VIEWS.filter((item) =>
     canAccessTab(access?.permissions, TAB_PERMISSION.usersAdmin[item]));
+  const canAssignRoles = allowedViews.includes('permissions');
   const view: AdminView | null = allowedViews.includes(selectedView) ? selectedView : (allowedViews[0] ?? null);
 
   // Đang ở chế độ nào thì đường dẫn trên thanh trên cùng in tới đó.
@@ -598,6 +599,7 @@ export function UsersAdminPage() {
             <button
               type="button"
               className="btn btn-secondary"
+              disabled={!canAssignRoles}
               onClick={() => { setError(null); setIsImportProfilesOpen(true); }}
             >
               <ShieldPlus aria-hidden="true" />
@@ -1065,7 +1067,7 @@ export function UsersAdminPage() {
                 <h4>Hồ sơ làm việc</h4>
                 <p>Mỗi hồ sơ có vai trò và phạm vi quyền độc lập.</p>
               </div>
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => openProfileForm()}>
+              <button type="button" className="btn btn-primary btn-sm" disabled={!canAssignRoles} onClick={() => openProfileForm()}>
                 <Plus aria-hidden="true" />
                 Tạo hồ sơ
               </button>
@@ -1086,7 +1088,7 @@ export function UsersAdminPage() {
                     <small>{profile.organizationUnitName || 'Toàn hệ thống'}{profile.organizationUnitCode ? ` (${profile.organizationUnitCode})` : ''}</small>
                   </div>
                   <div className="admin-row-actions">
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => openProfileForm(profile)}>
+                    <button type="button" className="btn btn-secondary btn-sm" disabled={!canAssignRoles} onClick={() => openProfileForm(profile)}>
                       <Pencil aria-hidden="true" />
                       Sửa
                     </button>
@@ -1094,7 +1096,7 @@ export function UsersAdminPage() {
                       type="button"
                       className={`btn btn-sm ${profile.isActive ? 'btn-danger' : 'btn-secondary'}`}
                       onClick={() => { setError(null); setStatusConfirmation({ type: 'profile', item: profile }); }}
-                      disabled={busy}
+                      disabled={busy || !canAssignRoles}
                     >
                       {profile.isActive ? <UserX aria-hidden="true" /> : <UserCheck aria-hidden="true" />}
                       {profile.isActive ? 'Vô hiệu' : 'Kích hoạt'}

@@ -11,6 +11,8 @@ namespace API.CourseGrades;
 /// </summary>
 public static class CourseGradeEndpoints
 {
+    private const long MaxUploadRequestBytes = 51L * 1024 * 1024;
+
     public static IEndpointRouteBuilder MapCourseGradeEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/v1/course-grades")
@@ -54,7 +56,8 @@ public static class CourseGradeEndpoints
                 return Results.Ok(await service.PreviewAsync(RequiredInt(form, "semesterId"), file.FileName, stream, ct));
             }
             catch (CourseGradeException exception) { return ToError(exception); }
-        }).AddEndpointFilter<RequireAntiforgeryFilter>();
+        }).WithMetadata(new RequestSizeLimitAttribute(MaxUploadRequestBytes))
+            .AddEndpointFilter<RequireAntiforgeryFilter>();
 
         group.MapPost("/imports/commit", async (
             HttpRequest request,
@@ -76,7 +79,8 @@ public static class CourseGradeEndpoints
                 return Results.Ok(result);
             }
             catch (CourseGradeException exception) { return ToError(exception); }
-        }).AddEndpointFilter<RequireAntiforgeryFilter>()
+        }).WithMetadata(new RequestSizeLimitAttribute(MaxUploadRequestBytes))
+            .AddEndpointFilter<RequireAntiforgeryFilter>()
             .AddEndpointFilter<WakeGradeAnalysisWorkerFilter>();
 
         group.MapDelete("/semesters/{semesterId:int}", async (

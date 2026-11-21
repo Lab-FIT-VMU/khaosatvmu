@@ -20,30 +20,35 @@ from .crypto import GradeCipher
 
 def process_run(conn, run, cipher, log):
     started = time.time()
-    semesters = db.load_semesters(conn, run['semester_ids'])
-    terms, semester_by_ky, section_ids_by_ky = [], {}, {}
-    for semester_id in run['semester_ids']:
-        semester = semesters.get(semester_id)
-        if semester is None:
-            raise ValueError(f'Học kỳ {semester_id} của lượt tính không còn trong CSDL.')
-        ky = pipeline.term_code(semester['SemesterName'], semester['AcademicYearName'])
-        if ky in semester_by_ky:
-            raise ValueError(f'Hai học kỳ cùng ra mã {ky}; kiểm tra tên học kỳ trong danh mục.')
+    # Read all terms from a single snapshot and release it before running the models.
+    with conn.transaction():
+        conn.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
+        semesters = db.load_semesters(conn, run['semester_ids'])
+        terms, semester_by_ky, section_ids_by_ky = [], {}, {}
+        for semester_id in run['semester_ids']:
+            semester = semesters.get(semester_id)
+            if semester is None:
+                raise ValueError(f'Học kỳ {semester_id} của lượt tính không còn trong CSDL.')
+            ky = pipeline.term_code(semester['SemesterName'], semester['AcademicYearName'], semester_id)
+            if ky in semester_by_ky:
+                ky = f'{ky}_{semester_id}'
 
-        def decrypt(row, column):
-            return cipher.decrypt(row[column], row['KeyVersion'], column, row['RevisionId'],
-                                  row['StudentNumber'], row['CourseCode'], row['SourceRowNumber'])
+            def decrypt(row, column):
+                return cipher.decrypt(row[column], row['KeyVersion'], column, row['RevisionId'],
+                                      row['StudentNumber'], row['CourseCode'], row['SourceRowNumber'])
 
-        lop, diem, section_ids = pipeline.build_term_input(
-            db.load_sections(conn, semester_id), db.load_grades(conn, semester_id), decrypt)
-        terms.append((ky, lop, diem))
-        semester_by_ky[ky] = semester_id
-        section_ids_by_ky[ky] = section_ids
-        log(f'  {ky}: {len(lop)} lớp, {len(diem)} dòng điểm')
+            lop, diem, section_ids = pipeline.build_term_input(
+                db.load_sections(conn, semester_id), db.load_grades(conn, semester_id), decrypt)
+            terms.append((ky, lop, diem))
+            semester_by_ky[ky] = semester_id
+            section_ids_by_ky[ky] = section_ids
+            log(f'  {ky}: {len(lop)} lớp, {len(diem)} dòng điểm')
 
     theo_ky, lk = pipeline.run_analysis(terms, run['thresholds'])
     rows = pipeline.result_rows(theo_ky, lk, semester_by_ky, section_ids_by_ky)
-    db.save_results(conn, run['run_id'], *rows, os.environ.get('GRADE_WORKER_VERSION', 'dev'))
+    if not db.save_results(conn, run['run_id'], *rows, os.environ.get('GRADE_WORKER_VERSION', 'dev')):
+        log('  skipped publication: run superseded or no longer active')
+        return
     log(f'  ghi {len(rows[1])} học phần, {len(rows[2])} lớp, {len(rows[3])} cặp giảng viên – học phần '
         f'({time.time() - started:.0f} giây)')
 

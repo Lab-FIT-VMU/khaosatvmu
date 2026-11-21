@@ -23,10 +23,10 @@ export const MODULE_REQUIRED_PERMISSION: Record<string, string | null> = {
   'course-grade-report-department': 'COURSE_GRADE_ANALYSIS_ACCESS',
   'course-grade-report-trends': 'COURSE_GRADE_ANALYSIS_ACCESS',
   'course-grade-glossary': 'COURSE_GRADE_ANALYSIS_ACCESS',
-  // Design System là mục riêng, mỗi người tự chỉnh màu trên máy mình: ai đăng nhập cũng mở được.
+  // Design System có quyền riêng; màu tùy chỉnh vẫn chỉ lưu trên trình duyệt.
   // Hash cũ trong nhóm Phân tích điểm được App chuyển sang mục mới.
-  'design-system': null,
-  'course-grade-design': null,
+  'design-system': 'DESIGN_SYSTEM_ACCESS',
+  'course-grade-design': 'DESIGN_SYSTEM_ACCESS',
   // Module audit (bản nguyên, độc lập): quyền riêng, mặc định chỉ cấp cho ADMIN. Backend
   // (/api/audit-grades) cũng kiểm đúng quyền này.
   'audit-grade-module': 'AUDIT_GRADE_MODULE_ACCESS',

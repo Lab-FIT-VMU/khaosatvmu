@@ -92,6 +92,133 @@ public sealed class SurveySubmissionConcurrencyTests
         (await fixture.Service(db, cache).GetPublicSurveyAsync(fixture.Token)).Succeeded.Should().BeTrue();
     }
 
+    private sealed class FixedScope(UserScope scope) : IUserScopeResolver
+    {
+        public Task<UserScope> ResolveAsync(CancellationToken cancellationToken = default) => Task.FromResult(scope);
+    }
+
+    [CatalogDatabaseFact]
+    public async Task FormConfig_RejectsScopesThatCannotManageCampaigns()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await SetFutureScheduleAsync(fixture);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        foreach (var scope in new[]
+        {
+            new UserScope(RoleCodes.DepartmentManager, 1, 175, 10, false),
+            new UserScope(RoleCodes.FacultyManager, 1, 175, 10, false),
+            new UserScope(RoleCodes.Lecturer, 1, 175, 10, false),
+            new UserScope(RoleCodes.BoardOfDirectors, null, null, null, true),
+            new UserScope("CUSTOM_READ_ONLY", null, null, null, true, RoleDataScopes.All, false),
+            UserScope.None,
+        })
+        {
+            await using var db = fixture.Db();
+            var service = new EfSurveyService(db, cache, new FixedScope(scope),
+                new FixedScoringThresholdProvider(), new PublishedSurveyPublicationService(), new SchoolOverviewCacheVersion());
+            var result = await service.SaveSemesterSurveyFormConfigAsync(fixture.CampaignId,
+                new SurveyFormConfigDto(CommentHeading: "Unauthorized change"));
+            result.Succeeded.Should().BeFalse(scope.RoleCode);
+            result.ErrorCode.Should().Be(SurveyErrorCodes.OutOfScope);
+        }
+        await using var verify = fixture.Db();
+        (await verify.SemesterSurveys.SingleAsync(x => x.SemesterSurveyId == fixture.CampaignId)).FormConfigJson.Should().BeNull();
+    }
+
+    [CatalogDatabaseFact]
+    public async Task FormConfig_PersistsCommentLabel_AndRefreshesCachedPublicPage()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await SetFutureScheduleAsync(fixture);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        await using var db = fixture.Db();
+        var service = fixture.Service(db, cache);
+        (await service.GetPublicSurveyAsync(fixture.Token)).Value!.FormConfig.Should().BeNull();
+        const string label = "Đề xuất của bạn về học phần";
+        var config = new SurveyFormConfigDto(CommentHeading: label, CommentPlaceholder: "Nhập đề xuất...");
+        var saved = await service.SaveSemesterSurveyFormConfigAsync(fixture.CampaignId, config);
+        saved.Succeeded.Should().BeTrue(saved.ErrorCode);
+        await using var verify = fixture.Db();
+        var stored = await verify.SemesterSurveys.SingleAsync(x => x.SemesterSurveyId == fixture.CampaignId);
+        SurveyFormConfig.Parse(stored.FormConfigJson)!.CommentHeading.Should().Be(label);
+        var page = await service.GetPublicSurveyAsync(fixture.Token);
+        page.ErrorCode.Should().Be(SurveyErrorCodes.LinkNotStarted);
+        page.Value!.FormConfig!.CommentHeading.Should().Be(label);
+        page.Value.Questions.Should().BeEmpty("a future survey must not reveal questions");
+        var invalid = await service.SaveSemesterSurveyFormConfigAsync(fixture.CampaignId,
+            config with { CommentHeading = new string('x', SurveyFormConfig.MaximumTextLength + 1) });
+        invalid.ErrorCode.Should().Be(SurveyErrorCodes.FormConfigTextTooLong);
+        var reset = await service.SaveSemesterSurveyFormConfigAsync(fixture.CampaignId, null);
+        reset.Succeeded.Should().BeTrue(reset.ErrorCode);
+        (await service.GetPublicSurveyAsync(fixture.Token)).Value!.FormConfig.Should().BeNull();
+    }
+
+    [CatalogDatabaseFact]
+    public async Task FormConfig_LocksWhenAClassHasStarted_EvenIfCampaignStartsLater()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await using var db = fixture.Db();
+        var campaign = await db.SemesterSurveys.SingleAsync(x => x.SemesterSurveyId == fixture.CampaignId);
+        campaign.StartTime = DateTime.UtcNow.AddMinutes(30);
+        await db.SaveChangesAsync();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var result = await fixture.Service(db, cache).SaveSemesterSurveyFormConfigAsync(fixture.CampaignId,
+            new SurveyFormConfigDto(CommentHeading: "Changed after opening"));
+        result.ErrorCode.Should().Be(SurveyErrorCodes.FormConfigLocked);
+        campaign.FormConfigJson.Should().BeNull();
+    }
+
+    [CatalogDatabaseFact]
+    public async Task FormConfig_SaveSerializesWithCampaignScheduleChanges()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        await SetFutureScheduleAsync(fixture);
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var pause = new PauseSave();
+        var observer = new ObserveLock("SemesterSurveys");
+        await using var firstDb = fixture.Db(pause);
+        await using var secondDb = fixture.Db(observer);
+        var first = fixture.Service(firstDb, cache).SaveSemesterSurveyFormConfigAsync(fixture.CampaignId,
+            new SurveyFormConfigDto(CommentHeading: "Saved before opening"));
+        Task<SurveyOperationResult<SemesterSurveyDto>>? second = null;
+        var waitedForLock = false;
+        try
+        {
+            await pause.Started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            second = fixture.Service(secondDb, cache).UpdateSemesterSurveyAsync(fixture.CampaignId,
+                new UpdateSemesterSurveyCommand("Opened survey", DateTime.UtcNow.AddMinutes(-1), DateTime.UtcNow.AddHours(2)));
+            var next = await Task.WhenAny(second, observer.Attempted.Task).WaitAsync(TimeSpan.FromSeconds(10));
+            if (next == observer.Attempted.Task)
+                waitedForLock = await fixture.WaitForLockAsync(await observer.Attempted.Task);
+        }
+        finally { pause.Release.TrySetResult(); }
+        (await first.WaitAsync(TimeSpan.FromSeconds(10))).Succeeded.Should().BeTrue();
+        try
+        {
+            (await second!.WaitAsync(TimeSpan.FromSeconds(10))).Succeeded.Should().BeTrue();
+        }
+        catch (Exception exception) when (exception.GetBaseException() is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure })
+        {
+            // The serializable schedule transaction may reject its stale snapshot.
+            // The API maps this to 409; a new request succeeds with the current data.
+            secondDb.ChangeTracker.Clear();
+            var retry = await fixture.Service(secondDb, cache).UpdateSemesterSurveyAsync(fixture.CampaignId,
+                new UpdateSemesterSurveyCommand("Opened survey", DateTime.UtcNow.AddMinutes(-1), DateTime.UtcNow.AddHours(2)));
+            retry.Succeeded.Should().BeTrue(retry.ErrorCode);
+        }
+        waitedForLock.Should().BeTrue("the schedule cannot open while a form configuration change is uncommitted");
+    }
+
+    private static async Task SetFutureScheduleAsync(Fixture fixture)
+    {
+        await using var db = fixture.Db();
+        var campaign = await db.SemesterSurveys.SingleAsync(x => x.SemesterSurveyId == fixture.CampaignId);
+        var link = await db.CourseSectionSurveys.SingleAsync(x => x.CourseSectionSurveyId == fixture.LinkId);
+        campaign.StartTime = link.StartTime = DateTime.UtcNow.AddHours(1);
+        campaign.EndTime = link.EndTime = DateTime.UtcNow.AddHours(2);
+        await db.SaveChangesAsync();
+    }
+
     private sealed class AdminScope : IUserScopeResolver
     {
         public Task<UserScope> ResolveAsync(CancellationToken cancellationToken = default) =>

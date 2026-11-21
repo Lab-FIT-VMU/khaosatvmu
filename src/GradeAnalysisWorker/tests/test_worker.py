@@ -76,6 +76,7 @@ class TermCodeTests(unittest.TestCase):
         self.assertEqual(pipeline.term_code('Học kỳ 1', '2025-2026'), '2526_HK1')
         self.assertEqual(pipeline.term_code('Học kỳ 2', '2024-2025'), '2425_HK2')
         self.assertEqual(pipeline.term_code('Học kỳ phụ', '2026-2027'), '2627_HKP')
+        self.assertEqual(pipeline.term_code('Học kỳ hè', '2026-2027', 42), '2627_HKX_42')
         with self.assertRaises(ValueError):
             pipeline.term_code('Học kỳ 1', 'E2E abc')
 

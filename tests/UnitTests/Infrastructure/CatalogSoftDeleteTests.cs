@@ -815,7 +815,16 @@ public sealed class CatalogSoftDeleteTests
 
     private static async Task AddSurvey(AppDbContext db, int semesterId)
     {
-        var template = new SurveyTemplate { TemplateName = "Regression", CreatedAt = DateTime.UtcNow };
+        var scale = new AnswerScale { AnswerScaleName = "Regression" };
+        db.AnswerScales.Add(scale);
+        await db.SaveChangesAsync();
+        db.AnswerScaleOptions.AddRange(
+            new AnswerScaleOption { AnswerScaleId = scale.AnswerScaleId, Value = 1, DisplayText = "Không đồng ý" },
+            new AnswerScaleOption { AnswerScaleId = scale.AnswerScaleId, Value = 5, DisplayText = "Đồng ý" });
+        var template = new SurveyTemplate
+        {
+            TemplateName = "Regression", AnswerScaleId = scale.AnswerScaleId, CreatedAt = DateTime.UtcNow,
+        };
         db.SurveyTemplates.Add(template);
         await db.SaveChangesAsync();
         db.SemesterSurveys.Add(new() { SemesterId = semesterId, SurveyTemplateId = template.SurveyTemplateId, SurveyName = "Regression", StartTime = DateTime.UtcNow, EndTime = DateTime.UtcNow.AddDays(1), CreatedAt = DateTime.UtcNow });

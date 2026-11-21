@@ -28,7 +28,6 @@ import {
 } from '../utils/reportThresholds';
 import { foldVietnamese } from '../utils/vietnamese';
 import { useStatusColors } from '../utils/statusColors';
-import { StatusColorSettings } from '../components/StatusColorSettings';
 import '../styles/survey-operations.css';
 import '../styles/survey-statistics.css';
 import '../styles/catalogs.css';
@@ -766,17 +765,6 @@ export const SurveyStatisticsPage: React.FC = () => {
           </div>
           {/* Nút xuất đứng cùng hàng với ô tìm kiếm, dồn sát mép phải, ngay trên bảng nó xuất. */}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <StatusColorSettings
-              items={[
-                { tone: 'success', label: 'Đủ điều kiện' },
-                { tone: 'danger', label: 'Không đủ điều kiện' },
-              ]}
-              colors={statusColors.colors}
-              isCustom={statusColors.isCustom}
-              onChange={statusColors.setColor}
-              onApplyPreset={statusColors.applyPreset}
-              onReset={statusColors.reset}
-            />
             {exportOptions && rows.length > 0 && (
               <ExportDropdown
                 buttonLabel="Xuất bảng dữ liệu"

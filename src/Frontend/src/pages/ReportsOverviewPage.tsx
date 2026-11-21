@@ -78,7 +78,6 @@ import {
   reportTableColorItems,
   useStatusColors,
 } from '../utils/statusColors';
-import { StatusColorSettings } from '../components/StatusColorSettings';
 import { toVietnameseFileSlug } from '../utils/vietnamese';
 import type { QuestionAnalysisExportMetadata } from '../services/exportQuestionAnalysisService';
 import '../styles/survey-operations.css';
@@ -2578,14 +2577,6 @@ export const ReportsOverviewPage: React.FC = () => {
           <BarChart3 className="operation-icon" aria-hidden="true" />
           Thống kê kết quả khảo sát học phần
         </h1>
-        <StatusColorSettings
-          items={reportTableColorItems}
-          colors={tableColors.colors}
-          isCustom={tableColors.isCustom}
-          onChange={tableColors.setColor}
-          onApplyPreset={tableColors.applyPreset}
-          onReset={tableColors.reset}
-        />
       </div>
 
       {/* Ngưỡng quyết định lớp nào được gộp vào mọi con số của trang này, nên in

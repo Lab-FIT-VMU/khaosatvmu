@@ -24,7 +24,6 @@ import {
   reportTableColorItems,
   useStatusColors,
 } from '../../utils/statusColors';
-import { StatusColorSettings } from '../StatusColorSettings';
 import { UnitReportBody, UnitReportToolbar, UnitScoringNote } from '../unitReports/UnitReportFrame';
 import {
   scoredValidResponseCountOf,
@@ -75,14 +74,6 @@ export const ProgramReportView: React.FC = () => {
           <BarChart3 className="operation-icon" aria-hidden="true" />
           Thống kê kết quả khảo sát chương trình đào tạo
         </h1>
-        <StatusColorSettings
-          items={reportTableColorItems}
-          colors={tableColors.colors}
-          isCustom={tableColors.isCustom}
-          onChange={tableColors.setColor}
-          onApplyPreset={tableColors.applyPreset}
-          onReset={tableColors.reset}
-        />
       </div>
 
       <UnitScoringNote report={state.report} surveyType="PROGRAM" />
@@ -815,19 +806,7 @@ const CommentsWorkspace: React.FC<{ report: UnitSurveyReport }> = ({ report }) =
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Tìm nội dung ý kiến, khoa/viện, khoá ngành..."
-        toolbarActions={(
-          <StatusColorSettings
-            items={[
-              { tone: 'success', label: 'Hợp lệ' },
-              { tone: 'danger', label: 'Bị lọc' },
-            ]}
-            colors={statusColors.colors}
-            isCustom={statusColors.isCustom}
-            onChange={statusColors.setColor}
-            onApplyPreset={statusColors.applyPreset}
-            onReset={statusColors.reset}
-          />
-        )}
+
         exportConfig={{
           title: 'TỔNG HỢP Ý KIẾN MỞ KHẢO SÁT CHƯƠNG TRÌNH ĐÀO TẠO',
           fileName: 'y-kien-mo-ctdt',

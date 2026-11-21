@@ -85,6 +85,18 @@ def load_grades(conn, semester_id):
 def save_results(conn, run_id, term_rows, course_rows, section_rows, lecturer_rows, cross_term, worker_version):
     """Ghi toàn bộ kết quả rồi chuyển lượt hiện hành, trong một transaction."""
     with conn.transaction():
+        # Same lock as GradeAnalysisRunQueue.QueueAsync. Keep the check and publication atomic.
+        conn.execute('SELECT pg_advisory_xact_lock(1447908657, 1)')
+        run = conn.execute(
+            'SELECT "Status" FROM "GradeAnalysisRuns" WHERE "RunId" = %s FOR UPDATE',
+            (run_id,)).fetchone()
+        if run is None or run['Status'] != RUNNING:
+            return False
+        if conn.execute(
+            'SELECT 1 FROM "GradeAnalysisRuns" WHERE "RunId" > %s LIMIT 1', (run_id,)).fetchone():
+            mark_failed(conn, run_id, 'Du lieu da thay doi. Luot tinh moi se thay the luot nay.')
+            return False
+
         with conn.cursor() as cur:
             cur.executemany(
                 'INSERT INTO "GradeAnalysisTermResults" ("RunId", "SemesterId", "DataJson") VALUES (%s, %s, %s)',
@@ -122,10 +134,11 @@ def save_results(conn, run_id, term_rows, course_rows, section_rows, lecturer_ro
                   AND "RunId" NOT IN (SELECT "RunId" FROM "GradeAnalysisRuns"
                                       WHERE "Status" IN ({SUCCEEDED}, {FAILED})
                                       ORDER BY "RunId" DESC LIMIT {KEEP_FINISHED_RUNS})""")
+    return True
 
 
 def mark_failed(conn, run_id, message):
     with conn.transaction():
         conn.execute(
             f"""UPDATE "GradeAnalysisRuns" SET "Status" = {FAILED}, "FinishedAtUtc" = now(), "ErrorMessage" = %s
-                WHERE "RunId" = %s""", (message[:4000], run_id))
+                WHERE "RunId" = %s AND "Status" = {RUNNING}""", (message[:4000], run_id))

@@ -20,7 +20,6 @@ import { useAuth } from '../auth/authContext';
 import { isUnrestrictedRole } from '../auth/roles';
 import { COMPLETED_COMPLETION_RATE } from '../utils/reportThresholds';
 import { useStatusColors } from '../utils/statusColors';
-import { StatusColorSettings } from '../components/StatusColorSettings';
 import { surveyApi } from '../services/surveyApi';
 import '../styles/survey-operations.css';
 // Thanh chọn học kỳ / đợt dùng .statistics-toolbar nằm trong tệp này.
@@ -739,18 +738,6 @@ export const SurveyProgressPage: React.FC<SurveyProgressPageProps> = ({
             // trạng thái của từng lớp bên dưới.
             toolbarActions={(
               <>
-              <StatusColorSettings
-                items={[
-                  { tone: 'success', label: 'Đạt chỉ tiêu' },
-                  { tone: 'warning', label: 'Đang thu' },
-                  { tone: 'danger', label: 'Không đạt chỉ tiêu' },
-                ]}
-                colors={statusColors.colors}
-                isCustom={statusColors.isCustom}
-                onChange={statusColors.setColor}
-                onApplyPreset={statusColors.applyPreset}
-                onReset={statusColors.reset}
-              />
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 650 }}>
                 <span style={{ whiteSpace: 'nowrap' }}>Tỷ lệ phản hồi (%)</span>
                 <input

@@ -26,6 +26,14 @@ public class GlobalExceptionHandler : IExceptionHandler
 
         var problemDetails = exception switch
         {
+            Exception conflict when IsConcurrentWriteConflict(conflict)
+                => new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Concurrent data change",
+                    Detail = "The data was updated by another request. Refresh the data and try again.",
+                    Extensions = { ["errorCode"] = "DATA_CONFLICT" },
+                },
             DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg }
                 => new ProblemDetails
                 {
@@ -89,6 +97,19 @@ public class GlobalExceptionHandler : IExceptionHandler
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
 
         return true;
+    }
+
+    private static bool IsConcurrentWriteConflict(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is DbUpdateConcurrencyException
+                || current is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected })
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static string UniqueConflictCode(string? constraint) => constraint switch

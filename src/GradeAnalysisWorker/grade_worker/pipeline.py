@@ -50,7 +50,7 @@ def is_organizational_unit(name):
     return bool(name) and bool(_UNIT_NAME.match(_normalize(name)))
 
 
-def term_code(semester_name, academic_year_name):
+def term_code(semester_name, academic_year_name, semester_id=None):
     """('Học kỳ 1', '2025-2026') → '2526_HK1'; học kỳ phụ → '2526_HKP'."""
     years = re.search(r'(\d{4})\D+(\d{4})', academic_year_name or '')
     name = _normalize(semester_name).lower()
@@ -63,6 +63,8 @@ def term_code(semester_name, academic_year_name):
     elif name.endswith('2'):
         position = '2'
     else:
+        if semester_id is not None:
+            return f'{years.group(1)[2:]}{years.group(2)[2:]}_HKX_{semester_id}'
         raise ValueError(f'Không đọc được loại học kỳ "{semester_name}".')
     return f'{years.group(1)[2:]}{years.group(2)[2:]}_HK{position}'
 

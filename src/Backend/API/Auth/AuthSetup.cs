@@ -35,6 +35,9 @@ public static class AuthSetup
         services.AddAuthorization(options =>
         {
             AddPermissionPolicy(AuthPolicies.UserAdminAccess, "USER_ADMIN_ACCESS");
+            AddPermissionPolicy(AuthPolicies.UserAdminAccounts, "USER_ADMIN_TAB_ACCOUNTS");
+            AddPermissionPolicy(AuthPolicies.UserAdminAudit, "USER_ADMIN_TAB_AUDIT");
+            AddPermissionPolicy(AuthPolicies.UserAdminPermissions, RequiredRolePermissions.UserAdminPermissionsTabCode);
             AddPermissionPolicy(AuthPolicies.FacultiesAccess, "FACULTIES_ACCESS");
             AddPermissionPolicy(AuthPolicies.DepartmentsAccess, "DEPARTMENTS_ACCESS");
             AddPermissionPolicy(AuthPolicies.LecturersAccess, "LECTURERS_ACCESS");
