@@ -996,7 +996,15 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
         SaveCourseSectionCommand command,
         CancellationToken cancellationToken = default)
     {
-        var section = await db.CourseSections
+        await using var transaction = db.Database.IsNpgsql() && db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+        var sections = db.Database.IsNpgsql()
+            ? db.CourseSections.FromSqlInterpolated($"""
+                SELECT * FROM "CourseSections" WHERE "CourseSectionId" = {courseSectionId} FOR UPDATE
+                """)
+            : db.CourseSections.AsQueryable();
+        var section = await sections
             .FirstOrDefaultAsync(x => x.CourseSectionId == courseSectionId, cancellationToken);
         if (section is null)
         {
@@ -1030,6 +1038,13 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             return Failed<CourseSectionDto>(validation);
         }
 
+        if (section.SemesterId != command.SemesterId && await db.CourseSectionSurveys
+            .IgnoreQueryFilters()
+            .AnyAsync(x => x.CourseSectionId == courseSectionId, cancellationToken))
+        {
+            return Failed<CourseSectionDto>(CatalogErrorCodes.CourseSectionSemesterLocked);
+        }
+
         section.CourseId = command.CourseId;
         section.SemesterId = command.SemesterId;
         section.LecturerId = command.LecturerId;
@@ -1039,6 +1054,7 @@ public sealed partial class EfCatalogService(AppDbContext db, IUserScopeResolver
             ? NullIfBlank(command.UnidentifiedLecturerName)
             : null;
         await db.SaveChangesAsync(cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
 
         return Succeeded(ToDto(section));
     }

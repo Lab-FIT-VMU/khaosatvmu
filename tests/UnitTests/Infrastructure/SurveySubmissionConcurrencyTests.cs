@@ -2,9 +2,11 @@ namespace UnitTests.InfrastructureTests;
 
 using System.Data.Common;
 using Application.Auth;
+using Application.Catalog;
 using Application.Surveys;
 using Domain;
 using FluentAssertions;
+using global::Infrastructure.Catalog;
 using global::Infrastructure.Persistence;
 using global::Infrastructure.Reports;
 using global::Infrastructure.Surveys;
@@ -23,6 +25,73 @@ public sealed class CommittedSurveyFixtureCollection { }
 [Collection("Committed survey fixtures")]
 public sealed class SurveySubmissionConcurrencyTests
 {
+    [CatalogDatabaseFact]
+    public async Task OpenForm_UsesCurrentQuestionsAfterTemplateEdit()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var readerCache = new MemoryCache(new MemoryCacheOptions());
+        using var writerCache = new MemoryCache(new MemoryCacheOptions());
+        await using var readerDb = fixture.Db();
+        await using var writerDb = fixture.Db();
+        var reader = fixture.Service(readerDb, readerCache);
+        var writer = fixture.Service(writerDb, writerCache);
+
+        (await reader.GetPublicSurveyAsync(fixture.Token)).Value!.Questions.Should().ContainSingle();
+        var edit = await writer.UpdateSurveyTemplateAsync(fixture.TemplateId, new(
+            "Regression", fixture.ScaleId, [new(fixture.GroupId, "Regression")],
+            [new("Regression", null, 0), new("New question", null, 0)]));
+        edit.Succeeded.Should().BeTrue(edit.ErrorCode);
+
+        (await reader.GetPublicSurveyAsync(fixture.Token)).Value!.Questions.Should().HaveCount(2);
+        (await reader.SubmitSurveyResponseAsync(fixture.Token, fixture.Answers)).ErrorCode
+            .Should().Be(SurveyErrorCodes.AnswersIncomplete);
+    }
+
+    [CatalogDatabaseFact]
+    public async Task ScaleEdit_RefreshesOpenForms_AndPreservesUsedValues()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var readerCache = new MemoryCache(new MemoryCacheOptions());
+        using var writerCache = new MemoryCache(new MemoryCacheOptions());
+        await using var readerDb = fixture.Db();
+        await using var writerDb = fixture.Db();
+        var reader = fixture.Service(readerDb, readerCache);
+        var writer = fixture.Service(writerDb, writerCache);
+
+        (await reader.GetPublicSurveyAsync(fixture.Token)).Value!.AnswerScale!.Options
+            .Should().Contain(x => x.Value == 5);
+        (await writer.UpdateAnswerScaleAsync(fixture.ScaleId, ScaleWithoutFive())).Succeeded.Should().BeTrue();
+        (await reader.GetPublicSurveyAsync(fixture.Token)).Value!.AnswerScale!.Options
+            .Should().NotContain(x => x.Value == 5);
+        (await reader.SubmitSurveyResponseAsync(fixture.Token, fixture.Answers)).ErrorCode
+            .Should().Be(SurveyErrorCodes.AnswerValueInvalid);
+        (await reader.SubmitSurveyResponseAsync(fixture.Token, new([new(fixture.QuestionId, "+02")], null, 60)))
+            .Succeeded.Should().BeTrue();
+        await readerDb.SurveyResponses.Where(x => x.CourseSectionSurveyId == fixture.LinkId)
+            .ExecuteUpdateAsync(update => update.SetProperty(x => x.IsDeleted, true));
+
+        var removeUsed = await writer.UpdateAnswerScaleAsync(fixture.ScaleId,
+            new("Regression", [new(1, "One"), new(5, "Five")]));
+        removeUsed.ErrorCode.Should().Be(SurveyErrorCodes.AnswerScaleResponseValueInUse);
+    }
+
+    [CatalogDatabaseFact]
+    public async Task LinkedClass_CannotChangeSemester()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        await using var db = fixture.Db();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var nextSemester = new Semester { AcademicYearId = fixture.YearId, SemesterName = "Next semester" };
+        db.Add(nextSemester);
+        await db.SaveChangesAsync();
+        var catalog = new EfCatalogService(db, new AdminScope());
+        var update = await catalog.UpdateCourseSectionAsync(fixture.SectionId, new(
+            fixture.CourseId, nextSemester.SemesterId, null, "Regression", 1, null));
+        update.ErrorCode.Should().Be(CatalogErrorCodes.CourseSectionSemesterLocked);
+        (await fixture.Service(db, cache).GetPublicSurveyAsync(fixture.Token)).Succeeded.Should().BeTrue();
+    }
+
     private sealed class AdminScope : IUserScopeResolver
     {
         public Task<UserScope> ResolveAsync(CancellationToken cancellationToken = default) =>
@@ -454,7 +523,7 @@ public sealed class SurveySubmissionConcurrencyTests
             await db.SurveyResponses.IgnoreQueryFilters().Where(x => responses.Contains(x.ResponseId)).ExecuteDeleteAsync();
             await db.CourseSectionSurveys.IgnoreQueryFilters().Where(x => links.Contains(x.CourseSectionSurveyId)).ExecuteDeleteAsync();
             await db.SemesterSurveys.IgnoreQueryFilters().Where(x => x.SemesterSurveyId == CampaignId).ExecuteDeleteAsync();
-            await db.SurveyQuestions.IgnoreQueryFilters().Where(x => x.QuestionId == QuestionId).ExecuteDeleteAsync();
+            await db.SurveyQuestions.IgnoreQueryFilters().Where(x => x.SectionId == GroupId).ExecuteDeleteAsync();
             await db.SurveyQuestionSections.IgnoreQueryFilters().Where(x => x.SectionId == GroupId).ExecuteDeleteAsync();
             await db.SurveyTemplates.IgnoreQueryFilters().Where(x => x.SurveyTemplateId == TemplateId).ExecuteDeleteAsync();
             await db.AnswerScaleOptions.Where(x => x.AnswerScaleId == ScaleId).ExecuteDeleteAsync();

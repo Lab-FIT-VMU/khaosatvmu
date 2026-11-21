@@ -541,6 +541,7 @@ public static class CatalogErrorCodes
     public const string CourseSectionNotFound = "CATALOG_COURSE_SECTION_NOT_FOUND";
     public const string CourseSectionNameRequired = "CATALOG_COURSE_SECTION_NAME_REQUIRED";
     public const string CourseSectionExists = "CATALOG_COURSE_SECTION_EXISTS";
+    public const string CourseSectionSemesterLocked = "CATALOG_COURSE_SECTION_SEMESTER_LOCKED";
     public const string CourseSectionSizeInvalid = "CATALOG_COURSE_SECTION_SIZE_INVALID";
     public const string CourseSectionDuplicateInFile = "CATALOG_COURSE_SECTION_DUPLICATE_IN_FILE";
     public const string CourseSectionDepartmentMismatch = "CATALOG_COURSE_SECTION_DEPARTMENT_MISMATCH";

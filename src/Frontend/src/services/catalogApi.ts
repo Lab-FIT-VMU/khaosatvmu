@@ -321,6 +321,7 @@ export const catalogErrorMessages: Record<string, string> = {
   CATALOG_COURSE_SECTION_NOT_FOUND: 'Không tìm thấy lớp học phần.',
   CATALOG_COURSE_SECTION_NAME_REQUIRED: 'Thiếu tên lớp.',
   CATALOG_COURSE_SECTION_EXISTS: 'Học phần này trong học kỳ đã có lớp trùng tên.',
+  CATALOG_COURSE_SECTION_SEMESTER_LOCKED: 'Lớp đã gắn với đợt khảo sát nên không thể chuyển sang học kỳ khác.',
   CATALOG_COURSE_SECTION_SIZE_INVALID: 'Sĩ số không hợp lệ.',
   CATALOG_COURSE_SECTION_DUPLICATE_IN_FILE: 'Lớp bị lặp trong tệp.',
   CATALOG_SECTION_LECTURER_REQUIRED: 'Thiếu giảng viên (cần email hoặc họ tên).',

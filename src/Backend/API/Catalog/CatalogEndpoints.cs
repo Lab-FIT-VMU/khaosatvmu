@@ -568,6 +568,7 @@ public static class CatalogEndpoints
             CatalogErrorCodes.AcademicYearNameExists => StatusCodes.Status409Conflict,
             CatalogErrorCodes.SemesterNameExists => StatusCodes.Status409Conflict,
             CatalogErrorCodes.CourseSectionExists => StatusCodes.Status409Conflict,
+            CatalogErrorCodes.CourseSectionSemesterLocked => StatusCodes.Status409Conflict,
             CatalogErrorCodes.SectionLecturerAlreadySet => StatusCodes.Status409Conflict,
             CatalogErrorCodes.LecturerAmbiguous => StatusCodes.Status409Conflict,
             CatalogErrorCodes.PrerequisiteNotFound => StatusCodes.Status404NotFound,

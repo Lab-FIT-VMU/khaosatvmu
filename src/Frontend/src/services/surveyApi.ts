@@ -990,6 +990,7 @@ export const surveyErrorMessages: Record<string, string> = {
   SURVEY_ANSWER_SCALE_OPTION_TEXT_REQUIRED: 'Thiếu nhãn hiển thị của một mức trả lời.',
   SURVEY_ANSWER_SCALE_IN_USE: 'Thang trả lời đang được bộ câu hỏi sử dụng.',
   SURVEY_TEMPLATE_SCALE_NOT_FOUND: 'Vui lòng chọn thang trả lời cho bộ câu hỏi.',
+  SURVEY_ANSWER_SCALE_RESPONSE_VALUE_IN_USE: 'Không thể xoá mức trả lời đã được dùng trong phiếu khảo sát.',
   SURVEY_ANSWER_SCALE_ATTENTION_VALUE_IN_USE:
     'Không thể xóa mức trả lời đang là đáp án câu bẫy, kể cả câu hỏi đã xóa. Hãy giữ mức này hoặc dùng thang mới.',
   SURVEY_TEMPLATE_ATTENTION_CHECK_LOCKED:

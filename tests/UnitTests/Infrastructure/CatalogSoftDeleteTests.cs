@@ -474,7 +474,8 @@ public sealed class CatalogSoftDeleteTests
             imported.Value!.Items.Single().Succeeded.Should().BeTrue();
             imported.Value.CreatedLecturerCount.Should().Be(1);
             (await db.Users.SingleAsync(x => x.Id == userId)).IsActive.Should().BeTrue();
-            var importedCourse = await db.Courses.SingleAsync(x => x.CourseCode == newCode);
+            var normalizedCode = newCode.ToUpperInvariant();
+            var importedCourse = await db.Courses.SingleAsync(x => x.CourseCode == normalizedCode);
             (await db.CourseSections.SingleAsync(x => x.CourseId == importedCourse.CourseId)).LecturerId
                 .Should().Be(lecturer.Value!.LecturerId);
 

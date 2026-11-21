@@ -123,6 +123,13 @@ interface SurveyDraft {
 
 const draftKeyOf = (linkToken: string) => `survey_draft_${linkToken}`;
 
+function answersFor(survey: PublicSurvey, answers: Record<number, string>): Record<number, string> {
+  const values = new Set(survey.answerScale?.options.map((option) => String(option.value)));
+  return Object.fromEntries(survey.questions
+    .filter((question) => values.has(answers[question.questionId]))
+    .map((question) => [question.questionId, answers[question.questionId]]));
+}
+
 function readDraft(linkToken: string): SurveyDraft | null {
   try {
     const raw = localStorage.getItem(draftKeyOf(linkToken));
@@ -282,7 +289,7 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
         // Có bài làm dở kèm vé thì vào thẳng màn làm bài, khỏi bắt bấm lại.
         const draft = readDraft(linkToken);
         if (draft) {
-          setAnswers(draft.answers);
+          setAnswers(answersFor(loadedSurvey, draft.answers));
           setComments(draft.comments);
           setStartTicket(draft.startTicket);
         }
@@ -398,6 +405,19 @@ export const PublicSurveyPage: React.FC<PublicSurveyPageProps> = ({ linkToken })
       // Nộp xong xoá cả bài dở lẫn vé.
       clearDraft(linkToken);
     } catch (error) {
+      if (error instanceof ApiError
+        && ['SURVEY_ANSWERS_INCOMPLETE', 'SURVEY_ANSWER_VALUE_INVALID'].includes(error.errorCode)) {
+        try {
+          const currentSurvey = await publicSurveyApi.survey(linkToken);
+          setSurvey(currentSurvey);
+          setAnswers((previous) => answersFor(currentSurvey, previous));
+          setSubmitError('Vui lòng kiểm tra lại các câu trả lời trước khi nộp.');
+          return;
+        } catch (refreshError) {
+          setSubmitError(messageFrom(refreshError));
+          return;
+        }
+      }
       setSubmitError(messageFrom(error));
     } finally {
       setSubmitting(false);

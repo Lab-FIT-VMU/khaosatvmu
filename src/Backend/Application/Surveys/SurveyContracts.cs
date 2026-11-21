@@ -1284,6 +1284,7 @@ public static class SurveyErrorCodes
 
     /// <summary>Bỏ một mức của thang mà mức đó đang là đáp án câu bẫy (kể cả câu đã xóa).</summary>
     public const string AnswerScaleAttentionValueInUse = "SURVEY_ANSWER_SCALE_ATTENTION_VALUE_IN_USE";
+    public const string AnswerScaleResponseValueInUse = "SURVEY_ANSWER_SCALE_RESPONSE_VALUE_IN_USE";
 
     public const string TemplateNotFound = "SURVEY_TEMPLATE_NOT_FOUND";
     public const string TemplateNameRequired = "SURVEY_TEMPLATE_NAME_REQUIRED";
